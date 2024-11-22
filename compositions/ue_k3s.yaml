@@ -1,0 +1,41 @@
+# Unreal Engine Kubernetes container example
+
+version: "3.9"
+services:
+  ue_server:
+    network_mode: "host"
+    image: cyberphysics/unrealengine
+    container_name: ue_server
+    volumes:
+      - ../applications/unrealengine/server:/server
+      - "/tmp/.X11-unix:/tmp/.X11-unix"
+    environment:
+      - "DISPLAY=${DISPLAY}"
+      - XAUTHORITY
+      - NVIDIA_DRIVER_CAPABILITIES=all
+    depends_on:
+      - roscore
+    command: >
+      stdbuf -o L
+      /server/Development/Linux/Environment.sh
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+  ue_client:
+    network_mode: "host"
+    image: cyberphysics/unrealengine
+    container_name: ue_client
+    volumes:
+      - ../applications/unrealengine/client/scripts:/scripts
+      - "/tmp/.X11-unix:/tmp/.X11-unix"
+    environment:
+      - "DISPLAY=${DISPLAY}"
+    depends_on:
+      - roscore
+    command: >
+      stdbuf -o L
+      bash -c "cd /scripts/ && python3 example.py"

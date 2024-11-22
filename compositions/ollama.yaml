@@ -1,0 +1,131 @@
+
+## Ollama:
+
+## Settings -> model -> Install a model (i.e. llama3.2)
+
+## http://localhost:3000/
+
+services:
+  openWebUI:
+    image: ghcr.io/open-webui/open-webui:main
+    pull_policy: missing
+    restart: always
+    ports:
+      - "3000:3000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - open-webui-local:/app/backend/data
+
+  ollama:
+    image: ollama/ollama:latest
+    pull_policy: missing
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-local:/root/.ollama
+
+    tty: true
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ['0']
+              capabilities: [compute, utility]
+
+volumes:
+  ollama-local:
+    external: false
+  open-webui-local:
+    external: false
+
+
+# version: '3.8'
+# services:
+#   app:
+#     build: .
+#     ports:
+#       - 8000:8000
+#       - 5678:5678
+#     command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
+#     restart: always
+#     depends_on:
+#       - ollama
+#       - ollama-webui
+#     networks:
+#       - ollama-docker
+
+#   ollama:
+#     image: ollama/ollama:latest
+#     ports:
+#       - 7869:11434
+#     volumes:
+#       - ./ollama/ollama:/root/.ollama
+#     container_name: ollama
+#     pull_policy: always
+#     tty: true
+#     restart: always
+#     environment:
+#       - OLLAMA_KEEP_ALIVE=24h
+#       - OLLAMA_HOST=0.0.0.0
+#     networks:
+#       - ollama-docker
+
+#   ollama-webui:
+#     image: ghcr.io/open-webui/open-webui:main
+#     container_name: ollama-webui
+#     volumes:
+#       - ollama-webui:/app/backend/data
+#     depends_on:
+#       - ollama
+#     ports:
+#       - 8080:8080
+#     environment: # https://docs.openwebui.com/getting-started/env-configuration#default_models
+#       - OLLAMA_BASE_URLS=http://host.docker.internal:7869 #comma separated ollama hosts
+#       - ENV=dev
+#       - WEBUI_AUTH=False
+#       - WEBUI_NAME=valiantlynx AI
+#       - WEBUI_URL=http://localhost:8080
+#       - WEBUI_SECRET_KEY=t0p-s3cr3t
+#     extra_hosts:
+#       - host.docker.internal:host-gateway
+#     restart: unless-stopped
+#     networks:
+#       - ollama-docker
+
+# networks:
+#   ollama-docker:
+#     external: false
+
+
+# OLLAMA_HOST=0.0.0.0:11434 ollama serve
+
+
+# docker run 
+# -p 3000:8080 
+# --add-host=host.docker.internal:host-gateway 
+# -v ollama-webui:/app/backend/data 
+# --name ollama-webui ghcr.io/ollama-webui/ollama-webui:main
+
+
+# Install:
+# curl -fsSL https://ollama.com/install.sh | sh
+
+# Download model:
+# ollama pull llama3.2
+# ollama pull qwen2.5-coder:latest
+
+# OLLAMA_HOST=0.0.0.0:11434
+
+# Run model:
+# ollama serve llama3.2
+
+# OLLAMA_HOST=0.0.0.0:11434 ollama serve
+
+# Web GUI:
+# docker run -p 3000:8080 --add-host=host.docker.internal:host-gateway -v ollama-webui:/app/backend/data --name ollama-webui ghcr.io/ollama-webui/ollama-webui:main
+
+# http://localhost:3000/
+
+# Go to chat settings and download "llama3.2"

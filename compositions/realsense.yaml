@@ -1,0 +1,58 @@
+
+version: "3.9"
+services:
+  rosboard:
+    networks:
+      - cyberphysics-network-bridge
+    ports:
+      - 8888:8888
+    pull_policy: if_not_present
+    image: cyberphysics/rosboard
+    container_name: rosboard
+  realsense:
+    networks:
+      - cyberphysics-network-bridge
+    pull_policy: if_not_present
+    privileged: true
+    image: cyberphysics/realsense
+    container_name: realsense
+    depends_on:
+      - rosboard
+    command: >
+      stdbuf -o L
+      ros2 launch realsense2_camera rs_launch.py
+  foxglove:
+    network_mode: "host"
+    image: cyberphysics/foxglove
+    container_name: foxglove
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    volumes:
+      - /dev/shm:/dev/shm
+    command: >
+      caddy file-server --listen :8080
+  foxglove_bridge:
+    network_mode: "host"
+    image: cyberphysics/ros2
+    container_name: foxglove_bridge
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    volumes:
+      - /dev/shm:/dev/shm
+    command: >
+      stdbuf -o L
+      ros2 launch rosbridge_server rosbridge_websocket_launch.xml
+  # rosbag:
+  #   networks:
+  #     - cyberphysics-network-bridge
+  #   image: cyberphysics/ros2_base
+  #   container_name: rosbag
+  #   volumes:
+  #     - /data:/data
+  #   command: >
+  #     stdbuf -o L
+  #     ros2 bag record -a -o /data/bag
+
+networks:
+  cyberphysics-network-bridge:
+    external: false
