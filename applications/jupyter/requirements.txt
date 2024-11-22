@@ -9,3 +9,6 @@ idx2numpy
 tiledb-ml
 tensorboard
 ffmpeg
+jax
+astropy
+bcrypt
