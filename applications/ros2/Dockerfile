@@ -24,7 +24,8 @@ RUN echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/r
 
 # Install ROS2 packages
 RUN apt update && apt install -q -y --no-install-recommends \
-    python3-serial imagemagick libboost-all-dev libgts-dev libjansson-dev \
+    python3-serial imagemagick libboost-all-dev libgts-dev libjansson-dev ros-$ROS2_DISTRO-rviz2 \
+    ros-$ROS2_DISTRO-foxglove-bridge ros-$ROS2_DISTRO-foxglove-compressed-video-transport ros-$ROS2_DISTRO-foxglove-msgs \
     ros-$ROS2_DISTRO-ros-core ros-$ROS2_DISTRO-sensor-msgs-py libeigen3-dev \
     ros-$ROS2_DISTRO-ros2bag ros-$ROS2_DISTRO-rclpy ros-$ROS2_DISTRO-rosbag2-storage-default-plugins \
     python3-rosdep python3-colcon-ros linuxptp python3-colcon-common-extensions \

@@ -1,0 +1,14 @@
+
+## TODO
+
+# WORKDIR=$(dirname "$0")
+# XSOCK=/tmp/.X11-unix
+
+# xhost +SI:localuser:root
+# docker run -it --rm --net=host \
+#          -v $XSOCK:$XSOCK:ro \
+#          -v $WORKDIR:/root \
+#          --device=/dev/ttyUSB0 --device=/dev/ttyACM0 \
+#          -e DISPLAY=$DISPLAY \
+#          --name arduino-ide arduino-ide          
+# xhost -SI:localuser:root

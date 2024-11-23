@@ -31,6 +31,8 @@ target_arm64:
 	$(eval PLATFORM=arm64)
 	@echo ${PLATFORM}
 
+build_arduino: cleanup
+	APP=arduino ./_build_it.sh
 build_ros2: cleanup
 	APP=ros2 ./_build_it.sh
 build_realsense: cleanup
@@ -39,20 +41,12 @@ build_blackfly: cleanup build_ros2
 	APP=blackfly ./_build_it.sh
 build_matlab: cleanup
 	APP=matlab ./_build_it.sh
-build_novatel: cleanup build_ros2
-	APP=novatel ./_build_it.sh
-build_anello: cleanup build_ros2
-	APP=anello ./_build_it.sh
-build_certus: cleanup
-	APP=certus ./_build_it.sh
 build_jupyter: cleanup
 	APP=jupyter ./_build_it.sh
 build_record: cleanup build_ros2
 	APP=record ./_build_it.sh --git
 build_oak1: cleanup build_ros2
 	APP=oak1 ./_build_it.sh
-build_foxglove: cleanup build_ros2
-	APP=foxglove ./_build_it.sh
 build_q_ground_control: cleanup
 	APP=qgroundcontrol ./_build_it.sh
 
@@ -65,4 +59,4 @@ run_ros2:
 	--network=host \
 	--volume=/tmp/.X11-unix:/tmp/.X11-unix \
 	--env="DISPLAY=$(DISPLAY)" \
-	$(NAMESPACE)/ros_rviz:latest
+	$(NAMESPACE)/ros2:latest rviz2

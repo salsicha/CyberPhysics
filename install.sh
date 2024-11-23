@@ -31,6 +31,10 @@ if ! [ $(getent group docker) ]; then
 fi
 sudo usermod -aG docker $USER
 
+# Install Foxglove
+sudo snap install foxglove-studio
+echo "To run Foxglove, open terminal: foxglove-studio"
+
 # Create data directory for recordings
 sudo mkdir /data
 
@@ -56,3 +60,6 @@ fi
 
 # Install k3s
 curl -sfL https://get.k3s.io | sh -s - --docker
+echo "FYI, K3S will automatically prune when disk nears capacity!"
+
+echo "All done."

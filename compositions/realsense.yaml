@@ -21,16 +21,6 @@ services:
     command: >
       stdbuf -o L
       ros2 launch realsense2_camera rs_launch.py
-  foxglove:
-    network_mode: "host"
-    image: cyberphysics/foxglove
-    container_name: foxglove
-    environment:
-      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
-    volumes:
-      - /dev/shm:/dev/shm
-    command: >
-      caddy file-server --listen :8080
   foxglove_bridge:
     network_mode: "host"
     image: cyberphysics/ros2
