@@ -11,6 +11,7 @@ sudo apt install -y git-lfs curl
 git config --global pull.rebase true
 git config --global fetch.prune true
 git lfs install
+git config --global credential.helper 'cache --timeout=31536000'
 
 # Sometimes needed to talk to devices
 sudo usermod -a -G dialout $USER
