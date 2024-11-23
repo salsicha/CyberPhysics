@@ -1,35 +1,38 @@
 
-## TODO
+## Arduino and MicroROS
 
-# WORKDIR=$(dirname "$0")
-# XSOCK=/tmp/.X11-unix
+## Connecting uros to the device:
+## serial --dev [YOUR BOARD PORT] -v6
 
-# xhost +SI:localuser:root
-# docker run -it --rm --net=host \
-#          -v $XSOCK:$XSOCK:ro \
-#          -v $WORKDIR:/root \
-#          --device=/dev/ttyUSB0 --device=/dev/ttyACM0 \
-#          -e DISPLAY=$DISPLAY \
-#          --name arduino-ide arduino-ide          
-# xhost -SI:localuser:root
+## Loading the uros library into the Arduino IDE:
+## Sketch -> Include library -> Add .ZIP Library...
+## /microrosarduino.zip
 
+## Teensy board support:
+## Copy "https://www.pjrc.com/teensy/package_teensy_index.json" 
+## Into "File -> Preferences -> Additional boards manager URLs", and click "OK"
+## Then "Boards Manager (Icon in left menu) -> teensy -> Install"
 
-# serial --dev [YOUR BOARD PORT] -v6 & &&
-
-
-# Sketch -> Include library -> Add .ZIP Library...
-# /microrosarduino.zip
 
 services:
+  uros:
+    network_mode: "host"
+    image: microros/micro-ros-agent:jazzy
+    privileged: true
+    devices:
+      - /dev:/dev
+    command: >
+      serial --dev 1234 -v6
   arduino:
     network_mode: "host"
     image: cyberphysics/arduino
+    depends_on:
+      - uros
     privileged: true
     volumes:
       - "/tmp/.X11-unix:/tmp/.X11-unix"
       - ../applications/arduino/scripts:/scripts
     devices:
-      - /dev/ttyUSB0:/dev/ttyUSB0
       - /dev:/dev
     environment:
       - "DISPLAY=${DISPLAY}"
@@ -38,7 +41,7 @@ services:
       - EGL_PLATFORM=surfaceless
     user: "1000:1000"
     command: >
-      bash -c "serial --dev 1234 -v6 & && /opt/arduino-ide/arduino-ide --no-sandbox"
+      bash -c "/opt/arduino-ide/arduino-ide --no-sandbox"
     deploy:
       resources:
         reservations:

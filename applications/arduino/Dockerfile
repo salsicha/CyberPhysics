@@ -1,7 +1,5 @@
 
-FROM microros/micro-ros-agent:jazzy AS build
-
-# docker run -it --rm -v /dev:/dev --privileged --net=host microros/micro-ros-agent:jazzy serial --dev [YOUR BOARD PORT] -v6
+FROM ubuntu:noble AS build
 
 ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US.UTF-8 \
@@ -17,24 +15,7 @@ SHELL ["/bin/bash","-c"]
 # Install required dependencies for the intermediate container
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        curl unzip ca-certificates && \
-    rm -rf /var/lib/apt/lists/*
-
-# Fetch the latest Arduino Pro IDE release version
-RUN curl -L -o /arduino.zip $(curl --silent https://api.github.com/repos/arduino/arduino-ide/releases/latest | grep "browser_download_url.*Linux_64bit.zip" | cut -d : -f 2,3 | xargs)
-
-# Unzip the Arduino Pro IDE
-RUN unzip /arduino.zip -d /opt && rm /arduino.zip
-RUN mv /opt/arduino* /opt/arduino-ide
-
-COPY scripts /scripts
-
-WORKDIR /root
-
-RUN curl -L -o microrosarduino.zip https://github.com/micro-ROS/micro_ros_arduino/archive/refs/tags/v2.0.7-iron.zip
-
-# Install required dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
+        curl unzip ca-certificates libfontconfig-dev libx11-dev libxft-dev \
         software-properties-common \
         python3-pip python3-venv python3-serial \
         git \
@@ -48,7 +29,26 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libcanberra-gtk3-module x11-apps && \
         rm -rf /var/lib/apt/lists/*
 
+# Fetch the latest Arduino Pro IDE release version
+RUN curl -L -o /arduino.zip $(curl --silent https://api.github.com/repos/arduino/arduino-ide/releases/latest | grep "browser_download_url.*Linux_64bit.zip" | cut -d : -f 2,3 | xargs)
+
+# Unzip the Arduino Pro IDE
+RUN unzip /arduino.zip -d /opt && rm /arduino.zip
+RUN mv /opt/arduino* /opt/arduino-ide
+
+WORKDIR /home/ubuntu/
+
+COPY scripts scripts
+
+# TODO: Upgrade to jazzy when available
+RUN curl -L -o microrosarduino.zip https://github.com/micro-ROS/micro_ros_arduino/archive/refs/tags/v2.0.7-iron.zip
+
+WORKDIR /home/ubuntu/
+
 RUN python3 -m venv /venv
+
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 #####################################################################
 FROM scratch
@@ -64,7 +64,7 @@ ENV LANG=en_US.UTF-8 \
 
 COPY --from=build / /
 
-WORKDIR /root
+WORKDIR /
 
 ENTRYPOINT [ "/entrypoint.sh" ]
 CMD ["/opt/arduino-ide/arduino-ide","--no-sandbox"]
