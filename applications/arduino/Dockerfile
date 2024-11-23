@@ -23,6 +23,8 @@ RUN unzip /arduino.zip -d /opt && \
     rm /arduino.zip
 RUN mv /opt/arduino* /opt/arduino-ide
 
+# TODO: micro ros library
+
 # Install required dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
         software-properties-common \
