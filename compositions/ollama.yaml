@@ -7,47 +7,72 @@
 ## Install model:
 ## Select a model -> Type model name (i.e. llama3.2, qwen2.5-coder:latest, ...) -> Click "pull model ..."
 
-services:
-  openWebUI:
-    image: ghcr.io/open-webui/open-webui:main
-    restart: always
-    environment: # https://docs.openwebui.com/getting-started/env-configuration#default_models
-      - OLLAMA_BASE_URLS=http://host.docker.internal:7869 #comma separated ollama hosts
-      - WEBUI_URL=http://host.docker.internal:8080
-      - ENV=dev
-      - WEBUI_AUTH=False
-      - WEBUI_NAME=demo
-      - WEBUI_SECRET_KEY=demo
-    ports:
-      - "3000:3000"
-      - "8080:8080"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    volumes:
-      - open-webui-local:/app/backend/data
 
+services:
   ollama:
-    image: ollama/ollama:latest
-    ports:
-      - "11434:11434"
-      - "7869:7869"
-    environment:
-      - OLLAMA_KEEP_ALIVE=24h
-      - OLLAMA_HOST=0.0.0.0
-    pull_policy: missing
     volumes:
       - ollama-local:/root/.ollama
+    ports:
+      - 11434:11434
+    container_name: ollama
+    pull_policy: always
     tty: true
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              device_ids: ['0']
-              capabilities: [compute, utility]
+    restart: unless-stopped
+    image: ollama/ollama:latest
+
+  ollama-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: ollama-webui
+    depends_on:
+      - ollama
+    ports:
+      - 8080:8080
+    environment:
+      - "OLLAMA_API_BASE_URL=http://ollama:11434/api"
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    restart: unless-stopped
 
 volumes:
   ollama-local:
     external: false
-  open-webui-local:
-    external: false
+
+
+# services:
+#   openWebUI:
+#     image: ghcr.io/open-webui/open-webui:main
+#     restart: always
+#     environment:
+#       - OLLAMA_BASE_URLS=http://host.docker.internal:7869 
+#       - WEBUI_URL=http://host.docker.internal:8080
+#     ports:
+#       - "8080:8080"
+#     extra_hosts:
+#       - "host.docker.internal:host-gateway"
+#     volumes:
+#       - open-webui-local:/app/backend/data
+
+#   ollama:
+#     image: ollama/ollama:latest
+#     ports:
+#       - "11434:11434"
+#     environment:
+#       - OLLAMA_KEEP_ALIVE=24h
+#       - OLLAMA_HOST=0.0.0.0
+#     pull_policy: missing
+#     volumes:
+#       - ollama-local:/root/.ollama
+#     tty: true
+#     deploy:
+#       resources:
+#         reservations:
+#           devices:
+#             - driver: nvidia
+#               device_ids: ['0']
+#               capabilities: [compute, utility]
+
+# volumes:
+#   ollama-local:
+#     external: false
+#   open-webui-local:
+#     external: false
