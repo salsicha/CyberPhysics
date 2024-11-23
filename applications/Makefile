@@ -47,8 +47,10 @@ build_record: cleanup build_ros2
 	APP=record ./_build_it.sh --git
 build_oak1: cleanup build_ros2
 	APP=oak1 ./_build_it.sh
-build_q_ground_control: cleanup
+build_qgroundcontrol: cleanup
 	APP=qgroundcontrol ./_build_it.sh
+build_tello: cleanup build_ros2
+	APP=tello ./_build_it.sh
 
 # Run rviz in ROS2 container with native display mounting
 run_ros2:

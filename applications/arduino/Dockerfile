@@ -58,5 +58,5 @@ COPY --from=build / /
 
 # WORKDIR /root
 
-# Set the entrypoint to the Arduino Pro IDE
-ENTRYPOINT ["/opt/arduino-ide/arduino-ide","--no-sandbox"]
+ENTRYPOINT [ "/entrypoint.sh" ]
+CMD ["/opt/arduino-ide/arduino-ide","--no-sandbox"]

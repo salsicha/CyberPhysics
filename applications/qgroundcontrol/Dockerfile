@@ -15,7 +15,9 @@ ENV QT_DESKTOP $QT_PATH/${QT_VERSION}/gcc_64
 
 ENV PATH /usr/lib/ccache:$QT_DESKTOP/bin:$PATH
 
-COPY qgroundcontrol /qgroundcontrol
+# COPY qgroundcontrol /qgroundcontrol
+RUN curl -L -k -o /master.zip https://github.com/mavlink/qgroundcontrol/archive/refs/heads/master.zip && \
+    unzip /master.zip && rm /master.zip && mv /qgroundcontrol-master/ /qgroundcontrol
 RUN chmod +rwx /qgroundcontrol
 
 COPY entrypoint.sh /entrypoint.sh
