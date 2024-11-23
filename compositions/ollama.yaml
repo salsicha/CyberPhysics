@@ -19,6 +19,13 @@ services:
     tty: true
     restart: unless-stopped
     image: ollama/ollama:latest
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ['0']
+              capabilities: [compute, utility]
 
   ollama-webui:
     image: ghcr.io/open-webui/open-webui:main
