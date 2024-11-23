@@ -12,3 +12,37 @@
 #          -e DISPLAY=$DISPLAY \
 #          --name arduino-ide arduino-ide          
 # xhost -SI:localuser:root
+
+
+# serial --dev [YOUR BOARD PORT] -v6 & &&
+
+
+# Sketch -> Include library -> Add .ZIP Library...
+# /microrosarduino.zip
+
+services:
+  arduino:
+    network_mode: "host"
+    image: cyberphysics/arduino
+    privileged: true
+    volumes:
+      - "/tmp/.X11-unix:/tmp/.X11-unix"
+      - ../applications/arduino/scripts:/scripts
+    devices:
+      - /dev/ttyUSB0:/dev/ttyUSB0
+      - /dev:/dev
+    environment:
+      - "DISPLAY=${DISPLAY}"
+      - XAUTHORITY
+      - NVIDIA_DRIVER_CAPABILITIES=all
+      - EGL_PLATFORM=surfaceless
+    user: "1000:1000"
+    command: >
+      bash -c "serial --dev 1234 -v6 & && /opt/arduino-ide/arduino-ide --no-sandbox"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

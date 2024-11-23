@@ -1,5 +1,7 @@
-# Use the official Ubuntu base image for the intermediate container
-FROM ubuntu:noble AS build
+
+FROM microros/micro-ros-agent:jazzy AS build
+
+# docker run -it --rm -v /dev:/dev --privileged --net=host microros/micro-ros-agent:jazzy serial --dev [YOUR BOARD PORT] -v6
 
 ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US.UTF-8 \
@@ -7,7 +9,10 @@ ENV LANG=en_US.UTF-8 \
     PYTHONIOENCODING=UTF-8 \
     ROS2_DISTRO=jazzy \
     DEBIAN_FRONTEND=noninteractive \
-    PATH="/venv/bin:$PATH" 
+    PATH="/venv/bin:$PATH" \
+    ROS_DISTRO=jazzy
+
+SHELL ["/bin/bash","-c"]
 
 # Install required dependencies for the intermediate container
 RUN apt-get update && \
@@ -16,14 +21,17 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Fetch the latest Arduino Pro IDE release version
-RUN curl -L -o arduino.zip $(curl --silent https://api.github.com/repos/arduino/arduino-ide/releases/latest | grep "browser_download_url.*Linux_64bit.zip" | cut -d : -f 2,3 | xargs)
+RUN curl -L -o /arduino.zip $(curl --silent https://api.github.com/repos/arduino/arduino-ide/releases/latest | grep "browser_download_url.*Linux_64bit.zip" | cut -d : -f 2,3 | xargs)
 
 # Unzip the Arduino Pro IDE
-RUN unzip /arduino.zip -d /opt && \
-    rm /arduino.zip
+RUN unzip /arduino.zip -d /opt && rm /arduino.zip
 RUN mv /opt/arduino* /opt/arduino-ide
 
-# TODO: micro ros library
+COPY scripts /scripts
+
+WORKDIR /root
+
+RUN curl -L -o microrosarduino.zip https://github.com/micro-ROS/micro_ros_arduino/archive/refs/tags/v2.0.7-iron.zip
 
 # Install required dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -56,7 +64,7 @@ ENV LANG=en_US.UTF-8 \
 
 COPY --from=build / /
 
-# WORKDIR /root
+WORKDIR /root
 
 ENTRYPOINT [ "/entrypoint.sh" ]
 CMD ["/opt/arduino-ide/arduino-ide","--no-sandbox"]
