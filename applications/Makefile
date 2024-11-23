@@ -51,6 +51,8 @@ build_qgroundcontrol: cleanup
 	APP=qgroundcontrol ./_build_it.sh
 build_tello: cleanup build_ros2
 	APP=tello ./_build_it.sh
+build_nicegui: cleanup build_ros2
+	APP=nicegui ./_build_it.sh
 
 # Run rviz in ROS2 container with native display mounting
 run_ros2:
