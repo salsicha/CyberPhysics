@@ -18,6 +18,8 @@ It is great starting place for projects that need to manage large-data and compl
 
 ## Installation
 
+(This project is designed for Ubuntu 24.04)
+
 ```bash
 ./install.sh
 ```

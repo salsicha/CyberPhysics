@@ -12,4 +12,3 @@ ffmpeg
 jax
 astropy
 bcrypt
-open3d
