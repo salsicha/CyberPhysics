@@ -31,7 +31,8 @@ services:
     privileged: true
     volumes:
       - "/tmp/.X11-unix:/tmp/.X11-unix"
-      - ../applications/arduino/scripts:/scripts
+      - ../applications/arduino/scripts:/home/ubuntu/scripts
+      - arduino-local:/home/ubuntu/
     devices:
       - /dev:/dev
     environment:
@@ -49,3 +50,7 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
+
+volumes:
+  arduino-local:
+    external: false

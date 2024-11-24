@@ -43,8 +43,6 @@ COPY scripts scripts
 # TODO: Upgrade to jazzy when available
 RUN curl -L -o microrosarduino.zip https://github.com/micro-ROS/micro_ros_arduino/archive/refs/tags/v2.0.7-iron.zip
 
-WORKDIR /home/ubuntu/
-
 RUN python3 -m venv /venv
 
 COPY entrypoint.sh /entrypoint.sh
