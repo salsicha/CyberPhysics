@@ -1,50 +1,58 @@
-<a href="https://nicegui.io/#about">
+<a href="">
   <img src="https://raw.githubusercontent.com/salsicha/cyberphysics/main/icon.png"
-    width="200" align="right" alt="Try online!" />
+    width="200" align="right" alt="" />
 </a>
 
 # CyberPhysics
 
-CyberPhysics is a....
+CyberPhysics is a repo for managing my personal robotics and ml projects.
 
-It is great for ....
+It is great starting place for projects that need to manage large-data and complex cyber-physical systems. 
 
 ## Features
 
 - browser-based graphical user interface
+- access to latest ROS tools
+- deployable to kubernetes
+- and more...
 
 ## Installation
 
 ```bash
-python3 ...
+./install.sh
 ```
 
 ## Building images
 
+From the applications folder run "make build_<app_name>". For example:
+
 ```bash
-python3 ...
+cd applications && make build_ros2
 ```
 
 ## Usage
 
-Write your application...:
+Write new applications and put them in the applications folder.
 
-Compose your applications together...:
+Compose your applications together using docker compose in the compositions folder.
 
-Launch it with:
+Launch it with docker compose. For example:
 
 ```bash
 docker compose -f compositions/jupyter.yaml up
 ```
 
-Open a GUI ... through http://localhost:8080/ in your browser.
+For viewing ROS data, run the Foxglove compose file, and launch Foxglove on your host machine.
+
+A web based GUI can be built with NiceGUI, and then accessed through your host machine's browser:
+http://localhost:8080/
 
 ## Documentation and Examples
 
-Have a look at the README in each application's folder.
+Have a look at the README in each application's folder for explanations of what they do.
 
 
 ## Why?
 
-Many cyber-physical systems quickly become unamangeable as complexity and dependency conflicts scale exponentially with the number of components....
+Many cyber-physical systems quickly become unamangeable as complexity and dependency conflicts scale exponentially with the number of components. This project should help with that.
 
