@@ -28,12 +28,28 @@ RUN pip install -r /requirements.txt && \
 
 # Install Cuda:
 # https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#network-repo-installation-for-ubuntu
-WORKDIR /
-RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb && \
-    dpkg -i cuda-keyring_1.1-1_all.deb && rm cuda-keyring_1.1-1_all.deb
-RUN apt update && apt upgrade -y && apt install -q -y --no-install-recommends \
-    cuda-toolkit nvidia-gds && \
-    rm -rf /var/lib/apt/lists/*
+# WORKDIR /
+# RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb && \
+#     dpkg -i cuda-keyring_1.1-1_all.deb && rm cuda-keyring_1.1-1_all.deb
+# RUN apt update && apt upgrade -y && apt install -q -y --no-install-recommends \
+#     cuda-toolkit nvidia-gds && \
+#     rm -rf /var/lib/apt/lists/*
+# Compile Open3D:
+# https://www.open3d.org/docs/release/compilation.html
+# RUN git clone https://github.com/isl-org/Open3D
+# WORKDIR /Open3D/
+# RUN export CUDA_ARCH_BIN=8.9 && \
+#     export PATH="/usr/local/cuda/bin:$PATH" && \
+#     export LD_LIBRARY_PATH="/usr/local/cuda/lib64:$LD_LIBRARY_PATH" && \
+#     mkdir build && cd build && \
+#     cmake -DBUILD_CUDA_MODULE=ON \
+#     -DGLIBCXX_USE_CXX11_ABI=OFF \
+#     -DBUILD_PYTORCH_OPS=ON \
+#     -DBUNDLE_OPEN3D_ML=ON \
+#     -DOPEN3D_ML_ROOT=https:///github.com/isl-org/Open3D-ML.git \
+#     -DCMAKE_CUDA_COMPILER=$(which nvcc) \
+#     .. && make -j$(nproc) && \
+#     . /venv/bin/activate && make install-pip-package
 
 # TODO: Open3D not working until Python 3.12 version is available!
 # https://github.com/isl-org/Open3D/releases
@@ -52,10 +68,7 @@ ENV LANG=en_US.UTF-8 \
     PYTHONIOENCODING=UTF-8 \
     ROS2_DISTRO=jazzy \
     DEBIAN_FRONTEND=noninteractive \
-    PATH="/venv/bin:$PATH" \
-    CUDA_ARCH_BIN=8.9 \
-    PATH="/usr/local/cuda/bin:$PATH" \
-    LD_LIBRARY_PATH="/usr/local/cuda/lib64:$LD_LIBRARY_PATH"
+    PATH="/venv/bin:$PATH"
 
 COPY --from=build / /
 
