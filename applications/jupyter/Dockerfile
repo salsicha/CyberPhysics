@@ -56,6 +56,9 @@ RUN pip install -r /requirements.txt && \
 # RUN wget https://github.com/isl-org/Open3D/releases/download/v0.18.0/open3d-0.18.0-cp311-cp311-manylinux_2_27_x86_64.whl
 # RUN pip3 install open3d-0.18.0-cp311-cp311-manylinux_2_27_x86_64.whl
 
+# TODO: install 
+# https://github.com/salsicha/ArrayDataEngine.git
+
 RUN mkdir -p /notebooks
 
 
