@@ -1,6 +1,6 @@
 <a href="">
   <img src="https://media.githubusercontent.com/media/salsicha/CyberPhysics/main/icon.png"
-    height="100" align="right" alt="" />
+    height="70" align="right" alt="" />
 </a>
 
 # CyberPhysics
