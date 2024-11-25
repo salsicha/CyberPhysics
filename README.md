@@ -1,5 +1,5 @@
 <a href="">
-  <img src="https://raw.githubusercontent.com/salsicha/cyberphysics/main/icon.png"
+  <img src="https://media.githubusercontent.com/media/salsicha/CyberPhysics/main/icon.png"
     width="200" align="right" alt="" />
 </a>
 
