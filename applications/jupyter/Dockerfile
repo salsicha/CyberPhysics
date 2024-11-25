@@ -1,7 +1,6 @@
 # JUPYTER
 
 FROM ubuntu:noble AS build
-# FROM nvidia/cuda:12.6.0-runtime-ubuntu24.04 AS build
 
 ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US.UTF-8 \
@@ -12,7 +11,10 @@ ENV LANG=en_US.UTF-8 \
     PATH="/venv/bin:$PATH"
 
 RUN apt update && apt upgrade -y && apt install -q -y --no-install-recommends \
-    python3-pip python3-venv curl gnupg2 lsb-release unzip ca-certificates cmake ccache wget && \
+    python3-pip python3-venv curl gnupg2 lsb-release unzip ca-certificates cmake \
+    ccache wget sudo git xorg-dev libxcb-shm0 libglu1-mesa-dev python3-dev clang \
+    libc++-dev libc++abi-dev libsdl2-dev ninja-build libxi-dev \
+    libtbb-dev libosmesa6-dev libudev-dev autoconf libtool && \
     rm -rf /var/lib/apt/lists/*
 
 RUN python3 -m venv /venv
@@ -33,22 +35,10 @@ RUN apt update && apt upgrade -y && apt install -q -y --no-install-recommends \
     cuda-toolkit nvidia-gds && \
     rm -rf /var/lib/apt/lists/*
 
-# Compile Open3D:
-# https://www.open3d.org/docs/release/compilation.html
-RUN curl -L -o /open3d.zip https://github.com/isl-org/Open3D/archive/refs/tags/main-devel.zip && \
-    unzip /open3d.zip && rm /open3d.zip
-RUN /Open3D-main-devel/util/install_deps_ubuntu.sh
-WORKDIR /Open3D-main-devel/
-RUN mkdir build && cd build && \
-    cmake -DBUILD_CUDA_MODULE=ON \
-    -DGLIBCXX_USE_CXX11_ABI=OFF \
-    -DBUILD_PYTORCH_OPS=ON \
-    -DBUILD_TENSORFLOW_OPS=ON \
-    -DBUNDLE_OPEN3D_ML=ON \
-    -DOPEN3D_ML_ROOT=https://github.com/isl-org/Open3D-ML.git \
-    .. && \
-    make -j$(nproc) && \
-    . /venv/bin/activate && make install && make install-pip-package
+# TODO: Open3D not working until Python 3.12 version is available!
+# https://github.com/isl-org/Open3D/releases
+# RUN wget https://github.com/isl-org/Open3D/releases/download/v0.18.0/open3d-0.18.0-cp311-cp311-manylinux_2_27_x86_64.whl
+# RUN pip3 install open3d-0.18.0-cp311-cp311-manylinux_2_27_x86_64.whl
 
 RUN mkdir -p /notebooks
 
@@ -62,7 +52,10 @@ ENV LANG=en_US.UTF-8 \
     PYTHONIOENCODING=UTF-8 \
     ROS2_DISTRO=jazzy \
     DEBIAN_FRONTEND=noninteractive \
-    PATH="/venv/bin:$PATH"
+    PATH="/venv/bin:$PATH" \
+    CUDA_ARCH_BIN=8.9 \
+    PATH="/usr/local/cuda/bin:$PATH" \
+    LD_LIBRARY_PATH="/usr/local/cuda/lib64:$LD_LIBRARY_PATH"
 
 COPY --from=build / /
 
