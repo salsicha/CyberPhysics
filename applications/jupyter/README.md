@@ -16,6 +16,3 @@ In your browser navigate to
 
 If you are redirected to the jupyter login page, insert the password
 `docker_jupyter`
-
-
-<!-- TODO: call dataengine setup.py from top of dataengine notebooks -->
