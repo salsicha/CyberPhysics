@@ -44,7 +44,7 @@ build_matlab: cleanup
 build_jupyter: cleanup
 	APP=jupyter ./_build_it.sh
 build_record: cleanup build_ros2
-	APP=record ./_build_it.sh --git
+	APP=record ./_build_it.sh
 build_oak1: cleanup build_ros2
 	APP=oak1 ./_build_it.sh
 build_qgroundcontrol: cleanup
@@ -57,6 +57,10 @@ build_navigation2: cleanup build_ros2
 	APP=navigation2 ./_build_it.sh
 build_nvblox: cleanup build_ros2
 	APP=nvblox ./_build_it.sh
+build_rtx2: cleanup
+	APP=rtx2 ./_build_it.sh
+build_pentestgpt: cleanup
+	APP=pentestgpt ./_build_it.sh
 
 # Run rviz in ROS2 container with native display mounting
 run_ros2:

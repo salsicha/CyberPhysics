@@ -1,9 +1,18 @@
-FROM cyberphysics/ros2:latest
+FROM cyberphysics/ros2:latest AS build
+
+ENV LANG=en_US.UTF-8 \
+    LANGUAGE=en_US.UTF-8 \
+    TERM=xterm \
+    PYTHONIOENCODING=UTF-8 \
+    ROS2_DISTRO=jazzy \
+    DEBIAN_FRONTEND=noninteractive \
+    PATH="/venv/bin:$PATH" \
+    ROS_DISTRO=jazzy
 
 COPY requirements.txt /
 
 RUN apt update && apt install -y --no-install-recommends \
-    python3-rosdep python3-colcon-ros python3-pip ros-humble-cv-bridge \
+    python3-rosdep python3-colcon-ros python3-pip ros-$ROS2_DISTRO-cv-bridge \
     && apt install -y x11-apps \
     && pip install -r /requirements.txt \
     && rm -rf /var/lib/apt/lists/* \
@@ -15,5 +24,10 @@ WORKDIR /
 
 COPY ./entrypoint.sh /
 RUN chmod +x /entrypoint.sh
+
+#####################################################################
+FROM scratch
+
+COPY --from=build / /
 
 ENTRYPOINT [ "/entrypoint.sh" ]

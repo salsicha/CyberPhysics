@@ -1,7 +1,9 @@
 # Cross platform support
-ARG TAG
 
-FROM --platform=$TARGETPLATFORM cyberphysics/ros2:latest AS build
+# FROM --platform=$TARGETPLATFORM cyberphysics/ros2 AS build
+FROM cyberphysics/ros2 AS build
+
+ARG TAG
 
 ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US.UTF-8 \

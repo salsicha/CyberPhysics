@@ -38,7 +38,9 @@ RUN pip install -r /requirements.txt && \
 # https://www.open3d.org/docs/release/compilation.html
 # RUN git clone https://github.com/isl-org/Open3D
 # WORKDIR /Open3D/
-# RUN export CUDA_ARCH_BIN=8.9 && \
+#
+## export CUDA_ARCH_BIN=8.9 && \
+# RUN export CUDACXX=/usr/local/cuda/bin/nvcc
 #     export PATH="/usr/local/cuda/bin:$PATH" && \
 #     export LD_LIBRARY_PATH="/usr/local/cuda/lib64:$LD_LIBRARY_PATH" && \
 #     mkdir build && cd build && \
