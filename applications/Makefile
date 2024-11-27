@@ -53,6 +53,10 @@ build_tello: cleanup build_ros2
 	APP=tello ./_build_it.sh
 build_nicegui: cleanup build_ros2
 	APP=nicegui ./_build_it.sh
+build_navigation2: cleanup build_ros2
+	APP=navigation2 ./_build_it.sh
+build_nvblox: cleanup build_ros2
+	APP=nvblox ./_build_it.sh
 
 # Run rviz in ROS2 container with native display mounting
 run_ros2:

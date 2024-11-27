@@ -1,6 +1,6 @@
 # Cross platform support
 ARG TAG
-FROM --platform=$TARGETPLATFORM cyberphysics/ros2:$TAG as build
+FROM --platform=$TARGETPLATFORM cyberphysics/ros2:$TAG AS build
 
 ARG TARGETARCH
 
@@ -13,6 +13,8 @@ ENV LANG=en_US.UTF-8 \
     PATH="/venv/bin:$PATH" \
     ROS_DISTRO=jazzy
 
+# This prevents ROS setup.bash from failing
+SHELL ["/bin/bash","-c"]
 
 # Install development tools
 RUN apt update && apt install -q -y --no-install-recommends \

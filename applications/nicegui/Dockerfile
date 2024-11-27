@@ -12,7 +12,7 @@ ENV LANG=en_US.UTF-8 \
 RUN apt-get update && apt-get install -y \
     python3-pip \
     build-essential \
-   && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/*
 
 SHELL ["/bin/bash", "-c"]
 
@@ -47,4 +47,4 @@ EXPOSE 8080
 
 ENTRYPOINT ["/entrypoint.sh"]
 
-CMD ros2 launch gui main_launch.py
+CMD ["ros2", "launch", "gui", "main_launch.py"]
