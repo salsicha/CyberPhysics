@@ -37,6 +37,10 @@ RUN curl -L -o isaac_ros_common.zip https://github.com/NVIDIA-ISAAC-ROS/isaac_ro
 RUN curl -L -o nvblox.zip https://github.com/NVIDIA-ISAAC-ROS/isaac_ros_nvblox/archive/refs/tags/v3.1.0.zip && \
     unzip nvblox.zip && rm nvblox.zip && mv isaac_ros_nvblox-* isaac_ros_nvblox
 
+# Install VPI packages
+RUN wget https://repo.download.nvidia.com/jetson/x86_64/jammy/pool/main/libn/libnvvpi3/libnvvpi3_3.2.4_amd64.deb
+RUN dpkg -i libnvvpi*
+
 WORKDIR /workspace/
 
 RUN apt-get update && \
