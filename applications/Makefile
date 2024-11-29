@@ -61,6 +61,10 @@ build_rtx2: cleanup
 	APP=rtx2 ./_build_it.sh
 build_pentestgpt: cleanup
 	APP=pentestgpt ./_build_it.sh
+build_roboticstoolbox: cleanup
+	APP=roboticstoolbox ./_build_it.sh
+build_pysimcoder: cleanup
+	APP=pysimcoder ./_build_it.sh
 
 # Run rviz in ROS2 container with native display mounting
 run_ros2:
