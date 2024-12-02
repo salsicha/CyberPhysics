@@ -6,19 +6,22 @@ services:
     privileged: true
     image: cyberphysics/realsense
     container_name: realsense
+    devices:
+      - /dev:/dev
     volumes:
       - /dev/shm:/dev/shm
     command: >
       stdbuf -o L
       ros2 launch realsense2_camera rs_launch.py
-  foxglove_bridge:
+  nvblox:
     network_mode: "host"
-    image: cyberphysics/ros2
-    container_name: foxglove_bridge
+    pull_policy: if_not_present
+    image: cyberphysics/nvblox
+    container_name: nvblox
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
     volumes:
       - /dev/shm:/dev/shm
     command: >
       stdbuf -o L
-      ros2 launch rosbridge_server rosbridge_websocket_launch.xml
+      ros2 launch nvblox_examples_bringup realsense_example.launch.py
