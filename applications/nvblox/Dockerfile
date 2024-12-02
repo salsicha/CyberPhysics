@@ -51,16 +51,17 @@ RUN apt update && \
     . /venv/bin/activate && . /opt/ros/$ROS2_DISTRO/setup.bash && \
     rosdep init && \
     rosdep update && \
-    rosdep install -i -r --from-paths /workspace/src/isaac_ros_nvblox/ --rosdistro $ROS2_DISTRO -y && \
-    colcon build --symlink-install --packages-up-to isaac_ros_nvblox
+    rosdep install -i -r --from-paths ./src/isaac_ros_nvblox/ --rosdistro humble -y && \
+    colcon build --symlink-install --packages-up-to isaac_ros_nvblox && \
+    rm -rf /var/lib/apt/lists/*
 
-# # Install VPI packages
+# Install VPI packages
 RUN wget https://repo.download.nvidia.com/jetson/x86_64/jammy/pool/main/libn/libnvvpi3/libnvvpi3_3.2.4_amd64.deb && \
     dpkg -i libnvvpi* && rm libnvvpi*
 RUN wget https://repo.download.nvidia.com/jetson/x86_64/jammy/pool/main/v/vpi3-dev/vpi3-dev_3.2.4_amd64.deb && \
     dpkg -i vpi3* && rm vpi3*
 
-# # Quickstart assets
+# Quickstart assets
 COPY setup.sh /setup.sh
 RUN chmod +x /setup.sh
 RUN /setup.sh
