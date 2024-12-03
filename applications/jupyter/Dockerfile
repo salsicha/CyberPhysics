@@ -26,14 +26,15 @@ COPY requirements.txt /requirements.txt
 RUN pip install -r /requirements.txt && \
     rm -rf /root/.cache
 
-# Install Cuda:
-# https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#network-repo-installation-for-ubuntu
-# WORKDIR /
-# RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb && \
-#     dpkg -i cuda-keyring_1.1-1_all.deb && rm cuda-keyring_1.1-1_all.deb
-# RUN apt update && apt upgrade -y && apt install -q -y --no-install-recommends \
-#     cuda-toolkit nvidia-gds && \
-#     rm -rf /var/lib/apt/lists/*
+### Install Cuda:
+### https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#network-repo-installation-for-ubuntu
+WORKDIR /
+RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb && \
+    dpkg -i cuda-keyring_1.1-1_all.deb && rm cuda-keyring_1.1-1_all.deb
+RUN apt update && apt upgrade -y && apt install -q -y --no-install-recommends \
+    cuda-toolkit nvidia-gds && \
+    rm -rf /var/lib/apt/lists/*
+
 # Compile Open3D:
 # https://www.open3d.org/docs/release/compilation.html
 # RUN git clone https://github.com/isl-org/Open3D
@@ -52,11 +53,15 @@ RUN pip install -r /requirements.txt && \
 #     -DCMAKE_CUDA_COMPILER=$(which nvcc) \
 #     .. && make -j$(nproc) && \
 #     . /venv/bin/activate && make install-pip-package
-
+#
 # TODO: Open3D not working until Python 3.12 version is available!
 # https://github.com/isl-org/Open3D/releases
 # RUN wget https://github.com/isl-org/Open3D/releases/download/v0.18.0/open3d-0.18.0-cp311-cp311-manylinux_2_27_x86_64.whl
 # RUN pip3 install open3d-0.18.0-cp311-cp311-manylinux_2_27_x86_64.whl
+#
+# Temporary workaround, install open3d nightly build from main branch:
+COPY open3d-0.18.0+c8856fc-cp312-cp312-manylinux_2_31_x86_64.whl /
+RUN pip3 install /open3d-0.18.0+c8856fc-cp312-cp312-manylinux_2_31_x86_64.whl
 
 # TODO: install 
 # https://github.com/salsicha/ArrayDataEngine.git
