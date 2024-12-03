@@ -58,3 +58,17 @@ Have a look at the README in each application's folder for explanations of what 
 
 Many cyber-physical systems quickly become unamangeable as complexity and dependency conflicts scale exponentially with the number of components. This project should help with that.
 
+## Note on real time performance
+
+Real time performance can be achieved by pinning a process to a core:
+
+```bash
+docker run --cpuset-cpus="0,1" -it your_image your_command
+```
+
+```yaml
+services:
+  your_service:
+    image: your_image
+    cpuset: "0,1"
+```
