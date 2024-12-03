@@ -40,7 +40,7 @@ RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86
 RUN apt update && apt upgrade -y && apt install -q -y --no-install-recommends \
     cuda-toolkit nvidia-gds
 
-# Install ROS2 packages
+# Install nvblox and apt packages
 RUN add-apt-repository universe && \
     apt update && apt install -q -y --no-install-recommends \
     ros-$ROS2_DISTRO-ros-core ros-$ROS2_DISTRO-rviz-default-plugins \
@@ -100,46 +100,10 @@ RUN add-apt-repository universe && \
     libbenchmark-dev
 
 RUN python3 -m venv /venv
-
+COPY requirements.txt /requirements.txt
 RUN . /venv/bin/activate && \
     pip3 uninstall em && \
-    pip3 install \
-    rosdep \
-    colcon-common-extensions \
-    pytest-rerunfailures \
-    lark \
-    empy==3.3.4 \
-    catkin-pkg \
-    argcomplete \
-    autopep8 \
-    flake8==4.0.1 \
-    flake8-blind-except \
-    flake8-builtins \
-    flake8-class-newline \
-    flake8-comprehensions \
-    flake8-deprecated \
-    flake8-docstrings \
-    flake8-import-order \
-    flake8-quotes \
-    gpustat==0.6.0 \
-    onnx \
-    pydocstyle \
-    scikit-learn \
-    ninja \
-    networkx \
-    numpy \
-    numpy-quaternion \
-    pyyaml \
-    setuptools_scm \
-    trimesh \
-    yourdfpy \
-    warp-lang \
-    scipy \
-    tqdm \
-    importlib_resources \
-    torch \
-    torchvision \
-    torchaudio
+    pip3 install -r /requirements.txt
 
 ### This isn't working for nvblox_ros, but maybe working for other packages
 # Build and install nvblox
