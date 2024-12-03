@@ -28,7 +28,17 @@ RUN wget -qO - https://isaac.download.nvidia.com/isaac-ros/repos.key | apt-key a
     grep -qxF "deb https://isaac.download.nvidia.com/isaac-ros/release-3 $(lsb_release -cs) release-3.0" /etc/apt/sources.list || \
     echo "deb https://isaac.download.nvidia.com/isaac-ros/release-3 $(lsb_release -cs) release-3.0" | tee -a /etc/apt/sources.list
 
-RUN python3 -m venv /venv
+# Install VPI packages
+RUN apt-key adv --fetch-key https://repo.download.nvidia.com/jetson/jetson-ota-public.asc && \
+    add-apt-repository "deb http://repo.download.nvidia.com/jetson/x86_64/$(lsb_release -cs) r36.3 main" && \
+    apt update && \
+    apt install -q -y --no-install-recommends libnvvpi3 vpi3-dev
+
+# CUDA packages
+RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb && \
+    dpkg -i cuda-keyring_1.1-1_all.deb && rm cuda-keyring_1.1-1_all.deb
+RUN apt update && apt upgrade -y && apt install -q -y --no-install-recommends \
+    cuda-toolkit nvidia-gds
 
 # Install ROS2 packages
 RUN add-apt-repository universe && \
@@ -89,11 +99,7 @@ RUN add-apt-repository universe && \
     libsqlite3-dev \
     libbenchmark-dev
 
-RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb && \
-    dpkg -i cuda-keyring_1.1-1_all.deb && rm cuda-keyring_1.1-1_all.deb
-RUN apt update && apt upgrade -y && apt install -q -y --no-install-recommends \
-    cuda-toolkit nvidia-gds && \
-    rm -rf /var/lib/apt/lists/*
+RUN python3 -m venv /venv
 
 RUN . /venv/bin/activate && \
     pip3 uninstall em && \
@@ -135,13 +141,7 @@ RUN . /venv/bin/activate && \
     torchvision \
     torchaudio
 
-# Install VPI packages
-RUN apt-key adv --fetch-key https://repo.download.nvidia.com/jetson/jetson-ota-public.asc && \
-    add-apt-repository "deb http://repo.download.nvidia.com/jetson/x86_64/$(lsb_release -cs) r36.3 main" && \
-    apt update && \
-    apt install libnvvpi3 vpi3-dev
-
-### This isn't working, fails for nvblox_ros, but maybe working for other packages
+### This isn't working for nvblox_ros, but maybe working for other packages
 # Build and install nvblox
 # WORKDIR /workspace/src/
 # RUN git clone -b release-3.1 https://github.com/NVIDIA-ISAAC-ROS/isaac_ros_common.git isaac_ros_common
