@@ -1,0 +1,32 @@
+
+# Foxglove example:
+# Foxglove is installed on the host through snap, which should already be done by install.sh
+# "sudo snap install foxglove-studio"
+# The ros bridge needs to be run to connect to it
+
+version: "3.9"
+services:
+  foxglove_bridge:
+    network_mode: "host"
+    image: cyberphysics/ros2
+    container_name: foxglove_bridge
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    volumes:
+      - /dev/shm:/dev/shm
+    command: >
+      stdbuf -o L
+      ros2 launch rosbridge_server rosbridge_websocket_launch.xml
+  ## Example: play bag...
+  # rosbag:
+  #   network_mode: "host"
+  #   image: cyberphysics/ros2
+  #   container_name: rosbag
+  #   environment:
+  #     - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+  #   volumes:
+  #     - /dev/shm:/dev/shm
+  #     - /data:/data
+  #   command: >
+  #     stdbuf -o L
+  #     ros2 bag play /data/oak/data.db3 --loop

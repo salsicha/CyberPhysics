@@ -1,0 +1,13 @@
+version: "3.9"
+services:
+  oak1_driver:
+    image: cyberphysics/oak1
+    restart: unless-stopped
+    network_mode: "host"
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - DISPLAY=${DISPLAY}
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix
+    privileged: true
+    command: stdbuf -o L python3 driver.py --topic-namespace oak1_right --device-ip 10.0.0.12 --rate 30 --debug

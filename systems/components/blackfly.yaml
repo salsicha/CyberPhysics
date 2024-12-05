@@ -1,0 +1,20 @@
+services:
+  blackfly:
+    restart: always
+    network_mode: "host"
+    init: true
+    ipc: "host"
+    image: cyberphysics/blackfly
+    environment:
+      - ROS_LOCALHOST_ONLY=$ROS_LOCALHOST_ONLY
+      - ROS_DOMAIN_ID=$ROS_DOMAIN_ID
+    depends_on:
+      - web
+    command: >
+      ros2 launch spinnaker_camera_driver blackfly_s_gige.launch.py
+        camera_name:="blackfly_1"
+        serial:="'$BFSERIAL1'"
+        frame_rate:="$FPS"
+        device_link_throughput_limit:="$DEVICE_LINK_THROUGHPUT_LIMIT"
+        gev_scps_packet_size:="$GEV_SCPS_PACKET_SIZE"
+        image_compression_mode:="'$IMAGE_COMPRESSION_MODE'"

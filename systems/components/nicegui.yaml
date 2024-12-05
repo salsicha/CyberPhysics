@@ -1,0 +1,14 @@
+services:
+  nicegui:
+    restart: always
+    pull_policy: never
+    image: cyberphysics/nicegui
+    init: true
+    network_mode: host
+    ipc: host
+    environment:
+      - ROS_LOCALHOST_ONLY=$ROS_LOCALHOST_ONLY
+      - ROS_DOMAIN_ID=$ROS_DOMAIN_ID
+    command: >
+      stdbuf -o L
+      python3 -m http.server 8000

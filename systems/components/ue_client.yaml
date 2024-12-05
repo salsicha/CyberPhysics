@@ -1,0 +1,14 @@
+
+services:
+  airsim_client:
+    network_mode: "host"
+    image: cyberphysics/unrealengine
+    volumes:
+      - "/tmp/.X11-unix:/tmp/.X11-unix"
+    environment:
+      - "DISPLAY=${DISPLAY}"
+    depends_on:
+      - roscore
+    command: >
+      stdbuf -o L
+      bash -c "cd /scripts/ && python3 script.py"

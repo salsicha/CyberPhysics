@@ -1,0 +1,15 @@
+
+# PySimCoder
+
+services:
+  pysimcoder:
+    network_mode: "host"
+    image: cyberphysics/pysimcoder
+    container_name: pysimcoder
+    environment:
+      - "DISPLAY=${DISPLAY}"
+      - XAUTHORITY=/tmp/.XAuthority
+      - "/tmp/.X11-unix:/tmp/.X11-unix"
+    volumes:
+      - /dev/shm:/dev/shm
+      - $XAUTHORITY:/tmp/.XAuthority

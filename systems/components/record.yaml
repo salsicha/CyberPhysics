@@ -1,0 +1,25 @@
+services:
+  record:
+    restart: always
+    pull_policy: never
+    image: cyberphysics/record
+    network_mode: host
+    ipc: host
+    privileged: true
+    depends_on:
+      - web
+    volumes:
+      - /data:/data
+      - ${PWD}/env/:/env
+      - /bin/systemctl:/bin/systemctl # these folders (*) allow the docker container to shutdown host
+      - /run/systemd/system:/run/systemd/system # *
+      - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket # *
+      - /sys/fs/cgroup:/sys/fs/cgroup # *
+    environment:
+      - TOPICS_EXCLUDED="-x '(.*)/image_raw_meta$'"
+      - TZ=America/Los_Angeles
+      - ROS_LOCALHOST_ONLY=$ROS_LOCALHOST_ONLY
+      - ROS_DOMAIN_ID=$ROS_DOMAIN_ID
+    command: >
+      stdbuf -o L
+      bash -c "source /env.list && python3 record.py --proj_name ${SYSTEM_NAME} --server_w_ip ${SERVER_IP} --server_eth_ip ${ETH_IP:-127.0.0.1}"

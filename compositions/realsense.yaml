@@ -1,0 +1,24 @@
+
+services:
+  realsense:
+    network_mode: "host"
+    pull_policy: if_not_present
+    privileged: true
+    image: cyberphysics/realsense
+    container_name: realsense
+    volumes:
+      - /dev/shm:/dev/shm
+    command: >
+      stdbuf -o L
+      ros2 launch realsense2_camera rs_launch.py
+  foxglove_bridge:
+    network_mode: "host"
+    image: cyberphysics/ros2
+    container_name: foxglove_bridge
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    volumes:
+      - /dev/shm:/dev/shm
+    command: >
+      stdbuf -o L
+      ros2 launch rosbridge_server rosbridge_websocket_launch.xml

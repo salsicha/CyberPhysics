@@ -1,0 +1,20 @@
+services:
+  airsim_server:
+    network_mode: "host"
+    image: cyberphysics/unrealengine
+    volumes:
+      - "/tmp/.X11-unix:/tmp/.X11-unix"
+    environment:
+      - "DISPLAY=${DISPLAY}"
+      - XAUTHORITY
+      - NVIDIA_DRIVER_CAPABILITIES=all
+    command: >
+      stdbuf -o L
+      /server/Development/Linux/server.sh
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

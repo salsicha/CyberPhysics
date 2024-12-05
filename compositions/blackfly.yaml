@@ -1,0 +1,47 @@
+# Blackfly camera test
+
+# Optional env to set before running docker compose
+# - CAMERA_SERIAL1
+# - ROS_DOMAIN_ID
+
+version: "3.9"
+services:
+  blackfly_autoconfigure_ip:
+    network_mode: "host"
+    ipc: "host"
+    image: cyberphysics/blackfly
+    environment:
+      - EXPECTED_NUM_BLACKFLY_CAMERAS=1
+    command: /bin/bash -c "/scripts/blackfly-autoconfigure-ip.sh $$EXPECTED_NUM_BLACKFLY_CAMERAS"
+  blackfly:
+    restart: unless-stopped
+    network_mode: "host"
+    ipc: "host"
+    image: cyberphysics/blackfly
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}  # 0 is default value, to isolate ROS2 msgs use a domain id between 1-101
+    command: >
+      ros2 launch spinnaker_camera_driver blackfly_s_gige.launch.py
+        camera_name:='blackfly_1'
+        serial:="'${CAMERA_SERIAL1}'"
+        frame_rate:='10'
+  record:
+    restart: always
+    pull_policy: never
+    image: cyberphysics/record
+    network_mode: host
+    volumes:
+      - /dev/shm:/dev/shm
+      - /data:/data
+      - ../systems/example/env/:/env
+      - /bin/systemctl:/bin/systemctl # these folders (*) allow the docker container to shutdown host
+      - /run/systemd/system:/run/systemd/system # *
+      - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket # *
+      - /sys/fs/cgroup:/sys/fs/cgroup # *
+    environment:
+      - TOPICS_EXCLUDED="-x '(.*)/image|(.*)/image_color|(.*)/image_mono|(.*)/image_proc_debayer/(.*)'"
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}  # 0 is default value, to isolate ROS2 msgs use a domain id between 1-101
+    command: >
+      stdbuf -o L
+      bash -c "env; python3 record.py --proj_name local --server_w_ip 127.0.0.1 --server_eth_ip 127.0.0.1"
+
