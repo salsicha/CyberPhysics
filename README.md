@@ -99,3 +99,21 @@ services:
     image: your_image
     cpuset: "0,1"
 ```
+
+Then reserve the cores needed before running the containers:
+
+```bash
+cset shield --cpu 0,1 --kthread on # cpu 5 and 11, move kernel processes if possible
+```
+
+Then set cgroup-parent in dockerd config "/etc/docker/daemon.json":
+```json 
+{
+  "cgroup-parent": "/system"
+}
+```
+
+Then to restore the host system:
+```bash
+cset shield --reset
+```
