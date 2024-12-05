@@ -45,7 +45,7 @@ RUN add-apt-repository universe && \
     apt update && apt install -q -y --no-install-recommends \
     ros-$ROS2_DISTRO-ros-core ros-$ROS2_DISTRO-rviz-default-plugins \
     ros-$ROS2_DISTRO-isaac-ros-managed-nitros ros-$ROS2_DISTRO-isaac-ros-nitros-image-type \
-    ros-$ROS2_DISTRO-isaac-ros-nvblox \
+    ros-$ROS2_DISTRO-isaac-ros-nvblox ros-$ROS2_DISTRO-rviz2 \
     python3-rosdep \
     python3-colcon-ros \
     linuxptp \

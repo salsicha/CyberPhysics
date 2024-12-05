@@ -37,7 +37,7 @@ RUN apt update && apt install -q -y --no-install-recommends \
 RUN python3 -m venv /venv
 # EM is preventing msgs from building...
 RUN pip3 uninstall em
-RUN pip3 install rosdep colcon-common-extensions pytest-rerunfailures numpy lark empy==3.3.4
+RUN pip3 install rosdep colcon-common-extensions pytest-rerunfailures numpy lark empy==3.3.4 pymongo psutil pillow tornado
 
 WORKDIR /workspace
 RUN mkdir -p /workspace/src
