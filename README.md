@@ -87,7 +87,7 @@ Many cyber-physical systems quickly become unamangeable as complexity and depend
 
 ## Note on real time performance
 
-Real time performance can be achieved by pinning a process to a core:
+Real time performance can be achieved by pinning a process to a core:  
 
 ```bash
 docker run --cpuset-cpus="0,1" -it your_image your_command
@@ -100,20 +100,20 @@ services:
     cpuset: "0,1"
 ```
 
-Then reserve the cores needed before running the containers:
+Then reserve the cores needed before running the containers:  
 
 ```bash
-cset shield --cpu 0,1 --kthread on # cpu 5 and 11, move kernel processes if possible
+cset shield --cpu 0,1 --kthread on 
 ```
 
-Then set cgroup-parent in dockerd config "/etc/docker/daemon.json":
+Then set cgroup-parent in dockerd config "/etc/docker/daemon.json":  
 ```json 
 {
   "cgroup-parent": "/system"
 }
 ```
 
-Then to restore the host system:
+Then to restore the host system:  
 ```bash
 cset shield --reset
 ```
