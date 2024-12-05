@@ -22,7 +22,7 @@ services:
     devices:
       - /dev:/dev
     command: >
-      serial --dev 1234 -v6
+      serial --dev /dev/ttyACM0 -v6
   arduino:
     network_mode: "host"
     image: cyberphysics/arduino

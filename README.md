@@ -45,11 +45,38 @@ docker compose -f compositions/jupyter.yaml up
 ```
 
 For viewing ROS data, run the Foxglove compose file, and launch Foxglove on your host machine.
+```bash
+foxglove-studio
+```
 
 A web based GUI can be built with NiceGUI, and then accessed through your host machine's browser:
 http://localhost:8080/
 
-## Documentation and Examples
+
+## Examples
+
+ARDUINO:  
+ - Connect Arduino Teensy 4.1 to USB port on host computer.  
+ - Launch "foxglove-studio" from command line.  
+```bash
+cd compositions
+docker compose -f arduino.yaml up
+```
+ - Load micro-ROS library: "Sketch -> Include library -> Add .ZIP Library... /microrosarduino.zip"
+ - Load "pub.ino" sketch
+ - Messages from the Arduino board should now be visible  
+
+SPATIAL RECONSTRUCTION:  
+ - Connect Realsense 435i to USB port on host computer.  
+ - Launch "foxglove-studio" from command line.  
+```bash  
+cd compositions  
+docker compose -f reconstruction.yaml up  
+```  
+ - Messages from the Nvblox board should now be visible  
+
+
+## Documentation
 
 Have a look at the README in each application's folder for explanations of what they do.
 
