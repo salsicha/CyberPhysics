@@ -1,0 +1,14 @@
+jupyterlab
+ipympl
+# symforce
+glob2
+tiledb
+torch
+torchvision
+idx2numpy
+tiledb-ml
+tensorboard
+ffmpeg
+jax
+astropy
+bcrypt

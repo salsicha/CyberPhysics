@@ -1,0 +1,3 @@
+## Record node for recording ROS topics via Web UI app
+
+* This node records a rosbag and stores pilot notes via the Web UI app which is used to start and stop recordings

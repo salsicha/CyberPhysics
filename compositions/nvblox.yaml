@@ -1,0 +1,27 @@
+
+services:
+  realsense:
+    network_mode: "host"
+    pull_policy: if_not_present
+    privileged: true
+    image: cyberphysics/realsense
+    container_name: realsense
+    devices:
+      - /dev:/dev
+    volumes:
+      - /dev/shm:/dev/shm
+    command: >
+      stdbuf -o L
+      ros2 launch realsense2_camera rs_launch.py
+  nvblox:
+    network_mode: "host"
+    pull_policy: if_not_present
+    image: cyberphysics/nvblox
+    container_name: nvblox
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    volumes:
+      - /dev/shm:/dev/shm
+    command: >
+      stdbuf -o L
+      ros2 launch nvblox_examples_bringup realsense_example.launch.py

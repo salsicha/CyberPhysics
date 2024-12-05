@@ -1,0 +1,19 @@
+
+# RoboticsToolbox
+
+services:
+  roboticstoolbox:
+    network_mode: "host"
+    image: cyberphysics/roboticstoolbox
+    container_name: roboticstoolbox
+    environment:
+      - "DISPLAY=${DISPLAY}"
+      - XAUTHORITY=/tmp/.XAuthority
+      - "/tmp/.X11-unix:/tmp/.X11-unix"
+    volumes:
+      - /dev/shm:/dev/shm
+      - $XAUTHORITY:/tmp/.XAuthority
+    command: >
+      stdbuf -o L
+      bash -c "/venv/lib/python3.12/site-packages/roboticstoolbox/examples/robots.py"
+
