@@ -54,6 +54,7 @@ sudo apt install -y qemu binfmt-support qemu-user-static
 # Convenient shortcuts
 if [ $(cat /home/$USER/.bashrc | grep -c 'xhost +local:root') -lt 1 ]; then
     echo 'xhost +local:root' >> /home/$USER/.bashrc
+    echo 'xhost +local:docker' >> /home/$USER/.bashrc
 fi
 if [ $(cat /etc/hosts | grep -c host.docker.internal) -lt 1 ]; then
     echo '127.0.0.1    host.docker.internal' | sudo tee -a /etc/hosts

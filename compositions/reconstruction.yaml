@@ -1,33 +1,36 @@
 
 # Viewer:
 # Run "foxglove-studio" from command line on host
+# Select "Open connection" -> "Rosbridge" -> "Open"
 
 services:
-  realsense:
-    network_mode: "host"
-    pull_policy: if_not_present
-    privileged: true
-    image: cyberphysics/realsense
-    container_name: realsense
-    devices:
-      - /dev:/dev
-    volumes:
-      - /dev/shm:/dev/shm
-    command: >
-      stdbuf -o L
-      ros2 launch realsense2_camera rs_launch.py
   nvblox:
     network_mode: "host"
+    privileged: true
     pull_policy: if_not_present
     image: cyberphysics/nvblox
     container_name: nvblox
+    devices:
+      - /dev:/dev
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - "DISPLAY=${DISPLAY}"
+      - XAUTHORITY
+      - NVIDIA_DRIVER_CAPABILITIES=all
+      - EGL_PLATFORM=surfaceless
     volumes:
       - /dev/shm:/dev/shm
+      - "/tmp/.X11-unix:/tmp/.X11-unix"
     command: >
       stdbuf -o L
       ros2 launch nvblox_examples_bringup realsense_example.launch.py
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu, compute, utility]
   foxglove_bridge:
     network_mode: "host"
     image: cyberphysics/ros2

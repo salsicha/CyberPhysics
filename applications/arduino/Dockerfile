@@ -8,7 +8,8 @@ ENV LANG=en_US.UTF-8 \
     ROS2_DISTRO=jazzy \
     DEBIAN_FRONTEND=noninteractive \
     PATH="/venv/bin:$PATH" \
-    ROS_DISTRO=jazzy
+    ROS_DISTRO=jazzy \
+    ARDUINO_LIBRARY_ENABLE_UNSAFE_INSTALL=true
 
 SHELL ["/bin/bash","-c"]
 
@@ -18,7 +19,7 @@ RUN apt-get update && \
         curl unzip ca-certificates libfontconfig-dev libx11-dev libxft-dev \
         software-properties-common \
         python3-pip python3-venv python3-serial \
-        git \
+        git curl wget \
         libx11-6 \
         libxext-dev \
         libxrender-dev \
@@ -34,14 +35,17 @@ RUN curl -L -o /arduino.zip $(curl --silent https://api.github.com/repos/arduino
 
 # Unzip the Arduino Pro IDE
 RUN unzip /arduino.zip -d /opt && rm /arduino.zip
-RUN mv /opt/arduino* /opt/arduino-ide
+RUN mv /opt/arduino* /opt/arduino-ide ||:
 
 WORKDIR /home/ubuntu/
 
-COPY scripts scripts
+COPY scripts /home/ubuntu/scripts
 
 # TODO: Upgrade to jazzy when available
-RUN curl -L -o microrosarduino.zip https://github.com/micro-ROS/micro_ros_arduino/archive/refs/tags/v2.0.7-iron.zip
+RUN curl -L -o /microrosarduino.zip https://github.com/micro-ROS/micro_ros_arduino/archive/refs/tags/v2.0.7-iron.zip
+RUN curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | BINDIR=/usr/local/bin sh
+RUN /usr/local/bin/arduino-cli lib install --zip-path /microrosarduino.zip
+RUN /usr/local/bin/arduino-cli core update-index --additional-urls https://www.pjrc.com/teensy/package_teensy_index.json
 
 RUN python3 -m venv /venv
 

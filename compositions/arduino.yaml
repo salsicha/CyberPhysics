@@ -1,19 +1,6 @@
 
 ## Arduino and MicroROS
 
-## Connecting uros to the device:
-## serial --dev [YOUR BOARD PORT] -v6
-
-## Loading the uros library into the Arduino IDE:
-## Sketch -> Include library -> Add .ZIP Library...
-## /microrosarduino.zip
-
-## Teensy board support:
-## Copy "https://www.pjrc.com/teensy/package_teensy_index.json" 
-## Into "File -> Preferences -> Additional boards manager URLs", and click "OK"
-## Then "Boards Manager (Icon in left menu) -> teensy -> Install"
-
-
 services:
   uros:
     network_mode: "host"
@@ -21,6 +8,8 @@ services:
     privileged: true
     devices:
       - /dev:/dev
+    volumes:
+      - /dev/shm:/dev/shm
     command: >
       serial --dev /dev/ttyACM0 -v6
   arduino:
@@ -42,7 +31,7 @@ services:
       - EGL_PLATFORM=surfaceless
     user: "1000:1000"
     command: >
-      bash -c "/opt/arduino-ide/arduino-ide --no-sandbox"
+      bash -c "arduino-cli upload /home/ubuntu/scripts/Pub/Pub.ino"
     deploy:
       resources:
         reservations:
@@ -50,7 +39,13 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
-
+  ros_sub:
+    network_mode: "host"
+    image: cyberphysics/ros2
+    volumes:
+      - /dev/shm:/dev/shm
+    command: >
+      ros2 topic echo /micro_ros_arduino_node_publisher
 volumes:
   arduino-local:
     external: false
