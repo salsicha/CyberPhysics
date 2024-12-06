@@ -9,12 +9,14 @@ CyberPhysics is a repo for managing my personal robotics and ml projects.
 
 It is great starting place for projects that need to manage large-data and complex cyber-physical systems. 
 
+
 ## Features
 
 - browser-based graphical user interface
 - access to latest ROS tools
 - deployable to kubernetes
 - and more...
+
 
 ## Installation
 
@@ -53,6 +55,25 @@ A web based GUI can be built with NiceGUI, and then accessed through your host m
 http://localhost:8080/
 
 
+## Nvblox extension for Foxglove (on host)
+
+Reference:
+https://github.com/NVIDIA-ISAAC-ROS/isaac_ros_nvblox/tree/main/nvblox_foxglove  
+
+1. git clone https://github.com/NVIDIA-ISAAC-ROS/isaac_ros_nvblox.git  
+2. cd nvblox_foxglove  
+3. (install npm==20.10.0, see below)  
+4. npm install  
+5. npm run local-install  
+
+To install npm==20.10.0:
+```bash
+curl https://raw.githubusercontent.com/creationix/nvm/master/install.sh | bash
+nvm install 20.10.0
+nvm use 20.10.0
+```
+
+
 ## Examples
 
 ARDUINO:  
@@ -62,17 +83,16 @@ ARDUINO:
 cd compositions
 docker compose -f arduino.yaml up
 ```
- - Load micro-ROS library: "Sketch -> Include library -> Add .ZIP Library... /microrosarduino.zip"
- - Load "pub.ino" sketch
  - Messages from the Arduino board should now be visible  
 
 SPATIAL RECONSTRUCTION:  
  - Connect Realsense 435i to USB port on host computer.  
- - Launch "foxglove-studio" from command line.  
 ```bash  
 cd compositions  
 docker compose -f reconstruction.yaml up  
 ```  
+ - Launch "foxglove-studio" from command line.  
+ - Select "Open connection" -> "Rosbridge" -> "Open"  
  - Messages from the Nvblox board should now be visible  
 
 
@@ -84,6 +104,7 @@ Have a look at the README in each application's folder for explanations of what 
 ## Why?
 
 Many cyber-physical systems quickly become unamangeable as complexity and dependency conflicts scale exponentially with the number of components. This project should help with that.
+
 
 ## Note on real time performance
 

@@ -46,6 +46,8 @@ RUN add-apt-repository universe && \
     ros-$ROS2_DISTRO-ros-core ros-$ROS2_DISTRO-rviz-default-plugins \
     ros-$ROS2_DISTRO-isaac-ros-managed-nitros ros-$ROS2_DISTRO-isaac-ros-nitros-image-type \
     ros-$ROS2_DISTRO-isaac-ros-nvblox ros-$ROS2_DISTRO-rviz2 \
+    ros-$ROS2_DISTRO-isaac-ros-realsense ros-$ROS2_DISTRO-as2-realsense-interface \
+    ros-$ROS2_DISTRO-librealsense2 ros-$ROS2_DISTRO-realsense2-camera ros-$ROS2_DISTRO-realsense2-description \
     python3-rosdep \
     python3-colcon-ros \
     linuxptp \
