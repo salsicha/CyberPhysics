@@ -1,16 +1,19 @@
-# lamp_autonomy
+# Drone behavior tree demo
 
-INSTALL:
-docker build -t lamp_autonomy .
+This is a demonstration of using Behavior Trees to make an Ardupilot quadcopter autonomous.  
 
-Note: set ROS_IP to the publisher's IP
+Currently the GPS coordinates are hard coded, and the map image has been pre-downloaded.  
 
-START:
-docker run -it --rm --net=host --privileged --ipc host lamp_autonomy
 
-Which should run ./scripts/behaviortree.sh
+INSTALL:  
+docker build -t drone_demo .  
 
-Load the web interface here:
-http://localhost:8080
-or possibly:
-http://lamp:8080
+Note: set ROS_IP to the publisher's IP  
+
+START:  
+docker run -it --rm --net=host --privileged --ipc host drone  
+
+Which should run ./scripts/behaviortree.sh  
+
+Load the web interface here:  
+http://localhost:8080  
