@@ -51,3 +51,14 @@ Published image topic:
 ## Reference:
 
 https://github.com/luxonis/depthai-python
+
+
+## TODO:
+
+This script should do optical flow for motion tracking on the MDK drone
+scripts/featuretracker.py
+
+This script should do object tracking
+scripts/objecttracking.py
+
+

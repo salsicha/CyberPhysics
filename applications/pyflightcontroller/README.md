@@ -13,3 +13,12 @@ and then converted to Cython
 Needs testing...
 
 
+## Raspberry Pi 5 fix:
+
+```bash
+sudo apt remove python3-rpi.gpio
+sudo apt install python3-rpi-lgpio
+```
+
+
+

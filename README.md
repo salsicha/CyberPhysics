@@ -138,7 +138,7 @@ Then to restore the host system:
 cset shield --reset
 ```
 
-## Raspberry Pi
+## Raspberry Pi 5 fix
 
 ```bash
 sudo apt remove python3-rpi.gpio
