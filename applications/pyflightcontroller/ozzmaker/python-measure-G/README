@@ -1,0 +1,8 @@
+This program demonstrates how to convert the raw values from an accelerometer to Gs
+
+http://ozzmaker.com/accelerometer-to-g/
+
+This script supports the LS6MDSL gyro and accelerometer which is included in the OzzMaker LTE-M IMU board
+
+Run using;
+python berryIMU-measure-G.py

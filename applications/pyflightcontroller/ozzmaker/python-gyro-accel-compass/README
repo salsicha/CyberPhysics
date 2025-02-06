@@ -1,0 +1,14 @@
+This program will enable your Raspberry Pi to read the values from a gyroscope, accelerometer & magnetometer and convert them to usable angles and heading.
+It also includes tilt compensation for compass heading. Utilises both the Complementary and Kalman filters.
+Go here for more information;
+
+http://ozzmaker.com/
+
+
+This script supports the LS6MDSL (gyro and accelerometer) and MMC5983 (compass) which is included in the OzzMaker LTE-M IMU board
+
+
+Run using;
+python berryIMU.py					
+python berryIMU-simple.py           #Simple version using only complementary filter 
+python calibrateBerryIMU.py			#Used to calibrate compass
