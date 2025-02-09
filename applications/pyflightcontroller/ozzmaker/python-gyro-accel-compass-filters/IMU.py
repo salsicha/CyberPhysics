@@ -44,8 +44,6 @@ def detectIMU():
 def writeByte(device_address,register,value):
     bus.write_byte_data(device_address, register, value)
 
-
-
 def readACCx():
     acc_l = 0
     acc_h = 0
@@ -55,7 +53,6 @@ def readACCx():
 
     acc_combined = (acc_l | acc_h <<8)
     return acc_combined  if acc_combined < 32768 else acc_combined - 65536
-
 
 def readACCy():
     acc_l = 0
@@ -166,3 +163,11 @@ def initIMU():
         writeByte(MMC5983MA_ADDRESS,MMC5983MA_CONTROL_0,0b00100100)     #Enable auto reset
         writeByte(MMC5983MA_ADDRESS,MMC5983MA_CONTROL_1,0b00000000)     #Filter bandwdith 100Hz (16 bit mode)
         writeByte(MMC5983MA_ADDRESS,MMC5983MA_CONTROL_2,0b10001101)     #Continous mode at 100Hz
+
+
+## TEST:
+# initIMU()
+# while True:
+#     print("x: ", readACCx())
+#     print("y: ", readACCy())
+#     print("z: ", readACCz())

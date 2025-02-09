@@ -2,7 +2,6 @@ import struct
 import sys
 import math
 import io
-import RPi.GPIO as GPIO
 
 def float_to_bytes(f:float) -> bytes:
     b = struct.pack("f", f)
@@ -57,7 +56,7 @@ class ControlCommand:
         ToReturn:bytearray = bytearray()
         
         # frame (int to 4 bytes)
-        # we have to do it differently by platform because micropython on the raspberry pi handles it differently
+        # we have to do it differetnly by platform because micropython on the raspberry pi handles it differently
         if sys.platform == "rp2":
             frame_bytes = self.frame.to_bytes(4, 0)
         else:
@@ -90,7 +89,7 @@ class ControlCommand:
         self.pitch = bytes_to_float(bs[12:16])
         self.yaw = bytes_to_float(bs[16:20])
 
-        # check sum
+        # check sunm
         self.checksum = bytes_to_float(bs[20:24])
 
 class PIDCommand:
@@ -269,6 +268,7 @@ class NonlinearTransformer:
             return self._transform(percent)
         else:
             return (self._transform(abs(percent)) * -1)
+        
 
 
 def log(msg:str) -> None:

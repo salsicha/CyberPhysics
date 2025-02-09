@@ -13,12 +13,16 @@ and then converted to Cython
 Needs testing...
 
 
-## Raspberry Pi 5 fix:
+## Raspberry Pi 5 fixes:
 
 ```bash
 sudo apt remove python3-rpi.gpio
 sudo apt install python3-rpi-lgpio
 ```
 
+I2C:
+https://ozzmaker.com/i2c/
+sudo raspi-config
+I2C -> select -> enable
 
 
