@@ -74,6 +74,10 @@ from MMC5983MA import *
 import time
 import sys
 
+from rpi_hardware_pwm import HardwarePWM
+
+
+
 # THE FLIGHT CONTROL LOOP
 def run() -> None:
     
@@ -172,25 +176,50 @@ def run() -> None:
     # print("Gyro bias: " + str((gyro_bias_x, gyro_bias_y, gyro_bias_z)))
 
 
-
-    ## TODO: make this look like the code above!!!
-
     # Ozzmaker
     initIMU()
-    gyro_x = readGYRx()
+    gxs = []
+    gys = []
+    gzs = []
+    started_at_ticks_ms = time.ticks_ms()
+    while ((time.ticks_ms() - started_at_ticks_ms) / 1000) < 3.0:
+        gxs.append(readGYRx())
+        gys.append(readGYRy())
+        gzs.append(readGYRz())
+        time.sleep(0.025)
+    gyro_bias_x = sum(gxs) / len(gxs)
+    gyro_bias_y = sum(gys) / len(gys)
+    gyro_bias_z = sum(gzs) / len(gzs)
+    print("Gyro bias: " + str((gyro_bias_x, gyro_bias_y, gyro_bias_z)))
 
 
 
+    # Old Pi micros code
     # Set up PWM's
-    M1:machine.PWM = machine.PWM(machine.Pin(gpio_motor1))
-    M2:machine.PWM = machine.PWM(machine.Pin(gpio_motor2))
-    M3:machine.PWM = machine.PWM(machine.Pin(gpio_motor3))
-    M4:machine.PWM = machine.PWM(machine.Pin(gpio_motor4))
-    M1.freq(250)
-    M2.freq(250)
-    M3.freq(250)
-    M4.freq(250)
-    print("Motor PWM's set up @ 250 hz")
+    # M1:machine.PWM = machine.PWM(machine.Pin(gpio_motor1))
+    # M2:machine.PWM = machine.PWM(machine.Pin(gpio_motor2))
+    # M3:machine.PWM = machine.PWM(machine.Pin(gpio_motor3))
+    # M4:machine.PWM = machine.PWM(machine.Pin(gpio_motor4))
+    # M1.freq(250)
+    # M2.freq(250)
+    # M3.freq(250)
+    # M4.freq(250)
+    # print("Motor PWM's set up @ 250 hz")
+
+
+
+    # TODO: get pwm working
+
+    # RPi5 PWM
+
+    # pwm = HardwarePWM(pwm_channel=0, hz=60, chip=0)
+    # pwm.start(100) # full duty cycle
+
+    # pwm.change_duty_cycle(50)
+    # pwm.change_frequency(25_000)
+
+
+
 
     # Constants calculations / state variables - no need to calculate these during the loop (save processor time)
     cycle_time_seconds:float = 1.0 / target_cycle_hz
