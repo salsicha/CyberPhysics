@@ -8,9 +8,6 @@ import sys
 
 
 
-
-
-
 def detectIMU():
     try:
         #Check for OzzMaker LTE IMU ALT (LSM6DSL and MMC5983MA)
@@ -27,17 +24,6 @@ def detectIMU():
             print("Found OzzMaker LTE IMU ALT (LSM6DSL and MMC5983MA)")
 
     time.sleep(1)
-
-
-
-
-
-
-
-
-
-
-
 
 
 

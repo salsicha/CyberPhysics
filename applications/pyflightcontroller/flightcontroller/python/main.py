@@ -16,7 +16,7 @@ THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR I
 
 # TODO: manually convert to python!!!
 # 1. replace "machine" with various tools, machine.i2c will become smbus.SMBus.read_byte_data()
-# 2. 
+# 2. select PWM lib to use...
 
 
 # Motor GPIO's (not pin number, GPIO number) ###
@@ -63,33 +63,46 @@ pid_yaw_kd:float = 0.0
 
 # import machine
 import time
-import ibus
+# import ibus
 import toolkit
+
+import smbus
+bus = smbus.SMBus(1)
+
+from LSM6DSL import *
+from MMC5983MA import *
+import time
+import sys
 
 # THE FLIGHT CONTROL LOOP
 def run() -> None:
     
     print("Hello from Scout!")
 
+
+    # Old Pi micros code
     # flash the LED a few times to show the microcontroller has received power and the program is active
-    led = machine.Pin(25, machine.Pin.OUT) # the onboard LED of the Raspberry Pi Pico
-    for x in range(8):
-        led.on()
-        time.sleep(0.1)
-        led.off()
-        time.sleep(0.1)
+    # led = machine.Pin(25, machine.Pin.OUT) # the onboard LED of the Raspberry Pi Pico
+    # for x in range(8):
+    #     led.on()
+    #     time.sleep(0.1)
+    #     led.off()
+    #     time.sleep(0.1)
+
 
     # wait a few seconds for the IMU to settle
     print("Waiting 3 seconds for the IMU to settle...")
     time.sleep(3)
 
+
+    # Old Pi micros code
     # overclock
     # machine.freq(250000000)
-    print("Overclocked to 250,000,000")
-
+    # print("Overclocked to 250,000,000")
     # set up RC receiver
     # rc:ibus.IBus = ibus.IBus(rc_uart)
     # print("RC receiver set up")
+
 
     # check that flight mode is not on when we are first starting - it needs to be set into standby mode
     # this is a safety check. Prevents from the drone taking off (at least spinning props) as soon as power is plugged in
@@ -105,55 +118,68 @@ def run() -> None:
     print("Pitch PID: " + str(pid_pitch_kp) + ", " + str(pid_pitch_ki) + ", " + str(pid_pitch_kd))
     print("Yaw PID: " + str(pid_yaw_kp) + ", " + str(pid_yaw_ki) + ", " + str(pid_yaw_kd))
 
+
+    # Old Pi micros code
     # Set up IMU (MPU-6050)
-    i2c = machine.I2C(0, sda = machine.Pin(gpio_i2c_sda), scl = machine.Pin(gpio_i2c_scl))
-    mpu6050_address:int = 0x68
-    i2c.writeto_mem(mpu6050_address, 0x6B, bytes([0x01])) # wake it up
-    i2c.writeto_mem(mpu6050_address, 0x1A, bytes([0x05])) # set low pass filter to 5 (0-6)
-    i2c.writeto_mem(mpu6050_address, 0x1B, bytes([0x08])) # set gyro scale to 1 (0-3)
-
+    # i2c = machine.I2C(0, sda = machine.Pin(gpio_i2c_sda), scl = machine.Pin(gpio_i2c_scl))
+    # mpu6050_address:int = 0x68
+    # i2c.writeto_mem(mpu6050_address, 0x6B, bytes([0x01])) # wake it up
+    # i2c.writeto_mem(mpu6050_address, 0x1A, bytes([0x05])) # set low pass filter to 5 (0-6)
+    # i2c.writeto_mem(mpu6050_address, 0x1B, bytes([0x08])) # set gyro scale to 1 (0-3)
     # confirm IMU is set up
-    whoami:int = i2c.readfrom_mem(mpu6050_address, 0x75, 1)[0]
-    lpf:int = i2c.readfrom_mem(mpu6050_address, 0x1A, 1)[0]
-    gs:int = i2c.readfrom_mem(mpu6050_address, 0x1B, 1)[0]
-    
+    # whoami:int = i2c.readfrom_mem(mpu6050_address, 0x75, 1)[0]
+    # lpf:int = i2c.readfrom_mem(mpu6050_address, 0x1A, 1)[0]
+    # gs:int = i2c.readfrom_mem(mpu6050_address, 0x1B, 1)[0]
     # did who am I work?
-    if whoami == 104: #0x68
-        print("MPU-6050 WHOAMI validated!")
-    else:
-        FATAL_ERROR("ERROR! MPU-6050 WHOAMI failed! '" + str(whoami) + "' returned.")
+    # if whoami == 104: #0x68
+    #     print("MPU-6050 WHOAMI validated!")
+    # else:
+    #     FATAL_ERROR("ERROR! MPU-6050 WHOAMI failed! '" + str(whoami) + "' returned.")
+    
 
+    # Old Pi micros code
     # did lpf get set?
-    if lpf == 0x05:
-        print("MPU-6050 LPF set to " + str(lpf) + " correctly.")
-    else:
-        FATAL_ERROR("ERROR! MPU-6050 LPF did not set correctly. Set to '" + str(lpf) + "'")
-
+    # if lpf == 0x05:
+    #     print("MPU-6050 LPF set to " + str(lpf) + " correctly.")
+    # else:
+    #     FATAL_ERROR("ERROR! MPU-6050 LPF did not set correctly. Set to '" + str(lpf) + "'")
     # did gyro scale get set?
-    if gs == 0x08:
-        print("MPU-6050 Gyro Scale set to " + str(gs) + " correctly.")
-    else:
-        FATAL_ERROR("ERROR! MPU-6050 gyro scale did not set correctly. " + str(gs) + " returned.")
+    # if gs == 0x08:
+    #     print("MPU-6050 Gyro Scale set to " + str(gs) + " correctly.")
+    # else:
+    #     FATAL_ERROR("ERROR! MPU-6050 gyro scale did not set correctly. " + str(gs) + " returned.")
 
+
+    # Old Pi micros code
     # measure gyro bias
-    print("Measuring gyro bias...")
-    gxs:list[float] = []
-    gys:list[float] = []
-    gzs:list[float] = []
-    started_at_ticks_ms:int = time.ticks_ms()
-    while ((time.ticks_ms() - started_at_ticks_ms) / 1000) < 3.0:
-        gyro_data = i2c.readfrom_mem(mpu6050_address, 0x43, 6) # read 6 bytes (2 for each axis)
-        gyro_x = (translate_pair(gyro_data[0], gyro_data[1]) / 65.5)
-        gyro_y = (translate_pair(gyro_data[2], gyro_data[3]) / 65.5)
-        gyro_z = (translate_pair(gyro_data[4], gyro_data[5]) / 65.5) * -1 # multiply by -1 because of the way I have it mounted on the quadcopter - it may be upside down. I want a "yaw to the right" to be positive and a "yaw to the left" to be negative.
-        gxs.append(gyro_x)
-        gys.append(gyro_y)
-        gzs.append(gyro_z)
-        time.sleep(0.025)
-    gyro_bias_x = sum(gxs) / len(gxs)
-    gyro_bias_y = sum(gys) / len(gys)
-    gyro_bias_z = sum(gzs) / len(gzs)
-    print("Gyro bias: " + str((gyro_bias_x, gyro_bias_y, gyro_bias_z)))
+    # print("Measuring gyro bias...")
+    # gxs:list[float] = []
+    # gys:list[float] = []
+    # gzs:list[float] = []
+    # started_at_ticks_ms:int = time.ticks_ms()
+    # while ((time.ticks_ms() - started_at_ticks_ms) / 1000) < 3.0:
+    #     gyro_data = i2c.readfrom_mem(mpu6050_address, 0x43, 6) # read 6 bytes (2 for each axis)
+    #     gyro_x = (translate_pair(gyro_data[0], gyro_data[1]) / 65.5)
+    #     gyro_y = (translate_pair(gyro_data[2], gyro_data[3]) / 65.5)
+    #     gyro_z = (translate_pair(gyro_data[4], gyro_data[5]) / 65.5) * -1 # multiply by -1 because of the way I have it mounted on the quadcopter - it may be upside down. I want a "yaw to the right" to be positive and a "yaw to the left" to be negative.
+    #     gxs.append(gyro_x)
+    #     gys.append(gyro_y)
+    #     gzs.append(gyro_z)
+    #     time.sleep(0.025)
+    # gyro_bias_x = sum(gxs) / len(gxs)
+    # gyro_bias_y = sum(gys) / len(gys)
+    # gyro_bias_z = sum(gzs) / len(gzs)
+    # print("Gyro bias: " + str((gyro_bias_x, gyro_bias_y, gyro_bias_z)))
+
+
+
+    ## TODO: make this look like the code above!!!
+
+    # Ozzmaker
+    initIMU()
+    gyro_x = readGYRx()
+
+
 
     # Set up PWM's
     M1:machine.PWM = machine.PWM(machine.Pin(gpio_motor1))
@@ -321,19 +347,6 @@ def run() -> None:
         FATAL_ERROR(str(e))
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 # UTILITY FUNCTIONS BELOW (Anything that is used by the flight controller loop should go here, not in a separate module or class (to save on processing time)
 
 def calculate_duty_cycle(throttle:float, dead_zone:float = 0.03) -> int:
@@ -378,11 +391,156 @@ def FATAL_ERROR(msg:str) -> None:
             time.sleep(1.0)
 
 
-
-
-
-
-
-
 ########### RUN THE SCOUT FLIGHT CONTROLLER PROGRAM ###########
+
+
+
+
+
+########### Ozzmaker PROGRAM ###########
+
+def detectIMU():
+    try:
+        #Check for OzzMaker LTE IMU ALT (LSM6DSL and MMC5983MA)
+        #If no LSM6DSL or MMC5983MA is connected, there will be an I2C bus error and the program will exit.
+        #This section of code stops this from happening.
+        LSM6DSL_WHO_AM_I_response = (bus.read_byte_data(LSM6DSL_ADDRESS, LSM6DSL_WHO_AM_I))
+        MMC5983MA_WHO_AM_I_response = (bus.read_byte_data(MMC5983MA_ADDRESS,MMC5983MA_WHO_AM_I ))
+
+    except IOError as f:
+        print('OzzMaker LTE IMU ALT not found')        #need to do something here, so we just print a space
+        sys.exit(1)
+    else:
+        if (LSM6DSL_WHO_AM_I_response == 0x6A) and (MMC5983MA_WHO_AM_I_response == 0x30):
+            print("Found OzzMaker LTE IMU ALT (LSM6DSL and MMC5983MA)")
+
+    time.sleep(1)
+
+
+def writeByte(device_address,register,value):
+    bus.write_byte_data(device_address, register, value)
+
+def readACCx():
+    acc_l = 0
+    acc_h = 0
+
+    acc_l = bus.read_byte_data(LSM6DSL_ADDRESS, LSM6DSL_OUTX_L_XL)
+    acc_h = bus.read_byte_data(LSM6DSL_ADDRESS, LSM6DSL_OUTX_H_XL)
+
+    acc_combined = (acc_l | acc_h <<8)
+    return acc_combined  if acc_combined < 32768 else acc_combined - 65536
+
+def readACCy():
+    acc_l = 0
+    acc_h = 0
+
+    acc_l = bus.read_byte_data(LSM6DSL_ADDRESS, LSM6DSL_OUTY_L_XL)
+    acc_h = bus.read_byte_data(LSM6DSL_ADDRESS, LSM6DSL_OUTY_H_XL)
+
+    acc_combined = (acc_l | acc_h <<8)
+    return acc_combined  if acc_combined < 32768 else acc_combined - 65536
+
+
+def readACCz():
+    acc_l = 0
+    acc_h = 0
+
+    acc_l = bus.read_byte_data(LSM6DSL_ADDRESS, LSM6DSL_OUTZ_L_XL)
+    acc_h = bus.read_byte_data(LSM6DSL_ADDRESS, LSM6DSL_OUTZ_H_XL)
+
+    acc_combined = (acc_l | acc_h <<8)
+    return acc_combined  if acc_combined < 32768 else acc_combined - 65536
+
+
+def readGYRx():
+    gyr_l = 0
+    gyr_h = 0
+
+    gyr_l = bus.read_byte_data(LSM6DSL_ADDRESS, LSM6DSL_OUTX_L_G)
+    gyr_h = bus.read_byte_data(LSM6DSL_ADDRESS, LSM6DSL_OUTX_H_G)
+
+    gyr_combined = (gyr_l | gyr_h <<8)
+    return gyr_combined  if gyr_combined < 32768 else gyr_combined - 65536
+
+
+def readGYRy():
+    gyr_l = 0
+    gyr_h = 0
+
+    gyr_l = bus.read_byte_data(LSM6DSL_ADDRESS, LSM6DSL_OUTY_L_G)
+    gyr_h = bus.read_byte_data(LSM6DSL_ADDRESS, LSM6DSL_OUTY_H_G)
+
+    gyr_combined = (gyr_l | gyr_h <<8)
+    return gyr_combined  if gyr_combined < 32768 else gyr_combined - 65536
+
+def readGYRz():
+    gyr_l = 0
+    gyr_h = 0
+
+    gyr_l = bus.read_byte_data(LSM6DSL_ADDRESS, LSM6DSL_OUTZ_L_G)
+    gyr_h = bus.read_byte_data(LSM6DSL_ADDRESS, LSM6DSL_OUTZ_H_G)
+
+    gyr_combined = (gyr_l | gyr_h <<8)
+    return gyr_combined  if gyr_combined < 32768 else gyr_combined - 65536
+
+
+def readMAGx():
+    mag_l = 0
+    mag_h = 0
+
+    mag_l = bus.read_byte_data(MMC5983MA_ADDRESS, MMC5983MA_XOUT_0)
+    mag_h = bus.read_byte_data(MMC5983MA_ADDRESS, MMC5983MA_XOUT_1)
+    mag_xyz = bus.read_byte_data(MMC5983MA_ADDRESS,MMC5983MA_XYZOUT_2)
+
+    return mag_l << 10 | mag_h << 2 | (mag_xyz & 0b11000000) >> 6
+
+
+def readMAGy():
+    mag_l = 0
+    mag_h = 0
+
+    mag_l = bus.read_byte_data(MMC5983MA_ADDRESS, MMC5983MA_YOUT_0)
+    mag_h = bus.read_byte_data(MMC5983MA_ADDRESS, MMC5983MA_YOUT_1)
+    mag_xyz = bus.read_byte_data(MMC5983MA_ADDRESS,MMC5983MA_XYZOUT_2)
+
+    return mag_l << 10 | mag_h <<2 | (mag_xyz & 0b00110000) >> 6
+
+
+def readMAGz():
+    mag_l = 0
+    mag_h = 0
+
+    mag_l = bus.read_byte_data(MMC5983MA_ADDRESS, MMC5983MA_ZOUT_0)
+    mag_h = bus.read_byte_data(MMC5983MA_ADDRESS, MMC5983MA_ZOUT_1)
+    mag_xyz = bus.read_byte_data(MMC5983MA_ADDRESS,MMC5983MA_XYZOUT_2)
+
+    return mag_l << 10 | mag_h <<2 | (mag_xyz & 0b00001100) >> 6
+
+
+def initIMU():
+
+        #initialise the accelerometer
+        writeByte(LSM6DSL_ADDRESS,LSM6DSL_CTRL1_XL,0b10011111)           #ODR 3.33 kHz, +/- 8g , BW = 400hz
+        writeByte(LSM6DSL_ADDRESS,LSM6DSL_CTRL8_XL,0b11001000)           #Low pass filter enabled, BW9, composite filter
+        writeByte(LSM6DSL_ADDRESS,LSM6DSL_CTRL3_C,0b01000100)            #Enable Block Data update, increment during multi byte read
+
+        #initialise the gyroscope
+        writeByte(LSM6DSL_ADDRESS,LSM6DSL_CTRL2_G,0b10011100)            #ODR 3.3 kHz, 2000 dps
+
+
+        #Enable compass, Continuous measurement mode, 100Hz
+        writeByte(MMC5983MA_ADDRESS,MMC5983MA_CONTROL_0,0b00001000)     #"deGauss" magnetometer
+        time.sleep(0.2)
+        writeByte(MMC5983MA_ADDRESS,MMC5983MA_CONTROL_1,0b10000000)     #soft reset
+        time.sleep(0.2)
+        writeByte(MMC5983MA_ADDRESS,MMC5983MA_CONTROL_0,0b00100100)     #Enable auto reset
+        writeByte(MMC5983MA_ADDRESS,MMC5983MA_CONTROL_1,0b00000000)     #Filter bandwdith 100Hz (16 bit mode)
+        writeByte(MMC5983MA_ADDRESS,MMC5983MA_CONTROL_2,0b10001101)     #Continous mode at 100Hz
+
+
+########### END Ozzmaker PROGRAM ###########
+
+
+
+
 run()
