@@ -127,10 +127,53 @@ def run() -> None:
     yaw_last_error:float = 0.0
 
 
+    input_throttle:float = 0
+    input_roll:float = 0
+    input_pitch:float = 0
+    input_yaw:float = 0
+
+    adj_throttle:float = 0
+
+    gyro_x:float = 0
+    gyro_y:float = 0
+    gyro_z:float = 0
+
+    error_rate_roll:float = 0
+    error_rate_pitch:float = 0
+    error_rate_yaw:float = 0
+
+    roll_p:float = 0
+    roll_i:float = 0
+    roll_i:float = 0
+    roll_d:float = 0
+    pid_roll:float = 0
+
+    yaw_p:float = 0
+    yaw_i:float = 0
+    yaw_i:float = 0
+    yaw_d:float = 0
+    pid_yaw:float = 0
+
+    t1:float = 0
+    t2:float = 0
+    t3:float = 0
+    t4:float = 0
+
+    loop_end_us:float = 0
+    elapsed_us:float = 0
+
+
+    profile_time = time.time()
+    average_diff = 0
+
     # INFINITE LOOP
     print("-- BEGINNING FLIGHT CONTROL LOOP NOW --")
     try:
         while True:
+
+            average_diff += profile_time
+            average_diff /= 2.0
+            print("run av loop time: ", average_diff)
             
             # mark start time
             loop_begin_us = time.monotonic() * 1000
@@ -164,10 +207,6 @@ def run() -> None:
             ## TODO:
             ## Read control commands from RC
             # normalize all RC input values
-            input_throttle = 0
-            input_roll = 0
-            input_pitch = 0
-            input_yaw = 0
 
 
             if last_mode == False: # last mode we were in was standby mode. So, this is the first frame we are going into flight mode
@@ -289,6 +328,7 @@ def FATAL_ERROR(msg:str) -> None:
     em:str = "Fatal error @ " + str(time.monotonic() * 1000) + " ms: " + msg
     print(em)
     toolkit.log(em)
+
 
 ########### Ozzmaker PROGRAM ###########
 

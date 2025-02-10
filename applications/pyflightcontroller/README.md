@@ -31,3 +31,7 @@ sudo apt-get install python3-venv
 cd ~
 python -m venv venv
 source ~/venv/bin/activate
+
+
+Raspberry Pi 5 config:
+Need to add 'dtoverlay=pwm-2chan' to /boot/firmware/config.txt and reboot
