@@ -127,12 +127,12 @@ def run() -> None:
     yaw_last_error:float = 0.0
 
 
-    input_throttle:float = 0
+    input_throttle:float = 10
     input_roll:float = 0
     input_pitch:float = 0
     input_yaw:float = 0
 
-    adj_throttle:float = 0
+    adj_throttle:float = 10
 
     gyro_x:float = 0
     gyro_y:float = 0
@@ -162,19 +162,22 @@ def run() -> None:
     loop_end_us:float = 0
     elapsed_us:float = 0
 
-
-    profile_time = time.time()
-    average_diff = 0
+    # Loop performance profiling
+    profile_time:float = time.monotonic()
+    average_diff:float = 0
+    #
 
     # INFINITE LOOP
     print("-- BEGINNING FLIGHT CONTROL LOOP NOW --")
     try:
         while True:
 
-            average_diff += profile_time
-            average_diff /= 2.0
+            # Loop performance profiling
+            average_diff = time.monotonic() - profile_time
             print("run av loop time: ", average_diff)
-            
+            profile_time = time.monotonic()
+            # This is currently looping at just over 200Hz !!! In pure python with no optimization
+                    
             # mark start time
             loop_begin_us = time.monotonic() * 1000
 
@@ -209,10 +212,12 @@ def run() -> None:
             # normalize all RC input values
 
 
-            if last_mode == False: # last mode we were in was standby mode. So, this is the first frame we are going into flight mode
-                if input_throttle > 0.05: # if throttle is > 5%
-                    FATAL_ERROR("Throttle was set to " + str(input_throttle) + " as soon as flight mode was entered. Throttle must be at 0% when flight mode begins (safety check).")
-            
+            # TODO: fix logging in toolkit
+            # if last_mode == False: # last mode we were in was standby mode. So, this is the first frame we are going into flight mode
+            #     if input_throttle > 0.05: # if throttle is > 5%
+            #         FATAL_ERROR("Throttle was set to " + str(input_throttle) + " as soon as flight mode was entered. Throttle must be at 0% when flight mode begins (safety check).")
+
+
             # calculate the adjusted desired throttle (above idle throttle, below governor throttle, scaled linearly)
             adj_throttle = throttle_idle + (throttle_range * input_throttle)
 
@@ -249,11 +254,22 @@ def run() -> None:
             t3 = adj_throttle - pid_pitch + pid_roll + pid_yaw
             t4 = adj_throttle - pid_pitch - pid_roll - pid_yaw
 
+            # TODO: numbers arent scaled properly, duty cycle must be between 0-100, this emits 2000000!!!
+            # print(t1, adj_throttle, pid_pitch, pid_roll, pid_yaw)
+            # print("duty cycle: ", calculate_duty_cycle(t1))
+
             # Adjust throttle according to input
-            pwm1.change_duty_cycle(calculate_duty_cycle(t1))
-            pwm2.change_duty_cycle(calculate_duty_cycle(t2))
-            pwm3.change_duty_cycle(calculate_duty_cycle(t3))
-            pwm4.change_duty_cycle(calculate_duty_cycle(t4))
+            # pwm1.change_duty_cycle(calculate_duty_cycle(t1))
+            # pwm2.change_duty_cycle(calculate_duty_cycle(t2))
+            # pwm3.change_duty_cycle(calculate_duty_cycle(t3))
+            # pwm4.change_duty_cycle(calculate_duty_cycle(t4))
+
+            # Test purposes only
+            pwm1.change_duty_cycle(50)
+            pwm2.change_duty_cycle(50)
+            pwm3.change_duty_cycle(50)
+            pwm4.change_duty_cycle(50)
+
 
             # Save state values for next loop
             roll_last_error = error_rate_roll
