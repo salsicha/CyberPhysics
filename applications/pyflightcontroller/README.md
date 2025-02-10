@@ -26,3 +26,8 @@ sudo raspi-config
 I2C -> select -> enable
 
 
+Set up venv:
+sudo apt-get install python3-venv
+cd ~
+python -m venv venv
+source ~/venv/bin/activate
