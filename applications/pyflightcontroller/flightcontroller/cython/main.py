@@ -1,7 +1,11 @@
 
 ########################################
-###########  SETTINGS  #################
-########################################
+
+# how to build:
+# python3 setup.py build_ext --inplace
+# then run:
+# python3 main.py
+
 
 
 # TODO: manually convert to python!!!
@@ -68,6 +72,11 @@ import gc
 # Disable garbage collection
 gc.disable()
 
+import flight_funcs
+# things like:
+# flight_funcs.calculate_duty_cycle()
+# should run the cython version of this function
+
 
 
 # THE FLIGHT CONTROL LOOP
@@ -129,7 +138,6 @@ def run() -> None:
     pitch_last_error:float = 0.0
     yaw_last_integral:float = 0.0
     yaw_last_error:float = 0.0
-
 
     input_throttle:float = 10
     input_roll:float = 0
@@ -222,41 +230,44 @@ def run() -> None:
             #         FATAL_ERROR("Throttle was set to " + str(input_throttle) + " as soon as flight mode was entered. Throttle must be at 0% when flight mode begins (safety check).")
 
 
-            # calculate the adjusted desired throttle (above idle throttle, below governor throttle, scaled linearly)
-            adj_throttle = throttle_idle + (throttle_range * input_throttle)
+            # TODO: this replaces the below, which is moved to flight_funcs.pyx
+            # TODO: pass all needed values by reference!!!
+            flight_funcs.calculate_values(t1, t2, t3, t4)
 
-            # calculate errors - diff between the actual rates and the desired rates
-            # "error" is calculated as setpoint (the goal) - actual
-            error_rate_roll = (input_roll * max_rate_roll) - gyro_x
-            error_rate_pitch = (input_pitch * max_rate_pitch) - gyro_y
-            error_rate_yaw = (input_yaw * max_rate_yaw) - gyro_z
 
-            # roll PID calc
-            roll_p = error_rate_roll * pid_roll_kp
-            roll_i = roll_last_integral + (error_rate_roll * pid_roll_ki * cycle_time_seconds)
-            roll_i = max(min(roll_i, i_limit), -i_limit) # constrain within I-term limits
-            roll_d = pid_roll_kd * (error_rate_roll - roll_last_error) / cycle_time_seconds
-            pid_roll = roll_p + roll_i + roll_d
 
-            # pitch PID calc
-            pitch_p = error_rate_pitch * pid_pitch_kp
-            pitch_i = pitch_last_integral + (error_rate_pitch * pid_pitch_ki * cycle_time_seconds)
-            pitch_i = max(min(pitch_i, i_limit), -i_limit) # constrain within I-term limits
-            pitch_d = pid_pitch_kd * (error_rate_pitch - pitch_last_error) / cycle_time_seconds
-            pid_pitch = pitch_p + pitch_i + pitch_d
+            # # calculate the adjusted desired throttle (above idle throttle, below governor throttle, scaled linearly)
+            # adj_throttle = throttle_idle + (throttle_range * input_throttle)
+            # # calculate errors - diff between the actual rates and the desired rates
+            # # "error" is calculated as setpoint (the goal) - actual
+            # error_rate_roll = (input_roll * max_rate_roll) - gyro_x
+            # error_rate_pitch = (input_pitch * max_rate_pitch) - gyro_y
+            # error_rate_yaw = (input_yaw * max_rate_yaw) - gyro_z
+            # # roll PID calc
+            # roll_p = error_rate_roll * pid_roll_kp
+            # roll_i = roll_last_integral + (error_rate_roll * pid_roll_ki * cycle_time_seconds)
+            # roll_i = max(min(roll_i, i_limit), -i_limit) # constrain within I-term limits
+            # roll_d = pid_roll_kd * (error_rate_roll - roll_last_error) / cycle_time_seconds
+            # pid_roll = roll_p + roll_i + roll_d
+            # # pitch PID calc
+            # pitch_p = error_rate_pitch * pid_pitch_kp
+            # pitch_i = pitch_last_integral + (error_rate_pitch * pid_pitch_ki * cycle_time_seconds)
+            # pitch_i = max(min(pitch_i, i_limit), -i_limit) # constrain within I-term limits
+            # pitch_d = pid_pitch_kd * (error_rate_pitch - pitch_last_error) / cycle_time_seconds
+            # pid_pitch = pitch_p + pitch_i + pitch_d
+            # # yaw PID calc
+            # yaw_p = error_rate_yaw * pid_yaw_kp
+            # yaw_i = yaw_last_integral + (error_rate_yaw * pid_yaw_ki * cycle_time_seconds)
+            # yaw_i = max(min(yaw_i, i_limit), -i_limit) # constrain within I-term limits
+            # yaw_d = pid_yaw_kd * (error_rate_yaw - yaw_last_error) / cycle_time_seconds
+            # pid_yaw = yaw_p + yaw_i + yaw_d
+            # # calculate throttle values
+            # t1 = adj_throttle + pid_pitch + pid_roll - pid_yaw
+            # t2 = adj_throttle + pid_pitch - pid_roll + pid_yaw
+            # t3 = adj_throttle - pid_pitch + pid_roll + pid_yaw
+            # t4 = adj_throttle - pid_pitch - pid_roll - pid_yaw
 
-            # yaw PID calc
-            yaw_p = error_rate_yaw * pid_yaw_kp
-            yaw_i = yaw_last_integral + (error_rate_yaw * pid_yaw_ki * cycle_time_seconds)
-            yaw_i = max(min(yaw_i, i_limit), -i_limit) # constrain within I-term limits
-            yaw_d = pid_yaw_kd * (error_rate_yaw - yaw_last_error) / cycle_time_seconds
-            pid_yaw = yaw_p + yaw_i + yaw_d
 
-            # calculate throttle values
-            t1 = adj_throttle + pid_pitch + pid_roll - pid_yaw
-            t2 = adj_throttle + pid_pitch - pid_roll + pid_yaw
-            t3 = adj_throttle - pid_pitch + pid_roll + pid_yaw
-            t4 = adj_throttle - pid_pitch - pid_roll - pid_yaw
 
             # TODO: numbers arent scaled properly, duty cycle must be between 0-100, this emits 2000000!!!
             # print(t1, adj_throttle, pid_pitch, pid_roll, pid_yaw)
