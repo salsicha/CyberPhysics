@@ -148,12 +148,10 @@ def run() -> None:
 
     roll_p:float = 0
     roll_i:float = 0
-    roll_i:float = 0
     roll_d:float = 0
     pid_roll:float = 0
 
     yaw_p:float = 0
-    yaw_i:float = 0
     yaw_i:float = 0
     yaw_d:float = 0
     pid_yaw:float = 0

@@ -51,6 +51,7 @@ pid_yaw_ki:float = 0.003428571
 pid_yaw_kd:float = 0.0
 
 
+
 ########################################
 ########################################
 ########################################
@@ -129,6 +130,7 @@ def run() -> None:
     throttle_range = max_throttle - throttle_idle # used for adjusted throttle calculation
     i_limit = 150.0 # PID I-term limiter. The applied I-term cannot exceed or go below (negative) this value. (safety mechanism to prevent excessive spooling of the motors)
     last_mode = False # the most recent mode the flight controller was in. False = Standby (props not spinning), True = Flight mode
+    
 
     # State variables - PID related
     # required to be delcared outside of the loop because their state will be used in multiple loops (passed from loop to loop)
@@ -156,12 +158,15 @@ def run() -> None:
 
     roll_p:float = 0
     roll_i:float = 0
-    roll_i:float = 0
     roll_d:float = 0
     pid_roll:float = 0
 
+    pitch_p:float = 0
+    pitch_i:float = 0
+    pitch_d:float = 0
+    pid_pitch:float = 0
+
     yaw_p:float = 0
-    yaw_i:float = 0
     yaw_i:float = 0
     yaw_d:float = 0
     pid_yaw:float = 0
@@ -230,10 +235,13 @@ def run() -> None:
             #         FATAL_ERROR("Throttle was set to " + str(input_throttle) + " as soon as flight mode was entered. Throttle must be at 0% when flight mode begins (safety check).")
 
 
-            # TODO: this replaces the below, which is moved to flight_funcs.pyx
-            # TODO: pass all needed values by reference!!!
-            flight_funcs.calculate_values(t1, t2, t3, t4)
-
+            # This is the cython version of what is below
+            flight_funcs.adj_throttle(adj_throttle, throttle_idle, throttle_range, input_throttle)
+            flight_funcs.calc_errors(max_rate_roll, max_rate_pitch, max_rate_yaw, error_rate_roll, error_rate_pitch, error_rate_yaw, input_roll, input_pitch, input_yaw, gyro_x, gyro_y, gyro_z)
+            flight_funcs.roll_pid_calc(pid_roll, roll_last_integral, roll_p, roll_i, roll_d, error_rate_roll, roll_last_error, pid_roll_kp, pid_roll_ki, pid_roll_kd, cycle_time_seconds, i_limit)
+            flight_funcs.pitch_pid_calc(pitch_p, pitch_i, pitch_d, pid_pitch, error_rate_pitch, pid_pitch_kp, pitch_last_integral, pid_pitch_ki, cycle_time_seconds, i_limit, pid_pitch_kd, pitch_last_error)
+            flight_funcs.yaw_pid_calc(pid_yaw, yaw_p, yaw_i, yaw_d, error_rate_yaw, pid_yaw_kp, yaw_last_integral, pid_yaw_ki, cycle_time_seconds, i_limit, pid_yaw_kd, yaw_last_error)
+            flight_funcs.throttle_calc(t1, t2, t3, t4, adj_throttle, pid_roll, pid_pitch, pid_yaw)
 
 
             # # calculate the adjusted desired throttle (above idle throttle, below governor throttle, scaled linearly)
@@ -271,13 +279,13 @@ def run() -> None:
 
             # TODO: numbers arent scaled properly, duty cycle must be between 0-100, this emits 2000000!!!
             # print(t1, adj_throttle, pid_pitch, pid_roll, pid_yaw)
-            # print("duty cycle: ", calculate_duty_cycle(t1))
+            # print("duty cycle: ", flight_funcs.calculate_duty_cycle(t1))
 
             # Adjust throttle according to input
-            # pwm1.change_duty_cycle(calculate_duty_cycle(t1))
-            # pwm2.change_duty_cycle(calculate_duty_cycle(t2))
-            # pwm3.change_duty_cycle(calculate_duty_cycle(t3))
-            # pwm4.change_duty_cycle(calculate_duty_cycle(t4))
+            # pwm1.change_duty_cycle(flight_funcs.calculate_duty_cycle(t1))
+            # pwm2.change_duty_cycle(flight_funcs.calculate_duty_cycle(t2))
+            # pwm3.change_duty_cycle(flight_funcs.calculate_duty_cycle(t3))
+            # pwm4.change_duty_cycle(flight_funcs.calculate_duty_cycle(t4))
 
             # Test purposes only
             pwm1.change_duty_cycle(50)
@@ -308,7 +316,7 @@ def run() -> None:
     except Exception as e: # something went wrong. Flash the LED so the pilot sees it
 
         # before we do anything, turn the motors OFF
-        duty_0_percent = calculate_duty_cycle(0.0)
+        duty_0_percent = flight_funcs.calculate_duty_cycle(0.0)
         pwm1.change_duty_cycle(duty_0_percent)
         pwm2.change_duty_cycle(duty_0_percent)
         pwm3.change_duty_cycle(duty_0_percent)

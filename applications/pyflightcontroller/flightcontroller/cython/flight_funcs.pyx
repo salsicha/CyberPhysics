@@ -1,72 +1,84 @@
 
-
-def calculate_values(t1, t2, t3, t4):
-        # calculate the adjusted desired throttle (above idle throttle, below governor throttle, scaled linearly)
-        adj_throttle = throttle_idle + (throttle_range * input_throttle)
-
-        # calculate errors - diff between the actual rates and the desired rates
-        # "error" is calculated as setpoint (the goal) - actual
-        error_rate_roll = (input_roll * max_rate_roll) - gyro_x
-        error_rate_pitch = (input_pitch * max_rate_pitch) - gyro_y
-        error_rate_yaw = (input_yaw * max_rate_yaw) - gyro_z
-
-        # roll PID calc
-        roll_p = error_rate_roll * pid_roll_kp
-        roll_i = roll_last_integral + (error_rate_roll * pid_roll_ki * cycle_time_seconds)
-        roll_i = max(min(roll_i, i_limit), -i_limit) # constrain within I-term limits
-        roll_d = pid_roll_kd * (error_rate_roll - roll_last_error) / cycle_time_seconds
-        pid_roll = roll_p + roll_i + roll_d
-
-        # pitch PID calc
-        pitch_p = error_rate_pitch * pid_pitch_kp
-        pitch_i = pitch_last_integral + (error_rate_pitch * pid_pitch_ki * cycle_time_seconds)
-        pitch_i = max(min(pitch_i, i_limit), -i_limit) # constrain within I-term limits
-        pitch_d = pid_pitch_kd * (error_rate_pitch - pitch_last_error) / cycle_time_seconds
-        pid_pitch = pitch_p + pitch_i + pitch_d
-
-        # yaw PID calc
-        yaw_p = error_rate_yaw * pid_yaw_kp
-        yaw_i = yaw_last_integral + (error_rate_yaw * pid_yaw_ki * cycle_time_seconds)
-        yaw_i = max(min(yaw_i, i_limit), -i_limit) # constrain within I-term limits
-        yaw_d = pid_yaw_kd * (error_rate_yaw - yaw_last_error) / cycle_time_seconds
-        pid_yaw = yaw_p + yaw_i + yaw_d
-
-        # calculate throttle values
-        t1 = adj_throttle + pid_pitch + pid_roll - pid_yaw
-        t2 = adj_throttle + pid_pitch - pid_roll + pid_yaw
-        t3 = adj_throttle - pid_pitch + pid_roll + pid_yaw
-        t4 = adj_throttle - pid_pitch - pid_roll - pid_yaw
-
-
-def calculate_duty_cycle(throttle:float, dead_zone:float = 0.03) -> int:
+cdef int calculate_duty_cycle(double *throttle, double *dead_zone):
     """Determines the appropriate PWM duty cycle, in nanoseconds, to use for an ESC controlling a BLDC motor"""
 
-    ### SETTINGS (that aren't parameters) ###
-    duty_ceiling:int = 2000000 # the maximum duty cycle (max throttle, 100%) is 2 ms, or 10% duty (0.10)
-    duty_floor:int = 1000000 # the minimum duty cycle (min throttle, 0%) is 1 ms, or 5% duty (0.05). HOWEVER, I've observed some "twitching" at exactly 5% duty cycle. It is off, but occasionally clips above, triggering the motor temporarily. To prevent this, i'm bringing the minimum down to slightly below 5%
-    ################
+    cdef int duty_ceiling = 2000000
+    cdef int duty_floor = 1000000
 
     # calcualte the filtered percentage (consider dead zone)
-    range:float = 1.0 - dead_zone - dead_zone
-    percentage:float = min(max((throttle - dead_zone) / range, 0.0), 1.0)
+    cdef double range = 1.0 - dead_zone[0] - dead_zone[0]
+    cdef double percentage = min(max((throttle[0] - dead_zone[0]) / range, 0.0), 1.0)
     
-    dutyns:int = duty_floor + ((duty_ceiling - duty_floor) * percentage)
+    cdef double dutyns = duty_floor + ((duty_ceiling - duty_floor) * percentage)
 
     # clamp within the range
     dutyns = max(duty_floor, min(dutyns, duty_ceiling))
 
     return int(dutyns)
 
-def normalize(value:float, original_min:float, original_max:float, new_min:float, new_max:float) -> float:
-    """Normalizes (scales) a value to within a specific range."""
-    return new_min + ((new_max - new_min) * ((value - original_min) / (original_max - original_min)))
 
-def translate_pair(high:int, low:int) -> int:
-        """Converts a byte pair to a usable value. Borrowed from https://github.com/m-rtijn/mpu6050/blob/0626053a5e1182f4951b78b8326691a9223a5f7d/mpu6050/mpu6050.py#L76C39-L76C39."""
-        value = (high << 8) + low
-        if value >= 0x8000:
-            value = -((65535 - value) + 1)
-        return value   
+cdef double normalize(double *value, double *original_min, double *original_max, double *new_min, double *new_max):
+    """Normalizes (scales) a value to within a specific range."""
+    cdef double result = new_min[0] + ((new_max[0] - new_min[0]) * ((value[0] - original_min[0]) / (original_max[0] - original_min[0])))
+    
+    return result
+
+
+cdef int translate_pair(int *high, int *low):
+    """Converts a byte pair to a usable value. Borrowed from https://github.com/m-rtijn/mpu6050/blob/0626053a5e1182f4951b78b8326691a9223a5f7d/mpu6050/mpu6050.py#L76C39-L76C39."""
+    value = (high[0] << 8) + low[0]
+    if value >= 0x8000:
+        value = -((65535 - value) + 1)
+    return value   
+
+
+cdef void adj_throttle(double *adj_throttle, double *throttle_idle, double *throttle_range, double *input_throttle):
+    # calculate the adjusted desired throttle (above idle throttle, below governor throttle, scaled linearly)
+    # Cython style dereferencing!!!
+    adj_throttle[0] = throttle_idle[0] + (throttle_range[0] * input_throttle[0])
+
+
+cdef void calc_errors(double *max_rate_roll, double *max_rate_pitch, double *max_rate_yaw, double *error_rate_roll, double *error_rate_pitch, double *error_rate_yaw, double *input_roll, double *input_pitch, double *input_yaw, double *gyro_x, double *gyro_y, double *gyro_z):
+    # calculate errors - diff between the actual rates and the desired rates
+    # "error" is calculated as setpoint (the goal) - actual
+    error_rate_roll[0] = (input_roll[0] * max_rate_roll[0]) - gyro_x[0]
+    error_rate_pitch[0] = (input_pitch[0] * max_rate_pitch[0]) - gyro_y[0]
+    error_rate_yaw[0] = (input_yaw[0] * max_rate_yaw[0]) - gyro_z[0]
+
+
+cdef void roll_pid_calc(double *pid_roll, double *roll_last_integral, double *roll_p, double *roll_i, double *roll_d, double *error_rate_roll, double *roll_last_error, double *pid_roll_kp, double *pid_roll_ki, double *pid_roll_kd, double *cycle_time_seconds, double *i_limit):
+    # roll PID calc
+    roll_p[0] = error_rate_roll[0] * pid_roll_kp[0]
+    roll_i[0] = roll_last_integral[0] + (error_rate_roll[0] * pid_roll_ki[0] * cycle_time_seconds[0])
+    roll_i[0] = max(min(roll_i[0], i_limit[0]), -i_limit[0])
+    roll_d[0] = pid_roll_kd[0] * (error_rate_roll[0] - roll_last_error[0]) / cycle_time_seconds[0]
+    pid_roll[0] = roll_p[0] + roll_i[0] + roll_d[0]
+
+
+cdef void pitch_pid_calc(double *pitch_p, double *pitch_i, double *pitch_d, double *pid_pitch, double *error_rate_pitch, double *pid_pitch_kp, double *pitch_last_integral, double *pid_pitch_ki, double *cycle_time_seconds, double *i_limit, double *pid_pitch_kd, double *pitch_last_error):
+    # pitch PID calc
+    pitch_p[0] = error_rate_pitch[0] * pid_pitch_kp[0]
+    pitch_i[0] = pitch_last_integral[0] + (error_rate_pitch[0] * pid_pitch_ki[0] * cycle_time_seconds[0])
+    pitch_i[0] = max(min(pitch_i[0], i_limit[0]), -i_limit[0]) 
+    pitch_d[0] = pid_pitch_kd[0] * (error_rate_pitch[0] - pitch_last_error[0]) / cycle_time_seconds[0]
+    pid_pitch[0] = pitch_p[0] + pitch_i[0] + pitch_d[0]
+
+
+cdef void yaw_pid_calc(double *pid_yaw, double *yaw_p, double *yaw_i, double *yaw_d, double *error_rate_yaw, double *pid_yaw_kp, double *yaw_last_integral, double *pid_yaw_ki, double *cycle_time_seconds, double *i_limit, double *pid_yaw_kd, double *yaw_last_error):
+    # yaw PID calc
+    yaw_p[0] = error_rate_yaw[0] * pid_yaw_kp[0]
+    yaw_i[0] = yaw_last_integral[0] + (error_rate_yaw[0] * pid_yaw_ki[0] * cycle_time_seconds[0])
+    yaw_i[0] = max(min(yaw_i[0], i_limit[0]), -i_limit[0]) 
+    yaw_d[0] = pid_yaw_kd[0] * (error_rate_yaw[0] - yaw_last_error[0]) / cycle_time_seconds[0]
+    pid_yaw[0] = yaw_p[0] + yaw_i[0] + yaw_d[0]
+
+
+cdef void throttle_calc(double *t1, double *t2, double *t3, double *t4, double *adj_throttle, double *pid_roll, double *pid_pitch, double *pid_yaw):
+    # calculate throttle values
+    t1[0] = adj_throttle[0] + pid_pitch[0] + pid_roll[0] - pid_yaw[0]
+    t2[0] = adj_throttle[0] + pid_pitch[0] - pid_roll[0] + pid_yaw[0]
+    t3[0] = adj_throttle[0] - pid_pitch[0] + pid_roll[0] + pid_yaw[0]
+    t4[0] = adj_throttle[0] - pid_pitch[0] - pid_roll[0] - pid_yaw[0]
 
 
 
