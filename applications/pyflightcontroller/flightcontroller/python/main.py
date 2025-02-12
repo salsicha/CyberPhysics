@@ -64,10 +64,18 @@ import sys
 
 from rpi_hardware_pwm import HardwarePWM
 
+import rclpy
+from rclpy.node import Node
+from std_msgs.msg import String
+
 import gc
 # Disable garbage collection
 gc.disable()
 
+
+
+def input_callback(msg):
+    print("data: ", msg.data)
 
 
 # THE FLIGHT CONTROL LOOP
@@ -169,10 +177,34 @@ def run() -> None:
     average_diff:float = 0
     #
 
+
+
+
+    ### ROS
+    rclpy.init()
+    node = Node('subscriber_node')
+    my_subscriber = node.create_subscription(
+        String,
+        'topic',
+        input_callback,
+        10)
+    ###
+
+
+
     # INFINITE LOOP
     print("-- BEGINNING FLIGHT CONTROL LOOP NOW --")
     try:
-        while True:
+        # while True:
+
+        ### ROS
+        while rclpy.ok():
+            rclpy.spin_once(my_subscriber, timeout_sec=0.001)
+            if my_subscriber.received_message:
+                # print(f"Processing message: {my_subscriber.received_message}")
+                my_subscriber.received_message = None
+            ###
+
 
             # Loop performance profiling
             average_diff = time.monotonic() - profile_time
@@ -308,6 +340,11 @@ def run() -> None:
         pwm4.stop()
         
         FATAL_ERROR(str(e))
+
+    finally:
+        my_subscriber.destroy_node()
+        rclpy.shutdown()
+
 
 
 # UTILITY FUNCTIONS BELOW (Anything that is used by the flight controller loop should go here, not in a separate module or class (to save on processing time)
@@ -493,4 +530,5 @@ def initIMU():
 
 
 ########### RUN THE SCOUT FLIGHT CONTROLLER PROGRAM ###########
+
 run()
