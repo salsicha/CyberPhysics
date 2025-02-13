@@ -144,3 +144,9 @@ cset shield --reset
 sudo apt remove python3-rpi.gpio
 sudo apt install python3-rpi-lgpio
 ```
+
+
+## Migrating to LFS
+```bash
+git lfs migrate import --include="*.exe, *.iso" --everything
+```
