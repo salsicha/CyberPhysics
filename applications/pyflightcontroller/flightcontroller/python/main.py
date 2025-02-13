@@ -73,9 +73,35 @@ import gc
 gc.disable()
 
 
+input_throttle:float = 10
+input_roll:float = 0
+input_pitch:float = 0
+input_yaw:float = 0
+
+adj_throttle:float = 10
+
+
 
 def input_callback(msg):
     print("data: ", msg.data)
+    # msg.data.linear.x
+    # msg.data.linear.y
+    # msg.data.linear.z
+    # msg.data.angular.x
+    # msg.data.angular.y
+    # msg.data.angular.z
+
+    # input_throttle
+    # input_roll
+    # input_pitch
+    # input_yaw
+
+    # TODO:
+    # keyboard arrow keys will be translated to Twist values
+    # the twist values need to be translated into input_throttle, input_roll, input_pitch, input_yaw
+    # the Twist linear.x will map to moving forward, "forward/up arrow key"
+    # the forward motion will be measured by a kalman filter of optical flow and gps data
+
 
 
 # THE FLIGHT CONTROL LOOP
@@ -138,14 +164,6 @@ def run() -> None:
     yaw_last_integral:float = 0.0
     yaw_last_error:float = 0.0
 
-
-    input_throttle:float = 10
-    input_roll:float = 0
-    input_pitch:float = 0
-    input_yaw:float = 0
-
-    adj_throttle:float = 10
-
     gyro_x:float = 0
     gyro_y:float = 0
     gyro_z:float = 0
@@ -185,7 +203,7 @@ def run() -> None:
     node = Node('subscriber_node')
     my_subscriber = node.create_subscription(
         String,
-        'topic',
+        'key_pressed',
         input_callback,
         10)
     ###
