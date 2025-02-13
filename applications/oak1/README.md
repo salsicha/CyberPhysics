@@ -1,3 +1,13 @@
+
+
+# Manual quickstart:
+source ~/venv/bin/activate
+./scripts/install_deps.sh
+python3 scripts/featuretracker.py
+or:
+depthai_viewer
+
+
 # Oak-1 Camera ROS2 Driver
 
 Publish Oak-1 camera images via ros2 msgs and utilize compute from camera 

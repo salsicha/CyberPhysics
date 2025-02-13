@@ -22,9 +22,10 @@ RUN apt update && apt install -y --no-install-recommends \
 COPY scripts/ /scripts/
 WORKDIR /scripts
 
-# TODO: do these need installing? on host?
-# RUN chmod +x /scripts/install_deps.sh
-# RUN apt update && /scripts/install_deps.sh
+RUN chmod +x /scripts/install_deps.sh
+RUN apt update && /scripts/install_deps.sh
+
+RUN . /venv/bin/activate && pip install depthai-viewer
 
 COPY ./entrypoint.sh /
 RUN chmod +x /entrypoint.sh
