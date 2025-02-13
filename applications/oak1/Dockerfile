@@ -14,13 +14,17 @@ COPY requirements.txt /
 RUN apt update && apt install -y --no-install-recommends \
     python3-rosdep python3-colcon-ros python3-pip ros-$ROS2_DISTRO-cv-bridge \
     && apt install -y x11-apps \
+    && . /venv/bin/activate \
     && pip install -r /requirements.txt \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get upgrade -y
 
-COPY scripts/driver.py /
-COPY scripts/custom_script.py /
-WORKDIR /
+COPY scripts/ /scripts/
+WORKDIR /scripts
+
+# TODO: do these need installing? on host?
+# RUN chmod +x /scripts/install_deps.sh
+# RUN apt update && /scripts/install_deps.sh
 
 COPY ./entrypoint.sh /
 RUN chmod +x /entrypoint.sh

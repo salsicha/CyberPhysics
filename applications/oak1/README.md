@@ -53,6 +53,15 @@ Published image topic:
 https://github.com/luxonis/depthai-python
 
 
+## Dependencies:
+sudo wget -qO- https://docs.luxonis.com/install_dependencies.sh | bash
+
+
+## DepthAI Viewer:
+python3 -m pip install depthai-viewer
+python3 -m depthai_viewer
+
+
 ## TODO:
 
 This script should do optical flow for motion tracking on the MDK drone
@@ -62,3 +71,5 @@ This script should do object tracking
 scripts/objecttracking.py
 
 
+## Running in container:
+-v /dev/bus/usb:/dev/bus/usb --device-cgroup-rule='c 189:* rmw'

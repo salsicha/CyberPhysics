@@ -5,13 +5,6 @@ Original source code here:
 https://github.com/timhanewich/scout
 
 
-TODO:
-The original MicroPython code was converted with Qwen2.5-coder
-It was converted to Python and the Raspberry Pi GPIO library,
-and then converted to Cython
-
-Needs testing...
-
 
 ## Raspberry Pi 5 fixes:
 
@@ -25,13 +18,14 @@ https://ozzmaker.com/i2c/
 sudo raspi-config
 I2C -> select -> enable
 
-
 Set up venv:
 sudo apt-get install python3-venv
 cd ~
 python -m venv venv
 source ~/venv/bin/activate
 
-
 Raspberry Pi 5 config:
 Need to add 'dtoverlay=pwm-2chan' to /boot/firmware/config.txt and reboot
+
+
+
