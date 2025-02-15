@@ -162,6 +162,9 @@ def run():
     node = Node('imu_publisher_node')
     # publisher = node.create_publisher(String, 'topic', 10)
 
+    # TODO:
+    # publisher topic type?
+
     rate = node.create_rate(0.1)
 
     while rclpy.ok():
