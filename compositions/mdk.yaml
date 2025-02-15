@@ -1,10 +1,12 @@
 
 
-# PyFlightController
+# Ozzmaker IMU, GPS pub
 
 # Oak-1 ROS feature publisher
 
-# VINS-MONO
+# FlightController, subscribers
+
+# VINS-MONO, only calculate velocity, do I need the whole repo???
 
 # Kalman Filter
 
