@@ -94,8 +94,6 @@ def run() -> None:
     print("Pitch PID: " + str(pid_pitch_kp) + ", " + str(pid_pitch_ki) + ", " + str(pid_pitch_kd))
     print("Yaw PID: " + str(pid_yaw_kp) + ", " + str(pid_yaw_ki) + ", " + str(pid_yaw_kd))
 
-    # Ozzmaker
-    initIMU()
     gxs = []
     gys = []
     gzs = []
@@ -175,14 +173,21 @@ def run() -> None:
     # INFINITE LOOP
     print("-- BEGINNING FLIGHT CONTROL LOOP NOW --")
     try:
-        # while True:
-
-        ### ROS
         while rclpy.ok():
-            rclpy.spin_once(my_subscriber, timeout_sec=0.001)
-            if my_subscriber.received_message:
-                # print(f"Processing message: {my_subscriber.received_message}")
-                my_subscriber.received_message = None
+
+            ### ROS
+            # IMU
+            rclpy.spin_once(imu_sub, timeout_sec=0.001)
+            if imu_sub.received_message:
+                # print(f"Processing message: {imu_sub.received_message}")
+                imu_data = imu_sub.received_message.data
+                imu_sub.received_message = None
+            # KEYBOARD
+            rclpy.spin_once(keyboard_sub, timeout_sec=0.001)
+            if keyboard_sub.received_message:
+                # print(f"Processing message: {keyboard_sub.received_message}")
+                keyboard_data = keyboard_sub.received_message.data
+                keyboard_sub.received_message = None
             ###
 
 

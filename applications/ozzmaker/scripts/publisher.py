@@ -1,16 +1,27 @@
 
-
-
 import rclpy
 from rclpy.node import Node
 
 from std_msgs.msg import String
+from sensor_msgs.msg import Imu
+
+from sensor_msgs.msg import NavSatFix
+from sensor_msgs.msg import NavSatStatus
+from std_msgs.msg import Header
+from geometry_msgs.msg import (Quaternion, Vector3)
 
 import time
 
+import smbus2
+bus = smbus2.SMBus(1)
+
+from LSM6DSL import *
+from MMC5983MA import *
+
+from gps import *
+
 import gc
 gc.disable() # Disable garbage collection
-
 
 
 ########### Ozzmaker PROGRAM ###########
@@ -158,35 +169,83 @@ def run():
 
     initIMU()
 
+    # TODO: 
+    # Sync clock to GPS
+
+    gpsd = gps(mode=WATCH_ENABLE|WATCH_NEWSTYLE) 
+
     rclpy.init()
-    node = Node('imu_publisher_node')
-    # publisher = node.create_publisher(String, 'topic', 10)
+    node = Node('nav_publisher_node')
+    imu_pub = node.create_publisher(Imu, 'imu', 10)
+    nav_pub = node.create_publisher(NavSatFix, 'imu', 10)
 
-    # TODO:
-    # publisher topic type?
-
-    rate = node.create_rate(0.1)
+    rate = node.create_rate(200) # 200 Hz, device supports up to 6000 Hz!!!
 
     while rclpy.ok():
 
+        # IMU
 
-        # TODO:
-        # ROS publish IMU, GPS
+        imu_msg = Imu()
 
+        accel = Vector3()
+        accel.x = readACCx()
+        accel.y = readACCy()
+        accel.z = readACCz()
+        imu_msg.linear_acceleration = accel
+        imu_msg.linear_acceleration_covariance[0] = 0.00001
+        imu_msg.linear_acceleration_covariance[4] = 0.00001
+        imu_msg.linear_acceleration_covariance[8] = 0.00001
 
-        ACCx = readACCx()
-        ACCy = readACCy()
-        ACCz = readACCz()
+        gyro = Vector3()
+        gyro.x = readGYRx()
+        gyro.y = readGYRy()
+        gyro.z = readGYRz()
+        imu_msg.angular_velocity = gyro
+        imu_msg.angular_velocity_covariance[0] = 0.00001
+        imu_msg.angular_velocity_covariance[4] = 0.00001
+        imu_msg.angular_velocity_covariance[8] = 0.00001
+            
+        imu_msg.orientation[w] = 0.0
+        imu_msg.orientation[x] = 0.0
+        imu_msg.orientation[y] = 0.0
+        imu_msg.orientation[z] = 0.0           
+        imu_msg.orientation_covariance[0] = 0.00001
+        imu_msg.orientation_covariance[4] = 0.00001
+        imu_msg.orientation_covariance[8] = 0.00001
+            
+        imu_msg.header.stamp = node.get_clock().now().to_msg()
+        imu_msg.header.frame_id = "imu"
 
-        GYRx = readGYRx()
-        GYRy = readGYRy()
-        GYRz = readGYRz()
+        imu_pub.publish(imu_msg)
 
+        # NAV
 
-        # msg = String()
-        # msg.data = 'Hello World'
-        # publisher.publish(msg)
+        report = gpsd.next() #
+        if report['class'] == 'TPV':
+            nav_msg = NavSatFix()
+            nav_msg.header = Header()
+            nav_msg.header.stamp = node.get_clock().now().to_msg()
+            nav_msg.header.frame_id = "gps"
 
+            nav_msg.status.status = NavSatStatus.STATUS_FIX
+            nav_msg.status.service = NavSatStatus.SERVICE_GPS
+             
+            nav_msg.latitude = getattr(report,'lat',0.0)
+            nav_msg.longitude = getattr(report,'lon',0.0)
+            nav_msg.altitude = getattr(report,'alt','nan')
+
+            # getattr(report,'time','')
+            # getattr(report,'epv','nan')
+            # getattr(report,'ept','nan')
+            # getattr(report,'speed','nan')
+            # getattr(report,'climb','nan')
+        
+            nav_msg.position_covariance[0] = 0
+            nav_msg.position_covariance[4] = 0
+            nav_msg.position_covariance[8] = 0
+            nav_msg.position_covariance_type = NavSatFix.COVARIANCE_TYPE_DIAGONAL_KNOWN
+            
+            nav_pub.publish(nav_msg)
 
         rate.sleep()
 
