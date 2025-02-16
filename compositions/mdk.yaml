@@ -1,12 +1,16 @@
 
 
 # Ozzmaker IMU, GPS pub
+/scripts/publisher.py
 
 # Oak-1 ROS feature publisher
+/scripts/featuretracker.py
 
 # FlightController, subscribers
+/flightcontroller/python/main.py
 
 # VINS-MONO, only calculate velocity, do I need the whole repo???
+vins_estimator.launch.py
 
 # Kalman Filter
 

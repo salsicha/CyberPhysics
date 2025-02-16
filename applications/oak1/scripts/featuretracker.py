@@ -140,12 +140,21 @@ with dai.Device(pipeline) as device:
     while True:
         inPassthroughFrameColor = passthroughImageColorQueue.get()
         passthroughFrameColor = inPassthroughFrameColor.getCvFrame()
-        colorFrame = passthroughFrameColor
 
         trackedFeaturesColor = outputFeaturesColorQueue.get().trackedFeatures
         colorFeatureDrawer.trackFeaturePath(trackedFeaturesColor)
 
+
+        # TODO: publish feature tracks!
+        # outputFeaturesColorQueue.get().trackedFeatures
+        # TrackedFeatures message. Carries position (X, Y) of tracked features and their ID.
+        # from std_msgs.msg import String,Int32,Int32MultiArray,MultiArrayLayout,MultiArrayDimension
+        # from rospy.numpy_msg import numpy_msg
+        # Which msg type??
+
+
         if show_window:
+            colorFrame = passthroughFrameColor
 
             colorFeatureDrawer.drawFeatures(colorFrame)
 
