@@ -322,11 +322,14 @@ void process()
             header.frame_id = "world";
 
             pubOdometry(estimator, header);
-            pubKeyPoses(estimator, header);
-            pubCameraPose(estimator, header);
-            pubPointCloud(estimator, header);
-            pubTF(estimator, header);
-            pubKeyframe(estimator);
+
+            // Not using these:
+            // pubKeyPoses(estimator, header);
+            // pubCameraPose(estimator, header);
+            // pubPointCloud(estimator, header);
+            // pubTF(estimator, header);
+            // pubKeyframe(estimator);
+
             if (relo_msg != NULL)
                 pubRelocalization(estimator);
             //RCUTILS_LOG_ERROR("end: %f, at %f", img_msg->header.stamp.toSec(), ros::Time::now().toSec());

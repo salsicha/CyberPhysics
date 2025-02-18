@@ -67,6 +67,7 @@ from rpi_hardware_pwm import HardwarePWM
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
+from nav_msgs.msg import Odometry
 
 
 
@@ -76,7 +77,6 @@ input_pitch:float = 0
 input_yaw:float = 0
 
 adj_throttle:float = 10
-
 
 
 
@@ -373,12 +373,13 @@ def FATAL_ERROR(msg:str) -> None:
 
 ########### ROS ###########
 
-# TODO: 
-# subscribe to IMU data topic
-
 GYRx = 0.0
 GYRy = 0.0
 GYRz = 0.0
+
+VELx = 0.0
+VELy = 0.0
+VELz = 0.0
 
 def input_callback(msg):
     print("data: ", msg.data)
@@ -409,6 +410,12 @@ def imu_callback(msg):
     GYRy = msg.data.angular.y
     GYRz = msg.data.angular.z
 
+def odom_callback(msg):
+    print("odom: ", msg.data)
+    msg.data.pose.pose.position.x
+    VELx = msg.data.twist.twist.linear.x
+    VELy = msg.data.twist.twist.linear.y
+    VELz = msg.data.twist.twist.linear.z
 
 rclpy.init()
 node = Node('subscriber_node')
@@ -423,6 +430,21 @@ imu_sub = node.create_subscription(
     'imu_data',
     imu_callback,
     10)
+
+odom_sub = node.create_subscription(
+    Odometry,
+    'odometry',
+    odom_callback,
+    10)
+
+def readVELx():
+    return VELx
+
+def readVELy():
+    return VELy
+
+def readVELz():
+    return VELz
 
 def readGYRx():
     return GYRx

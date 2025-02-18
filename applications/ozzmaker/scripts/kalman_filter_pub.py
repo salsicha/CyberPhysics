@@ -21,6 +21,24 @@ import IMU
 import datetime
 import os
 
+from gps import *
+
+import rclpy
+from rclpy.node import Node
+
+from std_msgs.msg import String
+from sensor_msgs.msg import Imu
+
+from sensor_msgs.msg import NavSatFix
+from sensor_msgs.msg import NavSatStatus
+from std_msgs.msg import Header
+from geometry_msgs.msg import (Quaternion, Vector3)
+
+import gc
+gc.disable() # Disable garbage collection
+
+
+
 
 RAD_TO_DEG = 57.29578
 M_PI = 3.14159265358979323846
@@ -189,8 +207,19 @@ IMU.detectIMU()     #Detect if BerryIMU is connected.
 IMU.initIMU()       #Initialise the accelerometer, gyroscope and compass
 
 
-while True:
+gpsd = gps(mode=WATCH_ENABLE|WATCH_NEWSTYLE) 
 
+rclpy.init()
+node = Node('nav_publisher_node')
+imu_pub = node.create_publisher(Imu, 'imu', 10)
+nav_pub = node.create_publisher(NavSatFix, 'imu', 10)
+
+rate = node.create_rate(200) # 200 Hz, device supports up to 6000 Hz!!!
+
+
+# while True:
+while rclpy.ok():
+    
     #Read the accelerometer,gyroscope and magnetometer values
     ACCx = IMU.readACCx()
     ACCy = IMU.readACCy()
@@ -375,23 +404,92 @@ while True:
     ##################### END Tilt Compensation ########################
 
 
-    if 1:                       #Change to '0' to stop showing the angles from the accelerometer
-        outputString += "#  ACCX Angle %5.2f ACCY Angle %5.2f  #  " % (AccXangle, AccYangle)
+    # if 1:                       #Change to '0' to stop showing the angles from the accelerometer
+    #     outputString += "#  ACCX Angle %5.2f ACCY Angle %5.2f  #  " % (AccXangle, AccYangle)
 
-    if 1:                       #Change to '0' to stop  showing the angles from the gyro
-        outputString +="\t# GRYX Angle %5.2f  GYRY Angle %5.2f  GYRZ Angle %5.2f # " % (gyroXangle,gyroYangle,gyroZangle)
+    # if 1:                       #Change to '0' to stop  showing the angles from the gyro
+    #     outputString +="\t# GRYX Angle %5.2f  GYRY Angle %5.2f  GYRZ Angle %5.2f # " % (gyroXangle,gyroYangle,gyroZangle)
 
-    if 1:                       #Change to '0' to stop  showing the angles from the complementary filter
-        outputString +="\t#  CFangleX Angle %5.2f   CFangleY Angle %5.2f  #" % (CFangleX,CFangleY)
+    # if 1:                       #Change to '0' to stop  showing the angles from the complementary filter
+    #     outputString +="\t#  CFangleX Angle %5.2f   CFangleY Angle %5.2f  #" % (CFangleX,CFangleY)
 
-    if 1:                       #Change to '0' to stop  showing the heading
-        outputString +="\t# HEADING %5.2f  tiltCompensatedHeading %5.2f #" % (heading,tiltCompensatedHeading)
+    # if 1:                       #Change to '0' to stop  showing the heading
+    #     outputString +="\t# HEADING %5.2f  tiltCompensatedHeading %5.2f #" % (heading,tiltCompensatedHeading)
 
-    if 1:                       #Change to '0' to stop  showing the angles from the Kalman filter
-        outputString +="# kalmanX %5.2f   kalmanY %5.2f #" % (kalmanX,kalmanY)
+    # if 1:                       #Change to '0' to stop  showing the angles from the Kalman filter
+    #     outputString +="# kalmanX %5.2f   kalmanY %5.2f #" % (kalmanX,kalmanY)
 
-    print(outputString)
+    # print(outputString)
 
     #slow program down a bit, makes the output more readable
-    time.sleep(0.03)
+    # time.sleep(0.03)
 
+
+    # IMU
+
+    imu_msg = Imu()
+
+    accel = Vector3()
+    accel.x = ACCx
+    accel.y = ACCy
+    accel.z = ACCz
+    imu_msg.linear_acceleration = accel
+    imu_msg.linear_acceleration_covariance[0] = 0.00001
+    imu_msg.linear_acceleration_covariance[4] = 0.00001
+    imu_msg.linear_acceleration_covariance[8] = 0.00001
+
+    gyro = Vector3()
+    gyro.x = GYRx
+    gyro.y = GYRy
+    gyro.z = GYRz
+    imu_msg.angular_velocity = gyro
+    imu_msg.angular_velocity_covariance[0] = 0.00001
+    imu_msg.angular_velocity_covariance[4] = 0.00001
+    imu_msg.angular_velocity_covariance[8] = 0.00001
+        
+    imu_msg.orientation[w] = 0.0
+    imu_msg.orientation[x] = 0.0
+    imu_msg.orientation[y] = 0.0
+    imu_msg.orientation[z] = 0.0           
+    imu_msg.orientation_covariance[0] = 0.00001
+    imu_msg.orientation_covariance[4] = 0.00001
+    imu_msg.orientation_covariance[8] = 0.00001
+        
+    imu_msg.header.stamp = node.get_clock().now().to_msg()
+    imu_msg.header.frame_id = "imu"
+
+    imu_pub.publish(imu_msg)
+
+    # NAV
+
+    report = gpsd.next() #
+    if report['class'] == 'TPV':
+        nav_msg = NavSatFix()
+        nav_msg.header = Header()
+        nav_msg.header.stamp = node.get_clock().now().to_msg()
+        nav_msg.header.frame_id = "gps"
+
+        nav_msg.status.status = NavSatStatus.STATUS_FIX
+        nav_msg.status.service = NavSatStatus.SERVICE_GPS
+            
+        nav_msg.latitude = getattr(report,'lat',0.0)
+        nav_msg.longitude = getattr(report,'lon',0.0)
+        nav_msg.altitude = getattr(report,'alt','nan')
+
+        # getattr(report,'time','')
+        # getattr(report,'epv','nan')
+        # getattr(report,'ept','nan')
+        # getattr(report,'speed','nan')
+        # getattr(report,'climb','nan')
+    
+        nav_msg.position_covariance[0] = 0
+        nav_msg.position_covariance[4] = 0
+        nav_msg.position_covariance[8] = 0
+        nav_msg.position_covariance_type = NavSatFix.COVARIANCE_TYPE_DIAGONAL_KNOWN
+        
+        nav_pub.publish(nav_msg)
+
+    rate.sleep()
+
+node.destroy_node()
+rclpy.shutdown()
