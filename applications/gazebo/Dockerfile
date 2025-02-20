@@ -28,3 +28,23 @@ RUN . /venv/bin/activate && . /opt/ros/$ROS2_DISTRO/setup.bash && \
     rosdep install --from-paths src --ignore-src -y && \
     colcon build --merge-install --install-base /opt/ros/$ROS2_DISTRO
 
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+
+#####################################################################
+FROM scratch
+
+ENV LANG=en_US.UTF-8 \
+    LANGUAGE=en_US.UTF-8 \
+    TERM=xterm \
+    PYTHONIOENCODING=UTF-8 \
+    ROS2_DISTRO=jazzy \
+    DEBIAN_FRONTEND=noninteractive \
+    PATH="/venv/bin:$PATH"
+
+COPY --from=build / /
+
+WORKDIR /workspace
+
+ENTRYPOINT ["/entrypoint.sh"]
