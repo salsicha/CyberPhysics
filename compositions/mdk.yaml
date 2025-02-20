@@ -1,21 +1,52 @@
 
 
-# Ozzmaker IMU, GPS pub
-/scripts/publisher.py
+services:
+  ozzmaker: # Ozzmaker IMU, GPS pub
+    network_mode: "host"
+    image: cyberphysics/ozzmaker
+    privileged: true
+    devices:
+      - /dev:/dev
+    volumes:
+      - /dev/shm:/dev/shm
+    command: >
+      /scripts/publisher.py
+  oak: # Oak-1 ROS feature publisher
+    network_mode: "host"
+    image: cyberphysics/oak
+    privileged: true
+    devices:
+      - /dev:/dev
+    volumes:
+      - /dev/shm:/dev/shm
+    command: >
+      /scripts/featuretracker.py
+  pyflightcontroller: # FlightController subscribers
+    network_mode: "host"
+    image: cyberphysics/ozzmaker
+    privileged: true
+    devices:
+      - /dev:/dev
+    volumes:
+      - /dev/shm:/dev/shm
+    command: >
+      /flightcontroller/python/main.py
 
-# Oak-1 ROS feature publisher
-/scripts/featuretracker.py
 
-# FlightController, subscribers
-/flightcontroller/python/main.py
 
 # VINS-MONO, only calculate velocity, do I need the whole repo???
 vins_estimator.launch.py
-
-# Kalman Filter
 
 # laser distance publisher
 
 # behavior tree, obstacle avoidance
 
 # web interface
+services:
+  nicegui:
+    build:
+      context: .
+    ports:
+      - 8080:8080
+    volumes:
+      - ./ros2_ws/src:/ros2_ws/src
