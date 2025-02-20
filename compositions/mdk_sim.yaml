@@ -1,0 +1,21 @@
+
+
+services:
+  pyflightcontroller: # FlightController subscribers
+    network_mode: "host"
+    image: cyberphysics/pyflightcontroller
+    privileged: true
+    devices:
+      - /dev:/dev
+    volumes:
+      - /dev/shm:/dev/shm
+    command: >
+      /flightcontroller/python/main.py
+  gazebo: # simulator
+    network_mode: "host"
+    image: cyberphysics/gazebo
+    privileged: true
+    volumes:
+      - /dev/shm:/dev/shm
+    command: >
+      ros2 launch drone.launch.py
