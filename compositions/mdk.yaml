@@ -41,16 +41,6 @@ services:
       - /dev/shm:/dev/shm
     command: >
       ros2 launch vins_estimator.launch.py
-  vinsmono: # VINS-MONO, only calculate velocity, do I need the whole repo???
-    network_mode: "host"
-    image: cyberphysics/vinsmono
-    privileged: true
-    devices:
-      - /dev:/dev
-    volumes:
-      - /dev/shm:/dev/shm
-    command: >
-      ros2 launch vins_estimator.launch.py
   rangefinder: # laser distance publisher
     network_mode: "host"
     image: cyberphysics/rangefinder
@@ -81,4 +71,12 @@ services:
       - /dev/shm:/dev/shm
     command: >
       /scripts/main.py
-      
+
+  # gazebo: # simulator
+  #   network_mode: "host"
+  #   image: cyberphysics/gazebo
+  #   privileged: true
+  #   volumes:
+  #     - /dev/shm:/dev/shm
+  #   command: >
+  #     ros2 launch drone.launch.py
