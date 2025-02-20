@@ -23,7 +23,7 @@ services:
       /scripts/featuretracker.py
   pyflightcontroller: # FlightController subscribers
     network_mode: "host"
-    image: cyberphysics/ozzmaker
+    image: cyberphysics/pyflightcontroller
     privileged: true
     devices:
       - /dev:/dev
@@ -31,22 +31,54 @@ services:
       - /dev/shm:/dev/shm
     command: >
       /flightcontroller/python/main.py
-
-
-
-# VINS-MONO, only calculate velocity, do I need the whole repo???
-vins_estimator.launch.py
-
-# laser distance publisher
-
-# behavior tree, obstacle avoidance
-
-# web interface
-services:
-  nicegui:
-    build:
-      context: .
-    ports:
-      - 8080:8080
+  vinsmono: # VINS-MONO, only calculate velocity, do I need the whole repo???
+    network_mode: "host"
+    image: cyberphysics/vinsmono
+    privileged: true
+    devices:
+      - /dev:/dev
     volumes:
-      - ./ros2_ws/src:/ros2_ws/src
+      - /dev/shm:/dev/shm
+    command: >
+      ros2 launch vins_estimator.launch.py
+  vinsmono: # VINS-MONO, only calculate velocity, do I need the whole repo???
+    network_mode: "host"
+    image: cyberphysics/vinsmono
+    privileged: true
+    devices:
+      - /dev:/dev
+    volumes:
+      - /dev/shm:/dev/shm
+    command: >
+      ros2 launch vins_estimator.launch.py
+  rangefinder: # laser distance publisher
+    network_mode: "host"
+    image: cyberphysics/rangefinder
+    privileged: true
+    devices:
+      - /dev:/dev
+    volumes:
+      - /dev/shm:/dev/shm
+    command: >
+      /scripts/main.py
+  behaviortree: # Behavior Tree, obstacle avoidance
+    network_mode: "host"
+    image: cyberphysics/behaviortree
+    privileged: true
+    devices:
+      - /dev:/dev
+    volumes:
+      - /dev/shm:/dev/shm
+    command: >
+      /scripts/main.py
+  nicegui: # web interface
+    network_mode: "host"
+    image: cyberphysics/nicegui
+    privileged: true
+    devices:
+      - /dev:/dev
+    volumes:
+      - /dev/shm:/dev/shm
+    command: >
+      /scripts/main.py
+      
