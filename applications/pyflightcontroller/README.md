@@ -80,3 +80,5 @@ https://github.com/DroneBridge/DroneBridge
 
 
 
+Front camera
+https://www.raspberrypi.com/products/ai-camera/
