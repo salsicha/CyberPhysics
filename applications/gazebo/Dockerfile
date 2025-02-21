@@ -2,6 +2,10 @@
 FROM cyberphysics/ros2:latest AS build
 
 
+# TODO:
+# needs ROS2 Iron, Ubuntu 22.04
+
+
 ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US.UTF-8 \
     TERM=xterm \
