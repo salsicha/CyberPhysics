@@ -1,60 +1,40 @@
+ARG ROS_DISTRO=iron
+FROM ros:${ROS_DISTRO}-ros-core-jammy
 
-FROM cyberphysics/ros2:latest AS build
+RUN apt-get update \
+    && apt-get install -y \
+    wget curl unzip \
+    lsb-release \
+    mesa-utils \
+    build-essential \
+    && apt-get clean
 
+# Get gazebo binaries
+RUN echo "deb http://packages.osrfoundation.org/gazebo/ubuntu `lsb_release -cs` main" > /etc/apt/sources.list.d/gazebo-stable.list \
+    && wget http://packages.osrfoundation.org/gazebo.key -O - | apt-key add - \
+    && apt-get update \
+    && apt-get install -y \
+    gazebo \
+    ros-${ROS_DISTRO}-gazebo-ros-pkgs \
+    python3-colcon-common-extensions python3-rosdep --no-install-recommends \
+    && apt-get clean
+RUN rosdep init && rosdep update
 
-# TODO:
-# needs ROS2 Iron, Ubuntu 22.04
+RUN mkdir -p /ros2_ws/src
+COPY ./sjtu_drone_description /ros2_ws/src/sjtu_drone_description
+COPY ./sjtu_drone_bringup /ros2_ws/src/sjtu_drone_bringup
+COPY ./sjtu_drone_control /ros2_ws/src/sjtu_drone_control
 
+RUN curl -L https://github.com/osrf/gazebo_models/archive/refs/heads/master.zip -o /tmp/gazebo_models.zip \
+    && unzip /tmp/gazebo_models.zip -d /tmp && mkdir -p ~/.gazebo/models/ && mv /tmp/gazebo_models-master/* ~/.gazebo/models/ \
+    && rm -r /tmp/gazebo_models.zip
 
-ENV LANG=en_US.UTF-8 \
-    LANGUAGE=en_US.UTF-8 \
-    TERM=xterm \
-    PYTHONIOENCODING=UTF-8 \
-    ROS2_DISTRO=jazzy \
-    DEBIAN_FRONTEND=noninteractive \
-    PATH="/venv/bin:$PATH" \
-    ROS_DISTRO=jazzy
+WORKDIR /ros2_ws
+RUN apt-get update && \
+    /bin/bash -c 'cd /ros2_ws/ \
+    && source /opt/ros/${ROS_DISTRO}/setup.bash \
+    && rosdep install --from-paths src --ignore-src -r -y \
+    && colcon build' && \
+    apt-get clean
 
-# This prevents ROS setup.bash from failing
-SHELL ["/bin/bash","-c"]
-
-RUN apt update && apt install -q -y --no-install-recommends \
-    lsb-release gnupg && \
-    rm -rf /var/lib/apt/lists/*
-
-RUN curl https://packages.osrfoundation.org/gazebo.gpg --output /usr/share/keyrings/pkgs-osrf-archive-keyring.gpg
-RUN echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] http://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/gazebo-stable.list > /dev/null
-RUN apt update && apt install -q -y --no-install-recommends \
-    gz-ionic ros-${ROS2_DISTRO}-joint-state-publisher ros-${ROS2_DISTRO}-joy \
-    ros-${ROS2_DISTRO}-robot-state-publisher ros-${ROS2_DISTRO}-teleop-twist-keyboard \
-    ros-${ROS2_DISTRO}-imu-tools ros-${ROS2_DISTRO}-xacro \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN mkdir -p /workspace/src
-COPY ros2_ws/ /workspace/src/
-WORKDIR /workspace
-RUN . /venv/bin/activate && . /opt/ros/$ROS2_DISTRO/setup.bash && \
-    rosdep update
-#     rosdep install --from-paths src --ignore-src -y && \
-#     colcon build --merge-install --install-base /opt/ros/$ROS2_DISTRO
-
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-
-
-#####################################################################
-FROM scratch
-
-ENV LANG=en_US.UTF-8 \
-    LANGUAGE=en_US.UTF-8 \
-    TERM=xterm \
-    PYTHONIOENCODING=UTF-8 \
-    ROS2_DISTRO=jazzy \
-    DEBIAN_FRONTEND=noninteractive \
-    PATH="/venv/bin:$PATH"
-
-COPY --from=build / /
-
-WORKDIR /workspace
-
-ENTRYPOINT ["/entrypoint.sh"]
+CMD ["/bin/bash", "-c", "source /opt/ros/${ROS_DISTRO}/setup.bash && source /ros2_ws/install/setup.bash && ros2 launch sjtu_drone_bringup sjtu_drone_bringup.launch.py"]
