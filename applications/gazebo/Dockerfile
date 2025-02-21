@@ -21,9 +21,7 @@ RUN echo "deb http://packages.osrfoundation.org/gazebo/ubuntu `lsb_release -cs` 
 RUN rosdep init && rosdep update
 
 RUN mkdir -p /ros2_ws/src
-COPY ./sjtu_drone_description /ros2_ws/src/sjtu_drone_description
-COPY ./sjtu_drone_bringup /ros2_ws/src/sjtu_drone_bringup
-COPY ./sjtu_drone_control /ros2_ws/src/sjtu_drone_control
+COPY ros2_ws/src/ /ros2_ws/src/
 
 RUN curl -L https://github.com/osrf/gazebo_models/archive/refs/heads/master.zip -o /tmp/gazebo_models.zip \
     && unzip /tmp/gazebo_models.zip -d /tmp && mkdir -p ~/.gazebo/models/ && mv /tmp/gazebo_models-master/* ~/.gazebo/models/ \
