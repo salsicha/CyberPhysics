@@ -1,5 +1,7 @@
 ARG ROS_DISTRO=iron
-FROM ros:${ROS_DISTRO}-ros-core-jammy
+FROM ros:${ROS_DISTRO}-ros-core-jammy as build
+
+SHELL ["/bin/bash","-c"]
 
 RUN apt-get update \
     && apt-get install -y \
@@ -14,25 +16,40 @@ RUN echo "deb http://packages.osrfoundation.org/gazebo/ubuntu `lsb_release -cs` 
     && wget http://packages.osrfoundation.org/gazebo.key -O - | apt-key add - \
     && apt-get update \
     && apt-get install -y \
-    gazebo \
-    ros-${ROS_DISTRO}-gazebo-ros-pkgs \
+    curl gnupg2 lsb-release python3-pip python3-venv gazebo \
+    ros-${ROS_DISTRO}-gazebo-ros-pkgs ros-${ROS_DISTRO}-joint-state-publisher ros-${ROS_DISTRO}-joy \
     python3-colcon-common-extensions python3-rosdep --no-install-recommends \
     && apt-get clean
 RUN rosdep init && rosdep update
 
-RUN mkdir -p /ros2_ws/src
-COPY ros2_ws/src/ /ros2_ws/src/
+RUN python3 -m venv /venv
+
+RUN mkdir -p /workspace/src
+COPY ros2_ws/src/ /workspace/src/
+WORKDIR /workspace
 
 RUN curl -L https://github.com/osrf/gazebo_models/archive/refs/heads/master.zip -o /tmp/gazebo_models.zip \
     && unzip /tmp/gazebo_models.zip -d /tmp && mkdir -p ~/.gazebo/models/ && mv /tmp/gazebo_models-master/* ~/.gazebo/models/ \
     && rm -r /tmp/gazebo_models.zip
 
-WORKDIR /ros2_ws
-RUN apt-get update && \
-    /bin/bash -c 'cd /ros2_ws/ \
-    && source /opt/ros/${ROS_DISTRO}/setup.bash \
-    && rosdep install --from-paths src --ignore-src -r -y \
-    && colcon build' && \
-    apt-get clean
+# RUN . /venv/bin/activate && . /opt/ros/${ROS_DISTRO}/setup.bash && \
+#     rosdep init && \
+#     rosdep update && \
+#     rosdep install --from-paths src --ignore-src -y && \
+#     colcon build --merge-install --install-base /opt/ros/${ROS_DISTRO} && \
+#     apt-get clean
 
-CMD ["/bin/bash", "-c", "source /opt/ros/${ROS_DISTRO}/setup.bash && source /ros2_ws/install/setup.bash && ros2 launch sjtu_drone_bringup sjtu_drone_bringup.launch.py"]
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+
+#####################################################################
+FROM scratch
+
+COPY --from=build / /
+
+WORKDIR /workspace
+
+# ENTRYPOINT ["/entrypoint.sh"]
+
+CMD ["ros2", "launch", "sjtu_drone_bringup", "sjtu_drone_bringup.launch.py"]
