@@ -14,19 +14,17 @@ ENV LANG=en_US.UTF-8 \
 # This prevents ROS setup.bash from failing
 SHELL ["/bin/bash","-c"]
 
-
 RUN apt update && apt install -q -y --no-install-recommends \
-    apt install ros-jazzy-gazebo-ros-pkgs && \
+    apt install ros-jazzy-ros-gz && \
     rm -rf /var/lib/apt/lists/*
 
-
-RUN mkdir -p /workspace/src
-COPY ros2_ws/ /workspace/src/
-RUN . /venv/bin/activate && . /opt/ros/$ROS2_DISTRO/setup.bash && \
-    rosdep init && \
-    rosdep update && \
-    rosdep install --from-paths src --ignore-src -y && \
-    colcon build --merge-install --install-base /opt/ros/$ROS2_DISTRO
+# RUN mkdir -p /workspace/src
+# COPY ros2_ws/ /workspace/src/
+# RUN . /venv/bin/activate && . /opt/ros/$ROS2_DISTRO/setup.bash && \
+#     rosdep init && \
+#     rosdep update && \
+#     rosdep install --from-paths src --ignore-src -y && \
+#     colcon build --merge-install --install-base /opt/ros/$ROS2_DISTRO
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
@@ -47,4 +45,4 @@ COPY --from=build / /
 
 WORKDIR /workspace
 
-ENTRYPOINT ["/entrypoint.sh"]
+# ENTRYPOINT ["/entrypoint.sh"]
