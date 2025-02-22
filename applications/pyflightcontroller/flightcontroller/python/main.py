@@ -68,8 +68,16 @@ import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
 from nav_msgs.msg import Odometry
+from sensor_msgs.msg import Imu
 
-
+import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument("sim", type=bool)
+args = parser.parse_args()
+if args.sim:
+    print("sim true")
+else:
+    print("sim false")
 
 input_throttle:float = 10
 input_roll:float = 0
@@ -109,16 +117,16 @@ def run() -> None:
     gyro_bias_z = sum(gzs) / len(gzs)
     print("Gyro bias: " + str((gyro_bias_x, gyro_bias_y, gyro_bias_z)))
 
-
-    # RPi5 PWM
-    pwm1 = HardwarePWM(pwm_channel=0, hz=250, chip=2)
-    pwm1.start(50) # full duty cycle
-    pwm2 = HardwarePWM(pwm_channel=1, hz=250, chip=2)
-    pwm2.start(50) # full duty cycle
-    pwm3 = HardwarePWM(pwm_channel=2, hz=250, chip=2)
-    pwm3.start(50) # full duty cycle
-    pwm4 = HardwarePWM(pwm_channel=3, hz=250, chip=2)
-    pwm4.start(50) # full duty cycle
+    if not args.sim:
+        # RPi5 PWM
+        pwm1 = HardwarePWM(pwm_channel=0, hz=250, chip=2)
+        pwm1.start(50) # full duty cycle
+        pwm2 = HardwarePWM(pwm_channel=1, hz=250, chip=2)
+        pwm2.start(50) # full duty cycle
+        pwm3 = HardwarePWM(pwm_channel=2, hz=250, chip=2)
+        pwm3.start(50) # full duty cycle
+        pwm4 = HardwarePWM(pwm_channel=3, hz=250, chip=2)
+        pwm4.start(50) # full duty cycle
 
 
     # Constants calculations / state variables - no need to calculate these during the loop (save processor time)
@@ -174,22 +182,22 @@ def run() -> None:
     print("-- BEGINNING FLIGHT CONTROL LOOP NOW --")
     try:
         while rclpy.ok():
-
             ### ROS
+
+            rclpy.spin_once(node, timeout_sec=0.001)
+
             # IMU
-            rclpy.spin_once(imu_sub, timeout_sec=0.001)
             if imu_sub.received_message:
                 # print(f"Processing message: {imu_sub.received_message}")
                 imu_data = imu_sub.received_message.data
                 imu_sub.received_message = None
+
             # KEYBOARD
-            rclpy.spin_once(keyboard_sub, timeout_sec=0.001)
             if keyboard_sub.received_message:
                 # print(f"Processing message: {keyboard_sub.received_message}")
                 keyboard_data = keyboard_sub.received_message.data
                 keyboard_sub.received_message = None
             ###
-
 
             # Loop performance profiling
             average_diff = time.monotonic() - profile_time
@@ -283,12 +291,12 @@ def run() -> None:
             # pwm3.change_duty_cycle(calculate_duty_cycle(t3))
             # pwm4.change_duty_cycle(calculate_duty_cycle(t4))
 
-            # Test purposes only
-            pwm1.change_duty_cycle(50)
-            pwm2.change_duty_cycle(50)
-            pwm3.change_duty_cycle(50)
-            pwm4.change_duty_cycle(50)
-
+            if not args.sim:
+                # Test purposes only
+                pwm1.change_duty_cycle(50)
+                pwm2.change_duty_cycle(50)
+                pwm3.change_duty_cycle(50)
+                pwm4.change_duty_cycle(50)
 
             # Save state values for next loop
             roll_last_error = error_rate_roll
@@ -311,23 +319,25 @@ def run() -> None:
 
     except Exception as e: # something went wrong. Flash the LED so the pilot sees it
 
-        # before we do anything, turn the motors OFF
-        duty_0_percent = calculate_duty_cycle(0.0)
-        pwm1.change_duty_cycle(duty_0_percent)
-        pwm2.change_duty_cycle(duty_0_percent)
-        pwm3.change_duty_cycle(duty_0_percent)
-        pwm4.change_duty_cycle(duty_0_percent)
+        if not args.sim:
+            # before we do anything, turn the motors OFF
+            duty_0_percent = calculate_duty_cycle(0.0)
+            pwm1.change_duty_cycle(duty_0_percent)
+            pwm2.change_duty_cycle(duty_0_percent)
+            pwm3.change_duty_cycle(duty_0_percent)
+            pwm4.change_duty_cycle(duty_0_percent)
 
-        # deinit
-        pwm1.stop()
-        pwm2.stop()
-        pwm3.stop()
-        pwm4.stop()
+            # deinit
+            pwm1.stop()
+            pwm2.stop()
+            pwm3.stop()
+            pwm4.stop()
         
         FATAL_ERROR(str(e))
 
     finally:
-        my_subscriber.destroy_node()
+        node.destroy_node()
+
         rclpy.shutdown()
 
 
@@ -426,7 +436,7 @@ keyboard_sub = node.create_subscription(
     10)
 
 imu_sub = node.create_subscription(
-    String,
+    Imu,
     'imu_data',
     imu_callback,
     10)

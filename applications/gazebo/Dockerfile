@@ -18,6 +18,7 @@ RUN echo "deb http://packages.osrfoundation.org/gazebo/ubuntu `lsb_release -cs` 
     && apt-get install -y \
     curl gnupg2 lsb-release python3-pip python3-venv gazebo \
     ros-${ROS_DISTRO}-gazebo-ros-pkgs ros-${ROS_DISTRO}-joint-state-publisher ros-${ROS_DISTRO}-joy \
+    ros-${ROS_DISTRO}-robot-state-publisher ros-${ROS_DISTRO}-teleop-twist-keyboard ros-${ROS_DISTRO}-imu-tools ros-${ROS_DISTRO}-rviz2 ros-${ROS_DISTRO}-xacro \
     python3-colcon-common-extensions python3-rosdep --no-install-recommends \
     && apt-get clean
 RUN rosdep init && rosdep update
@@ -32,12 +33,12 @@ RUN curl -L https://github.com/osrf/gazebo_models/archive/refs/heads/master.zip 
     && unzip /tmp/gazebo_models.zip -d /tmp && mkdir -p ~/.gazebo/models/ && mv /tmp/gazebo_models-master/* ~/.gazebo/models/ \
     && rm -r /tmp/gazebo_models.zip
 
-# RUN . /venv/bin/activate && . /opt/ros/${ROS_DISTRO}/setup.bash && \
-#     rosdep init && \
-#     rosdep update && \
-#     rosdep install --from-paths src --ignore-src -y && \
-#     colcon build --merge-install --install-base /opt/ros/${ROS_DISTRO} && \
-#     apt-get clean
+RUN . /venv/bin/activate && . /opt/ros/${ROS_DISTRO}/setup.bash && \
+    rosdep init && \
+    rosdep update && \
+    rosdep install --from-paths src --ignore-src -y && \
+    colcon build --merge-install --install-base /opt/ros/${ROS_DISTRO} && \
+    apt-get clean
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
