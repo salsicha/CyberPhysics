@@ -19,11 +19,11 @@ RUN echo "deb http://packages.osrfoundation.org/gazebo/ubuntu `lsb_release -cs` 
     curl gnupg2 lsb-release python3-pip python3-venv gazebo \
     ros-${ROS_DISTRO}-gazebo-ros-pkgs ros-${ROS_DISTRO}-joint-state-publisher ros-${ROS_DISTRO}-joy \
     ros-${ROS_DISTRO}-robot-state-publisher ros-${ROS_DISTRO}-teleop-twist-keyboard ros-${ROS_DISTRO}-imu-tools ros-${ROS_DISTRO}-rviz2 ros-${ROS_DISTRO}-xacro \
-    python3-colcon-common-extensions python3-rosdep --no-install-recommends \
+    python3-catkin-pkg python3-colcon-common-extensions python3-rosdep --no-install-recommends \
     && apt-get clean
-RUN rosdep init && rosdep update
 
 RUN python3 -m venv /venv
+RUN . /venv/bin/activate && pip3 install catkin_pkg
 
 RUN mkdir -p /workspace/src
 COPY ros2_ws/src/ /workspace/src/
@@ -51,6 +51,6 @@ COPY --from=build / /
 
 WORKDIR /workspace
 
-# ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["/entrypoint.sh"]
 
 CMD ["ros2", "launch", "sjtu_drone_bringup", "sjtu_drone_bringup.launch.py"]

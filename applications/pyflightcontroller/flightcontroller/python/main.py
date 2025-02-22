@@ -182,21 +182,15 @@ def run() -> None:
     print("-- BEGINNING FLIGHT CONTROL LOOP NOW --")
     try:
         while rclpy.ok():
+
             ### ROS
-
-            rclpy.spin_once(node, timeout_sec=0.001)
-
-            # IMU
-            if imu_sub.received_message:
-                # print(f"Processing message: {imu_sub.received_message}")
-                imu_data = imu_sub.received_message.data
-                imu_sub.received_message = None
-
-            # KEYBOARD
-            if keyboard_sub.received_message:
-                # print(f"Processing message: {keyboard_sub.received_message}")
-                keyboard_data = keyboard_sub.received_message.data
-                keyboard_sub.received_message = None
+            rclpy.spin_once(node)
+            print("spun")
+            # rclpy.spin_once(node, timeout_sec=0.001)
+            # if node.received_message:
+            #     print(f"Processing message: {node.received_message.data}")
+            #     # TODO: get type and assign data
+            #     node.received_message = None
             ###
 
             # Loop performance profiling
