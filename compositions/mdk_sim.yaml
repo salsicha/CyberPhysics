@@ -10,24 +10,29 @@ services:
       - /dev/shm:/dev/shm
     command: >
       python3 /flightcontroller/python/main.py True
-  gazebo: # simulator
-    network_mode: "host"
-    image: cyberphysics/gazebo
-    privileged: true
-    volumes:
-      - /dev/shm:/dev/shm
-      - "/tmp/.X11-unix:/tmp/.X11-unix"
-    environment:
-      - "DISPLAY=${DISPLAY}"
-      - XAUTHORITY
-      - NVIDIA_DRIVER_CAPABILITIES=all
-    command: >
-      ros2 launch sjtu_drone_bringup sjtu_drone_bringup.launch.py
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
+
+  # TODO: Replace with PyBullet
+
+  # pybulletdronegym
+
+  # gazebo: # simulator
+  #   network_mode: "host"
+  #   image: cyberphysics/gazebo
+  #   privileged: true
+  #   volumes:
+  #     - /dev/shm:/dev/shm
+  #     - "/tmp/.X11-unix:/tmp/.X11-unix"
+  #   environment:
+  #     - "DISPLAY=${DISPLAY}"
+  #     - XAUTHORITY
+  #     - NVIDIA_DRIVER_CAPABILITIES=all
+  #   command: >
+  #     ros2 launch sjtu_drone_bringup sjtu_drone_bringup.launch.py
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: 1
+  #             capabilities: [gpu]
 
