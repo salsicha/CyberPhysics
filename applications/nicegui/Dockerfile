@@ -19,12 +19,10 @@ SHELL ["/bin/bash", "-c"]
 RUN python3 -m venv /venv
 RUN . /venv/bin/activate && pip3 install nicegui
 
-ADD ros2_ws /ros2_ws
-
-WORKDIR /ros2_ws
-
-RUN source /opt/ros/jazzy/setup.bash && \
-    colcon build --symlink-install
+# ADD ros2_ws /ros2_ws
+# WORKDIR /ros2_ws
+# RUN source /opt/ros/jazzy/setup.bash && \
+#     colcon build --symlink-install
 
 COPY entrypoint.sh /
 RUN chmod +x /entrypoint.sh

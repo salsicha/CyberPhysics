@@ -10,38 +10,23 @@ services:
       - /dev/shm:/dev/shm
     command: >
       python3 /flightcontroller/python/main.py True
-  
-  
-# docker run --name isaac-sim --entrypoint bash -it --runtime=nvidia --gpus all -e "ACCEPT_EULA=Y" --rm --network=host \
-#     -e "PRIVACY_CONSENT=Y" \
-#     -v ~/docker/isaac-sim/cache/kit:/isaac-sim/kit/cache:rw \
-#     -v ~/docker/isaac-sim/cache/ov:/root/.cache/ov:rw \
-#     -v ~/docker/isaac-sim/cache/pip:/root/.cache/pip:rw \
-#     -v ~/docker/isaac-sim/cache/glcache:/root/.cache/nvidia/GLCache:rw \
-#     -v ~/docker/isaac-sim/cache/computecache:/root/.nv/ComputeCache:rw \
-#     -v ~/docker/isaac-sim/logs:/root/.nvidia-omniverse/logs:rw \
-#     -v ~/docker/isaac-sim/data:/root/.local/share/ov/data:rw \
-#     -v ~/docker/isaac-sim/documents:/root/Documents:rw \
-#     nvcr.io/nvidia/isaac-sim:4.5.0
-
-  
-  # pybulletdronegym: # simulator
-  #   network_mode: "host"
-  #   image: cyberphysics/pybulletdronegym
-  #   privileged: true
-  #   volumes:
-  #     - /dev/shm:/dev/shm
-  #     - "/tmp/.X11-unix:/tmp/.X11-unix"
-  #   environment:
-  #     - "DISPLAY=${DISPLAY}"
-  #     - XAUTHORITY
-  #     - NVIDIA_DRIVER_CAPABILITIES=all
-  #   command: >
-  #     python3 /scripts/drone.py
-  #   deploy:
-  #     resources:
-  #       reservations:
-  #         devices:
-  #           - driver: nvidia
-  #             count: 1
-  #             capabilities: [gpu]
+    genesissim: # simulator
+    network_mode: "host"
+    image: cyberphysics/genesissim
+    privileged: true
+    volumes:
+      - /dev/shm:/dev/shm
+      - "/tmp/.X11-unix:/tmp/.X11-unix"
+    environment:
+      - "DISPLAY=${DISPLAY}"
+      - XAUTHORITY
+      - NVIDIA_DRIVER_CAPABILITIES=all
+    command: >
+      python3 /scripts/vehicle.py
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

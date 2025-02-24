@@ -1,4 +1,6 @@
 
+https://docs.luxonis.com/software/depthai/examples/feature_tracker/
+
 
 # Manual quickstart:
 source ~/venv/bin/activate
