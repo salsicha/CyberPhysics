@@ -56,47 +56,8 @@ def fly_to_point(target, controller: DronePIDController, scene: gs.Scene, cam: C
     while distance > 0.1 and step < 1000:
 
 
-        # TODO:
-        # Kp, Kd, Ki params are in pid_params below
-
-        ### Compute an approximation of the current vehicle acceleration in the inertial frame (since we cannot measure it directly)
-        # Kp=[10.0, 10.0, 10.0]
-        # Kd=[8.5, 8.5, 8.5]
-        # Ki=[1.50, 1.50, 1.50]
-        # self.Kp = np.diag(Kp)
-        # self.Kd = np.diag(Kd)
-        # self.Ki = np.diag(Ki)
-        # self.total_time += dt # running total
-        # s = 0.6
-        # self.reverse = False
-        ### Desired acceleration (self.dd_pd())
-        # a_ref = self.dd_pd(self.total_time, s, self.reverse)
-        # F_des = -(self.Kp @ ep) - (self.Kd @ ev) - (self.Ki @ ei) + np.array([0.0, 0.0, self.m * self.g]) + (self.m * a_ref)
-        # Z_B = self.R.as_matrix()[:,2]
-        ### u_1 = F_des @ Z_B
-        # self.R: Rotation = Rotation.identity() # The vehicle attitude
-        ### Z_B = self.R.as_matrix()[:,2]
-        ### self.m = 1.50
-        ### self.g = 9.81
-        ### 
-        ### self.a = (u_1 * Z_B) / mass - g)
-
-
         # TODO: publish acceleration
-
-
-        # p_ref = 
-        # v_ref = 
-        # int = np.array([0.0, 0.0, 0.0])
-        # dt = 0.05 # time between updates
-        # ep = state.position - p_ref
-        # ev = state.linear_velocity - v_ref
-        # ei = int + (ep * dt)
-        # F_des = -(kp @ ep) - (kd @ ev) - (ki @ ei) + np.array([0.0, 0.0, mass * gravity]) + (mass * a_ref)
-        # u_1 = F_des @ Z_B
-        # Z_B = rotation.as_matrix()[:,2]
-        # g = np.array([0.0, 0.0, gravity])
-        # acc = (u_1 * Z_B) / mass - g
+        # divide get_dofs_force() by mass?
 
 
         [M1, M2, M3, M4] = controller.update(target)
