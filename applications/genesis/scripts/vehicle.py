@@ -20,18 +20,19 @@ from genesis.vis.camera import Camera
 import numpy as np
 from scipy.spatial.transform import Rotation
 
+
 base_rpm = 14468.429183500699
 min_rpm = 0.9 * base_rpm
 max_rpm = 1.5 * base_rpm
 
-
-###
 kp = [2.0, 2.0, 2.0, 20.0, 20.0, 25.0, 10.0, 10.0, 2.0]
 ki = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 kd = [0.0, 0.0, 0.0, 20.0, 20.0, 20.0, 1.0, 1.0, 0.2]
-mass = 1.50
-gravity = 9.81
-rotation = Rotation.identity()
+
+###
+# mass = 1.50
+# gravity = 9.81
+# rotation = Rotation.identity()
 ###
 
 
@@ -98,14 +99,13 @@ def fly_to_point(target, controller: DronePIDController, scene: gs.Scene, cam: C
         # acc = (u_1 * Z_B) / mass - g
 
 
-
         [M1, M2, M3, M4] = controller.update(target)
         M1 = clamp(M1)
         M2 = clamp(M2)
         M3 = clamp(M3)
         M4 = clamp(M4)
         drone.set_propellels_rpm([M1, M2, M3, M4])
-        print("drone: ", dir(drone))
+        # print("drone: ", drone.get_dofs_force())
         scene.step()
         cam.render()
         # print("point =", drone.get_pos())
@@ -126,7 +126,7 @@ def main():
     gs.init(backend=gs.gpu)
 
     ##### scene #####
-    scene = gs.Scene(show_viewer=False, sim_options=gs.options.SimOptions(dt=0.01))
+    scene = gs.Scene(show_viewer=True, sim_options=gs.options.SimOptions(dt=0.01))
 
     ##### entities #####
     plane = scene.add_entity(morph=gs.morphs.Plane())

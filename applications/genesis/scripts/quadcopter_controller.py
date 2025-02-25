@@ -38,6 +38,9 @@ class DronePIDController:
         self.__dt = dt
         self.__base_rpm = base_rpm
 
+    def __get_drone_force(self) -> torch.Tensor:
+        return self.drone.get_dofs_force()
+
     def __get_drone_pos(self) -> torch.Tensor:
         return self.drone.get_pos()
 
