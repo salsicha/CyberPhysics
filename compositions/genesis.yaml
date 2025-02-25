@@ -1,10 +1,23 @@
-
-
-docker run --gpus all --rm -it \
--e DISPLAY=$DISPLAY \
--v /dev/dri:/dev/dri \
--v /tmp/.X11-unix/:/tmp/.X11-unix \
--v $PWD:/workspace \
-genesis
-
-
+# Genesis World simulator
+services:
+  genesis: # simulator
+    network_mode: "host"
+    image: cyberphysics/genesis
+    privileged: true
+    volumes:
+      - /dev/shm:/dev/shm
+      - "/tmp/.X11-unix:/tmp/.X11-unix"
+      - /dev/dri:/dev/dri
+    environment:
+      - "DISPLAY=${DISPLAY}"
+      - XAUTHORITY
+      - NVIDIA_DRIVER_CAPABILITIES=all
+    command: >
+      python3 /scripts/vehicle.py
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

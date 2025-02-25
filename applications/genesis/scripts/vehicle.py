@@ -17,10 +17,22 @@ import math
 from quadcopter_controller import DronePIDController
 from genesis.engine.entities.drone_entity import DroneEntity
 from genesis.vis.camera import Camera
+import numpy as np
+from scipy.spatial.transform import Rotation
 
 base_rpm = 14468.429183500699
 min_rpm = 0.9 * base_rpm
 max_rpm = 1.5 * base_rpm
+
+
+###
+kp = [2.0, 2.0, 2.0, 20.0, 20.0, 25.0, 10.0, 10.0, 2.0]
+ki = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+kd = [0.0, 0.0, 0.0, 20.0, 20.0, 20.0, 1.0, 1.0, 0.2]
+mass = 1.50
+gravity = 9.81
+rotation = Rotation.identity()
+###
 
 
 def hover(drone: DroneEntity):
@@ -66,10 +78,25 @@ def fly_to_point(target, controller: DronePIDController, scene: gs.Scene, cam: C
         ### self.m = 1.50
         ### self.g = 9.81
         ### 
-        ### self.a = (u_1 * Z_B) / self.m - np.array([0.0, 0.0, self.g])
+        ### self.a = (u_1 * Z_B) / mass - g)
 
-        # TODO:
-        # publish self.a
+
+        # TODO: publish acceleration
+
+
+        # p_ref = 
+        # v_ref = 
+        # int = np.array([0.0, 0.0, 0.0])
+        # dt = 0.05 # time between updates
+        # ep = state.position - p_ref
+        # ev = state.linear_velocity - v_ref
+        # ei = int + (ep * dt)
+        # F_des = -(kp @ ep) - (kd @ ev) - (ki @ ei) + np.array([0.0, 0.0, mass * gravity]) + (mass * a_ref)
+        # u_1 = F_des @ Z_B
+        # Z_B = rotation.as_matrix()[:,2]
+        # g = np.array([0.0, 0.0, gravity])
+        # acc = (u_1 * Z_B) / mass - g
+
 
 
         [M1, M2, M3, M4] = controller.update(target)
@@ -78,6 +105,7 @@ def fly_to_point(target, controller: DronePIDController, scene: gs.Scene, cam: C
         M3 = clamp(M3)
         M4 = clamp(M4)
         drone.set_propellels_rpm([M1, M2, M3, M4])
+        print("drone: ", dir(drone))
         scene.step()
         cam.render()
         # print("point =", drone.get_pos())
@@ -108,15 +136,15 @@ def main():
     # parameters are tuned such that the
     # drone can fly, not optimized
     pid_params = [
-        [2.0, 0.0, 0.0],
-        [2.0, 0.0, 0.0],
-        [2.0, 0.0, 0.0],
-        [20.0, 0.0, 20.0],
-        [20.0, 0.0, 20.0],
-        [25.0, 0.0, 20.0],
-        [10.0, 0.0, 1.0],
-        [10.0, 0.0, 1.0],
-        [2.0, 0.0, 0.2],
+        [kp[0], ki[0], kd[0]],
+        [kp[1], ki[1], kd[1]],
+        [kp[2], ki[2], kd[2]],
+        [kp[3], ki[3], kd[3]],
+        [kp[4], ki[4], kd[4]],
+        [kp[5], ki[5], kd[5]],
+        [kp[6], ki[6], kd[6]],
+        [kp[7], ki[7], kd[7]],
+        [kp[8], ki[8], kd[8]],
     ]
 
     controller = DronePIDController(drone=drone, dt=0.01, base_rpm=base_rpm, pid_params=pid_params)

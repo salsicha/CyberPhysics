@@ -27,4 +27,3 @@ COPY --from=build / /
 WORKDIR /workspace
 
 ENTRYPOINT ["/entrypoint.sh"]
-
