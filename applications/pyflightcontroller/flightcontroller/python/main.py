@@ -69,6 +69,7 @@ from rclpy.node import Node
 from std_msgs.msg import String
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import Imu
+from std_msgs.msg import Float32MultiArray
 
 import argparse
 parser = argparse.ArgumentParser()
@@ -183,15 +184,8 @@ def run() -> None:
     try:
         while rclpy.ok():
 
-            ### ROS
+            # ROS
             rclpy.spin_once(node)
-            print("spun")
-            # rclpy.spin_once(node, timeout_sec=0.001)
-            # if node.received_message:
-            #     print(f"Processing message: {node.received_message.data}")
-            #     # TODO: get type and assign data
-            #     node.received_message = None
-            ###
 
             # Loop performance profiling
             average_diff = time.monotonic() - profile_time
@@ -279,18 +273,28 @@ def run() -> None:
             # print(t1, adj_throttle, pid_pitch, pid_roll, pid_yaw)
             # print("duty cycle: ", calculate_duty_cycle(t1))
 
-            # Adjust throttle according to input
-            # pwm1.change_duty_cycle(calculate_duty_cycle(t1))
-            # pwm2.change_duty_cycle(calculate_duty_cycle(t2))
-            # pwm3.change_duty_cycle(calculate_duty_cycle(t3))
-            # pwm4.change_duty_cycle(calculate_duty_cycle(t4))
-
             if not args.sim:
+                # Adjust throttle according to input
+                # pwm1.change_duty_cycle(calculate_duty_cycle(t1))
+                # pwm2.change_duty_cycle(calculate_duty_cycle(t2))
+                # pwm3.change_duty_cycle(calculate_duty_cycle(t3))
+                # pwm4.change_duty_cycle(calculate_duty_cycle(t4))
+
                 # Test purposes only
                 pwm1.change_duty_cycle(50)
                 pwm2.change_duty_cycle(50)
                 pwm3.change_duty_cycle(50)
                 pwm4.change_duty_cycle(50)
+
+            if args.sim:
+
+                # TODO:
+                # publish RPMs
+
+                # Float32MultiArray
+                msg = Float32MultiArray()
+
+
 
             # Save state values for next loop
             roll_last_error = error_rate_roll
@@ -406,9 +410,10 @@ def imu_callback(msg):
     # msg.data.linear.x
     # msg.data.linear.y
     # msg.data.linear.z
-    # msg.data.angular.x
-    # msg.data.angular.y
-    # msg.data.angular.z
+
+    global GYRx
+    global GYRy
+    global GYRz
 
     GYRx = msg.data.angular.x
     GYRy = msg.data.angular.y
@@ -416,6 +421,11 @@ def imu_callback(msg):
 
 def odom_callback(msg):
     print("odom: ", msg.data)
+
+    global VELx
+    global VELy
+    global VELz
+
     msg.data.pose.pose.position.x
     VELx = msg.data.twist.twist.linear.x
     VELy = msg.data.twist.twist.linear.y
@@ -440,6 +450,8 @@ odom_sub = node.create_subscription(
     'odometry',
     odom_callback,
     10)
+
+rpm_pub = node.create_publisher(Float32MultiArray, "rpms", 10)
 
 def readVELx():
     return VELx
