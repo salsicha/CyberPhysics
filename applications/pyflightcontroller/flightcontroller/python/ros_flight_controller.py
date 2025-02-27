@@ -3,12 +3,6 @@
 ###########  SETTINGS  #################
 ########################################
 
-
-# TODO: manually convert to python!!!
-# 1. profile performance
-# 2. add input (ROS?)
-
-
 # Motor GPIO's (not pin number, GPIO number) ###
 gpio_motor1 = 2 # front left, clockwise
 gpio_motor2 = 28 # front right, counter clockwise
@@ -70,6 +64,11 @@ from std_msgs.msg import String
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import Imu
 from std_msgs.msg import Float32MultiArray
+
+from sensor_msgs.msg import NavSatFix
+from sensor_msgs.msg import NavSatStatus
+from std_msgs.msg import Header
+from geometry_msgs.msg import (Quaternion, Vector3)
 
 import argparse
 parser = argparse.ArgumentParser()
@@ -291,8 +290,10 @@ def run() -> None:
                 # TODO:
                 # publish RPMs
 
-                # Float32MultiArray
                 msg = Float32MultiArray()
+                rpms = Vector3()
+                msg.data = rpms
+                rpm_pub.publish(msg)
 
 
 
