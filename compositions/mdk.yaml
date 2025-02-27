@@ -30,7 +30,7 @@ services:
     volumes:
       - /dev/shm:/dev/shm
     command: >
-      python3 /flightcontroller/python/main.py False
+      python3 /flightcontroller/python/ros_flight_controller.py False
   vinsmono: # VINS-MONO, only calculate velocity, do I need the whole repo???
     network_mode: "host"
     image: cyberphysics/vinsmono

@@ -1,5 +1,15 @@
 
 services:
+  keyboardpublisher: # keyboard input
+    network_mode: "host"
+    image: cyberphysics/pyflightcontroller
+    privileged: true
+    devices:
+      - /dev:/dev
+    volumes:
+      - /dev/shm:/dev/shm
+    command: >
+      python3 /flightcontroller/python/keyboard_publisher.py
   pyflightcontroller: # FlightController subscribers
     network_mode: "host"
     image: cyberphysics/pyflightcontroller
@@ -9,7 +19,7 @@ services:
     volumes:
       - /dev/shm:/dev/shm
     command: >
-      python3 /flightcontroller/python/main.py True
+      python3 /flightcontroller/python/ros_flight_controller.py True
   genesis: # simulator
     network_mode: "host"
     image: cyberphysics/genesis

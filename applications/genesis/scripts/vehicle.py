@@ -26,6 +26,11 @@ from std_msgs.msg import String
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import Imu
 from std_msgs.msg import Float32MultiArray
+from sensor_msgs.msg import Imu
+from sensor_msgs.msg import NavSatFix
+from sensor_msgs.msg import NavSatStatus
+from std_msgs.msg import Header
+from geometry_msgs.msg import (Quaternion, Vector3)
 
 
 base_rpm = 14468.429183500699
@@ -35,6 +40,41 @@ max_rpm = 1.5 * base_rpm
 kp = [2.0, 2.0, 2.0, 20.0, 20.0, 25.0, 10.0, 10.0, 2.0]
 ki = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 kd = [0.0, 0.0, 0.0, 20.0, 20.0, 20.0, 1.0, 1.0, 0.2]
+
+RPM_1 = 50
+RPM_2 = 50
+RPM_3 = 50
+RPM_4 = 50
+
+def rpm_callback(msg):
+    # print("rpm: ", msg.data)
+
+    global RPM_1
+    global RPM_2
+    global RPM_3
+    global RPM_4
+
+    RPM_1 = msg.data.rpm1
+    RPM_2 = msg.data.rpm2
+    RPM_3 = msg.data.rpm3
+    RPM_4 = msg.data.rpm4
+
+    # TODO: set RPMs of simulated motors
+    # [M1, M2, M3, M4] = controller.update(target)
+    # M1 = clamp(M1)
+    # M2 = clamp(M2)
+    # M3 = clamp(M3)
+    # M4 = clamp(M4)
+    # drone.set_propellels_rpm([M1, M2, M3, M4])
+
+
+# TODO: 
+# Subscribe IMU
+# Publish RPMs
+rclpy.init()
+node = Node('subscriber_node')
+rpm_sub = node.create_subscription(Float32MultiArray, 'rpms', rpm_callback, 10)
+imu_pub = node.create_publisher(Imu, 'imu_data', 10)
 
 
 # def hover(drone: DroneEntity):
@@ -46,6 +86,39 @@ def clamp(rpm):
 
 
 def fly_to_point(target, controller: DronePIDController, scene: gs.Scene, cam: Camera):
+
+    # Publish IMU
+    # drone_pos = drone.get_pos()
+    global imu_pub
+    imu_msg = Imu()
+    accel = Vector3()
+    # accel.x = drone_pos
+    # accel.y = drone_pos
+    # accel.z = drone_pos
+    imu_msg.linear_acceleration = accel
+    imu_msg.linear_acceleration_covariance[0] = 0.00001
+    imu_msg.linear_acceleration_covariance[4] = 0.00001
+    imu_msg.linear_acceleration_covariance[8] = 0.00001
+    gyro = Vector3()
+    # gyro.x = drone_pos
+    # gyro.y = drone_pos
+    # gyro.z = drone_pos
+    imu_msg.angular_velocity = gyro
+    imu_msg.angular_velocity_covariance[0] = 0.00001
+    imu_msg.angular_velocity_covariance[4] = 0.00001
+    imu_msg.angular_velocity_covariance[8] = 0.00001
+    # imu_msg.orientation[w] = 0.0
+    # imu_msg.orientation[x] = 0.0
+    # imu_msg.orientation[y] = 0.0
+    # imu_msg.orientation[z] = 0.0
+    imu_msg.orientation_covariance[0] = 0.00001
+    imu_msg.orientation_covariance[4] = 0.00001
+    imu_msg.orientation_covariance[8] = 0.00001
+    imu_msg.header.stamp = node.get_clock().now().to_msg()
+    imu_msg.header.frame_id = "imu"
+    imu_pub.publish(imu_msg)
+
+
     drone = controller.drone
     step = 0
     x = target[0] - drone.get_pos()[0]
@@ -78,44 +151,7 @@ def fly_to_point(target, controller: DronePIDController, scene: gs.Scene, cam: C
         step += 1
 
 
-def rpm_callback(msg):
-    # print("rpm: ", msg.data)
-
-    RPM_1 = msg.data.rpm1
-    RPM_2 = msg.data.rpm2
-    RPM_3 = msg.data.rpm3
-    RPM_4 = msg.data.rpm4
-
-    # [M1, M2, M3, M4] = controller.update(target)
-    # M1 = clamp(M1)
-    # M2 = clamp(M2)
-    # M3 = clamp(M3)
-    # M4 = clamp(M4)
-    # drone.set_propellels_rpm([M1, M2, M3, M4])
-
-
 def main():
-
-
-    # TODO: 
-    # Subscribe IMU
-    # Publish RPMs
-
-
-    rclpy.init()
-    node = Node('subscriber_node')
-    rpm_sub = node.create_subscription(Float32MultiArray, 'rpms', rpm_callback, 10)
-
-    # TODO: pub imu
-    imu_pub = node.create_publisher(Imu, 'imu_data', 10)
-
-    # TODO: move this below
-    # while True:
-        # init drone
-        # drone_pos = drone.get_pos()
-        # msg = Imu()
-        # scene.step()
-
 
     gs.init(backend=gs.gpu)
 
