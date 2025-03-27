@@ -1,6 +1,21 @@
 
-Python based quadcopter flight controller.
 
+# Quadcopter flight controller.
+
+
+
+## TODO:
+update dockerfile to install aerostack2
+get aerostack2 working in sim from examples
+get aerostack2 flight controller running
+keyboard publisher
+get genesis sim version working 
+get sensors working
+etc...
+
+
+
+Deprecated:
 Original source code here:
 https://github.com/timhanewich/scout
 
