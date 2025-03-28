@@ -31,6 +31,8 @@ target_arm64:
 	$(eval PLATFORM=arm64)
 	@echo ${PLATFORM}
 
+build_aerostack2: cleanup
+	APP=aerostack2 ./_build_it.sh
 build_arduino: cleanup
 	APP=arduino ./_build_it.sh
 build_blackfly: cleanup build_ros2

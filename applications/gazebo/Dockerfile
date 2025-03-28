@@ -14,7 +14,7 @@ SHELL ["/bin/bash","-c"]
 
 RUN apt update && apt install -q -y --no-install-recommends \
     curl gnupg2 lsb-release vim wget \
-    ros-{ROS_DISTRO}-ros-gz && \
+    ros-$ROS_DISTRO-ros-gz && \
     rm -rf /var/lib/apt/lists/*
 
 RUN python3 -m venv /venv

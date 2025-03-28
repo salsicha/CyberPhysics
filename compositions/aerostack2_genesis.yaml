@@ -1,5 +1,6 @@
 
 
+
 # RViz
 # On by default
 
@@ -35,27 +36,18 @@
 
 
 
+
 services:
-  ozzmaker: # Ozzmaker IMU, GPS pub
+  keyboardpublisher: # keyboard input
     network_mode: "host"
-    image: cyberphysics/ozzmaker
+    image: cyberphysics/pyflightcontroller
     privileged: true
     devices:
       - /dev:/dev
     volumes:
       - /dev/shm:/dev/shm
     command: >
-      /scripts/publisher.py
-  oak: # Oak-1 ROS feature publisher
-    network_mode: "host"
-    image: cyberphysics/oak
-    privileged: true
-    devices:
-      - /dev:/dev
-    volumes:
-      - /dev/shm:/dev/shm
-    command: >
-      /scripts/featuretracker.py
+      python3 /flightcontroller/python/keyboard_publisher.py
   pyflightcontroller: # FlightController subscribers
     network_mode: "host"
     image: cyberphysics/pyflightcontroller
@@ -65,45 +57,24 @@ services:
     volumes:
       - /dev/shm:/dev/shm
     command: >
-      python3 /flightcontroller/python/ros_flight_controller.py False
-  vinsmono: # VINS-MONO, only calculate velocity, do I need the whole repo???
+      python3 /flightcontroller/python/ros_flight_controller.py True
+  genesis: # simulator
     network_mode: "host"
-    image: cyberphysics/vinsmono
+    image: cyberphysics/genesis
     privileged: true
-    devices:
-      - /dev:/dev
     volumes:
       - /dev/shm:/dev/shm
+      - "/tmp/.X11-unix:/tmp/.X11-unix"
+    environment:
+      - "DISPLAY=${DISPLAY}"
+      - XAUTHORITY
+      - NVIDIA_DRIVER_CAPABILITIES=all
     command: >
-      ros2 launch vins_estimator.launch.py
-  rangefinder: # laser distance publisher
-    network_mode: "host"
-    image: cyberphysics/rangefinder
-    privileged: true
-    devices:
-      - /dev:/dev
-    volumes:
-      - /dev/shm:/dev/shm
-    command: >
-      /scripts/main.py
-  behaviortree: # Behavior Tree, obstacle avoidance
-    network_mode: "host"
-    image: cyberphysics/behaviortree
-    privileged: true
-    devices:
-      - /dev:/dev
-    volumes:
-      - /dev/shm:/dev/shm
-    command: >
-      /scripts/main.py
-  nicegui: # web interface
-    network_mode: "host"
-    image: cyberphysics/nicegui
-    privileged: true
-    devices:
-      - /dev:/dev
-    volumes:
-      - /dev/shm:/dev/shm
-    command: >
-      /scripts/main.py
-
+      python3 /scripts/vehicle.py
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
