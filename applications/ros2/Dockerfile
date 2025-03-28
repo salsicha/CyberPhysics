@@ -30,7 +30,7 @@ RUN apt update && apt install -q -y --no-install-recommends \
     ros-$ROS2_DISTRO-ros2bag ros-$ROS2_DISTRO-rclpy ros-$ROS2_DISTRO-rosbag2-storage-default-plugins \
     python3-rosdep python3-colcon-ros linuxptp python3-colcon-common-extensions \
     ros-$ROS2_DISTRO-rosbridge-suite ros-$ROS2_DISTRO-rosbag2 ros-$ROS2_DISTRO-gps-msgs \
-    ros-$ROS2_DISTRO-ros2-control vim git jq \
+    ros-$ROS2_DISTRO-ros2-control vim git jq wget \
     ros-$ROS2_DISTRO-tf2-msgs software-properties-common build-essential gcc && \
     rm -rf /var/lib/apt/lists/*
 

@@ -4,7 +4,7 @@
 # On by default
 
 # Launch aerostack2 simulated drone platform (gazebo needs to be running)
-# CMD ["ros2", "launch", "as2_platform_gazebo", "platform_gazebo_launch.py", "namespace:=drone_sim_0", "simulation_config_file:=world_json_path"]
+# ros2 launch as2_platform_gazebo platform_gazebo_launch.py namespace:=drone_sim_0 simulation_config_file:=world_json_path
 
 # Keyboard teleoperation:
 # ros2 launch as2_keyboard_teleoperation as2_keyboard_teleoperation_launch.py namespace:=<%= drone_namespace %>
@@ -16,7 +16,7 @@
 # ros2 launch as2_state_estimator state_estimator_launch.py namespace:=<%= drone_namespace %> config_file:=config/config.yaml
 
 # Motion Control:
-# ros2 launch as2_motion_controller controller_launch.py namespace:=<%= drone_namespace %> config_file:=config/config.yaml plugin_name:=<%= motion_controller_plugin %> plugin_config_file:=config/<%= motion_controller_plugin %>.yaml
+# ros2 launch as2_motion_controller controller_launch.py namespace:=<%= drone_namespace %> config_file:=config/config.yaml plugin_name:=pid_speed_controller plugin_config_file:=config/pid_speed_controller.yaml
 
 # Motion behaviors
 # ros2 launch as2_behaviors_motion motion_behaviors_launch.py namespace:=<%= drone_namespace %> config_file:=config/config.yaml
@@ -36,74 +36,58 @@
 
 
 services:
-  ozzmaker: # Ozzmaker IMU, GPS pub
+  gazebo:
     network_mode: "host"
-    image: cyberphysics/ozzmaker
+    image: cyberphysics/aerostack2
     privileged: true
     devices:
       - /dev:/dev
     volumes:
       - /dev/shm:/dev/shm
     command: >
-      /scripts/publisher.py
-  oak: # Oak-1 ROS feature publisher
+      ros2 launch as2_platform_gazebo platform_gazebo_launch.py namespace:=drone_sim_0 simulation_config_file:=world_json_path
+
+  stateestimator:
     network_mode: "host"
-    image: cyberphysics/oak
+    image: cyberphysics/aerostack2
     privileged: true
     devices:
       - /dev:/dev
     volumes:
       - /dev/shm:/dev/shm
     command: >
-      /scripts/featuretracker.py
-  pyflightcontroller: # FlightController subscribers
+      ros2 launch as2_state_estimator state_estimator_launch.py namespace:=<%= drone_namespace %> config_file:=config/config.yaml
+
+  motioncontroller:
     network_mode: "host"
-    image: cyberphysics/pyflightcontroller
+    image: cyberphysics/aerostack2
     privileged: true
     devices:
       - /dev:/dev
     volumes:
       - /dev/shm:/dev/shm
     command: >
-      python3 /flightcontroller/python/ros_flight_controller.py False
-  vinsmono: # VINS-MONO, only calculate velocity, do I need the whole repo???
+      ros2 launch as2_motion_controller controller_launch.py namespace:=<%= drone_namespace %> config_file:=config/config.yaml plugin_name:=pid_speed_controller plugin_config_file:=config/pid_speed_controller.yaml
+
+  viewer:
     network_mode: "host"
-    image: cyberphysics/vinsmono
+    image: cyberphysics/aerostack2
     privileged: true
     devices:
       - /dev:/dev
     volumes:
       - /dev/shm:/dev/shm
     command: >
-      ros2 launch vins_estimator.launch.py
-  rangefinder: # laser distance publisher
+      ros2 run as2_alphanumeric_viewer as2_alphanumeric_viewer_node --ros-args -r  __ns:=/<%= drone_namespace %>
+
+  keyboardteleoperation:
     network_mode: "host"
-    image: cyberphysics/rangefinder
+    image: cyberphysics/aerostack2
     privileged: true
     devices:
       - /dev:/dev
     volumes:
       - /dev/shm:/dev/shm
     command: >
-      /scripts/main.py
-  behaviortree: # Behavior Tree, obstacle avoidance
-    network_mode: "host"
-    image: cyberphysics/behaviortree
-    privileged: true
-    devices:
-      - /dev:/dev
-    volumes:
-      - /dev/shm:/dev/shm
-    command: >
-      /scripts/main.py
-  nicegui: # web interface
-    network_mode: "host"
-    image: cyberphysics/nicegui
-    privileged: true
-    devices:
-      - /dev:/dev
-    volumes:
-      - /dev/shm:/dev/shm
-    command: >
-      /scripts/main.py
+      ros2 launch as2_keyboard_teleoperation as2_keyboard_teleoperation_launch.py namespace:=<%= drone_namespace %>
 

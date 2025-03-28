@@ -61,10 +61,8 @@ build_ozzmaker: cleanup build_ros2
 	APP=ozzmaker ./_build_it.sh
 build_pentestgpt: cleanup
 	APP=pentestgpt ./_build_it.sh
-build_pybulletdronegym: cleanup
-	APP=pybulletdronegym ./_build_it.sh
-build_pyflightcontroller: cleanup
-	APP=pyflightcontroller ./_build_it.sh
+build_rpiflightcontroller: cleanup
+	APP=rpiflightcontroller ./_build_it.sh
 build_pysimcoder: cleanup
 	APP=pysimcoder ./_build_it.sh
 build_qgroundcontrol: cleanup
