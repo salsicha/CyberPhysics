@@ -1,4 +1,15 @@
 
+
+
+# Gazebo
+# CMD ["ros2", "launch", "as2_gazebo_assets", "launch_simulation.py", "simulation_config_file:=world_json_path"]
+
+# Launch aerostack2 simulated drone platform (gazebo needs to be running)
+# CMD ["ros2", "launch", "as2_platform_gazebo", "platform_gazebo_launch.py", "namespace:=drone_sim_0", "simulation_config_file:=world_json_path"]
+
+
+
+
 services:
   keyboardpublisher: # keyboard input
     network_mode: "host"

@@ -13,13 +13,13 @@ ENV LANG=en_US.UTF-8 \
 SHELL ["/bin/bash","-c"]
 
 RUN apt update && apt install -q -y --no-install-recommends \
-    curl gnupg2 lsb-release vim wget ros-{ROS_DISTRO}-aerostack2 && \
+    curl gnupg2 lsb-release vim wget \
+    ros-{ROS_DISTRO}-as2-platform-gazebo ros-{ROS_DISTRO}-ros-gzharmonic && \
     rm -rf /var/lib/apt/lists/*
 
-RUN python3 -m venv /venv
-RUN . /venv/bin/activate && pip3 install rpi-hardware-pwm smbus smbus2
 
-COPY scripts/ /scripts/
+RUN python3 -m venv /venv
+
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
@@ -35,5 +35,5 @@ WORKDIR /workspace
 
 ENTRYPOINT ["/entrypoint.sh"]
 
-# Launch aerostack2 simulated drone platform (gazebo needs to be running)
-CMD ["ros2", "launch", "as2_platform_gazebo", "platform_gazebo_launch.py", "namespace:=drone_sim_0", "simulation_config_file:=world_json_path"]
+# Launch Aerostack2 gazebo simulator
+CMD ["ros2", "launch", "as2_gazebo_assets", "launch_simulation.py", "simulation_config_file:=world_json_path"]
