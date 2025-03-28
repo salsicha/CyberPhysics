@@ -272,29 +272,28 @@ def run() -> None:
             # print(t1, adj_throttle, pid_pitch, pid_roll, pid_yaw)
             # print("duty cycle: ", calculate_duty_cycle(t1))
 
-            if not args.sim:
+            # if not args.sim:
                 # Adjust throttle according to input
-                # pwm1.change_duty_cycle(calculate_duty_cycle(t1))
-                # pwm2.change_duty_cycle(calculate_duty_cycle(t2))
-                # pwm3.change_duty_cycle(calculate_duty_cycle(t3))
-                # pwm4.change_duty_cycle(calculate_duty_cycle(t4))
+            pwm1.change_duty_cycle(calculate_duty_cycle(t1))
+            pwm2.change_duty_cycle(calculate_duty_cycle(t2))
+            pwm3.change_duty_cycle(calculate_duty_cycle(t3))
+            pwm4.change_duty_cycle(calculate_duty_cycle(t4))
 
                 # Test purposes only
-                pwm1.change_duty_cycle(50)
-                pwm2.change_duty_cycle(50)
-                pwm3.change_duty_cycle(50)
-                pwm4.change_duty_cycle(50)
+                # pwm1.change_duty_cycle(50)
+                # pwm2.change_duty_cycle(50)
+                # pwm3.change_duty_cycle(50)
+                # pwm4.change_duty_cycle(50)
 
-            if args.sim:
+            # if args.sim:
 
-                # TODO:
-                # publish RPMs
+            #     # TODO:
+            #     # publish RPMs
 
-                msg = Float32MultiArray()
-                rpms = Vector3()
-                msg.data = rpms
-                rpm_pub.publish(msg)
-
+            #     msg = Float32MultiArray()
+            #     rpms = Vector3()
+            #     msg.data = rpms
+            #     rpm_pub.publish(msg)
 
 
             # Save state values for next loop
@@ -434,11 +433,16 @@ def odom_callback(msg):
 
 rclpy.init()
 node = Node('subscriber_node')
-keyboard_sub = node.create_subscription(
-    String,
-    'key_pressed',
-    input_callback,
-    10)
+
+# TODO:
+# modify PID controller in Aerostack2 to publish commands
+# or maybe just subscribe to the keyboard controller from aerostack2 here?
+
+# keyboard_sub = node.create_subscription(
+#     String,
+#     'key_pressed',
+#     input_callback,
+#     10)
 
 imu_sub = node.create_subscription(
     Imu,
