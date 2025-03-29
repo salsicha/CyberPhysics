@@ -1,6 +1,22 @@
 
 # RPi Drone
 
+
+TODO:
+get aerostack2 gazebo sim working
+flight controller needs to be able to hover mode
+this requires a PID
+get velocity from camera, use velocity error in python script
+drone will only move forward
+pitch will control forward velocity
+PID in python script will adjust pitch to get desired velocity
+get aerostack2 genesis sim working
+
+
+
+
+Types:
+
 Input to flight controller
 - input_throttle
 - input_roll
@@ -14,7 +30,7 @@ Output from AS2 PID speed controller
 - z velocity
 - yaw speed
 
-Ozzmaker fuse gravity
+Ozzmaker IMU filter
 
 Keyboard output
 - ControlValues.SPEED_VALUE
