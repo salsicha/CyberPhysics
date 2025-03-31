@@ -5,13 +5,13 @@
 TODO:
 get aerostack2 gazebo sim working
 flight controller needs to be able to hover mode, this requires a PID
-use_optical_flow_mono.py and estimate scale
-optimizer for scale???
+use_optical_flow_mono.py and estimate motion
 use velocity error in python script
 drone will only move forward
 pitch will control forward velocity
 PID in python script will adjust pitch to get desired velocity
 get aerostack2 genesis sim working
+enable mode switch, stabilize with INS, use Oak for MegaDepth or people tracking
 
 
 
