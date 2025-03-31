@@ -19,7 +19,7 @@ services:
     volumes:
       - /dev/shm:/dev/shm
     command: >
-      /scripts/featuretracker.py
+      /scripts/optical_flow_mono.py
   imufilter: # IMU Filter
     network_mode: "host"
     image: cyberphysics/rpiflightcontroller
@@ -40,7 +40,7 @@ services:
       - /dev/shm:/dev/shm
     command: >
       python3 /scripts/scout/python/ros_flight_controller.py False
-  vinsmono: # VINS-MONO, only calculate velocity, do I need the whole repo???
+  vinsmono: # VINS-MONO, only calculate velocity, do I need this?
     network_mode: "host"
     image: cyberphysics/vinsmono
     privileged: true
