@@ -1,0 +1,53 @@
+/**:
+  # Global Parameters
+  ros__parameters:
+    use_sim_time: true
+    tf_timeout_threshold: 0.1
+
+/**:
+  # Basic Robotics Functions
+  platform:
+    ros__parameters:
+      cmd_freq: 50.0  # Hz of platform commands send
+
+  # State Estimator
+  state_estimator:
+    ros__parameters:
+      use_gazebo_tf: true
+      plugin_name: "ground_truth"
+      # Outdoor (GPS)
+      use_gps: true
+      set_origin_on_start: true # Set origin on start
+
+  # Motion Controller
+  controller_manager:
+    ros__parameters:
+      cmd_freq: 50.0 # Hz of controller commands send
+
+  # Behaviors Motion
+  TakeoffBehavior:
+    ros__parameters:
+      # takeoff_plugin_name: "takeoff_plugin_speed"
+      takeoff_plugin_name: "takeoff_plugin_position"
+      # takeoff_plugin_name: "takeoff_plugin_trajectory"
+  LandBehavior:
+    ros__parameters:
+      land_plugin_name: "land_plugin_speed"
+      # land_plugin_name: "land_plugin_trajectory"
+  GoToBehavior:
+    ros__parameters:
+      go_to_plugin_name: "go_to_plugin_position"
+      # go_to_plugin_name: "go_to_plugin_trajectory"
+  FollowPathBehavior:
+    ros__parameters:
+      follow_path_plugin_name: "follow_path_plugin_position"
+      # follow_path_plugin_name: "follow_path_plugin_trajectory"
+
+  # Behaviors Perception
+  point_gimbal_behavior:
+    ros__parameters:
+      behavior_timeout: 10.0
+      gimbal_name: gimbal
+      gimbal_frame_id: gimbal/_0/_1/_2
+      gimbal_base_frame_id: gimbal
+      gimbal_threshold: 0.01

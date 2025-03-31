@@ -14,8 +14,18 @@ SHELL ["/bin/bash","-c"]
 
 RUN apt update && apt install -q -y --no-install-recommends \
     curl gnupg2 lsb-release vim wget python3-pip \
-    ros-${ROS_DISTRO}-aerostack2 ros-${ROS_DISTRO}-as2-platform-gazebo ros-${ROS_DISTRO}-as2-gazebo-assets && \
+    ros-${ROS_DISTRO}-aerostack2 ros-${ROS_DISTRO}-as2-platform-gazebo ros-${ROS_DISTRO}-as2-gazebo-assets \
+    ros-${ROS_DISTRO}-as2-platform-tello && \
     rm -rf /var/lib/apt/lists/*
+
+RUN pip3 install rsa PySimpleGUI-4-foss
+
+COPY config/ /workspace/config/
+COPY config_ground_station/ /workspace/config_ground_station/
+COPY rosbag/ /workspace/rosbag/
+COPY trees/ /workspace/trees/
+COPY utils/ /workspace/utils/
+COPY tmuxinator/ /workspace/tmuxinator/
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
@@ -30,5 +40,3 @@ COPY --from=build / /
 WORKDIR /workspace
 
 ENTRYPOINT ["/entrypoint.sh"]
-
-CMD ["ros2", "launch", "as2_platform_gazebo", "platform_gazebo_launch.py", "namespace:=drone_sim_0", "simulation_config_file:=world_json_path"]
