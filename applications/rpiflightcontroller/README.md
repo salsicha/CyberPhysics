@@ -3,9 +3,8 @@
 
 
 TODO:
-use_optical_flow_mono.py and estimate motion for hover mode
 use velocity error in ros_flight_controller.py
-add PID in ros_flight_controller.py use pitch for forward velocity
+add PID in ros_flight_controller.py with flow and height to estimate forward velocity
 get aerostack2 genesis sim working
 enable mode switch, stabilize with INS, use Oak for MegaDepth or people tracking
 

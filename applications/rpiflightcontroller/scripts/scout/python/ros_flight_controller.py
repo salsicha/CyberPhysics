@@ -70,6 +70,9 @@ from sensor_msgs.msg import NavSatStatus
 from std_msgs.msg import Header
 from geometry_msgs.msg import (Quaternion, Vector3)
 
+import gc
+gc.disable()
+
 import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument("sim", type=bool)
@@ -86,6 +89,7 @@ input_yaw:float = 0
 
 adj_throttle:float = 10
 
+input_speed:float = 0
 
 
 # THE FLIGHT CONTROL LOOP
@@ -377,7 +381,6 @@ def FATAL_ERROR(msg:str) -> None:
     print(em)
     toolkit.log(em)
 
-########### RUN THE SCOUT FLIGHT CONTROLLER PROGRAM ###########
 
 ########### ROS ###########
 
@@ -389,19 +392,18 @@ VELx = 0.0
 VELy = 0.0
 VELz = 0.0
 
-def input_callback(msg):
+FLOWx = 0.0
+FLOWy = 0.0
+
+
+def flow_callback(msg):
     print("data: ", msg.data)
 
-    # input_throttle
-    # input_roll
-    # input_pitch
-    # input_yaw
+    global FLOWx
+    global FLOWy
 
-    # TODO:
-    # keyboard arrow keys will be translated to Twist values
-    # the twist values need to be translated into input_throttle, input_roll, input_pitch, input_yaw
-    # the Twist linear.x will map to moving forward, "forward/up arrow key"
-    # the forward motion will be measured by a kalman filter of optical flow and gps data
+    FLOWx = msg.data[0]
+    FLOWy = msg.data[1]
 
 
 def imu_callback(msg):
@@ -434,15 +436,22 @@ def odom_callback(msg):
 rclpy.init()
 node = Node('subscriber_node')
 
+
+
 # TODO:
 # modify PID controller in Aerostack2 to publish commands
 # or maybe just subscribe to the keyboard controller from aerostack2 here?
 
-# keyboard_sub = node.create_subscription(
-#     String,
-#     'key_pressed',
-#     input_callback,
-#     10)
+# TODO: subscriber to keyboard commands
+# get inputs from Aerostack2 node
+# input_throttle, input_roll, input_pitch, input_yaw, adj_throttle, input_speed
+
+
+flow_sub = node.create_subscription(
+    Float32MultiArray,
+    'flow_pub',
+    flow_callback,
+    10)
 
 imu_sub = node.create_subscription(
     Imu,
