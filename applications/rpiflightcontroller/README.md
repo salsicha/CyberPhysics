@@ -4,6 +4,7 @@
 
 TODO:
 calculate homographies between frames 
+use drone_stabilization.py's method, don't needs to keep tracks
 publish transformation and subscribe in flight controller
 add transformation to PID control in flight controller
 add keyboard command subscriber to ros_flight_controller.py
