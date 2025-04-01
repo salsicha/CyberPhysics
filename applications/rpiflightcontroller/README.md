@@ -3,8 +3,9 @@
 
 
 TODO:
+calculate homographies between frames 
+publish transformation and subscribe in flight controller
 add keyboard command subscriber to ros_flight_controller.py
-add PID in ros_flight_controller.py with flow and height to estimate forward velocity
 get aerostack2 genesis sim working
 enable mode switch, stabilize with INS, use Oak for MegaDepth or people tracking
 

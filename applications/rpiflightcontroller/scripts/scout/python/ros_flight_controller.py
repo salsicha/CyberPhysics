@@ -438,13 +438,10 @@ node = Node('subscriber_node')
 
 
 
-# TODO:
-# modify PID controller in Aerostack2 to publish commands
-# or maybe just subscribe to the keyboard controller from aerostack2 here?
+# TODO: subscribe to the keyboard controller from aerostack2 here
 
-# TODO: subscriber to keyboard commands
-# get inputs from Aerostack2 node
-# input_throttle, input_roll, input_pitch, input_yaw, adj_throttle, input_speed
+# TODO: subscribe to transformation from optical flow
+
 
 
 flow_sub = node.create_subscription(
