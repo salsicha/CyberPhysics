@@ -5,6 +5,7 @@
 TODO:
 calculate homographies between frames 
 publish transformation and subscribe in flight controller
+add transformation to PID control in flight controller
 add keyboard command subscriber to ros_flight_controller.py
 get aerostack2 genesis sim working
 enable mode switch, stabilize with INS, use Oak for MegaDepth or people tracking

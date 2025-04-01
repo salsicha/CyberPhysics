@@ -438,9 +438,11 @@ node = Node('subscriber_node')
 
 
 
-# TODO: subscribe to the keyboard controller from aerostack2 here
-
 # TODO: subscribe to transformation from optical flow
+
+# TODO: add transformation to PID controls
+
+# TODO: subscribe to the keyboard controller from aerostack2 here
 
 
 

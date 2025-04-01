@@ -238,6 +238,19 @@ if __name__ == '__main__':
             left_frame = cv2.cvtColor(passthrough_frame_left, cv2.COLOR_GRAY2BGR)
 
             tracked_features_left = output_features_left_queue.get().trackedFeatures
+
+
+            # TODO: get arrays for cv2.findHomography
+
+
+            print("tracked features: ", tracked_features_left)
+            print("features drawer: ", left_feature_drawer.trackedFeaturesPath)
+
+
+            # TODO: look at drone_stabilization.py 
+            # don't need the tracks, just the last two frames
+
+
             motions_left, vanishing_pt_left, avg_flow = camera_estimator_left.estimate_motion(
                 left_feature_drawer.trackedFeaturesPath)
 
