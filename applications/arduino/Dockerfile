@@ -46,6 +46,12 @@ RUN curl -L -o /microrosarduino.zip https://github.com/micro-ROS/micro_ros_ardui
 RUN curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | BINDIR=/usr/local/bin sh
 RUN /usr/local/bin/arduino-cli lib install --zip-path /microrosarduino.zip
 RUN /usr/local/bin/arduino-cli core update-index --additional-urls https://www.pjrc.com/teensy/package_teensy_index.json
+RUN /usr/local/bin/arduino-cli config add board_manager.additional_urls https://www.pjrc.com/teensy/package_teensy_index.json
+RUN /usr/local/bin/arduino-cli core install teensy:avr
+RUN find . -name *.ino | xargs -I {} bash -c "/usr/local/bin/arduino-cli compile {} --fqbn teensy:avr:teensy41 -v" || true
+
+# Need build flag???
+# arduino-cli compile HardwareTest.ino --output-dir Build/ --fqbn teensy:avr:teensy41 -v
 
 RUN python3 -m venv /venv
 

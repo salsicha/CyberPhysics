@@ -11,8 +11,8 @@ services:
       - /dev:/dev
     volumes:
       - /dev/shm:/dev/shm
-    command: > # arduino-cli monitor -p /dev/ttyACM0
-      serial --dev /dev/ttyACM0 -v6
+    command: > 
+      serial --dev /dev/ttyUSB0 -v6
   arduino:
     network_mode: "host"
     image: cyberphysics/arduino
@@ -21,33 +21,24 @@ services:
     privileged: true
     volumes:
       - "/tmp/.X11-unix:/tmp/.X11-unix"
-      - ../applications/arduino/scripts:/home/ubuntu/scripts
-      - arduino-local:/home/ubuntu/
     devices:
       - /dev:/dev
-    environment:
-      - "DISPLAY=${DISPLAY}"
-      - XAUTHORITY
-      - NVIDIA_DRIVER_CAPABILITIES=all
-      - EGL_PLATFORM=surfaceless
-    user: "1000:1000"
+    # command: >
+    #   bash -c "arduino-cli upload /home/ubuntu/scripts/Pub/Pub.ino --fqbn teensy:avr:teensy41 -p usb3/3-2"
     command: >
-      bash -c "arduino-cli upload /home/ubuntu/scripts/Pub/Pub.ino"
-    # Nvidia not needed, should be able to run on NUC
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: 1
-    #           capabilities: [gpu]
+      bash -c "arduino-cli compile /home/ubuntu/scripts/Pub/Pub.ino --fqbn teensy:avr:teensy41 -p usb3/3-2 || true"
+    # command: >
+    #   bash -c "arduino-cli board list"
+    restart: "no"
   ros_sub:
     network_mode: "host"
     image: cyberphysics/ros2
+    # depends_on:
+    #   - arduino
     volumes:
       - /dev/shm:/dev/shm
     command: >
-      ros2 topic echo /micro_ros_arduino_node_publisher
+      sleep 2 && ros2 topic echo /micro_ros_arduino_node_publisher
 volumes:
   arduino-local:
     external: false
