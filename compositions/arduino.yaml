@@ -5,12 +5,13 @@ services:
   uros:
     network_mode: "host"
     image: microros/micro-ros-agent:jazzy
+    # image: cyberphysics/arduino
     privileged: true
     devices:
       - /dev:/dev
     volumes:
       - /dev/shm:/dev/shm
-    command: >
+    command: > # arduino-cli monitor -p /dev/ttyACM0
       serial --dev /dev/ttyACM0 -v6
   arduino:
     network_mode: "host"
@@ -32,13 +33,14 @@ services:
     user: "1000:1000"
     command: >
       bash -c "arduino-cli upload /home/ubuntu/scripts/Pub/Pub.ino"
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
+    # Nvidia not needed, should be able to run on NUC
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
   ros_sub:
     network_mode: "host"
     image: cyberphysics/ros2

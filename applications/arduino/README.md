@@ -4,10 +4,21 @@
 This app provides all the necessary things for building Arduino projects and deploying ROS2 enabled sketches.
 
 
+## TODO:
+ros_sub needs to know topic type  
+arduino missing FQBN  
+
+
+
 ## Instructions:
 
-Connecting uros to the device:
+Run the arduino.yaml in the compositions folder to see full working example.
+
+Debugging, connecting uros to the device:
 serial --dev [YOUR BOARD PORT] -v6
+
+Or if using the arduino CLI:
+arduino-cli monitor -p /dev/ttyACM0
 
 (Deprecated, should be handled by the dockerfile now)
 Loading the uros library into the Arduino IDE:
