@@ -26,7 +26,7 @@ services:
     # command: >
     #   bash -c "arduino-cli upload /home/ubuntu/scripts/Pub/Pub.ino --fqbn teensy:avr:teensy41 -p usb3/3-2"
     command: >
-      bash -c "arduino-cli compile /home/ubuntu/scripts/Pub/Pub.ino --fqbn teensy:avr:teensy41 -p usb3/3-2 || true"
+      bash -c "arduino-cli compile /home/ubuntu/scripts/Pub/Pub.ino --fqbn teensy:avr:teensy41 -p /dev/ttyACM0 || true"
     # command: >
     #   bash -c "arduino-cli board list"
     restart: "no"
@@ -38,7 +38,7 @@ services:
     volumes:
       - /dev/shm:/dev/shm
     command: >
-      sleep 2 && ros2 topic echo /micro_ros_arduino_node_publisher
+      ros2 topic echo /micro_ros_arduino_node_publisher
 volumes:
   arduino-local:
     external: false
