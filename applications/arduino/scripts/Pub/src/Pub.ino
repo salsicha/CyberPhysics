@@ -1,4 +1,4 @@
-#include <micro_ros_arduino.h>
+#include <micro_ros_platformio.h>
 
 #include <stdio.h>
 #include <rcl/rcl.h>
@@ -39,7 +39,10 @@ void timer_callback(rcl_timer_t * timer, int64_t last_call_time)
 }
 
 void setup() {
-  set_microros_transports();
+  // set_microros_transports();
+  
+  Serial.begin(115200);
+  set_microros_serial_transports(Serial);
   
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, HIGH);  

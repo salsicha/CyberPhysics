@@ -1,12 +1,24 @@
 
+
+Run platformio
+- pio run --target upload
+Run uros bridge
+- ros2 run micro_ros_agent micro_ros_agent serial --dev /dev/ttyACM0
+Run ROS subscriber
+- ros2 topic echo /micro_ros_arduino_node_publisher
+UDEV Rules
+- wget https://www.pjrc.com/teensy/00-teensy.rules
+- sudo cp 00-teensy.rules /etc/udev/rules.d/
+
+
+
+
 # Arduino
 
 This app provides all the necessary things for building Arduino projects and deploying ROS2 enabled sketches.
 
 
 ## TODO:
-ros_sub needs to know topic type  
-arduino missing FQBN  
 
 
 

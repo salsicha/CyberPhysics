@@ -1,4 +1,4 @@
-#include <micro_ros_arduino.h>
+#include <micro_ros_platformio.h>
 
 #include <stdio.h>
 #include <TimeLib.h>
@@ -30,8 +30,12 @@ void error_loop(){
 }
 
 void setup() {
-  set_microros_transports();
-  HWSERIAL.begin(115200); // Configure debug serial
+  // set_microros_transports();
+  // HWSERIAL.begin(115200); // Configure debug serial
+
+  Serial.begin(115200);
+  set_microros_serial_transports(Serial);
+
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, HIGH);  
   
