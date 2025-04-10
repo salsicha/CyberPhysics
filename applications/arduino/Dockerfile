@@ -1,5 +1,9 @@
 
-FROM ubuntu:noble AS build
+# FROM ubuntu:noble AS build
+
+# Ubuntu Jammy (22.04) goes with ROS Iron
+
+FROM ubuntu:jammy AS build
 
 ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US.UTF-8 \
@@ -50,8 +54,33 @@ RUN /usr/local/bin/arduino-cli config add board_manager.additional_urls https://
 RUN /usr/local/bin/arduino-cli core install teensy:avr
 RUN find . -name *.ino | xargs -I {} bash -c "/usr/local/bin/arduino-cli compile {} --fqbn teensy:avr:teensy41 -v" || true
 
+# I installed teensy, not teensyduino?
+# https://www.pjrc.com/teensy/td_159/TeensyduinoInstall.linux64
+
+# chmod 755 TeensyduinoInstall.linux64
+# ./TeensyduinoInstall.linux64
+
+# for me it was $ export ARDUINO_PATH=/home/manzur/arduino-1.8.13/
+# export ARDUINO_PATH=[Your Arduino + Teensiduino path]
+
+# cd $ARDUINO_PATH/hardware/teensy/avr/
+
+# curl https://raw.githubusercontent.com/micro-ROS/micro_ros_arduino/foxy/extras/patching_boards/platform_teensy.txt > platform.txt
+
+# /root/Arduino/libraries/micro_ros_arduino
+
+
+
+
+
 # Need build flag???
 # arduino-cli compile HardwareTest.ino --output-dir Build/ --fqbn teensy:avr:teensy41 -v
+
+# Udev???
+# https://www.pjrc.com/teensy/00-teensy.rules
+# copy the file to /etc/udev/rules.d.
+# sudo cp 00-teensy.rules /etc/udev/rules.d/
+
 
 RUN python3 -m venv /venv
 
