@@ -5,7 +5,6 @@ services:
   uros:
     network_mode: "host"
     image: cyberphysics/ros2
-    # image: cyberphysics/arduino
     privileged: true
     devices:
       - /dev:/dev
@@ -24,7 +23,9 @@ services:
     devices:
       - /dev:/dev
     command: >
-      bash -c "cd Pub && pio run --target upload, monitor"
+      bash -c "cd Sub && pio run --target upload"
+    # command: >
+    #   bash -c "cd Pub && pio run --target upload"
     restart: "no"
   ros_sub:
     network_mode: "host"
@@ -32,7 +33,9 @@ services:
     volumes:
       - /dev/shm:/dev/shm
     command: >
-      ros2 topic echo --qos-durability=transient_local /micro_ros_arduino_node_publisher std_msgs/msg/Int32
+      ros2 topic pub /micro_ros_arduino_subscriber std_msgs/msg/Int32 "data: 1" -1
+    # command: >
+    #   ros2 topic echo --qos-durability=transient_local /micro_ros_arduino_node_publisher std_msgs/msg/Int32
 volumes:
   arduino-local:
     external: false
