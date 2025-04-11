@@ -1,5 +1,21 @@
 
 
+
+
+## TODO:
+
+
+The LED is blinking because an error, that should be the last piece of the puzzel
+
+
+
+## Program Button
+
+Must hit program button before running "pio run upload"
+
+
+## Example:
+
 Run platformio
 - pio run --target upload
 Run uros bridge
@@ -17,8 +33,6 @@ UDEV Rules
 
 This app provides all the necessary things for building Arduino projects and deploying ROS2 enabled sketches.
 
-
-## TODO:
 
 
 

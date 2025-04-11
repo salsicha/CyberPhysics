@@ -4,7 +4,7 @@
 services:
   uros:
     network_mode: "host"
-    image: microros/micro-ros-agent:jazzy
+    image: cyberphysics/ros2
     # image: cyberphysics/arduino
     privileged: true
     devices:
@@ -12,7 +12,7 @@ services:
     volumes:
       - /dev/shm:/dev/shm
     command: > 
-      serial --dev /dev/ttyUSB0 -v6
+      ros2 run micro_ros_agent micro_ros_agent serial --dev /dev/ttyUSB0 -v 6
   arduino:
     network_mode: "host"
     image: cyberphysics/arduino
@@ -23,22 +23,16 @@ services:
       - "/tmp/.X11-unix:/tmp/.X11-unix"
     devices:
       - /dev:/dev
-    # command: >
-    #   bash -c "arduino-cli upload /home/ubuntu/scripts/Pub/Pub.ino --fqbn teensy:avr:teensy41 -p usb3/3-2"
     command: >
-      bash -c "arduino-cli compile /home/ubuntu/scripts/Pub/Pub.ino --fqbn teensy:avr:teensy41 -p /dev/ttyACM0 || true"
-    # command: >
-    #   bash -c "arduino-cli board list"
+      bash -c "cd Pub && pio run --target upload, monitor"
     restart: "no"
   ros_sub:
     network_mode: "host"
     image: cyberphysics/ros2
-    # depends_on:
-    #   - arduino
     volumes:
       - /dev/shm:/dev/shm
     command: >
-      ros2 topic echo /micro_ros_arduino_node_publisher
+      ros2 topic echo --qos-durability=transient_local /micro_ros_arduino_node_publisher std_msgs/msg/Int32
 volumes:
   arduino-local:
     external: false

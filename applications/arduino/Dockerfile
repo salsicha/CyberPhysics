@@ -62,6 +62,7 @@ RUN cp /venv/bin/activate /root/.platformio/penv/bin/activate
 
 ## Install all projects
 RUN . /venv/bin/activate && bash -c 'for i in ./*; do cd "$i" && pio lib install && pio run && cd -; done'
+## Debug:
 # RUN . /venv/bin/activate && cd example && bash -c 'pio lib install && pio run'
 
 COPY entrypoint.sh /entrypoint.sh
@@ -81,7 +82,7 @@ ENV LANG=en_US.UTF-8 \
 
 COPY --from=build / /
 
-WORKDIR /
+WORKDIR /home/ubuntu/scripts
 
 ENTRYPOINT [ "/entrypoint.sh" ]
 CMD ["/opt/arduino-ide/arduino-ide","--no-sandbox"]

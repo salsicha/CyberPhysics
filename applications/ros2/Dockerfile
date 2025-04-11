@@ -30,7 +30,7 @@ RUN apt update && apt install -q -y --no-install-recommends \
     ros-$ROS2_DISTRO-ros2bag ros-$ROS2_DISTRO-rclpy ros-$ROS2_DISTRO-rosbag2-storage-default-plugins \
     python3-rosdep python3-colcon-ros linuxptp python3-colcon-common-extensions \
     ros-$ROS2_DISTRO-rosbridge-suite ros-$ROS2_DISTRO-rosbag2 ros-$ROS2_DISTRO-gps-msgs \
-    ros-$ROS2_DISTRO-ros2-control vim git jq wget \
+    ros-$ROS2_DISTRO-ros2-control vim git jq wget flex \
     ros-$ROS2_DISTRO-tf2-msgs software-properties-common build-essential gcc && \
     rm -rf /var/lib/apt/lists/*
 
@@ -41,12 +41,22 @@ RUN pip3 install rosdep colcon-common-extensions pytest-rerunfailures numpy lark
 
 WORKDIR /workspace
 RUN mkdir -p /workspace/src
-COPY custom_msgs/ /workspace/src/
+COPY custom_msgs/flir_camera_msgs /workspace/src/flir_camera_msgs
+
+RUN git clone -b jazzy https://github.com/micro-ROS/micro_ros_setup.git src/micro_ros_setup
 
 RUN . /venv/bin/activate && . /opt/ros/$ROS2_DISTRO/setup.bash && \
+    apt update && \
     rosdep init && \
     rosdep update && \
     rosdep install --from-paths src --ignore-src -y && \
+    colcon build --merge-install --install-base /opt/ros/$ROS2_DISTRO
+
+# Micro-ROS agent
+RUN . /venv/bin/activate && . /opt/ros/$ROS2_DISTRO/setup.bash && \
+    apt update && \
+    ros2 run micro_ros_setup create_agent_ws.sh && \
+    rosdep update && rosdep install --from-paths src --ignore-src -y && \
     colcon build --merge-install --install-base /opt/ros/$ROS2_DISTRO
 
 COPY entrypoint.sh /entrypoint.sh
