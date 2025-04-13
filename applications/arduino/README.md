@@ -13,6 +13,11 @@ https://docs.platformio.org/en/latest/core/installation/udev-rules.html
 
 ## Example
 
+Raspberry Pi Pico 2 W:
+(Pico appears as a storage device, drag and drop this file)
+https://downloads.raspberrypi.com/micropython/mp_firmware_unofficial_latest.uf2
+
+Teensy:
 Must hit program button before running "pio run upload"
 
 docker run -ti --privileged cyberphysics/arduino bash -c "cd Sub && pio run -e pico --target upload"
