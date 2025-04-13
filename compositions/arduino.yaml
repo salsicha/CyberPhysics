@@ -26,6 +26,8 @@ services:
       - /dev/shm:/dev/shm
     command: > 
       ros2 run micro_ros_agent micro_ros_agent serial --dev /dev/ttyACM0 baudrate=115200
+    # command: > # WiFi:
+    #   ros2 run micro_ros_agent micro_ros_agent udp4 --port 8888 -v6
   ros_sub:
     network_mode: "host"
     image: cyberphysics/ros2

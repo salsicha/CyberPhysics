@@ -1,5 +1,10 @@
 
 
+## TODO:
+- get WiFi UDP micro-ros example working for Pico 2 W  
+- get ESP32 PoE board
+
+
 ## Walkthrough:
 
 (This uses Raspberry Pi Pico 2 W)  
@@ -15,6 +20,7 @@ ros2 run micro_ros_agent micro_ros_agent serial --dev /dev/ttyACM0 baudrate=1152
 
 4. 
 ros2 topic pub /micro_ros_arduino_subscriber std_msgs/msg/Int32 "data: 1" -1  
+
 
 
 ## Note on accessing devices
