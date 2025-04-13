@@ -2,16 +2,6 @@
 ## Arduino and MicroROS
 
 services:
-  uros:
-    network_mode: "host"
-    image: cyberphysics/ros2
-    privileged: true
-    devices:
-      - /dev:/dev
-    volumes:
-      - /dev/shm:/dev/shm
-    command: > 
-      ros2 run micro_ros_agent micro_ros_agent serial --dev /dev/serial/by-id/$rpicoid baudrate=115200
   arduino:
     network_mode: "host"
     image: cyberphysics/arduino
@@ -23,10 +13,18 @@ services:
     devices:
       - /dev:/dev
     command: >
-      bash -c "cd Sub && pio run -e pico --target upload"
-    # command: >
-    #   bash -c "cd Pub && pio run --target upload"
+      bash -c "cd Sub && pio run -e pico --target upload --upload-port /dev/ttyUSB0"
     restart: "no"
+  uros:
+    network_mode: "host"
+    image: cyberphysics/ros2
+    privileged: true
+    devices:
+      - /dev:/dev
+    volumes:
+      - /dev/shm:/dev/shm
+    command: > 
+      ros2 run micro_ros_agent micro_ros_agent serial --dev /dev/ttyACM0 baudrate=115200
   ros_sub:
     network_mode: "host"
     image: cyberphysics/ros2
