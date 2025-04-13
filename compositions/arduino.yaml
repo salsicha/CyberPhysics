@@ -23,7 +23,7 @@ services:
     devices:
       - /dev:/dev
     command: >
-      bash -c "cd Sub && pio run --target upload"
+      bash -c "cd Sub && pio run -e pico --target upload"
     # command: >
     #   bash -c "cd Pub && pio run --target upload"
     restart: "no"

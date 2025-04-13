@@ -4,7 +4,10 @@
 
 ## TODO:
 
-Teensy doesn't seem to work, switch to Pico 2 W
+
+Please install `99-platformio-udev.rules`. 
+https://docs.platformio.org/en/latest/core/installation/udev-rules.html
+
 
 
 
@@ -12,7 +15,7 @@ Teensy doesn't seem to work, switch to Pico 2 W
 
 Must hit program button before running "pio run upload"
 
-docker run -ti --privileged cyberphysics/arduino bash -c "cd Sub && pio run --target upload"
+docker run -ti --privileged cyberphysics/arduino bash -c "cd Sub && pio run -e pico --target upload"
 
 docker run -ti -v /dev/shm:/dev/shm --privileged cyberphysics/ros2 bash -c "ros2 run micro_ros_agent micro_ros_agent serial --dev /dev/ttyUSB0 -v 6"
 
