@@ -216,7 +216,7 @@ def create_pipeline():
 if __name__ == '__main__':
 
     rclpy.init()
-    node = Node()
+    node = rclpy.create_node('publisher')
     flow_publisher = node.create_publisher(Float32MultiArray, "flow_pub", 10)
 
     pipeline = create_pipeline()

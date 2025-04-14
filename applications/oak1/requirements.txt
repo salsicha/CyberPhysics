@@ -1,4 +1,4 @@
-depthai==2.22.0.0
-opencv-python==4.8.0.76
-numpy==1.26.0
-PySimpleGUI==4.60.5
+depthai
+opencv-python
+numpy
+PySimpleGUI
