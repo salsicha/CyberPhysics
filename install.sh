@@ -16,6 +16,10 @@ git config --global credential.helper 'cache --timeout=31536000'
 # Sometimes needed to talk to devices
 sudo usermod -a -G dialout $USER
 
+# Oak-1 camera
+echo 'SUBSYSTEM=="usb", ATTRS{idVendor}=="03e7", MODE="0666"' | sudo tee /etc/udev/rules.d/80-movidius.rules
+sudo udevadm control --reload-rules && sudo udevadm trigger
+
 # Install Docker
 if [ -x "$(command -v docker)" ]; then
     echo "Docker is already installed on this machine"

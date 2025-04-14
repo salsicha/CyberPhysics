@@ -6,6 +6,7 @@ TODO:
 calculate homographies between frames 
 use drone_stabilization.py's method, don't needs to keep tracks
 but either optical_flow_mono.py or featuretracker.py have something similar but with hardware acceleration
+optical_flow_mono.py doesn't detect camera?
 publish transformation and subscribe in flight controller
 add transformation to PID control in flight controller
 add keyboard command subscriber to ros_flight_controller.py
