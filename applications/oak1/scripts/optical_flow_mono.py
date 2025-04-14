@@ -261,7 +261,7 @@ if __name__ == '__main__':
             cv2.imshow(left_window_name, left_frame)
 
 
-            print("Average flow: ", avg_flow)
+            # print("Average flow: ", avg_flow)
 
 
             # ROS publisher

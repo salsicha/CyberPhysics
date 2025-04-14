@@ -145,7 +145,32 @@ with dai.Device(pipeline) as device:
         colorFeatureDrawer.trackFeaturePath(trackedFeaturesColor)
 
 
-        # TODO: publish feature tracks!
+
+        ## TODO: calculate velocity and publish
+
+
+        first_key = list(colorFeatureDrawer.trackedFeaturesPath.keys())[0]
+        feature_queue = colorFeatureDrawer.trackedFeaturesPath[first_key]
+        first_feature = feature_queue[0]
+
+        print(f"Features: {first_feature.x}, {first_feature.y} \n")
+
+
+        ## TODO: Calculate optical flow
+        ## prev_gray and gray are just the grayscale image
+        # new_pts, status, errors = cv2.calcOpticalFlowPyrLK(prev_gray, gray, prev_pts, None, **lk_params)
+        ## Select good points
+        # good_new = new_pts[status == 1]
+        # good_old = prev_pts[status == 1]
+        # H, _ = cv2.findHomography(good_old, good_new, cv2.RANSAC, 5.0)
+        ## Get translation out of homography "H"
+        # rotation_matrix, translation_vector, camera_normal = cv2.decomposeHomographyMat(H)
+
+        # print(f"Translation: {translation_vector}"")
+        
+
+        # TODO: Publish
+
         # outputFeaturesColorQueue.get().trackedFeatures
         # TrackedFeatures message. Carries position (X, Y) of tracked features and their ID.
         # from std_msgs.msg import String,Int32,Int32MultiArray,MultiArrayLayout,MultiArrayDimension
@@ -165,16 +190,16 @@ with dai.Device(pipeline) as device:
             if key == ord('q'):
                 break
 
-            elif key == ord('s'):
-                if featureTrackerConfig.motionEstimator.type == dai.FeatureTrackerConfig.MotionEstimator.Type.LUCAS_KANADE_OPTICAL_FLOW:
-                    featureTrackerConfig.motionEstimator.type = dai.FeatureTrackerConfig.MotionEstimator.Type.HW_MOTION_ESTIMATION
-                    print("Switching to hardware accelerated motion estimation")
-                else:
-                    featureTrackerConfig.motionEstimator.type = dai.FeatureTrackerConfig.MotionEstimator.Type.LUCAS_KANADE_OPTICAL_FLOW
-                    print("Switching to Lucas-Kanade optical flow")
-                cfg = dai.FeatureTrackerConfig()
-                cfg.set(featureTrackerConfig)
-                inputFeatureTrackerConfigQueue.send(cfg)
+            # elif key == ord('s'):
+            #     if featureTrackerConfig.motionEstimator.type == dai.FeatureTrackerConfig.MotionEstimator.Type.LUCAS_KANADE_OPTICAL_FLOW:
+            #         featureTrackerConfig.motionEstimator.type = dai.FeatureTrackerConfig.MotionEstimator.Type.HW_MOTION_ESTIMATION
+            #         print("Switching to hardware accelerated motion estimation")
+            #     else:
+            #         featureTrackerConfig.motionEstimator.type = dai.FeatureTrackerConfig.MotionEstimator.Type.LUCAS_KANADE_OPTICAL_FLOW
+            #         print("Switching to Lucas-Kanade optical flow")
+            #     cfg = dai.FeatureTrackerConfig()
+            #     cfg.set(featureTrackerConfig)
+            #     inputFeatureTrackerConfigQueue.send(cfg)
 
         else:
             time.sleep(0.032)

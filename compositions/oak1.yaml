@@ -10,7 +10,9 @@ services:
       - /tmp/.X11-unix:/tmp/.X11-unix
       - /dev/:/dev/
     privileged: true
-    command: stdbuf -o L python3 /scripts/featuretracker.py --topic-namespace oak1_right --device-ip 10.0.0.12 --rate 30 --debug
+    command: stdbuf -o L python3 /scripts/featuretracker.py
+    
+    # --topic-namespace oak1_right --device-ip 10.0.0.12 --rate 30 --debug
 
     # -v /dev/bus/usb:/dev/bus/usb --device-cgroup-rule='c 189:* rmw'
     
