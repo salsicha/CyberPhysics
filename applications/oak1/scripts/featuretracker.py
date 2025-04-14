@@ -7,7 +7,7 @@ from collections import deque
 import time
 
 
-show_window = False
+show_window = True
 
 
 class FeatureTrackerDrawer:
@@ -165,16 +165,16 @@ with dai.Device(pipeline) as device:
             if key == ord('q'):
                 break
 
-            # elif key == ord('s'):
-            #     if featureTrackerConfig.motionEstimator.type == dai.FeatureTrackerConfig.MotionEstimator.Type.LUCAS_KANADE_OPTICAL_FLOW:
-            #         featureTrackerConfig.motionEstimator.type = dai.FeatureTrackerConfig.MotionEstimator.Type.HW_MOTION_ESTIMATION
-            #         print("Switching to hardware accelerated motion estimation")
-            #     else:
-            #         featureTrackerConfig.motionEstimator.type = dai.FeatureTrackerConfig.MotionEstimator.Type.LUCAS_KANADE_OPTICAL_FLOW
-            #         print("Switching to Lucas-Kanade optical flow")
-            #     cfg = dai.FeatureTrackerConfig()
-            #     cfg.set(featureTrackerConfig)
-            #     inputFeatureTrackerConfigQueue.send(cfg)
+            elif key == ord('s'):
+                if featureTrackerConfig.motionEstimator.type == dai.FeatureTrackerConfig.MotionEstimator.Type.LUCAS_KANADE_OPTICAL_FLOW:
+                    featureTrackerConfig.motionEstimator.type = dai.FeatureTrackerConfig.MotionEstimator.Type.HW_MOTION_ESTIMATION
+                    print("Switching to hardware accelerated motion estimation")
+                else:
+                    featureTrackerConfig.motionEstimator.type = dai.FeatureTrackerConfig.MotionEstimator.Type.LUCAS_KANADE_OPTICAL_FLOW
+                    print("Switching to Lucas-Kanade optical flow")
+                cfg = dai.FeatureTrackerConfig()
+                cfg.set(featureTrackerConfig)
+                inputFeatureTrackerConfigQueue.send(cfg)
 
         else:
             time.sleep(0.032)

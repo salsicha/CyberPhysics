@@ -28,7 +28,7 @@ class CameraMotionEstimator:
         print(f"Number of features: {num_features}")
 
         if num_features == 0:
-            return most_prominent_motion, vanishing_point
+            return most_prominent_motion, vanishing_point, avg_flow
 
         for path in feature_paths.values():
             if len(path) >= 2:
@@ -184,10 +184,10 @@ def create_pipeline():
     pipeline = dai.Pipeline()
 
     # Create a MonoCamera node and set its properties
-    mono_left = pipeline.create(dai.node.MonoCamera)
-    mono_left.setCamera("left")
-    mono_left.setResolution(dai.MonoCameraProperties.SensorResolution.THE_720_P)
-    mono_left.setFps(15)
+    mono_left = pipeline.create(dai.node.ColorCamera)
+    # mono_left.setCamera("left")
+    # mono_left.setResolution(dai.MonoCameraProperties.SensorResolution.THE_720_P)
+    # mono_left.setFps(15)
 
     # Create a FeatureTracker node
     feature_tracker_left = pipeline.create(dai.node.FeatureTracker)
@@ -206,7 +206,7 @@ def create_pipeline():
     feature_tracker_left.setHardwareResources(num_shaves, num_memory_slices)
 
     # Link the nodes
-    mono_left.out.link(feature_tracker_left.inputImage)
+    mono_left.video.link(feature_tracker_left.inputImage)
     feature_tracker_left.passthroughInputImage.link(xout_passthrough_left.input)
     feature_tracker_left.outputFeatures.link(xout_tracked_features_left.input)
 
