@@ -30,8 +30,13 @@ class CameraMotionEstimator:
         if num_features == 0:
             return most_prominent_motion, vanishing_point, avg_flow
 
+        src_hom = []
+        dst_hom = []
+
         for path in feature_paths.values():
             if len(path) >= 2:
+                src_hom.append([path[-2].x, path[-2].y])
+                dst_hom.append([path[-1].x, path[-1].y])
                 src = np.array([path[-2].x, path[-2].y])
                 dst = np.array([path[-1].x, path[-1].y])
                 avg_flow += dst - src
@@ -39,29 +44,31 @@ class CameraMotionEstimator:
                 vanishing_point += motion_vector
                 rotation = np.arctan2(dst[1] - src[1], dst[0] - src[0])
                 total_rotation += rotation
+        
+
+        ## Using findHomography to estimate translation, rotation
+        translation = [0.0, 0.0, 0.0]
+        if len(src_hom) >= 4:
+            src_pts = np.array(src_hom).reshape(-1, 1, 2)
+            dst_pts = np.array(dst_hom).reshape(-1, 1, 2)
+            H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
+            # print("Homography matrix:\n", H)
+            scale_x = np.sqrt(np.linalg.det(H[:3, :3]))
+            rotation_matrix = H[:3, :3] / scale_x
+            translation_vector = H[:3, 2]
+            translation = translation_vector.tolist()
+            print(f"Translation: {translation_vector}")
+            print(f"Rotation: {rotation_matrix}")
+
+
 
         avg_flow /= num_features
         avg_rotation = total_rotation / num_features
         vanishing_point /= num_features
 
+
         print(f"Average Flow: {avg_flow}")
         print(f"Average Rotation: {avg_rotation}")
-
-
-        ## TODO: return rotation and translation
-        ## the gyro already knows roll, pitch, yaw rates
-        ## just return average flow?
-        # 
-        # M, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
-        ## Decompose Homography to get rotation and translation (This is approximate)
-        ## For more accurate results with findHomography, camera calibration is needed
-        # scale_x = np.sqrt(np.linalg.det(M[:3, :3]))
-        # rotation_matrix = M[:3, :3] / scale_x
-        # translation_vector = M[:3, 2]
-        ## Convert rotation matrix to Euler angles for easier interpretation
-        # rotation = R.from_matrix(rotation_matrix)
-        # euler_angles = rotation.as_euler('xyz', degrees=True)
-        # return translation_vector, euler_angles
 
 
         avg_flow = (self.filter_weight * self.last_avg_flow +
@@ -81,7 +88,7 @@ class CameraMotionEstimator:
         if rotation_magnitude > max_magnitude and rotation_magnitude > self.rotation_threshold:
             most_prominent_motion = 'Rotating'
 
-        return most_prominent_motion, vanishing_point, avg_flow
+        return most_prominent_motion, vanishing_point, avg_flow, translation
 
 
 class FeatureTrackerDrawer:
@@ -239,36 +246,20 @@ if __name__ == '__main__':
 
             tracked_features_left = output_features_left_queue.get().trackedFeatures
 
-
-            # TODO: get arrays for cv2.findHomography
-
-
-            print("tracked features: ", tracked_features_left)
-            print("features drawer: ", left_feature_drawer.trackedFeaturesPath)
-
-
-            # TODO: look at drone_stabilization.py 
-            # don't need the tracks, just the last two frames
-
-
-            motions_left, vanishing_pt_left, avg_flow = camera_estimator_left.estimate_motion(
+            motions_left, vanishing_pt_left, avg_flow, translation = camera_estimator_left.estimate_motion(
                 left_feature_drawer.trackedFeaturesPath)
 
             left_feature_drawer.trackFeaturePath(tracked_features_left)
-            left_feature_drawer.drawFeatures(left_frame, vanishing_pt_left, motions_left)
 
-            print("Motions:", motions_left)
-            cv2.imshow(left_window_name, left_frame)
+            # left_feature_drawer.drawFeatures(left_frame, vanishing_pt_left, motions_left)
 
-
-            # print("Average flow: ", avg_flow)
-
+            # print("Motions:", motions_left)
+            # cv2.imshow(left_window_name, left_frame)
 
             # ROS publisher
             msg = Float32MultiArray()
-            msg.data = [avg_flow[0], avg_flow[1]]
+            msg.data = [translation[0], translation[1], translation[2]]
             flow_publisher.publish(msg)
-
 
             if cv2.waitKey(1) == ord('q'):
                 break

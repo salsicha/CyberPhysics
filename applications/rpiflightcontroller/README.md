@@ -3,11 +3,8 @@
 
 
 TODO:
-calculate homographies between frames 
-- use drone_stabilization.py's method, don't needs to keep tracks
-- featuretracker.py uses hardware acceleration, start there
-- publish translation vector and subscribe in flight controller
-add transformation to PID control in flight controller
+subscribe to "flow_pub" topic in rpiflightcontroller/scout/ros_flight_controller.py
+add translation to PID control in flight controller
 add keyboard command subscriber to ros_flight_controller.py
 get aerostack2 genesis sim working
 enable mode switch, stabilize with INS, use Oak for MegaDepth or people tracking

@@ -1,0 +1,102 @@
+
+Snippets for getting premade blobs or converting ONNX to .blob
+
+Prebuilt:  
+https://github.com/borongyuan/depthai-superpoint
+
+
+    superpoint_200x320_6shave.blob
+
+
+—-
+
+Example importing blob into script:
+
+import depthai as dai
+
+# Create pipeline
+pipeline = dai.Pipeline()
+
+# Define a neural network node
+nn = pipeline.createNeuralNetwork()
+nn.setBlobPath("superpoint_200x320_6shave.blob")
+
+# ... rest of your pipeline setup ...
+
+
+—-
+
+
+Ensure that the input image size matches the expected dimensions of the model (200x320 in this case).
+
+
+——
+
+Export torch model to ONNX:
+
+import torch
+from superpoint import SuperPoint  # Modify if needed
+import numpy as np
+
+model = SuperPoint()
+model.load_state_dict(torch.load('superpoint_v1.pth'))
+model.eval()
+
+dummy_input = torch.randn(1, 1, 240, 320)  # grayscale input
+torch.onnx.export(
+    model, dummy_input, "superpoint.onnx",
+    input_names=['input'], output_names=['keypoints', 'descriptors'],
+    opset_version=11
+)
+
+—-
+
+Convert ONNX to OpenVINO IR:
+
+mo --input_model superpoint.onnx --input_shape [1,1,240,320] --data_type FP16
+
+superpoint.xml
+superpoint.bin
+
+—-
+
+Compile OpenVINO IR to .blob:
+
+import blobconverter
+
+blobconverter.from_openvino(
+    xml="superpoint.xml",
+    data_type="FP16",
+    shaves=6,
+    version="2021.4",  # or match your OAK firmware
+    output_dir=".",
+)
+
+—-
+
+Alternately, Intel has a compile tool:
+
+/path/to/depthai/tools/compile_tool \
+    -m superpoint.xml \
+    -o superpoint.blob \
+    -ip U8 \
+    -VPU_NUMBER_OF_SHAVES 6 \
+    -VPU_NUMBER_OF_CMX_SLICES 6
+
+
+—-
+
+
+Tips:
+
+
+    Set input precision to U8 or FP16, depending on model.
+    The input shape must be static.
+    Use shaves=6 for OAK-1 (single Myriad X chip).
+    SuperPoint usually outputs:
+        keypoints: [1, N, 2] (x, y)
+        descriptors: [1, N, 256]
+
+
+
+
