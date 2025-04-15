@@ -33,6 +33,12 @@ From the applications folder run "make build_<app_name>". For example:
 cd applications && make build_ros2
 ```
 
+!!! Targeting ARM64 (Raspberry Pi, Jetson) !!!
+```bash
+cd applications && make target_arm64 build_ros2
+```
+
+
 ## Usage
 
 Write new applications and put them in the applications folder.  
