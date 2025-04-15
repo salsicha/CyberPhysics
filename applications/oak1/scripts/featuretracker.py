@@ -88,6 +88,32 @@ colorCam = pipeline.create(dai.node.ColorCamera)
 # colorCam = pipeline.create(dai.node.MonoCamera)
 featureTrackerColor = pipeline.create(dai.node.FeatureTracker)
 
+
+## Script
+script_node = pipeline.create(dai.node.Script)
+script_node.setScript("""
+    import marshal
+
+    input_data = node.io['input'].get()
+                      
+    num = 123
+    node.warn(f"Number {num}")
+
+    output_data = [1, "hello", {"foo": "bar"}]
+    out_serial = marshal.dumps(output_data)
+    buf = Buffer(len(out_serial))
+    while True:
+        node.io['output'].send(b)
+""")
+input_node = pipeline.create(dai.node.XLinkIn)
+input_node.setStreamName("input")
+output_node = pipeline.create(dai.node.XLinkOut)
+output_node.setStreamName("output")
+input_node.out.link(script_node.inputs["input"])
+script_node.outputs["output"].link(output_node.input)
+
+
+
 xoutPassthroughFrameColor = pipeline.create(dai.node.XLinkOut)
 xoutTrackedFeaturesColor = pipeline.create(dai.node.XLinkOut)
 xinTrackedFeaturesConfig = pipeline.create(dai.node.XLinkIn)
@@ -122,6 +148,12 @@ featureTrackerConfig = featureTrackerColor.initialConfig.get()
 # Connect to device and start pipeline
 with dai.Device(pipeline) as device:
 
+
+    ## Script
+    input_queue = device.getInputQueue("input")
+    output_queue = device.getOutputQueue("output", 8, False)
+
+
     # Output queues used to receive the results
     passthroughImageColorQueue = device.getOutputQueue("passthroughFrameColor", 8, False)
     outputFeaturesColorQueue = device.getOutputQueue("trackedFeaturesColor", 8, False)
@@ -138,6 +170,17 @@ with dai.Device(pipeline) as device:
 
 
     while True:
+
+
+        ## Script
+        # input_data = 1
+        # input_queue.send(input_data)
+        # output_data = output_queue.get()
+        # print(f"output data: {output_data}")
+
+
+
+
         inPassthroughFrameColor = passthroughImageColorQueue.get()
         passthroughFrameColor = inPassthroughFrameColor.getCvFrame()
 
@@ -148,13 +191,25 @@ with dai.Device(pipeline) as device:
 
         ## TODO: calculate velocity and publish
 
+        try:
+            keys = list(colorFeatureDrawer.trackedFeaturesPath.keys())
+            # print(f"keys: {keys}")
+            feature_queue = colorFeatureDrawer.trackedFeaturesPath[keys[0]]
 
-        first_key = list(colorFeatureDrawer.trackedFeaturesPath.keys())[0]
-        feature_queue = colorFeatureDrawer.trackedFeaturesPath[first_key]
-        first_feature = feature_queue[0]
+            # first_feature = feature_queue[-2]
+            # print(f"Features: {first_feature.x}, {first_feature.y} \n")
 
-        print(f"Features: {first_feature.x}, {first_feature.y} \n")
+            # first_feature = feature_queue[-1]
+            # print(f"Features: {first_feature.x}, {first_feature.y} \n")
 
+            frame_one = []
+            frame_two = []
+            for key in keys:
+                feature_queue = colorFeatureDrawer.trackedFeaturesPath[key]
+                
+
+        except:
+            pass
 
         ## TODO: Calculate optical flow
         ## prev_gray and gray are just the grayscale image
@@ -167,7 +222,7 @@ with dai.Device(pipeline) as device:
         # rotation_matrix, translation_vector, camera_normal = cv2.decomposeHomographyMat(H)
 
         # print(f"Translation: {translation_vector}"")
-        
+
 
         # TODO: Publish
 
