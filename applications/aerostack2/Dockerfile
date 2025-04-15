@@ -1,3 +1,4 @@
+ARG TAG=amd64
 
 FROM ros:humble AS build
 

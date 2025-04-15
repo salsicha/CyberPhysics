@@ -12,7 +12,7 @@ services:
       /scripts/publisher.py
   oak: # Oak-1 ROS feature publisher
     network_mode: "host"
-    image: cyberphysics/oak
+    image: cyberphysics/oak1
     privileged: true
     devices:
       - /dev:/dev
