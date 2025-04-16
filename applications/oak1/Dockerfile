@@ -16,7 +16,7 @@ COPY requirements.txt /
 
 RUN apt update && apt install -y --no-install-recommends \
     python3-rosdep python3-colcon-ros python3-pip ros-$ROS2_DISTRO-cv-bridge \
-    && apt install -y x11-apps qtwayland5 \
+    x11-apps qtwayland5 \
     && . /venv/bin/activate \
     && pip install -r /requirements.txt \
     && rm -rf /var/lib/apt/lists/* \
