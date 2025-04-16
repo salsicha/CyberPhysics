@@ -395,15 +395,30 @@ VELz = 0.0
 FLOWx = 0.0
 FLOWy = 0.0
 
+HOMOx = 0.0
+HOMOy = 0.0
+HOMOz = 0.0
+
+
+def input_callback(msg):
+    print("input data: ", msg.data)
+
 
 def flow_callback(msg):
     print("data: ", msg.data)
 
+    global HOMOx
+    global HOMOy
+    global HOMOz
+
     global FLOWx
     global FLOWy
-
-    FLOWx = msg.data[0]
-    FLOWy = msg.data[1]
+    
+    HOMOx = msg.data[0]    
+    HOMOy = msg.data[1]
+    HOMOz = msg.data[2]
+    FLOWx = msg.data[3]
+    FLOWy = msg.data[4]
 
 
 def imu_callback(msg):
@@ -438,13 +453,18 @@ node = Node('subscriber_node')
 
 
 
-# TODO: subscribe to transformation from optical flow
 
 # TODO: add transformation to PID controls
 
-# TODO: subscribe to the keyboard controller from aerostack2 here
+
+# TODO: look at aerostack2 control output, match input here
 
 
+control_input = node.create_subscription(
+    Float32MultiArray,
+    'control_input',
+    input_callback,
+    10)
 
 flow_sub = node.create_subscription(
     Float32MultiArray,

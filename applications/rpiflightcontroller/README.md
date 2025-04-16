@@ -3,7 +3,7 @@
 
 
 TODO:
-subscribe to "flow_pub" topic in rpiflightcontroller/scout/ros_flight_controller.py
+does aerostack2 keyboard interface have input dependencies?
 rangefider drive
 add translation to PID control in flight controller
 add keyboard command subscriber to ros_flight_controller.py

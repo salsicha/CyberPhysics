@@ -70,6 +70,24 @@ services:
       - /dev/shm:/dev/shm
     command: >
       /scripts/main.py
+  keyboardteleoperation:
+    network_mode: "host"
+    image: cyberphysics/aerostack2
+    privileged: true
+    devices:
+      - /dev:/dev
+    volumes:
+      - /dev/shm:/dev/shm
+      - "/tmp/.X11-unix:/tmp/.X11-unix"
+      - ../applications/aerostack2/config:/workspace/config/
+    environment:
+      - "DISPLAY=${DISPLAY}"
+      - XAUTHORITY
+      - NVIDIA_DRIVER_CAPABILITIES=all
+      - EGL_PLATFORM=surfaceless
+    command: >
+      ros2 launch as2_keyboard_teleoperation as2_keyboard_teleoperation_launch.py namespace:=drone_sim_0
+
   # vinsmono: # VINS-MONO, only calculate velocity
   #   network_mode: "host"
   #   image: cyberphysics/vinsmono
