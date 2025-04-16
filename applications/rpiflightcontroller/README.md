@@ -4,11 +4,13 @@
 
 TODO:
 subscribe to "flow_pub" topic in rpiflightcontroller/scout/ros_flight_controller.py
+rangefider drive
 add translation to PID control in flight controller
 add keyboard command subscriber to ros_flight_controller.py
-get aerostack2 genesis sim working
-enable mode switch, stabilize with INS, use Oak for MegaDepth or people tracking
-
+enable mode switch
+stabilize with INS
+MegaDepth or people tracking
+GUI
 
 
 Types:
