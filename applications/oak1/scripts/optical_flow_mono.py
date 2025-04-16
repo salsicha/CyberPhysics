@@ -258,7 +258,7 @@ if __name__ == '__main__':
 
             # ROS publisher
             msg = Float32MultiArray()
-            msg.data = [translation[0], translation[1], translation[2]]
+            msg.data = [translation[0], translation[1], translation[2], avg_flow[0], avg_flow[1]]
             flow_publisher.publish(msg)
 
             if cv2.waitKey(1) == ord('q'):
