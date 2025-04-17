@@ -18,6 +18,7 @@ enable mode switch
 stabilize with INS  
 MegaDepth or people tracking  
 GUI  
+Make full c++ version in as2?
 
 
 Types:  
