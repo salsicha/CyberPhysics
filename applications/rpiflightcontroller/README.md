@@ -8,7 +8,9 @@ aerostack2 keyboard interface
 - and uses OOP to move data around
 - I can just subscribe directly to the topics from the keyboard publisher
 - as2_core/include/as2_core/names/
-- takeoff service: "platform_takeoff", takeoff action: "TakeoffBehavior"
+- takeoff service: "platform_takeoff", takeoff action: "TakeoffBehavior" ...
+- I can just reproduce the services in my flight controller
+Use the as2 PID and motion control nodes?
 rangefider drive  
 add translation to PID control in flight controller  
 add keyboard command subscriber to ros_flight_controller.py  
