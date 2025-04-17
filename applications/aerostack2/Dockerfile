@@ -21,12 +21,12 @@ RUN apt update && apt install -q -y --no-install-recommends \
 
 RUN pip3 install rsa PySimpleGUI-4-foss
 
-COPY config/ /workspace/config/
-COPY config_ground_station/ /workspace/config_ground_station/
-COPY rosbag/ /workspace/rosbag/
-COPY trees/ /workspace/trees/
-COPY utils/ /workspace/utils/
-COPY tmuxinator/ /workspace/tmuxinator/
+COPY project_as2_multirotor_simulator/config/ /workspace/config/
+COPY project_as2_multirotor_simulator/config_ground_station/ /workspace/config_ground_station/
+COPY project_as2_multirotor_simulator/rosbag/ /workspace/rosbag/
+COPY project_as2_multirotor_simulator/trees/ /workspace/trees/
+COPY project_as2_multirotor_simulator/utils/ /workspace/utils/
+COPY project_as2_multirotor_simulator/tmuxinator/ /workspace/tmuxinator/
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
