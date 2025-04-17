@@ -3,38 +3,43 @@
 
 
 TODO:
-does aerostack2 keyboard interface have input dependencies?
-rangefider drive
-add translation to PID control in flight controller
-add keyboard command subscriber to ros_flight_controller.py
-enable mode switch
-stabilize with INS
-MegaDepth or people tracking
-GUI
+aerostack2 keyboard interface  
+- as2 compiles the platform with the framework
+- and uses OOP to move data around
+- I can just subscribe directly to the topics from the keyboard publisher
+- as2_core/include/as2_core/names/
+- takeoff service: "platform_takeoff", takeoff action: "TakeoffBehavior"
+rangefider drive  
+add translation to PID control in flight controller  
+add keyboard command subscriber to ros_flight_controller.py  
+enable mode switch  
+stabilize with INS  
+MegaDepth or people tracking  
+GUI  
 
 
-Types:
+Types:  
 
-Input to flight controller
-- input_throttle
-- input_roll
-- input_pitch
-- input_yaw
-- adj_throttle
+Input to flight controller  
+- input_throttle  
+- input_roll  
+- input_pitch  
+- input_yaw  
+- adj_throttle  
 
-Output from AS2 PID speed controller
-- x velocity
-- y velocity
-- z velocity
-- yaw speed
+Output from AS2 PID speed controller  
+- x velocity  
+- y velocity  
+- z velocity  
+- yaw speed  
 
-Ozzmaker IMU filter
+Ozzmaker IMU filter  
 
-Keyboard output
-- ControlValues.SPEED_VALUE
-- ControlValues.VERTICAL_VALUE
-- ControlValues.TURN_SPEED_VALUE
-- ControlValues.POSITION_VALUE
-- ControlValues.ALTITUDE_VALUE
-- ControlValues.TURN_ANGLE_VALUE
+Keyboard output  
+- ControlValues.SPEED_VALUE  
+- ControlValues.VERTICAL_VALUE  
+- ControlValues.TURN_SPEED_VALUE  
+- ControlValues.POSITION_VALUE  
+- ControlValues.ALTITUDE_VALUE  
+- ControlValues.TURN_ANGLE_VALUE  
 
