@@ -31,7 +31,7 @@ RUN python3 -m venv /venv
 
 COPY requirements.txt /requirements.txt
 
-RUN . /venv/bin/activate && pip install -r /requirements.txt
+RUN . /venv/bin/activate && pip3 install -r /requirements.txt
 
 COPY scripts/ /scripts/
 
