@@ -30,7 +30,7 @@ COPY requirements.txt /requirements.txt
 
 RUN . /venv/bin/activate && pip3 install -r /requirements.txt
 
-RUN . /venv/bin/activate && pip3 install adafruit-extended-bus
+RUN pip3 install setuptools --upgrade && . /venv/bin/activate && pip3 install adafruit-extended-bus
 
 COPY scripts/ /scripts/
 
