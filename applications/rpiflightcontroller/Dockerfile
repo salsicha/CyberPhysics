@@ -19,15 +19,19 @@ ENV LANG=en_US.UTF-8 \
 SHELL ["/bin/bash","-c"]
 
 RUN apt update && apt install -q -y --no-install-recommends \
-    curl gnupg2 lsb-release vim wget python3-pip python3-venv \
+    curl gnupg2 lsb-release vim wget python3-pip python3-venv python3-setuptools \
     ros-${ROS_DISTRO}-aerostack2 ros-${ROS_DISTRO}-as2-platform-gazebo ros-${ROS_DISTRO}-as2-gazebo-assets \
     ros-${ROS_DISTRO}-as2-platform-tello && \
     rm -rf /var/lib/apt/lists/*
 
 RUN python3 -m venv /venv
-RUN . /venv/bin/activate && pip3 install rpi-hardware-pwm smbus smbus2 \
-    board adafruit-extended-bus lgpio adafruit-circuitpython-icm20x adafruit-circuitpython-bme280 \
-    rsa PySimpleGUI-4-foss
+# RUN . /venv/bin/activate && pip3 install rpi-hardware-pwm smbus smbus2 \
+#     board adafruit-extended-bus lgpio adafruit-circuitpython-icm20x adafruit-circuitpython-bme280 \
+#     rsa PySimpleGUI-4-foss
+
+COPY requirements.txt /requirements.txt
+
+RUN . /venv/bin/activate && pip install -r /requirements.txt
 
 COPY scripts/ /scripts/
 
