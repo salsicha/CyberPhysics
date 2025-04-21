@@ -25,9 +25,6 @@ RUN apt update && apt install -q -y --no-install-recommends \
     rm -rf /var/lib/apt/lists/*
 
 RUN python3 -m venv /venv
-# RUN . /venv/bin/activate && pip3 install rpi-hardware-pwm smbus smbus2 \
-#     board adafruit-extended-bus lgpio adafruit-circuitpython-icm20x adafruit-circuitpython-bme280 \
-#     rsa PySimpleGUI-4-foss
 
 COPY requirements.txt /requirements.txt
 
