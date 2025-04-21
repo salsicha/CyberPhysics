@@ -1,9 +1,7 @@
 ARG TAG=amd64
 
 # FROM cyberphysics/ros2:${TAG} AS build
-# FROM ros:humble:${TAG} AS build
-FROM arm64v8/ros:humble AS build
-
+FROM ros:humble-ros-base AS build
 
 ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US.UTF-8 \
@@ -11,7 +9,7 @@ ENV LANG=en_US.UTF-8 \
     PYTHONIOENCODING=UTF-8 \
     DEBIAN_FRONTEND=noninteractive \
     PATH="/venv/bin:$PATH" \
-    ROS_DISTRO=jazzy
+    ROS_DISTRO=humble
 
 # This prevents ROS setup.bash from failing
 SHELL ["/bin/bash","-c"]
