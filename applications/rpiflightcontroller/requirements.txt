@@ -2,7 +2,6 @@ rpi-hardware-pwm
 smbus 
 smbus2
 board 
-adafruit-extended-bus 
 lgpio 
 adafruit-circuitpython-icm20x 
 adafruit-circuitpython-bme280
