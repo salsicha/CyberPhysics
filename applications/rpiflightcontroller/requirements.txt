@@ -8,3 +8,4 @@ adafruit-circuitpython-icm20x
 adafruit-circuitpython-bme280
 rsa
 PySimpleGUI-4-foss
+numpy
