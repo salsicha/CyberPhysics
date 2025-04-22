@@ -39,7 +39,7 @@ services:
     volumes:
       - /dev/shm:/dev/shm
     command: >
-      python3 /scripts/scout/python/ros_flight_controller.py False
+      python3 /scripts/scout/python/ros_flight_controller.py
   rangefinder: # laser distance publisher
     network_mode: "host"
     image: cyberphysics/rangefinder
