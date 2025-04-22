@@ -75,7 +75,7 @@ gc.disable()
 
 import argparse
 parser = argparse.ArgumentParser()
-parser.add_argument("sim", type=bool)
+parser.add_argument("sim", default=False, type=bool)
 args = parser.parse_args()
 if args.sim:
     print("sim true")
