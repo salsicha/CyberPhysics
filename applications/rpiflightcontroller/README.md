@@ -26,9 +26,7 @@ Make full c++ version in as2?
 
 The Ozzmaker pins conflict with the default PWM pins, new pins must be selected for the 4 PWMS
 
-/boot/firmware/config.txt
-
-
+See ./pwm/README.md for instructions setting up PWM
 
 
 

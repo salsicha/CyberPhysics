@@ -17,3 +17,11 @@ sudo python3 test.py
 
 Final test:
 connect LEDs to pins 12, 13, 18, 19 and test
+
+
+
+https://github.com/danjperron/Pi5PWM_HARDWARE
+
+https://gist.github.com/Gadgetoid/b92ad3db06ff8c264eef2abf0e09d569
+
+https://forums.raspberrypi.com/viewtopic.php?t=363122
