@@ -21,6 +21,18 @@ GUI
 Make full c++ version in as2?
 
 
+
+## Edit Raspberry Pi system file:
+
+The Ozzmaker pins conflict with the default PWM pins, new pins must be selected for the 4 PWMS
+
+/boot/firmware/config.txt
+
+
+
+
+
+
 Types:  
 
 Input to flight controller  
