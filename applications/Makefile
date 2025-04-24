@@ -35,8 +35,12 @@ build_aerostack2: cleanup
 	APP=aerostack2 ./_build_it.sh
 build_arduino: cleanup
 	APP=arduino ./_build_it.sh
+build_bitnet: cleanup
+	APP=bitnet ./_build_it.sh
 build_blackfly: cleanup build_ros2
 	APP=blackfly ./_build_it.sh
+build_dia: cleanup
+	APP=dia ./_build_it.sh
 build_dronedemo: cleanup
 	APP=dronedemo ./_build_it.sh
 build_gazebo: cleanup build_ros2

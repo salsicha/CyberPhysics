@@ -1,6 +1,6 @@
 ARG TAG=amd64
 
-FROM ros:humble AS build
+FROM ros:humble-ros-base AS build
 
 ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US.UTF-8 \
@@ -28,6 +28,11 @@ COPY project_as2_multirotor_simulator/trees/ /workspace/trees/
 COPY project_as2_multirotor_simulator/utils/ /workspace/utils/
 COPY project_as2_multirotor_simulator/tmuxinator/ /workspace/tmuxinator/
 
+COPY rpiflightcontroller/requirements.txt /requirements.txt
+RUN pip3 install setuptools --upgrade
+RUN . /venv/bin/activate && pip3 install -r /requirements.txt
+COPY rpiflightcontroller/scripts/ /scripts/
+
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
@@ -41,3 +46,5 @@ COPY --from=build / /
 WORKDIR /workspace
 
 ENTRYPOINT ["/entrypoint.sh"]
+
+CMD ["python3", "/scripts/scout/python/ros_flight_controller.py", "False"]
