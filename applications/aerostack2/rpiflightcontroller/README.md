@@ -1,4 +1,9 @@
 
+
+Turns out that the RPi 5b can't emit 4 simultaneous PWM signals, even though it has the hardware for it. Maybe it will be supported one day...
+
+
+
 # RPi Drone
 
 

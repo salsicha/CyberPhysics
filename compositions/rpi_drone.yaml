@@ -1,4 +1,6 @@
 
+# RPi5B doesn't support 4 simultaneous PWM, until then this is stuck
+
 services:
   ozzmaker: # Ozzmaker IMU, GPS pub
     network_mode: "host"
@@ -22,7 +24,7 @@ services:
       /scripts/optical_flow_mono.py
   imufilter: # IMU Filter
     network_mode: "host"
-    image: cyberphysics/rpiflightcontroller
+    image: cyberphysics/rpiflightcontroller # moved to aerostack2
     privileged: true
     devices:
       - /dev:/dev
@@ -32,7 +34,7 @@ services:
       python3 /scripts/scout/python/ozzmaker-LTE-IMU-filters.py
   rpiflightcontroller: # FlightController subscribers
     network_mode: "host"
-    image: cyberphysics/rpiflightcontroller
+    image: cyberphysics/rpiflightcontroller # moved to aerostack2
     privileged: true
     devices:
       - /dev:/dev
