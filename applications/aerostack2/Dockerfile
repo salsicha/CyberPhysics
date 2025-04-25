@@ -14,7 +14,7 @@ ENV LANG=en_US.UTF-8 \
 SHELL ["/bin/bash","-c"]
 
 RUN apt update && apt install -q -y --no-install-recommends \
-    curl gnupg2 lsb-release vim wget python3-pip \
+    curl gnupg2 lsb-release vim wget python3-pip python3-venv python3-setuptools \
     ros-${ROS_DISTRO}-aerostack2 ros-${ROS_DISTRO}-as2-platform-gazebo ros-${ROS_DISTRO}-as2-gazebo-assets \
     ros-${ROS_DISTRO}-as2-platform-tello && \
     rm -rf /var/lib/apt/lists/*
@@ -28,7 +28,8 @@ COPY project_as2_multirotor_simulator/trees/ /workspace/trees/
 COPY project_as2_multirotor_simulator/utils/ /workspace/utils/
 COPY project_as2_multirotor_simulator/tmuxinator/ /workspace/tmuxinator/
 
-COPY rpiflightcontroller/requirements.txt /requirements.txt
+COPY requirements.txt /requirements.txt
+RUN python3 -m venv /venv
 RUN pip3 install setuptools --upgrade
 RUN . /venv/bin/activate && pip3 install -r /requirements.txt
 COPY rpiflightcontroller/scripts/ /scripts/
