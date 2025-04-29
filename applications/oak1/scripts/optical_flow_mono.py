@@ -9,6 +9,19 @@ from rclpy.node import Node
 from std_msgs.msg import Float32MultiArray
 
 
+"""
+Optical Flow
+
+Harris corners are detected in frame
+Lucas Kanade optical flow tracks features between frames
+Translation between frames is the mean of the flow vectors
+Rotation between frames is homography estimation
+
+Translation and Rotation vectors are published with ROS
+
+"""
+
+
 class CameraMotionEstimator:
 
     def __init__(self, filter_weight=0.5, motion_threshold=0.01, rotation_threshold=0.05):
