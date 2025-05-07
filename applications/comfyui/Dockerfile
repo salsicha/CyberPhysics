@@ -31,6 +31,8 @@ RUN . /venv/bin/activate && cd ComfyUI && pip3 install -r requirements.txt
 RUN cd /ComfyUI/custom_nodes && git clone https://github.com/Lightricks/ComfyUI-LTXVideo.git
 RUN . /venv/bin/activate && cd /ComfyUI/custom_nodes/ComfyUI-LTXVideo && pip3 install -r requirements.txt
 
+RUN cd /ComfyUI/models/checkpoints && wget https://huggingface.co/Lightricks/LTX-Video/resolve/main/ltx-video-2b-v0.9.1.safetensors
+
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 

@@ -5,8 +5,8 @@ services:
     container_name: comfyui
     volumes:
       - "/tmp/.X11-unix:/tmp/.X11-unix"
-      - /ComfyUI/custom_nodes:/ComfyUI/custom_nodes
-      - /ComfyUI/models/:/ComfyUI/models/
+      # - /ComfyUI/custom_nodes:/ComfyUI/custom_nodes
+      # - /ComfyUI/models/:/ComfyUI/models/
     environment:
       - "DISPLAY=${DISPLAY}"
       - XAUTHORITY
