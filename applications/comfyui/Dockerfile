@@ -23,13 +23,13 @@ WORKDIR /
 RUN . /venv/bin/activate && pip3 install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu128
 
 RUN git clone https://github.com/Lightricks/LTX-Video.git
-RUN . /venv/bin/activate && cd LTX-Video && python -m pip3 install -e .
+RUN . /venv/bin/activate && cd LTX-Video && python3 -m pip install -e .
 
 RUN git clone https://github.com/comfyanonymous/ComfyUI.git
-RUN . /venv/bin/activate && cd ComfyUI && pip3 install requirements.txt
+RUN . /venv/bin/activate && cd ComfyUI && pip3 install -r requirements.txt
 
 RUN cd /ComfyUI/custom_nodes && git clone https://github.com/Lightricks/ComfyUI-LTXVideo.git
-RUN . /venv/bin/activate && cd /ComfyUI/custom_nodes/ComfyUI-LTXVideo && pip install -r requirements.txt
+RUN . /venv/bin/activate && cd /ComfyUI/custom_nodes/ComfyUI-LTXVideo && pip3 install -r requirements.txt
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
