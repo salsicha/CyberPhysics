@@ -1,0 +1,23 @@
+services:
+  comfyui:
+    network_mode: "host"
+    image: cyberphysics/comfyui
+    container_name: comfyui
+    volumes:
+      - "/tmp/.X11-unix:/tmp/.X11-unix"
+      - /ComfyUI/custom_nodes:/ComfyUI/custom_nodes
+      - /ComfyUI/models/:/ComfyUI/models/
+    environment:
+      - "DISPLAY=${DISPLAY}"
+      - XAUTHORITY
+      - NVIDIA_DRIVER_CAPABILITIES=all
+    command: >
+      stdbuf -o L
+      python3 main.py
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

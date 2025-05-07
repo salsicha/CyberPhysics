@@ -39,6 +39,8 @@ build_bitnet: cleanup
 	APP=bitnet ./_build_it.sh
 build_blackfly: cleanup build_ros2
 	APP=blackfly ./_build_it.sh
+build_comfyui: cleanup
+	APP=comfyui ./_build_it.sh
 build_dia: cleanup
 	APP=dia ./_build_it.sh
 build_dronedemo: cleanup
