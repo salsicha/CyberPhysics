@@ -38,6 +38,8 @@ RUN cd /ComfyUI/models/checkpoints && wget https://huggingface.co/mcmonkey/googl
 RUN cd /ComfyUI/models/checkpoints && wget https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.ckpt
 RUN cd /ComfyUI/models/checkpoints && wget https://huggingface.co/Comfy-Org/stable-diffusion-v1-5-archive/resolve/main/v1-5-pruned-emaonly-fp16.safetensors
 
+# https://huggingface.co/Lightricks/LTX-Video/resolve/main/ltxv-spatial-upscaler-0.9.7.safetensors
+
 RUN cd /ComfyUI/models/vae/ && wget https://huggingface.co/stabilityai/sd-vae-ft-mse-original/resolve/main/vae-ft-mse-840000-ema-pruned.safetensors
 
 RUN cd /ComfyUI/custom_nodes && git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/Comfy-Org/ComfyUI-Manager.git comfyui-manager
