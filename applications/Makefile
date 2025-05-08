@@ -91,6 +91,8 @@ build_vinsmono: cleanup
 	APP=vinsmono ./_build_it.sh
 build_whereami: cleanup
 	APP=whereami ./_build_it.sh
+build_whisper: cleanup
+	APP=whisper ./_build_it.sh
 
 # Run rviz in ROS2 container with native display mounting
 run_ros2:

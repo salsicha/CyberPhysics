@@ -1,8 +1,8 @@
 services:
-  dia:
+  whisper:
     network_mode: "host"
-    image: cyberphysics/dia
-    container_name: dia
+    image: cyberphysics/whisper
+    container_name: whisper
     volumes:
       - "/tmp/.X11-unix:/tmp/.X11-unix"
     environment:
@@ -11,7 +11,7 @@ services:
       - NVIDIA_DRIVER_CAPABILITIES=all
     command: >
       stdbuf -o L
-      python3 app.py
+      python3 main.py
     deploy:
       resources:
         reservations:
