@@ -19,7 +19,7 @@ RUN apt update && apt install -q -y --no-install-recommends \
 
 COPY scripts/ /scripts/
 
-RUN git clone https://github.com/microsoft/BitNet.git /bitnet
+RUN git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/microsoft/BitNet.git /bitnet
 
 WORKDIR /bitnet
 

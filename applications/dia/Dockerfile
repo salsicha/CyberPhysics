@@ -26,7 +26,7 @@ RUN pip3 install setuptools --upgrade
 
 # RUN . /venv/bin/activate && pip3 install git+https://github.com/nari-labs/dia.git
 
-RUN git clone https://github.com/nari-labs/dia.git /dia
+RUN git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/nari-labs/dia.git /dia
 
 WORKDIR /dia
 

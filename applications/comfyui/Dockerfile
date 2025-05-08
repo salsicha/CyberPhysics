@@ -22,11 +22,11 @@ WORKDIR /
 
 RUN . /venv/bin/activate && pip3 install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu128
 
-RUN git clone https://github.com/Lightricks/LTX-Video.git
+RUN git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/Lightricks/LTX-Video.git
 RUN . /venv/bin/activate && cd LTX-Video && python3 -m pip install -e .
-RUN git clone https://github.com/comfyanonymous/ComfyUI.git
+RUN git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/comfyanonymous/ComfyUI.git
 RUN . /venv/bin/activate && cd ComfyUI && pip3 install -r requirements.txt
-RUN cd /ComfyUI/custom_nodes && git clone https://github.com/Lightricks/ComfyUI-LTXVideo.git
+RUN cd /ComfyUI/custom_nodes && git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/Lightricks/ComfyUI-LTXVideo.git
 RUN . /venv/bin/activate && cd /ComfyUI/custom_nodes/ComfyUI-LTXVideo && pip3 install -r requirements.txt
 
 RUN cd /ComfyUI/models/checkpoints && wget https://huggingface.co/Lightricks/LTX-Video/resolve/main/ltx-video-2b-v0.9.1.safetensors
@@ -36,11 +36,11 @@ RUN cd /ComfyUI/models/checkpoints && wget https://huggingface.co/Comfy-Org/stab
 
 RUN cd /ComfyUI/models/vae/ && wget https://huggingface.co/stabilityai/sd-vae-ft-mse-original/resolve/main/vae-ft-mse-840000-ema-pruned.safetensors
 
-RUN cd /ComfyUI/custom_nodes && git clone https://github.com/Comfy-Org/ComfyUI-Manager.git comfyui-manager
+RUN cd /ComfyUI/custom_nodes && git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/Comfy-Org/ComfyUI-Manager.git comfyui-manager
 
-RUN cd /ComfyUI/custom_nodes && git clone https://github.com/kijai/ComfyUI-KJNodes.git
+RUN cd /ComfyUI/custom_nodes && git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/kijai/ComfyUI-KJNodes.git
 RUN . /venv/bin/activate && cd /ComfyUI/custom_nodes/ComfyUI-KJNodes && pip3 install -r requirements.txt
-RUN cd /ComfyUI/custom_nodes && git clone https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite.git
+RUN cd /ComfyUI/custom_nodes && git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite.git
 RUN . /venv/bin/activate && cd /ComfyUI/custom_nodes/ComfyUI-VideoHelperSuite && pip3 install -r requirements.txt
 
 COPY prestart.py /ComfyUI/prestart.py

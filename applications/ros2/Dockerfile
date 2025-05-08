@@ -43,7 +43,7 @@ WORKDIR /workspace
 RUN mkdir -p /workspace/src
 COPY custom_msgs/flir_camera_msgs /workspace/src/flir_camera_msgs
 
-RUN git clone -b jazzy https://github.com/micro-ROS/micro_ros_setup.git src/micro_ros_setup
+RUN git clone --depth 1 --recurse-submodules --shallow-submodules -b jazzy https://github.com/micro-ROS/micro_ros_setup.git src/micro_ros_setup
 
 RUN . /venv/bin/activate && . /opt/ros/$ROS2_DISTRO/setup.bash && \
     apt update && \

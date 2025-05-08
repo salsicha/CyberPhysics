@@ -37,7 +37,7 @@ RUN apt update && apt upgrade -y && apt install -q -y --no-install-recommends \
 
 # Compile Open3D:
 # https://www.open3d.org/docs/release/compilation.html
-# RUN git clone https://github.com/isl-org/Open3D
+# RUN git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/isl-org/Open3D
 # WORKDIR /Open3D/
 #
 ## export CUDA_ARCH_BIN=8.9 && \

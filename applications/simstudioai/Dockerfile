@@ -8,7 +8,7 @@ RUN apt update && apt install -q -y --no-install-recommends \
 WORKDIR /
 
 ## Clone your forked repository
-RUN git clone https://github.com/salsicha/sim.git
+RUN git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/salsicha/sim.git
 
 WORKDIR /sim
 

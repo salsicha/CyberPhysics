@@ -4,7 +4,7 @@ conda create -y -n lerobot python=3.10
 
 conda activate lerobot
 
-git clone https://github.com/huggingface/lerobot.git ~/lerobot
+git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/huggingface/lerobot.git ~/lerobot
 
 cd ~/lerobot && pip install -e ".[feetech]"
 pip install -e ".[aloha, xarm, pusht]"
