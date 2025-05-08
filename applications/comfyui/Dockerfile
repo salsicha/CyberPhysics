@@ -20,6 +20,9 @@ RUN python3 -m venv /venv
 
 WORKDIR /
 
+COPY configs /configs/
+COPY workflows /workflows/
+
 RUN . /venv/bin/activate && pip3 install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu128
 
 RUN git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/Lightricks/LTX-Video.git
@@ -29,7 +32,8 @@ RUN . /venv/bin/activate && cd ComfyUI && pip3 install -r requirements.txt
 RUN cd /ComfyUI/custom_nodes && git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/Lightricks/ComfyUI-LTXVideo.git
 RUN . /venv/bin/activate && cd /ComfyUI/custom_nodes/ComfyUI-LTXVideo && pip3 install -r requirements.txt
 
-RUN cd /ComfyUI/models/checkpoints && wget https://huggingface.co/Lightricks/LTX-Video/resolve/main/ltx-video-2b-v0.9.1.safetensors
+RUN cd /ComfyUI/models/checkpoints && wget https://huggingface.co/Lightricks/LTX-Video/resolve/main/ltx-video-2b-v0.9.5.safetensors
+RUN cd /ComfyUI/models/checkpoints && wget https://huggingface.co/Lightricks/LTX-Video/resolve/main/ltxv-13b-0.9.7-dev-fp8.safetensors
 RUN cd /ComfyUI/models/checkpoints && wget https://huggingface.co/mcmonkey/google_t5-v1_1-xxl_encoderonly/resolve/main/model.safetensors
 RUN cd /ComfyUI/models/checkpoints && wget https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.ckpt
 RUN cd /ComfyUI/models/checkpoints && wget https://huggingface.co/Comfy-Org/stable-diffusion-v1-5-archive/resolve/main/v1-5-pruned-emaonly-fp16.safetensors
