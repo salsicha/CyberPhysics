@@ -83,6 +83,8 @@ build_ros2: cleanup
 	APP=ros2 ./_build_it.sh
 build_rtx2: cleanup
 	APP=rtx2 ./_build_it.sh
+build_simstudioai: cleanup
+	APP=simstudioai ./_build_it.sh
 build_tello: cleanup build_ros2
 	APP=tello ./_build_it.sh
 build_unrealengine: cleanup
