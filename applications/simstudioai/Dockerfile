@@ -8,13 +8,15 @@ RUN apt-get update && apt-get install -q -y --no-install-recommends \
     apt-get install -y nodejs && \
     rm -rf /var/lib/apt/lists/*
 
-WORKDIR /
+RUN mkdir /app
+
+WORKDIR /app
 
 ## Clone your forked repository
 RUN git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/simstudioai/sim.git
 
-RUN mkdir /app
-RUN cp -r /sim/sim /app/sim
+# RUN cp -r /sim/sim /app/sim
+RUN cp cp /app/sim/.env.example /app/sim/.env
 
 ## Set working directory
 WORKDIR /app/sim
@@ -24,6 +26,9 @@ RUN touch /app/.env
 
 ## Install dependencies
 RUN npm install
+
+# Install Turbo globally
+RUN npm install -g turbo
 
 ## Generate database schema
 RUN npx drizzle-kit generate
@@ -46,7 +51,7 @@ FROM scratch
 
 COPY --from=build / /
 
-WORKDIR /workspace
+WORKDIR /app/sim
 
 ENTRYPOINT ["/entrypoint.sh"]
 
