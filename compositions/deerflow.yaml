@@ -1,0 +1,21 @@
+services:
+  deerflow:
+    network_mode: "host"
+    image: cyberphysics/deerflow
+    container_name: deerflow
+    volumes:
+      - "/tmp/.X11-unix:/tmp/.X11-unix"
+    environment:
+      - "DISPLAY=${DISPLAY}"
+      - XAUTHORITY
+      - NVIDIA_DRIVER_CAPABILITIES=all
+    command: >
+      stdbuf -o L
+      uv run main.py
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
