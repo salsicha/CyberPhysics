@@ -23,6 +23,21 @@ WORKDIR /
 COPY configs /configs/
 COPY workflows /workflows/
 
+# Workflows
+COPY workflows/ltxvideo-i2v.json /ComfyUI/custom_nodes/ComfyUI-LTXVideo/example_workflows/ltxvideo-i2v.json
+COPY workflows/ltxv-13b-i2v-base-fp8.json /ComfyUI/custom_nodes/ComfyUI-LTXVideo/example_workflows/ltxv-13b-i2v-base-fp8.json
+
+# Configs
+COPY configs/ltxv-2b-0.9.5-dev.yaml /LTX-Video#/configs/ltxv-2b-0.9.5-dev.yaml
+COPY configs/ltxv-13b-0.9.7-dev-fp8.yaml /LTX-Video#/configs/ltxv-13b-0.9.7-dev-fp8.yaml
+COPY configs/ltxv-2b-0.9.6-distilled.yaml /LTX-Video#/configs/ltxv-2b-0.9.6-distilled.yaml
+
+# Example images
+RUN cp /ComfyUI/custom_nodes/ComfyUI-LTXVideo/example_workflows/low_level/shrek2.jpg /ComfyUI/input/
+
+RUN rm /LTX-Video/MODEL_DIR/
+RUN ln -s /ComfyUI/models/checkpoints/ /LTX-Video/MODEL_DIR/
+
 RUN . /venv/bin/activate && pip3 install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu128
 
 RUN git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/Lightricks/LTX-Video.git
@@ -39,7 +54,9 @@ RUN cd /ComfyUI/models/checkpoints && wget https://huggingface.co/runwayml/stabl
 RUN cd /ComfyUI/models/checkpoints && wget https://huggingface.co/Comfy-Org/stable-diffusion-v1-5-archive/resolve/main/v1-5-pruned-emaonly-fp16.safetensors
 RUN cd /ComfyUI/models/checkpoints && wget https://huggingface.co/Lightricks/LTX-Video/resolve/main/ltxv-spatial-upscaler-0.9.7.safetensors
 RUN cd /ComfyUI/models/checkpoints && wget https://huggingface.co/Lightricks/LTX-Video/resolve/main/ltxv-temporal-upscaler-0.9.7.safetensors
-RUN cd /ComfyUI/models/checkpoints && wget https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp16.safetensors
+RUN cd /ComfyUI/models/checkpoints && wget https://huggingface.co/Lightricks/LTX-Video/resolve/main/ltxv-2b-0.9.6-distilled-04-25.safetensors
+
+RUN cd /ComfyUI/models/text_encoders/ && wget https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp16.safetensors
 
 RUN cd /ComfyUI/models/vae/ && wget https://huggingface.co/stabilityai/sd-vae-ft-mse-original/resolve/main/vae-ft-mse-840000-ema-pruned.safetensors
 

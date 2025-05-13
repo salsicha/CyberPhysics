@@ -67,10 +67,6 @@ build_oak1: cleanup build_ros2
 	APP=oak1 ./_build_it.sh
 build_ozzmaker: cleanup build_ros2
 	APP=ozzmaker ./_build_it.sh
-build_pentestgpt: cleanup
-	APP=pentestgpt ./_build_it.sh
-build_rpiflightcontroller: cleanup
-	APP=rpiflightcontroller ./_build_it.sh
 build_pysimcoder: cleanup
 	APP=pysimcoder ./_build_it.sh
 build_qgroundcontrol: cleanup
@@ -85,8 +81,6 @@ build_ros2: cleanup
 	APP=ros2 ./_build_it.sh
 build_rtx2: cleanup
 	APP=rtx2 ./_build_it.sh
-build_simstudioai: cleanup
-	APP=simstudioai ./_build_it.sh
 build_tello: cleanup build_ros2
 	APP=tello ./_build_it.sh
 build_unrealengine: cleanup
