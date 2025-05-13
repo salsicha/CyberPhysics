@@ -14,7 +14,7 @@ ENV LANG=en_US.UTF-8 \
 SHELL ["/bin/bash","-c"]
 
 RUN apt update && apt install -q -y --no-install-recommends \
-    curl gnupg2 lsb-release python3-pip python3-venv vim git software-properties-common build-essential gcc cmake && \
+    curl gnupg2 lsb-release python3-pip python3-venv vim git software-properties-common build-essential gcc cmake clang && \
     rm -rf /var/lib/apt/lists/*
 
 COPY scripts/ /scripts/
