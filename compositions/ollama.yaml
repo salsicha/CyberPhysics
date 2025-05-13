@@ -26,6 +26,9 @@ services:
             - driver: nvidia
               device_ids: ['0']
               capabilities: [compute, utility]
+    command: >
+      stdbuf -o L
+      ollama serve qwen3:8b
 
   ollama-webui:
     image: ghcr.io/open-webui/open-webui:main
