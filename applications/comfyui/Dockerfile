@@ -23,21 +23,6 @@ WORKDIR /
 COPY configs /configs/
 COPY workflows /workflows/
 
-# Workflows
-COPY workflows/ltxvideo-i2v.json /ComfyUI/custom_nodes/ComfyUI-LTXVideo/example_workflows/ltxvideo-i2v.json
-COPY workflows/ltxv-13b-i2v-base-fp8.json /ComfyUI/custom_nodes/ComfyUI-LTXVideo/example_workflows/ltxv-13b-i2v-base-fp8.json
-
-# Configs
-COPY configs/ltxv-2b-0.9.5-dev.yaml /LTX-Video#/configs/ltxv-2b-0.9.5-dev.yaml
-COPY configs/ltxv-13b-0.9.7-dev-fp8.yaml /LTX-Video#/configs/ltxv-13b-0.9.7-dev-fp8.yaml
-COPY configs/ltxv-2b-0.9.6-distilled.yaml /LTX-Video#/configs/ltxv-2b-0.9.6-distilled.yaml
-
-# Example images
-RUN cp /ComfyUI/custom_nodes/ComfyUI-LTXVideo/example_workflows/low_level/shrek2.jpg /ComfyUI/input/
-
-RUN rm /LTX-Video/MODEL_DIR/
-RUN ln -s /ComfyUI/models/checkpoints/ /LTX-Video/MODEL_DIR/
-
 RUN . /venv/bin/activate && pip3 install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu128
 
 RUN git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/Lightricks/LTX-Video.git
@@ -66,6 +51,22 @@ RUN . /venv/bin/activate && cd /ComfyUI/custom_nodes/ComfyUI-KJNodes && pip3 ins
 RUN cd /ComfyUI/custom_nodes && git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite.git
 RUN . /venv/bin/activate && cd /ComfyUI/custom_nodes/ComfyUI-VideoHelperSuite && pip3 install -r requirements.txt
 
+# Workflows
+COPY workflows/ltxvideo-i2v.json /ComfyUI/custom_nodes/ComfyUI-LTXVideo/example_workflows/ltxvideo-i2v.json
+COPY workflows/ltxv-13b-i2v-base-fp8.json /ComfyUI/custom_nodes/ComfyUI-LTXVideo/example_workflows/ltxv-13b-i2v-base-fp8.json
+
+# Configs
+COPY configs/ltxv-2b-0.9.5-dev.yaml /LTX-Video#/configs/ltxv-2b-0.9.5-dev.yaml
+COPY configs/ltxv-13b-0.9.7-dev-fp8.yaml /LTX-Video#/configs/ltxv-13b-0.9.7-dev-fp8.yaml
+COPY configs/ltxv-2b-0.9.6-distilled.yaml /LTX-Video#/configs/ltxv-2b-0.9.6-distilled.yaml
+
+# Example images
+RUN cp /ComfyUI/custom_nodes/ComfyUI-LTXVideo/example_workflows/low_level/shrek2.jpg /ComfyUI/input/
+
+RUN rm /LTX-Video/MODEL_DIR/
+RUN ln -s /ComfyUI/models/checkpoints/ /LTX-Video/MODEL_DIR/
+
+# Prestart script
 COPY prestart.py /ComfyUI/prestart.py
 RUN . /venv/bin/activate && cd /ComfyUI && python3 prestart.py
 
