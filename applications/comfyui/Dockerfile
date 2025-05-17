@@ -63,8 +63,8 @@ COPY configs/ltxv-2b-0.9.6-distilled.yaml /LTX-Video#/configs/ltxv-2b-0.9.6-dist
 # Example images
 RUN cp /ComfyUI/custom_nodes/ComfyUI-LTXVideo/example_workflows/low_level/shrek2.jpg /ComfyUI/input/
 
-RUN rm /LTX-Video/MODEL_DIR/
-RUN ln -s /ComfyUI/models/checkpoints/ /LTX-Video/MODEL_DIR/
+RUN rm /LTX-Video/MODEL_DIR/ || true
+RUN ln -s /ComfyUI/models/checkpoints /LTX-Video/MODEL_DIR
 
 # Prestart script
 COPY prestart.py /ComfyUI/prestart.py
