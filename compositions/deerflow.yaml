@@ -9,6 +9,7 @@ services:
       - "DISPLAY=${DISPLAY}"
       - XAUTHORITY
       - NVIDIA_DRIVER_CAPABILITIES=all
+      - TAVILY_API_KEY=${TAVILY_API_KEY}
     command: >
       stdbuf -o L
       uv run main.py
