@@ -13,7 +13,8 @@ RUN mkdir /app
 WORKDIR /app
 
 # Clone the repository
-RUN git clone https://github.com/bytedance/deer-flow.git
+# RUN git clone https://github.com/bytedance/deer-flow.git
+RUN git clone https://github.com/salsicha/deer-flow.git
 WORKDIR /app/deer-flow
 
 RUN python3 -m venv /venv
