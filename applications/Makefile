@@ -71,6 +71,8 @@ build_pysimcoder: cleanup
 	APP=pysimcoder ./_build_it.sh
 build_qgroundcontrol: cleanup
 	APP=qgroundcontrol ./_build_it.sh
+build_simstudio: cleanup
+	APP=simstudio ./_build_it.sh
 build_realsense: cleanup
 	APP=realsense ./_build_it.sh
 build_record: cleanup build_ros2
