@@ -2,7 +2,7 @@
 FROM ubuntu:noble AS build
 
 RUN apt-get update && apt-get install -q -y --no-install-recommends \
-    curl git vim gnupg2 gnupg lsb-release python3-pip python3-venv && \
+    curl git vim gnupg2 gnupg lsb-release python3-pip python3-venv unzip && \
     curl -sL https://deb.nodesource.com/setup_22.x | bash - && \
     apt-get update && \
     apt-get install -y nodejs && \
@@ -15,23 +15,11 @@ WORKDIR /app
 ## Clone your forked repository
 RUN git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/simstudioai/sim.git
 
-# RUN cp -r /sim/sim /app/sim
-# RUN cp /app/sim/.env.example /app/sim/.env
-
 ## Set working directory
 WORKDIR /app/sim
 
-## Create the .env file if it doesn't exist
-# RUN touch /app/.env
-
-## Install dependencies
-RUN npm install
-
-# Install Turbo globally
-RUN npm install -g turbo
-
-## Generate database schema
-# RUN npx drizzle-kit generate
+## Install bun
+RUN curl -fsSL https://bun.sh/install | bash
 
 ## Install
 RUN bun install
