@@ -16,13 +16,13 @@ WORKDIR /app
 RUN git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/simstudioai/sim.git
 
 # RUN cp -r /sim/sim /app/sim
-RUN cp cp /app/sim/.env.example /app/sim/.env
+# RUN cp /app/sim/.env.example /app/sim/.env
 
 ## Set working directory
 WORKDIR /app/sim
 
 ## Create the .env file if it doesn't exist
-RUN touch /app/.env
+# RUN touch /app/.env
 
 ## Install dependencies
 RUN npm install
@@ -31,7 +31,14 @@ RUN npm install
 RUN npm install -g turbo
 
 ## Generate database schema
-RUN npx drizzle-kit generate
+# RUN npx drizzle-kit generate
+
+## Install
+RUN bun install
+
+RUN cd apps/sim && cp .env.example .env
+
+RUN bunx drizzle-kit push
 
 EXPOSE 3000
 
