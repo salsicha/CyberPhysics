@@ -19,14 +19,15 @@ RUN git clone --depth 1 --recurse-submodules --shallow-submodules https://github
 WORKDIR /app/sim
 
 ## Install bun
-RUN curl -fsSL https://bun.sh/install | bash
+RUN npm install -g bun
 
 ## Install
 RUN bun install
 
-RUN cd apps/sim && cp .env.example .env
+WORKDIR /app/sim/apps/sim
+RUN cp .env.example .env
 
-RUN bunx drizzle-kit push
+RUN bunx drizzle-kit push --config=drizzle.config.ts
 
 EXPOSE 3000
 
@@ -50,4 +51,4 @@ WORKDIR /app/sim
 
 ENTRYPOINT ["/entrypoint.sh"]
 
-CMD ["npx", "drizzle-kit", "push", "&&", "npm", "run", "dev"]
+CMD ["bun", "run", "dev"]
