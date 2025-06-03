@@ -12,7 +12,7 @@ services:
       - EGL_PLATFORM=surfaceless
       - SEARCH_API=duckduckgo
       - LLM_PROVIDER=ollama 
-      - OLLAMA_BASE_URL="http://host.docker.internal:11434/" 
+      - OLLAMA_BASE_URL="http://localhost:11434/" 
       - LOCAL_LLM="qwen3:8b"
     command: >
       bash -c "uvx --refresh --from langgraph-cli[inmem] --with-editable . --python 3.11 langgraph dev --host 0.0.0.0"
