@@ -53,8 +53,8 @@ build_jupyter: cleanup
 	APP=jupyter ./_build_it.sh
 build_lerobot: cleanup
 	APP=lerobot ./_build_it.sh
-build_localdeepresearcher: cleanup
-	APP=localdeepresearcher ./_build_it.sh
+build_deepresearcher: cleanup
+	APP=deepresearcher ./_build_it.sh
 build_matlab: cleanup
 	APP=matlab ./_build_it.sh
 build_navigation2: cleanup build_ros2

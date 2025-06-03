@@ -1,8 +1,10 @@
 
 services:
-  localdeepresearcher:
+  deepresearcher:
     network_mode: "host"
-    image: cyberphysics/localdeepresearcher
+    image: cyberphysics/deepresearcher
+    expose:
+      - "2024:2024"
     volumes:
       - "/tmp/.X11-unix:/tmp/.X11-unix"
     environment:
