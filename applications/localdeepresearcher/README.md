@@ -214,3 +214,5 @@ URL: https://smith.langchain.com/studio/?baseUrl=http://0.0.0.0:2024
 Instead, visit this link with the correct baseUrl IP address: [`https://smith.langchain.com/studio/thread?baseUrl=http://127.0.0.1:2024`](https://smith.langchain.com/studio/thread?baseUrl=http://127.0.0.1:2024)
 
 
+
+docker run --rm -it --net=host -e SEARCH_API="duckduckgo" -e TAVILY_API_KEY="tvly-***YOUR_KEY_HERE***" -e LLM_PROVIDER=ollama -e OLLAMA_BASE_URL="http://host.docker.internal:11434/" -e LOCAL_LLM="qwen3:8b" localdeepresearcher

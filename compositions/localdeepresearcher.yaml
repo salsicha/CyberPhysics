@@ -1,3 +1,26 @@
 
-# docker run --rm -it -p 2024:2024 -e SEARCH_API="tavily" -e TAVILY_API_KEY="tvly-***YOUR_KEY_HERE***" -e LLM_PROVIDER=ollama -e OLLAMA_BASE_URL="http://host.docker.internal:11434/" -e LOCAL_LLM="qwen3:8b" localdeepresearcher
+services:
+  localdeepresearcher:
+    network_mode: "host"
+    image: cyberphysics/localdeepresearcher
+    volumes:
+      - "/tmp/.X11-unix:/tmp/.X11-unix"
+    environment:
+      - "DISPLAY=${DISPLAY}"
+      - XAUTHORITY
+      - NVIDIA_DRIVER_CAPABILITIES=all
+      - EGL_PLATFORM=surfaceless
+      - SEARCH_API=duckduckgo
+      - LLM_PROVIDER=ollama 
+      - OLLAMA_BASE_URL="http://host.docker.internal:11434/" 
+      - LOCAL_LLM="qwen3:8b"
+    command: >
+      bash -c "uvx --refresh --from langgraph-cli[inmem] --with-editable . --python 3.11 langgraph dev --host 0.0.0.0"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
 

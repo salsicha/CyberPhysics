@@ -1,3 +1,3 @@
 #!/bin/sh
-ollama serve &
+# ollama serve &
 exec "$@" 
