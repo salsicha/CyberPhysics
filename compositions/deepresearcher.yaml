@@ -1,10 +1,10 @@
 
 services:
   deepresearcher:
-    network_mode: "host"
     image: cyberphysics/deepresearcher
-    expose:
-      - "2024:2024"
+    stdin_open: true
+    tty: true
+    network_mode: host
     volumes:
       - "/tmp/.X11-unix:/tmp/.X11-unix"
     environment:
@@ -13,11 +13,10 @@ services:
       - NVIDIA_DRIVER_CAPABILITIES=all
       - EGL_PLATFORM=surfaceless
       - SEARCH_API=duckduckgo
-      - LLM_PROVIDER=ollama 
-      - OLLAMA_BASE_URL="http://localhost:11434/" 
-      - LOCAL_LLM="qwen3:8b"
-    command: >
-      bash -c "uvx --refresh --from langgraph-cli[inmem] --with-editable . --python 3.11 langgraph dev --host 0.0.0.0"
+      - TAVILY_API_KEY=tvly-***YOUR_KEY_HERE***
+      - LLM_PROVIDER=ollama
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434/
+      - LOCAL_LLM=qwen3:8b
     deploy:
       resources:
         reservations:
@@ -26,3 +25,5 @@ services:
               count: 1
               capabilities: [gpu]
 
+# Open in browser:
+# https://smith.langchain.com/studio/thread?baseUrl=http://127.0.0.1:2024
