@@ -38,3 +38,8 @@ https://github.com/huggingface/lerobot/blob/main/examples/10_use_so100.md
 
 https://huggingface.co/lerobot/pi0
 
+
+
+Hardware used to train and evaluate SO-100/101: https://github.com/TheRobotStudio/SO-ARM100
+
+Base model https://huggingface.co/lerobot/smolvla_base
