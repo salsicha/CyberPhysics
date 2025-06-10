@@ -1,11 +1,6 @@
 
 
 
-## running pi0
-# policy = Pi0Policy.from_pretrained("lerobot/pi0")
-# action = policy.select_action(batch)
-
-
 FROM ubuntu:noble AS build
 
 ENV LANG=en_US.UTF-8 \
@@ -34,8 +29,8 @@ WORKDIR /
 # conda activate /home/ubuntu/anaconda3
 # 
 # Install miniconda
-# ENV CONDA_DIR /opt/conda
-# RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda.sh && \
+ENV CONDA_DIR /opt/conda
+RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda.sh && \
 #     /bin/bash ~/miniconda.sh -b -p /opt/conda
 # # Put conda in path so we can use conda activate
 # ENV PATH=$CONDA_DIR/bin:$PATH
@@ -56,25 +51,32 @@ WORKDIR /
 
 RUN python3 -m venv /venv
 
-RUN . /venv/bin/activate &&  pip3 install ffmpeg opencv hf_xet
+RUN . /venv/bin/activate && pip3 install ffmpeg opencv-python hf_xet
 
-RUN mkdir /lerobot
-
-RUN WORKDIR /lerobot
-
-# Smolval base
-RUN wget https://huggingface.co/lerobot/smolvla_base/resolve/main/model.safetensors
+WORKDIR /
 
 RUN git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/huggingface/lerobot.git /lerobot
 
-RUN . /venv/bin/activate && pip3 install -e ".[feetech]"
-RUN . /venv/bin/activate && pip3 install -e ".[aloha, xarm, pusht]"
-RUN . /venv/bin/activate && pip3 install -e ".[pi0]"
-RUN . /venv/bin/activate && pip3 install -e ".[smolvla]"
+WORKDIR /lerobot
+
+# Smolval base
+RUN mkdir -p /lerobot/models/smolvla_base
+WORKDIR /lerobot/models/smolvla_base
+
+RUN wget https://huggingface.co/lerobot/smolvla_base/resolve/main/model.safetensors
+
+RUN . /venv/bin/activate && pip3 install ".[pusht]"
+RUN . /venv/bin/activate && pip3 install ".[feetech]"
+RUN . /venv/bin/activate && pip3 install ".[xarm]"
+RUN . /venv/bin/activate && pip3 install ".[aloha]"
+RUN . /venv/bin/activate && pip3 install ".[pi0]"
+RUN . /venv/bin/activate && pip3 install ".[smolvla]"
 
 # RUN conda install -y -c conda-forge ffmpeg
 # RUN pip uninstall -y opencv-python
 # RUN conda install -y -c conda-forge "opencv>=4.10.0"
+
+COPY scripts/ /lerobot/scripts
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
@@ -92,7 +94,7 @@ ENV LANG=en_US.UTF-8 \
 
 COPY --from=build / /
 
-WORKDIR /workspace
+WORKDIR /lerobot/scripts
 
 ENTRYPOINT ["/entrypoint.sh"]
 

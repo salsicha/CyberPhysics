@@ -40,7 +40,7 @@ output_directory.mkdir(parents=True, exist_ok=True)
 device = "cuda"
 
 # Provide the [hugging face repo id](https://huggingface.co/lerobot/diffusion_pusht):
-pretrained_policy_path = "lerobot/diffusion_pusht"
+pretrained_policy_path = "/lerobot/models/smolvla_base"
 # OR a path to a local outputs/train folder.
 # pretrained_policy_path = Path("outputs/train/example_pusht_diffusion")
 

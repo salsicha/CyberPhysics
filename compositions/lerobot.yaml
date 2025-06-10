@@ -1,0 +1,20 @@
+services:
+  lerobot:
+    network_mode: "host"
+    image: cyberphysics/lerobot
+    volumes:
+      - "/tmp/.X11-unix:/tmp/.X11-unix"
+    environment:
+      - "DISPLAY=${DISPLAY}"
+      - XAUTHORITY
+      - NVIDIA_DRIVER_CAPABILITIES=all
+      - EGL_PLATFORM=surfaceless
+    command: >
+      bash -c "python3 evaluate_pretrained_policy.py"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
