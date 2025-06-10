@@ -8,7 +8,9 @@ ENV LANG=en_US.UTF-8 \
     TERM=xterm \
     PYTHONIOENCODING=UTF-8 \
     DEBIAN_FRONTEND=noninteractive \
-    PATH="/venv/bin:$PATH"
+    PATH="/venv/bin:$PATH" \
+    CONDA_DIR=/opt/miniconda \
+    PATH="/opt/miniconda/bin:$PATH"
 
 # This prevents ROS setup.bash from failing
 SHELL ["/bin/bash","-c"]
@@ -29,11 +31,11 @@ WORKDIR /
 # conda activate /home/ubuntu/anaconda3
 # 
 # Install miniconda
-ENV CONDA_DIR /opt/conda
-RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda.sh && \
-#     /bin/bash ~/miniconda.sh -b -p /opt/conda
+RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /miniconda.sh
+RUN /bin/bash /miniconda.sh -b -p /opt/miniconda
+# . /opt/miniconda/bin/activate
+
 # # Put conda in path so we can use conda activate
-# ENV PATH=$CONDA_DIR/bin:$PATH
 # 
 # RUN mkdir -p /opt/conda 
 # RUN wget https://repo.anaconda.com/miniconda/Miniconda3-py38_4.12.0-Linux-x86_64.sh -O /opt/conda/miniconda.sh \ && bash /opt/conda/miniconda.sh -b -p /opt/miniconda # Install your environment.yaml deps into base env 
@@ -46,12 +48,15 @@ RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86
 # # COPY * ./ # Run the software in conda base environment 
 # CMD ["/opt/miniconda/bin/conda", "run", "--no-capture-output", "-n", "base", "python" "app.py"]
 
-# RUN conda create -y -n lerobot python=3.10
+RUN conda create -y -n lerobot python 
+# =3.10
 # RUN conda activate lerobot
 
-RUN python3 -m venv /venv
+# RUN python3 -m venv /venv
 
-RUN . /venv/bin/activate && pip3 install ffmpeg opencv-python hf_xet
+# RUN . /venv/bin/activate && 
+
+RUN . /opt/miniconda/bin/activate && pip3 install ffmpeg opencv-python hf_xet
 
 WORKDIR /
 
@@ -65,12 +70,12 @@ WORKDIR /lerobot/models/smolvla_base
 
 RUN wget https://huggingface.co/lerobot/smolvla_base/resolve/main/model.safetensors
 
-RUN . /venv/bin/activate && pip3 install ".[pusht]"
-RUN . /venv/bin/activate && pip3 install ".[feetech]"
-RUN . /venv/bin/activate && pip3 install ".[xarm]"
-RUN . /venv/bin/activate && pip3 install ".[aloha]"
-RUN . /venv/bin/activate && pip3 install ".[pi0]"
-RUN . /venv/bin/activate && pip3 install ".[smolvla]"
+RUN . /opt/miniconda/bin/activate && pip3 install ".[pusht]"
+RUN . /opt/miniconda/bin/activate && pip3 install ".[feetech]"
+RUN . /opt/miniconda/bin/activate && pip3 install ".[xarm]"
+RUN . /opt/miniconda/bin/activate && pip3 install ".[aloha]"
+RUN . /opt/miniconda/bin/activate && pip3 install ".[pi0]"
+RUN . /opt/miniconda/bin/activate && pip3 install ".[smolvla]"
 
 # RUN conda install -y -c conda-forge ffmpeg
 # RUN pip uninstall -y opencv-python
@@ -90,7 +95,9 @@ ENV LANG=en_US.UTF-8 \
     PYTHONIOENCODING=UTF-8 \
     ROS2_DISTRO=jazzy \
     DEBIAN_FRONTEND=noninteractive \
-    PATH="/venv/bin:$PATH"
+    PATH="/venv/bin:$PATH" \
+    CONDA_DIR=/opt/miniconda \
+    PATH="/opt/miniconda/bin:$PATH"
 
 COPY --from=build / /
 
