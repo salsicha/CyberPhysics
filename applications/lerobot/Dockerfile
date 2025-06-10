@@ -1,16 +1,9 @@
 
 
 
-
-
-
 ## running pi0
 # policy = Pi0Policy.from_pretrained("lerobot/pi0")
 # action = policy.select_action(batch)
-
-
-
-
 
 
 FROM ubuntu:noble AS build
@@ -27,15 +20,16 @@ SHELL ["/bin/bash","-c"]
 
 RUN apt update && apt install -q -y --no-install-recommends \
     curl gnupg2 lsb-release python3-pip python3-venv \
-    python3-serial imagemagick libboost-all-dev libgts-dev libjansson-dev \
-    libeigen3-dev python3-rosdep python3-colcon-ros linuxptp python3-colcon-common-extensions \
+    imagemagick libboost-all-dev libgts-dev libjansson-dev \
+    less util-linux htop atop nvtop sysstat \
     vim git jq wget flex software-properties-common build-essential gcc && \
     rm -rf /var/lib/apt/lists/*
 
+WORKDIR /
 
-# curl -O https://repo.anaconda.com/archive/Anaconda3-2020.11-Linux-x86_64.sh
-# wget https://repo.anaconda.com/archive/Anaconda3-2024.06-1-Linux-x86_64.sh
-# bash Anaconda3-2024.06-1-Linux-x86_64.sh
+# RUN wget https://repo.anaconda.com/archive/Anaconda3-2024.06-1-Linux-x86_64.sh
+# RUN bash Anaconda3-2024.06-1-Linux-x86_64.sh
+
 # source ~/.bashrc
 # conda activate /home/ubuntu/anaconda3
 # 
@@ -57,27 +51,30 @@ RUN apt update && apt install -q -y --no-install-recommends \
 # # COPY * ./ # Run the software in conda base environment 
 # CMD ["/opt/miniconda/bin/conda", "run", "--no-capture-output", "-n", "base", "python" "app.py"]
 
+# RUN conda create -y -n lerobot python=3.10
+# RUN conda activate lerobot
 
-RUN conda create -y -n lerobot python=3.10
+RUN python3 -m venv /venv
 
-RUN conda activate lerobot
+RUN . /venv/bin/activate &&  pip3 install ffmpeg opencv hf_xet
 
-RUN git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/huggingface/lerobot.git /lerobot
+RUN mkdir /lerobot
 
 RUN WORKDIR /lerobot
 
-RUN pip install -e ".[feetech]"
-RUN pip install -e ".[aloha, xarm, pusht]"
-RUN pip install -e ".[pi0]"
-RUN pip install -e ".[smolvla]"
+# Smolval base
+RUN wget https://huggingface.co/lerobot/smolvla_base/resolve/main/model.safetensors
 
-RUN conda install -y -c conda-forge ffmpeg
-RUN pip uninstall -y opencv-python
-RUN conda install -y -c conda-forge "opencv>=4.10.0"
+RUN git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/huggingface/lerobot.git /lerobot
 
+RUN . /venv/bin/activate && pip3 install -e ".[feetech]"
+RUN . /venv/bin/activate && pip3 install -e ".[aloha, xarm, pusht]"
+RUN . /venv/bin/activate && pip3 install -e ".[pi0]"
+RUN . /venv/bin/activate && pip3 install -e ".[smolvla]"
 
-
-RUN python3 -m venv /venv
+# RUN conda install -y -c conda-forge ffmpeg
+# RUN pip uninstall -y opencv-python
+# RUN conda install -y -c conda-forge "opencv>=4.10.0"
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
