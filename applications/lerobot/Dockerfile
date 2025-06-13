@@ -1,6 +1,4 @@
 
-
-
 FROM ubuntu:noble AS build
 
 ENV LANG=en_US.UTF-8 \
@@ -8,21 +6,112 @@ ENV LANG=en_US.UTF-8 \
     TERM=xterm \
     PYTHONIOENCODING=UTF-8 \
     DEBIAN_FRONTEND=noninteractive \
-    PATH="/venv/bin:$PATH" \
     CONDA_DIR=/opt/miniconda \
-    PATH="/opt/miniconda/bin:$PATH"
+    LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/mujoco/mujoco-3.3.3/bin/:/usr/lib/nvidia" \
+    PATH="$PATH:/opt/miniconda/bin:/venv/bin:$LD_LIBRARY_PATHx" \
+    LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libGLEW.so \
+    MUJOCO_PATH=/mujoco/mujoco-3.3.3/bin/ \
+    MUJOCO_PLUGIN_PATH=/mujoco/mujoco-3.3.3/
 
 # This prevents ROS setup.bash from failing
 SHELL ["/bin/bash","-c"]
 
 RUN apt update && apt install -q -y --no-install-recommends \
-    curl gnupg2 lsb-release python3-pip python3-venv \
+    curl gnupg2 lsb-release \
     imagemagick libboost-all-dev libgts-dev libjansson-dev \
     less util-linux htop atop nvtop sysstat \
+    apt-transport-https python3-dev build-essential libssl-dev libffi-dev libxml2-dev \
+    libxslt1-dev zlib1g-dev libglew-dev libglew2.2 \
     vim git jq wget flex software-properties-common build-essential gcc && \
     rm -rf /var/lib/apt/lists/*
 
+RUN curl -fsSL https://bazel.build/bazel-release.pub.gpg | gpg --dearmor >bazel-archive-keyring.gpg
+RUN mv bazel-archive-keyring.gpg /usr/share/keyrings
+RUN echo "deb [arch=amd64 signed-by=/usr/share/keyrings/bazel-archive-keyring.gpg] https://storage.googleapis.com/bazel-apt stable jdk1.8" | tee /etc/apt/sources.list.d/bazel.list
+
+RUN apt update && apt install -y bazel
+
 WORKDIR /
+
+# Install miniconda
+RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /miniconda.sh
+RUN /bin/bash /miniconda.sh -b -p /opt/miniconda
+
+RUN git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/huggingface/lerobot.git /lerobot
+
+RUN mkdir /mujoco
+RUN wget https://github.com/google-deepmind/mujoco/releases/download/3.3.3/mujoco-3.3.3-linux-x86_64.tar.gz -O mujoco-linux-x86_64.tar.gz
+RUN tar -xvf mujoco-linux-x86_64.tar.gz -C /mujoco/
+
+WORKDIR /lerobot
+
+RUN conda create -y -n lerobot && \
+    . /opt/miniconda/bin/activate lerobot && \
+    conda init bash && \
+    conda install pip && \
+    pip install .
+
+RUN . /opt/miniconda/bin/activate lerobot && \
+    pip install mujoco mujoco-py
+
+    # pip install gym-aloha
+
+# labmaze ?
+
+RUN . /opt/miniconda/bin/activate lerobot && \
+    pip install ".[pusht]" && \
+    pip install ".[pi0]" && \
+    pip install ".[smolvla]" 
+
+    # pip install ".[xarm]" && \
+    # pip install ".[aloha]" && \
+
+
+
+# && \
+    # pip install ".[pusht]"
+    
+    # && \
+
+# Smolval base
+# RUN mkdir -p /lerobot/models/smolvla_base
+# WORKDIR /lerobot/models/smolvla_base
+
+# RUN wget https://huggingface.co/lerobot/smolvla_base/resolve/main/model.safetensors
+
+COPY scripts/ /lerobot/scripts
+
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+
+#####################################################################
+FROM scratch
+
+ENV LANG=en_US.UTF-8 \
+    LANGUAGE=en_US.UTF-8 \
+    TERM=xterm \
+    PYTHONIOENCODING=UTF-8 \
+    ROS2_DISTRO=jazzy \
+    DEBIAN_FRONTEND=noninteractive \
+    PATH="/venv/bin:$PATH" \
+    CONDA_DIR=/opt/miniconda \
+    LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/mujoco/mujoco-3.3.3/bin/:/usr/lib/nvidia" \
+    PATH="/venv/bin:$LD_LIBRARY_PATH:/opt/miniconda/bin:$PATH" \
+    LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libGLEW.so \
+    MUJOCO_PATH=/mujoco/mujoco-3.3.3/bin/ \
+    MUJOCO_PLUGIN_PATH=/mujoco/mujoco-3.3.3/
+
+COPY --from=build / /
+
+WORKDIR /lerobot/scripts
+
+ENTRYPOINT ["/entrypoint.sh"]
+
+
+
+
+
 
 # RUN wget https://repo.anaconda.com/archive/Anaconda3-2024.06-1-Linux-x86_64.sh
 # RUN bash Anaconda3-2024.06-1-Linux-x86_64.sh
@@ -30,9 +119,8 @@ WORKDIR /
 # source ~/.bashrc
 # conda activate /home/ubuntu/anaconda3
 # 
-# Install miniconda
-RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /miniconda.sh
-RUN /bin/bash /miniconda.sh -b -p /opt/miniconda
+
+
 # . /opt/miniconda/bin/activate
 
 # # Put conda in path so we can use conda activate
@@ -48,7 +136,7 @@ RUN /bin/bash /miniconda.sh -b -p /opt/miniconda
 # # COPY * ./ # Run the software in conda base environment 
 # CMD ["/opt/miniconda/bin/conda", "run", "--no-capture-output", "-n", "base", "python" "app.py"]
 
-RUN conda create -y -n lerobot python 
+
 # =3.10
 # RUN conda activate lerobot
 
@@ -56,52 +144,54 @@ RUN conda create -y -n lerobot python
 
 # RUN . /venv/bin/activate && 
 
-RUN . /opt/miniconda/bin/activate && pip3 install ffmpeg opencv-python hf_xet
 
-WORKDIR /
+# RUN conda create -y -n lerobot
+# RUN conda env create -f /lerobot.yml
 
-RUN git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/huggingface/lerobot.git /lerobot
 
-WORKDIR /lerobot
 
-# Smolval base
-RUN mkdir -p /lerobot/models/smolvla_base
-WORKDIR /lerobot/models/smolvla_base
-
-RUN wget https://huggingface.co/lerobot/smolvla_base/resolve/main/model.safetensors
-
-RUN . /opt/miniconda/bin/activate && pip3 install ".[pusht]"
-RUN . /opt/miniconda/bin/activate && pip3 install ".[feetech]"
-RUN . /opt/miniconda/bin/activate && pip3 install ".[xarm]"
-RUN . /opt/miniconda/bin/activate && pip3 install ".[aloha]"
-RUN . /opt/miniconda/bin/activate && pip3 install ".[pi0]"
-RUN . /opt/miniconda/bin/activate && pip3 install ".[smolvla]"
 
 # RUN conda install -y -c conda-forge ffmpeg
 # RUN pip uninstall -y opencv-python
 # RUN conda install -y -c conda-forge "opencv>=4.10.0"
 
-COPY scripts/ /lerobot/scripts
 
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
 
-#####################################################################
-FROM scratch
+# \
+#     pip \
+#     numpy \
+#     pandas \
+#     ffmpeg \
+#     opencv \
+#     hf_xet \
+#     && conda clean -afy
 
-ENV LANG=en_US.UTF-8 \
-    LANGUAGE=en_US.UTF-8 \
-    TERM=xterm \
-    PYTHONIOENCODING=UTF-8 \
-    ROS2_DISTRO=jazzy \
-    DEBIAN_FRONTEND=noninteractive \
-    PATH="/venv/bin:$PATH" \
-    CONDA_DIR=/opt/miniconda \
-    PATH="/opt/miniconda/bin:$PATH"
+# RUN conda init
 
-COPY --from=build / /
+# RUN source activate lerobot
 
-WORKDIR /lerobot/scripts
+    # python=3.10 \
+    # scikit-learn \
+    # scikit-image \
+    # matplotlib \
+    # seaborn \
+    # jupyterlab \
+    # ipykernel \
 
-ENTRYPOINT ["/entrypoint.sh"]
-
+# RUN conda activate lerobot && conda install -y -c conda-forge \
+#     "python>=3.10" \
+#     "scikit-learn>=1.4.0" \
+#     "scikit-image>=0.22.0" \
+#     "matplotlib>=3.8.0" \
+#     "seaborn>=0.13.2" \
+#     "jupyterlab>=4.0.0" \
+#     "ipykernel>=6.25.2" \
+#     "ffmpeg>=5.1.2" \
+#     "opencv>=4.10.0"
+# RUN conda activate lerobot && conda install -y -c huggingface \
+#     "hf_xet>=0.1.0" \
+#     "hf_hub>=0.16.4" \
+#     "hf_transfer>=0.1.0" \
+#     "hf_transformers>=4.40.2" \
+#     "hf_datasets>=2.14.3" \
+#     "hf_tokenizers
