@@ -1,4 +1,4 @@
 #!/bin/bash
 set -e
-source /opt/miniconda/bin/activate lerobot
+conda activate lerobot
 exec "$@"

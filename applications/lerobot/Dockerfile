@@ -45,33 +45,27 @@ RUN tar -xvf mujoco-linux-x86_64.tar.gz -C /mujoco/
 
 WORKDIR /lerobot
 
-RUN conda create -y -n lerobot && \
+RUN conda create -y -n lerobot python=3.10 && \
     . /opt/miniconda/bin/activate lerobot && \
     conda init bash && \
     conda install pip && \
     pip install .
 
 RUN . /opt/miniconda/bin/activate lerobot && \
-    pip install mujoco mujoco-py
-
-    # pip install gym-aloha
+    pip install mujoco mujoco-py gym-xarm gym-aloha
 
 # labmaze ?
 
 RUN . /opt/miniconda/bin/activate lerobot && \
     pip install ".[pusht]" && \
     pip install ".[pi0]" && \
-    pip install ".[smolvla]" 
+    pip install ".[smolvla]"
 
     # pip install ".[xarm]" && \
     # pip install ".[aloha]" && \
 
-
-
 # && \
     # pip install ".[pusht]"
-    
-    # && \
 
 # Smolval base
 # RUN mkdir -p /lerobot/models/smolvla_base
