@@ -46,7 +46,7 @@ RUN tar -xvf mujoco-linux-x86_64.tar.gz -C /mujoco/
 
 WORKDIR /lerobot
 
-RUN conda create -y -n lerobot python=3.10 && \
+RUN conda create -y -n lerobot python=3.10 && conda init && \
     . /opt/miniconda/bin/activate lerobot && \
     conda init bash && \
     conda install pip && \
