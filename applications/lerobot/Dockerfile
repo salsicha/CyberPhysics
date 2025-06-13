@@ -54,24 +54,18 @@ RUN conda create -y -n lerobot python=3.10 && \
 RUN . /opt/miniconda/bin/activate lerobot && \
     pip install mujoco mujoco-py gym-xarm gym-aloha
 
-# labmaze ?
-
 RUN . /opt/miniconda/bin/activate lerobot && \
     pip install ".[pusht]" && \
     pip install ".[pi0]" && \
-    pip install ".[smolvla]"
-
-    # pip install ".[xarm]" && \
-    # pip install ".[aloha]" && \
-
-# && \
-    # pip install ".[pusht]"
+    pip install ".[smolvla]" && \
+    pip install ".[xarm]" && \
+    pip install ".[aloha]"
 
 # Smolval base
-# RUN mkdir -p /lerobot/models/smolvla_base
-# WORKDIR /lerobot/models/smolvla_base
+RUN mkdir -p /lerobot/models/smolvla_base
+WORKDIR /lerobot/models/smolvla_base
 
-# RUN wget https://huggingface.co/lerobot/smolvla_base/resolve/main/model.safetensors
+RUN wget https://huggingface.co/lerobot/smolvla_base/resolve/main/model.safetensors
 
 COPY scripts/ /lerobot/scripts
 
