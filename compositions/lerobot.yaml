@@ -10,7 +10,7 @@ services:
       - NVIDIA_DRIVER_CAPABILITIES=all
       - EGL_PLATFORM=surfaceless
     command: >
-      bash -c "python3 evaluate_pretrained_policy.py"
+      bash -c "conda activate lerobot && python3 evaluate_pretrained_policy.py"
     deploy:
       resources:
         reservations:

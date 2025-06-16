@@ -1,4 +1,5 @@
 #!/bin/bash
 set -e
-conda activate lerobot
+# conda init && conda activate lerobot
+# source /opt/miniconda/bin/activate lerobot
 exec "$@"

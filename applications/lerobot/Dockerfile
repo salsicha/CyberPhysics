@@ -7,12 +7,10 @@ ENV LANG=en_US.UTF-8 \
     PYTHONIOENCODING=UTF-8 \
     DEBIAN_FRONTEND=noninteractive \
     CONDA_DIR=/opt/miniconda \
-    LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/mujoco/mujoco-3.3.3/bin/:/usr/lib/nvidia" \
+    LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/root/.mujoco/mujoco210/bin:/usr/lib/nvidia" \
     PATH="$PATH:/opt/miniconda/bin:/venv/bin:$LD_LIBRARY_PATHx" \
-    LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libGLEW.so \
-    MUJOCO_PATH=/mujoco/mujoco-3.3.3/bin/ \
-    MUJOCO_PLUGIN_PATH=/mujoco/mujoco-3.3.3/
-
+    LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libGLEW.so
+    
 # This prevents ROS setup.bash from failing
 SHELL ["/bin/bash","-c"]
 
@@ -40,9 +38,10 @@ RUN /bin/bash /miniconda.sh -b -p /opt/miniconda
 
 RUN git clone --depth 1 --recurse-submodules --shallow-submodules https://github.com/huggingface/lerobot.git /lerobot
 
-RUN mkdir /mujoco
-RUN wget https://github.com/google-deepmind/mujoco/releases/download/3.3.3/mujoco-3.3.3-linux-x86_64.tar.gz -O mujoco-linux-x86_64.tar.gz
-RUN tar -xvf mujoco-linux-x86_64.tar.gz -C /mujoco/
+RUN mkdir -p /root/.mujoco
+# RUN wget https://github.com/google-deepmind/mujoco/releases/download/3.3.3/mujoco-3.3.3-linux-x86_64.tar.gz -O mujoco-linux-x86_64.tar.gz
+RUN wget https://mujoco.org/download/mujoco210-linux-x86_64.tar.gz -O mujoco-linux-x86_64.tar.gz
+RUN tar -xvf mujoco-linux-x86_64.tar.gz -C /root/.mujoco/
 
 WORKDIR /lerobot
 
@@ -53,7 +52,7 @@ RUN conda create -y -n lerobot python=3.10 && conda init && \
     pip install .
 
 RUN . /opt/miniconda/bin/activate lerobot && \
-    pip install mujoco mujoco-py gym-xarm gym-aloha
+    pip install mujoco mujoco-py gym-xarm gym-aloha gym_pusht
 
 RUN . /opt/miniconda/bin/activate lerobot && \
     pip install ".[pusht]" && \
@@ -85,11 +84,9 @@ ENV LANG=en_US.UTF-8 \
     DEBIAN_FRONTEND=noninteractive \
     PATH="/venv/bin:$PATH" \
     CONDA_DIR=/opt/miniconda \
-    LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/mujoco/mujoco-3.3.3/bin/:/usr/lib/nvidia" \
+    LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/root/.mujoco/mujoco210/bin:/usr/lib/nvidia" \
     PATH="/venv/bin:$LD_LIBRARY_PATH:/opt/miniconda/bin:$PATH" \
-    LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libGLEW.so \
-    MUJOCO_PATH=/mujoco/mujoco-3.3.3/bin/ \
-    MUJOCO_PLUGIN_PATH=/mujoco/mujoco-3.3.3/
+    LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libGLEW.so
 
 COPY --from=build / /
 
@@ -99,6 +96,15 @@ ENTRYPOINT ["/entrypoint.sh"]
 
 
 
+# LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/mujoco/mujoco-3.3.3/bin/:/usr/lib/nvidia" \
+# MUJOCO_PATH=/mujoco/mujoco-3.3.3/bin/ \
+# MUJOCO_PLUGIN_PATH=/mujoco/mujoco-3.3.3/
+
+
+# LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/root/.mujoco/mujoco210/bin
+# LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/mujoco/mujoco-3.3.3/bin/:/usr/lib/nvidia" \
+# MUJOCO_PATH=/mujoco/mujoco-3.3.3/bin/ \
+# MUJOCO_PLUGIN_PATH=/mujoco/mujoco-3.3.3/
 
 
 
