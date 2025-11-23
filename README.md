@@ -38,6 +38,11 @@ cd applications && make build_ros2
 cd applications && make target_arm64 build_ros2
 ```
 
+## Install TorchStudio and Conda
+Install Conda:
+https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+Install TorchStudio (manual):
+https://www.torchstudio.ai/getstarted/
 
 ## Usage
 
