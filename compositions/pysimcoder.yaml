@@ -13,3 +13,7 @@ services:
     volumes:
       - /dev/shm:/dev/shm
       - $XAUTHORITY:/tmp/.XAuthority
+    command: >
+      stdbuf -o L
+      psc
+      
