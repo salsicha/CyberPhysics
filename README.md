@@ -38,11 +38,13 @@ cd applications && make build_ros2
 cd applications && make target_arm64 build_ros2
 ```
 
+
 ## Install TorchStudio and Conda
 Install Conda:
 https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
 Install TorchStudio (manual):
 https://www.torchstudio.ai/getstarted/
+
 
 ## Usage
 
@@ -114,6 +116,10 @@ Have a look at the README in each application's folder for explanations of what 
 ## Why?
 
 Many cyber-physical systems quickly become unamangeable as complexity and dependency conflicts scale exponentially with the number of components. This project should help with that.  
+
+
+## Real time ROS2 image for RPi4
+https://github.com/ros-realtime/ros-realtime-rpi4-image
 
 
 ## Note on real time performance
