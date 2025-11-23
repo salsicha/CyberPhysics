@@ -1,0 +1,18 @@
+
+# RAI
+
+services:
+  pysimcoder:
+    network_mode: "host"
+    image: cyberphysics/rai
+    container_name: rai
+    environment:
+      - "DISPLAY=${DISPLAY}"
+      - XAUTHORITY=/tmp/.XAuthority
+      - "/tmp/.X11-unix:/tmp/.X11-unix"
+    volumes:
+      - /dev/shm:/dev/shm
+      - $XAUTHORITY:/tmp/.XAuthority
+    # command: >
+    #   stdbuf -o L
+      
