@@ -21,6 +21,8 @@ RUN python3 -m venv /venv
 
 RUN . /venv/bin/activate && pip3 install rai-core && rai-config-init
 
+# TODO: set up RAI application
+
 WORKDIR /
 RUN curl -sSL https://install.python-poetry.org | python3 -
 RUN git clone https://github.com/RobotecAI/rai.git
