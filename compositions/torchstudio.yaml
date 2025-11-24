@@ -1,0 +1,24 @@
+# Torch Studio 
+
+version: "3.9"
+services:
+  torchstudio:
+    network_mode: "host"
+    image: cyberphysics/torchstudio
+    container_name: torchstudio
+    volumes:
+      - "/tmp/.X11-unix:/tmp/.X11-unix"
+    environment:
+      - "DISPLAY=${DISPLAY}"
+      - XAUTHORITY
+      - NVIDIA_DRIVER_CAPABILITIES=all
+    command: >
+      stdbuf -o L
+      torchstudio
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
