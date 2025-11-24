@@ -22,14 +22,15 @@ RUN python3 -m venv /venv
 # TODO:
 # https://github.com/dridri/bcflight
 
-# Controller:
+# Flight Controller:
 # Dependencies
-# sudo apt-get install nasm qtmultimedia5-dev qtbase5-dev qtchooser qt5-qmake qtbase5-dev-tools libnl-3-dev libnl-genl-3-dev libnl-route-3-dev libiw-dev libfftw3-dev libqscintilla2-qt5-dev
-# git clone https://github.com/dridri/bcflight.git
-# cd bcflight/controller_pc
-# cmake -DCMAKE_BUILD_TYPE=Release -S . -B build
+# sudo apt update
+# sudo apt install git pkg-config cmake make g++ libc6-dev libraspberrypi-dev libiw-dev libdrm-dev libgbm-dev libcamera-dev libgles2-mesa-dev libgps-dev libasound2-dev libcrypt-dev zlib1g-dev libpng-dev libshine-dev libavformat-dev libavutil-dev libavcodec-dev libpigpio-dev lua5.3 libfftw3-dev
+# Build
+# git clone https://github.com/dridri/bcflight
+# cd bcflight/flight
+# cmake -Dboard=rpi -Ddebug=1 -S . -B build
 # cd build && make -j$(nproc)
-# ./controller_pc
 
 
 COPY entrypoint.sh /entrypoint.sh
