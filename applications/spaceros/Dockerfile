@@ -1,5 +1,5 @@
 
-FROM ros:humble-ros-base AS build
+FROM osrf/space-ros:latest AS build
 
 ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US.UTF-8 \
@@ -18,10 +18,10 @@ RUN apt update && apt install -q -y --no-install-recommends \
 
 RUN python3 -m venv /venv
 
-
-# TODO:
-# https://github.com/space-ros/demos/blob/main/curiosity_rover/README.md
-
+# Demos
+RUN git clone https://github.com/space-ros/demos.git /demos
+WORKDIR /demos/curiosity_rover
+RUN ./build.sh
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
@@ -44,3 +44,4 @@ WORKDIR /workspace
 
 ENTRYPOINT ["/entrypoint.sh"]
 
+CMD [ "/demos/curiosity_rover/run.sh" ]

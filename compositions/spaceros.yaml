@@ -13,6 +13,7 @@ services:
     volumes:
       - /dev/shm:/dev/shm
       - $XAUTHORITY:/tmp/.XAuthority
-    # command: >
-    #   stdbuf -o L
+    command: >
+      stdbuf -o L
+      /demos/curiosity_rover/run.sh
       
