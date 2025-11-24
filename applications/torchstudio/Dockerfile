@@ -1,5 +1,5 @@
 
-FROM pytorch/pytorch:latest AS build
+FROM plexlabs/torchstudio:2.6.0-3 AS build
 
 ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US.UTF-8 \
