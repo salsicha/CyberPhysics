@@ -1,0 +1,148 @@
+<?xml version="1.0" ?>
+<robot name="pan_tilt" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+<xacro:include filename="$(find pan_tilt_ros)/urdf/materials.xacro" />
+<xacro:include filename="$(find pan_tilt_ros)/urdf/pan_tilt_urdf.trans" />
+<xacro:include filename="$(find pan_tilt_ros)/urdf/pan_tilt_urdf.gazebo" />
+
+<link name="base_link">
+  <visual>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://pan_tilt_ros/meshes/base_link.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="matte_black"/>
+  </visual>
+  <collision>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://pan_tilt_ros/meshes/base_link.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="base_link_inertial">
+  <inertial>
+    <origin xyz="3.100257446207066e-05 -2.4988496235187414e-05 0.012657202544439227" rpy="0 0 0"/>
+    <mass value="0.08489188819476734"/>
+    <inertia ixx="1e-05" iyy="8e-06" izz="9e-06" ixy="-0.0" iyz="-0.0" ixz="-0.0"/>
+  </inertial>
+</link>
+
+<link name="tilt_motor">
+  <inertial>
+    <origin xyz="-0.019875146307512716 0.0162793854605978 0.010245897629134384" rpy="0 0 0"/>
+    <mass value="0.04700597163076828"/>
+    <inertia ixx="6e-06" iyy="1e-05" izz="1.1e-05" ixy="-0.0" iyz="-0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.01243 0.016155 -0.0275" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://pan_tilt_ros/meshes/tilt_motor.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="matte_black"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.01243 0.016155 -0.0275" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://pan_tilt_ros/meshes/tilt_motor.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="pan_tilt_bracket">
+  <inertial>
+    <origin xyz="1.033653797971601e-09 -0.016649542795301807 0.019464379532745206" rpy="0 0 0"/>
+    <mass value="0.05018543913699325"/>
+    <inertia ixx="2.4e-05" iyy="1.3e-05" izz="1.5e-05" ixy="-0.0" iyz="0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.02032 -0.017545 -0.03775" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://pan_tilt_ros/meshes/pan_tilt_bracket.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="matte_black"/>
+  </visual>
+  <collision>
+    <origin xyz="0.02032 -0.017545 -0.03775" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://pan_tilt_ros/meshes/pan_tilt_bracket.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="pan_motor">
+  <inertial>
+    <origin xyz="0.012874853692487125 -4.173783098805313e-06 0.0174208176028941" rpy="0 0 0"/>
+    <mass value="0.04700597163076828"/>
+    <inertia ixx="6e-06" iyy="1.1e-05" izz="1e-05" ixy="0.0" iyz="0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0.02032 -0.00042 -0.07405" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://pan_tilt_ros/meshes/pan_motor.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="matte_black"/>
+  </visual>
+  <collision>
+    <origin xyz="0.02032 -0.00042 -0.07405" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://pan_tilt_ros/meshes/pan_motor.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<link name="payload_link">
+  <inertial>
+    <origin xyz="-0.004991360468491857 -0.011542339627033346 0.004227044433613547" rpy="0 0 0"/>
+    <mass value="0.09449139072993021"/>
+    <inertia ixx="2.1e-05" iyy="1.8e-05" izz="2.1e-05" ixy="-6e-06" iyz="0.0" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="-0.0001099 0.0164388 -0.0939786" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://pan_tilt_ros/meshes/payload_link.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="matte_black"/>
+  </visual>
+  <collision>
+    <origin xyz="-0.0001099 0.0164388 -0.0939786" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://pan_tilt_ros/meshes/payload_link.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+<joint name="base_inertial_fixed" type="fixed">
+  <origin xyz="0 0 0" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="base_link_inertial"/>
+</joint>
+
+<joint name="base_tilt_fixed" type="fixed">
+  <origin xyz="0.01243 -0.016155 0.0275" rpy="0 0 0"/>
+  <parent link="base_link"/>
+  <child link="tilt_motor"/>
+</joint>
+
+<joint name="tilt_joint" type="continuous">
+  <origin xyz="-0.03275 0.0337 0.01025" rpy="0 0 0"/>
+  <parent link="tilt_motor"/>
+  <child link="pan_tilt_bracket"/>
+  <axis xyz="-0.0 1.0 0.0"/>
+</joint>
+
+<joint name="pan_joint" type="continuous">
+  <origin xyz="0.0 -0.017125 0.0363" rpy="0 0 0"/>
+  <parent link="pan_tilt_bracket"/>
+  <child link="pan_motor"/>
+  <axis xyz="0.0 0.0 1.0"/>
+</joint>
+
+<joint name="payload_mount_fixed" type="fixed">
+  <origin xyz="0.0204299 -0.0168588 0.0199286" rpy="0 0 0"/>
+  <parent link="pan_motor"/>
+  <child link="payload_link"/>
+</joint>
+
+</robot>

@@ -1,0 +1,18 @@
+
+# Pan Tilt ROS
+
+services:
+  pantiltros:
+    network_mode: "host"
+    image: cyberphysics/pantiltros
+    container_name: pantiltros
+    environment:
+      - "DISPLAY=${DISPLAY}"
+      - XAUTHORITY=/tmp/.XAuthority
+      - "/tmp/.X11-unix:/tmp/.X11-unix"
+    volumes:
+      - /dev/shm:/dev/shm
+      - $XAUTHORITY:/tmp/.XAuthority
+    # command: >
+    #   stdbuf -o L
+      

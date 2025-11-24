@@ -1,0 +1,11 @@
+pan_tilt_cmd_node:
+  ros__parameters:
+    joint_names:
+      - pan_joint
+      - tilt_joint
+    joint_inv: [false, false]
+    joy_axes0: [3] # LJoy left/right
+    joy_axes1: [4] # RJoy up/down
+    mid_pos: [2048, 2048]
+    min_pos: [1024, 1600]
+    max_pos: [3072, 3072]
