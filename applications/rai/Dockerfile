@@ -33,6 +33,9 @@ RUN rosdep install --from-paths src --ignore-src -r -y
 RUN poetry run streamlit run src/rai_core/rai/frontend/configurator.py
 RUN colcon build --symlink-install
 
+# Example demos:
+# https://robotecai.github.io/rai/demos/manipulation/
+
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
