@@ -2,7 +2,7 @@
 # RAI
 
 services:
-  pysimcoder:
+  rai:
     network_mode: "host"
     image: cyberphysics/rai
     container_name: rai

@@ -1,10 +1,11 @@
-# BCFlight
+
+# GROOT
 
 services:
-  bcflight:
+  groot:
     network_mode: "host"
-    image: cyberphysics/bcflight
-    container_name: bcflight
+    image: cyberphysics/groot
+    container_name: groot
     environment:
       - "DISPLAY=${DISPLAY}"
       - XAUTHORITY=/tmp/.XAuthority
