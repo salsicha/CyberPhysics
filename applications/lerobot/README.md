@@ -1,7 +1,10 @@
 
 
+Update:
+SO-101 with IsaacSim
+https://lycheeai-hub.com/isaac-sim/ros2/so-arm101-moveit-in-isaac-sim-with-ros2
 
-<!-- 
+
 
 Make lerobot run in simulation with pi0 and SO-100
 
@@ -13,9 +16,6 @@ python lerobot/scripts/control_robot.py record \
     --sim-config lerobot/configs/env/your_sim_config.yaml
     --pretrained_policy_name_or_path=/path/to/pretrained/pi0
 
- -->
-
-<!-- 
 
 Make lerobot control real SO-100 with pi0
 
@@ -25,8 +25,6 @@ python lerobot/scripts/control_robot.py \
     --robot.type=so100 \
     --control.type=teleoperate
     --control.policy.path=/path/to/pretrained/pi0
-
- -->
 
 
 
