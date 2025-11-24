@@ -41,6 +41,7 @@ cd applications && make target_arm64 build_ros2
 
 ## TorchStudio
 https://www.torchstudio.ai/getstarted/
+Don't install new Python environment, select ~/venv/bin/python
 
 
 ## Usage
