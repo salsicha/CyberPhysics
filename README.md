@@ -39,6 +39,10 @@ cd applications && make target_arm64 build_ros2
 ```
 
 
+## TorchStudio
+https://www.torchstudio.ai/getstarted/
+
+
 ## Usage
 
 Write new applications and put them in the applications folder.  

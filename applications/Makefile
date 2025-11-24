@@ -95,8 +95,6 @@ build_spaceros: cleanup
 	APP=spaceros ./_build_it.sh
 build_tello: cleanup build_ros2
 	APP=tello ./_build_it.sh
-build_torchstudio: cleanup
-	APP=torchstudio ./_build_it.sh
 build_unrealengine: cleanup
 	APP=unrealengine ./_build_it.sh
 build_vinsmono: cleanup

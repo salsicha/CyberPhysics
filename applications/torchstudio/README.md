@@ -1,5 +1,0 @@
-
-# TorchStudio
-
-Torch Studio IDE.
-
