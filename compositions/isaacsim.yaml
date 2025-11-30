@@ -1,0 +1,37 @@
+
+# Isaac Sim Docker Compose File
+
+services:
+  isaacsim:
+    network_mode: "host"
+    image: nvcr.io/nvidia/isaac-sim:5.1.0
+    container_name: isaacsim
+    environment:
+      - "DISPLAY=${DISPLAY}"
+      - XAUTHORITY=/tmp/.XAuthority
+      - "/tmp/.X11-unix:/tmp/.X11-unix"
+      - "PRIVACY_CONSENT=Y"
+      - "ACCEPT_EULA=Y"
+    volumes:
+      - /dev/shm:/dev/shm
+      - $XAUTHORITY:/tmp/.XAuthority
+      - ~/docker/isaac-sim/cache/kit:/isaac-sim/kit/cache:rw
+      - ~/docker/isaac-sim/cache/ov:/root/.cache/ov:rw
+      - ~/docker/isaac-sim/cache/pip:/root/.cache/pip:rw
+      - ~/docker/isaac-sim/cache/glcache:/root/.cache/nvidia/GLCache:rw
+      - ~/docker/isaac-sim/cache/computecache:/root/.nv/ComputeCache:rw
+      - ~/docker/isaac-sim/logs:/root/.nvidia-omniverse/logs:rw
+      - ~/docker/isaac-sim/data:/root/.local/share/ov/data:rw
+      - ~/docker/isaac-sim/documents:/root/Documents:rw
+    command: >
+      stdbuf -o L
+      runapp.sh
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+
