@@ -21,18 +21,14 @@ RUN apt update && apt install -q -y --no-install-recommends \
 
 RUN pip3 install rsa PySimpleGUI-4-foss
 
-COPY project_as2_multirotor_simulator/config/ /workspace/config/
-COPY project_as2_multirotor_simulator/config_ground_station/ /workspace/config_ground_station/
-COPY project_as2_multirotor_simulator/rosbag/ /workspace/rosbag/
-COPY project_as2_multirotor_simulator/trees/ /workspace/trees/
-COPY project_as2_multirotor_simulator/utils/ /workspace/utils/
-COPY project_as2_multirotor_simulator/tmuxinator/ /workspace/tmuxinator/
+WORKDIR /
+RUN git clone https://github.com/aerostack2/project_as2_multirotor_simulator.git
+RUN cp -r /project_as2_multirotor_simulator/* /workspace/
 
 COPY requirements.txt /requirements.txt
 RUN python3 -m venv /venv
 RUN pip3 install setuptools --upgrade
 RUN . /venv/bin/activate && pip3 install -r /requirements.txt
-COPY rpiflightcontroller/scripts/ /scripts/
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
@@ -47,5 +43,3 @@ COPY --from=build / /
 WORKDIR /workspace
 
 ENTRYPOINT ["/entrypoint.sh"]
-
-CMD ["python3", "/scripts/scout/python/ros_flight_controller.py", "False"]

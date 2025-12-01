@@ -20,14 +20,14 @@ RUN python3 -m venv /venv
 
 
 # TODO:
-# https://github.com/dridri/bcflight
+# https://github.com/salsicha/bcflight
 
 # Flight Controller:
 # Dependencies
 # sudo apt update
 # sudo apt install git pkg-config cmake make g++ libc6-dev libraspberrypi-dev libiw-dev libdrm-dev libgbm-dev libcamera-dev libgles2-mesa-dev libgps-dev libasound2-dev libcrypt-dev zlib1g-dev libpng-dev libshine-dev libavformat-dev libavutil-dev libavcodec-dev libpigpio-dev lua5.3 libfftw3-dev
 # Build
-# git clone https://github.com/dridri/bcflight
+# git clone https://github.com/salsicha/bcflight
 # cd bcflight/flight
 # cmake -Dboard=rpi -Ddebug=1 -S . -B build
 # cd build && make -j$(nproc)

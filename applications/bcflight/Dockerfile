@@ -20,12 +20,12 @@ RUN python3 -m venv /venv
 
 
 # TODO:
-# https://github.com/dridri/bcflight
+# https://github.com/salsicha/bcflight
 
 # Controller:
 # Dependencies
 # sudo apt-get install nasm qtmultimedia5-dev qtbase5-dev qtchooser qt5-qmake qtbase5-dev-tools libnl-3-dev libnl-genl-3-dev libnl-route-3-dev libiw-dev libfftw3-dev libqscintilla2-qt5-dev
-# git clone https://github.com/dridri/bcflight.git
+# git clone https://github.com/salsicha/bcflight.git
 # cd bcflight/controller_pc
 # cmake -DCMAKE_BUILD_TYPE=Release -S . -B build
 # cd build && make -j$(nproc)
