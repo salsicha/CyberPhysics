@@ -1,0 +1,14 @@
+services:
+  openclaw:
+    image: cyberphysics/openclaw
+    build:
+      context: ../applications/openclaw
+    volumes:
+      - ../applications/openclaw:/app
+      - /tmp/.X11-unix:/tmp/.X11-unix
+    environment:
+      - DISPLAY=${DISPLAY}
+    privileged: true
+    network_mode: "host"
+    restart: unless-stopped
+    command: python3 openclaw_app.py
