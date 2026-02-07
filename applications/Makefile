@@ -39,8 +39,6 @@ build_bcflight: cleanup
 	APP=bcflight ./_build_it.sh
 build_bcflightcontroller: cleanup
 	APP=bcflightcontroller ./_build_it.sh
-build_bitnet: cleanup
-	APP=bitnet ./_build_it.sh
 build_blackfly: cleanup build_ros2
 	APP=blackfly ./_build_it.sh
 build_comfyui: cleanup
@@ -59,8 +57,6 @@ build_jupyter: cleanup
 	APP=jupyter ./_build_it.sh
 build_lerobot: cleanup
 	APP=lerobot ./_build_it.sh
-build_deepresearcher: cleanup
-	APP=deepresearcher ./_build_it.sh
 build_matlab: cleanup
 	APP=matlab ./_build_it.sh
 build_navigation2: cleanup build_ros2
@@ -105,8 +101,6 @@ build_vinsmono: cleanup
 	APP=vinsmono ./_build_it.sh
 build_whereami: cleanup
 	APP=whereami ./_build_it.sh
-build_whisper: cleanup
-	APP=whisper ./_build_it.sh
 
 # Run rviz in ROS2 container with native display mounting
 run_ros2:
