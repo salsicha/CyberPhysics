@@ -1,5 +1,12 @@
 FROM ubuntu:20.04
 
+
+ENV LANG=en_US.UTF-8 \
+    LANGUAGE=en_US.UTF-8 \
+    TERM=xterm \
+    PYTHONIOENCODING=UTF-8 \
+    DEBIAN_FRONTEND=noninteractive
+
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     python3 \
