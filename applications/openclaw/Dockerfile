@@ -21,13 +21,15 @@ RUN apt install -y nodejs
 
 # Install OpenClaw
 RUN npm install -g openclaw@latest
-RUN openclaw onboard --install-daemon
+RUN openclaw onboard --install-daemon --non-interactive --accept-risk
 
 # Set working directory
 WORKDIR /app
 
 # Copy application code
 COPY . .
+
+COPY openclaw.json ~/.openclaw/openclaw.json
 
 #####################################################################
 FROM scratch
@@ -38,4 +40,7 @@ ENTRYPOINT [ "/entrypoint.sh" ]
 
 # Command to run the application
 CMD ["openclaw", "dashboard"]
+
+# Ollama needs a command too?
+# ollama launch openclaw --config
 
