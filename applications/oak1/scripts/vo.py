@@ -1,8 +1,6 @@
 
-# TODO: implement visual odometry for the Oak-1 camera using the depthai SDK.
-# The output will be unscaled/non-metric depth.
-# Then publish the depth map as a ROS topic.
-# Another ros node will fuse IMU and depth map to produce a scaled/metric depth map.
-# The navigation stack will use the metric depth map for obstacle avoidance and path planning.
- 
 
+# TODO: using the depthai SDK, implement relative depth estimation for the Oak-1 camera.
+# Compute everything on the device. 
+# The depth images won't be metric scaled depth, just relative depth.
+# Publish the depth images as ROS topic.
