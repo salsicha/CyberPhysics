@@ -43,18 +43,10 @@ class RelativeDepthPublisher(Node):
             self.pub_rgb.publish(rgb_msg)
 
 def get_blob_path():
-    # Attempt to use blobconverter to get the model
-    try:
-        import blobconverter
-        # MiDaS v2.1 Small is a good default for monocular relative depth
-        return blobconverter.from_zoo(name="midas_v2_1_small", zoo_type="depthai", shaves=6)
-    except ImportError:
-        print("Module 'blobconverter' not found. Please install it or provide a model blob.")
-    except Exception as e:
-        print(f"Error downloading model: {e}")
-    
-    # Fallback: check local directory
-    default_blob = "midas_v2_1_small_6shave.blob"
+
+    # https://blobconverter.luxonis.com/
+
+    default_blob = "models/megadepth_8.blob"
     if os.path.exists(default_blob):
         return default_blob
         
