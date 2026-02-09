@@ -8,13 +8,15 @@ ENV LANG=en_US.UTF-8 \
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
-    python3 python3-pip build-essential \
+    curl gnupg2 lsb-release python3-pip python3-venv \
     git curl wget portaudio19-dev \
     && rm -rf /var/lib/apt/lists/*
 
+RUN python3 -m venv /venv
+    
 # Install Python dependencies
 COPY requirements.txt .
-RUN pip3 install -r requirements.txt
+RUN /venv/bin/pip install -r requirements.txt
 
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
 RUN apt install -y nodejs
