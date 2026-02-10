@@ -97,6 +97,8 @@ build_tello: cleanup build_ros2
 	APP=tello ./_build_it.sh
 build_unrealengine: cleanup
 	APP=unrealengine ./_build_it.sh
+build_videpth: cleanup
+	APP=videpth ./_build_it.sh
 build_vinsmono: cleanup
 	APP=vinsmono ./_build_it.sh
 build_whereami: cleanup
