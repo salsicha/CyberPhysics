@@ -103,6 +103,8 @@ build_vinsmono: cleanup
 	APP=vinsmono ./_build_it.sh
 build_whereami: cleanup
 	APP=whereami ./_build_it.sh
+build_wildnav: cleanup
+	APP=wildnav ./_build_it.sh
 
 # Run rviz in ROS2 container with native display mounting
 run_ros2:
