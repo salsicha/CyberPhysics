@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Clone the repository
-RUN git clone https://github.com/ntnu-arl/sdf-nmpc.git .
+RUN git clone https://github.com/salsicha/sdf-nmpc.git .
 
 # Install Python dependencies
 RUN if [ -f requirements.txt ]; then \

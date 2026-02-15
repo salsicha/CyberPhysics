@@ -1,3 +1,3 @@
 
-https://github.com/ntnu-arl/sdf-nmpc
+https://github.com/salsicha/sdf-nmpc
 
