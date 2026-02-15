@@ -41,6 +41,8 @@ build_bcflightcontroller: cleanup
 	APP=bcflightcontroller ./_build_it.sh
 build_blackfly: cleanup build_ros2
 	APP=blackfly ./_build_it.sh
+build_cbfkit: cleanup
+	APP=cbfkit ./_build_it.sh
 build_comfyui: cleanup
 	APP=comfyui ./_build_it.sh
 build_dia: cleanup
@@ -55,8 +57,6 @@ build_isaacsim: cleanup
 	APP=isaacsim ./_build_it.sh
 build_jupyter: cleanup
 	APP=jupyter ./_build_it.sh
-build_lerobot: cleanup
-	APP=lerobot ./_build_it.sh
 build_matlab: cleanup
 	APP=matlab ./_build_it.sh
 build_navigation2: cleanup build_ros2
@@ -85,12 +85,18 @@ build_record: cleanup build_ros2
 	APP=record ./_build_it.sh
 build_roboticstoolbox: cleanup
 	APP=roboticstoolbox ./_build_it.sh
+build_robotransformers: cleanup
+	APP=robotransformers ./_build_it.sh
 build_ros2: cleanup
 	APP=ros2 ./_build_it.sh
 build_rtx2: cleanup
 	APP=rtx2 ./_build_it.sh
+build_sdfnmpc: cleanup
+	APP=sdfnmpc ./_build_it.sh
 build_simstudio: cleanup
 	APP=simstudio ./_build_it.sh
+build_so101: cleanup
+	APP=so101 ./_build_it.sh
 build_spaceros: cleanup
 	APP=spaceros ./_build_it.sh
 build_tello: cleanup build_ros2
