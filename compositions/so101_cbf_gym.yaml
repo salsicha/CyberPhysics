@@ -1,0 +1,23 @@
+services:
+  so101_cbf:
+    image: so101
+    container_name: so101_cbf
+    network_mode: host
+    ipc: host
+    pid: host
+    privileged: true
+    restart: unless-stopped
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    command: python3 /app/so101_cbf_control.py
+
+  so101_gym:
+    image: so101
+    container_name: so101_gym
+    network_mode: host
+    ipc: host
+    pid: host
+    privileged: true
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    command: python3 /app/run_gym_hil.py
