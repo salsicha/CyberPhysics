@@ -1,0 +1,25 @@
+services:
+  navigator:
+    image: navigator
+    container_name: navigator
+    network_mode: host
+    ipc: host
+    pid: host
+    privileged: true
+    restart: unless-stopped
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+
+  dronegui:
+    image: dronegui
+    container_name: dronegui
+    network_mode: host
+    ipc: host
+    pid: host
+    privileged: true
+    environment:
+      - DISPLAY=${DISPLAY}
+      - QT_X11_NO_MITSHM=1
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix
