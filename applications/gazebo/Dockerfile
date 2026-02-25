@@ -14,7 +14,9 @@ SHELL ["/bin/bash","-c"]
 
 RUN apt update && apt install -q -y --no-install-recommends \
     curl gnupg2 lsb-release vim wget \
-    ros-$ROS_DISTRO-ros-gz && \
+    ros-$ROS_DISTRO-ros-gz \
+    ros-$ROS_DISTRO-launch-ros \
+    ros-$ROS_DISTRO-ros2launch && \
     rm -rf /var/lib/apt/lists/*
 
 RUN python3 -m venv /venv
@@ -22,6 +24,7 @@ RUN python3 -m venv /venv
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
+COPY scripts/simulate_drone_sf.py /workspace/simulate_drone_sf.py
 
 #####################################################################
 
