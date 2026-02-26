@@ -52,6 +52,7 @@ RUN pip install pid pymavlink dronekit dronekit-sitl -UI
 
 COPY scripts/ros_bridge.sh /ros_bridge.sh
 COPY scripts/behaviortree.sh /behaviortree.sh
+COPY scripts/fly_to_point.py /fly_to_point.py
 
 RUN mkdir -p /workspace/misc/lamp_autonomy
 COPY . /workspace/misc/lamp_autonomy
@@ -65,11 +66,10 @@ RUN echo 'roslaunch mavros apm.launch fcu_url:=/dev/ttyACM0:921600 &' >> /entryp
 RUN echo 'rosservice call /mavros/set_stream_rate 0 10 1' >> /entrypoint.sh
 RUN echo 'exec "$@"' >> /entrypoint.sh
 RUN chmod +x /entrypoint.sh
+RUN chmod +x /fly_to_point.py
 
 # RUN sed -i '/^exec*/i rosservice call /mavros/set_stream_rate 0 10 1' /entrypoint.sh
 # RUN sed -i '/^exec*/i roslaunch mavros apm.launch fcu_url:=/dev/ttyACM0:921600 &' /entrypoint.sh
 
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["/behaviortree.sh"]
-
-
+CMD ["/fly_to_point.py"]
