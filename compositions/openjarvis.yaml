@@ -1,0 +1,46 @@
+services:
+  openjarvis-gateway:
+    image: ${OPENJARVIS_IMAGE:-openjarvis:local}
+    environment:
+      HOME: /home/node
+      TERM: xterm-256color
+      OPENJARVIS_GATEWAY_TOKEN: ${OPENJARVIS_GATEWAY_TOKEN}
+      CLAUDE_AI_SESSION_KEY: ${CLAUDE_AI_SESSION_KEY}
+      CLAUDE_WEB_SESSION_KEY: ${CLAUDE_WEB_SESSION_KEY}
+      CLAUDE_WEB_COOKIE: ${CLAUDE_WEB_COOKIE}
+    volumes:
+      - ${OPENJARVIS_CONFIG_DIR}:/home/node/.openjarvis
+      - ${OPENJARVIS_WORKSPACE_DIR}:/home/node/.openjarvis/workspace
+    ports:
+      - "${OPENJARVIS_GATEWAY_PORT:-18789}:18789"
+      - "${OPENJARVIS_BRIDGE_PORT:-18790}:18790"
+    init: true
+    restart: unless-stopped
+    command:
+      [
+        "node",
+        "dist/index.js",
+        "gateway",
+        "--bind",
+        "${OPENJARVIS_GATEWAY_BIND:-lan}",
+        "--port",
+        "18789",
+      ]
+
+  openjarvis-cli:
+    image: ${OPENJARVIS_IMAGE:-openjarvis:local}
+    environment:
+      HOME: /home/node
+      TERM: xterm-256color
+      OPENJARVIS_GATEWAY_TOKEN: ${OPENJARVIS_GATEWAY_TOKEN}
+      BROWSER: echo
+      CLAUDE_AI_SESSION_KEY: ${CLAUDE_AI_SESSION_KEY}
+      CLAUDE_WEB_SESSION_KEY: ${CLAUDE_WEB_SESSION_KEY}
+      CLAUDE_WEB_COOKIE: ${CLAUDE_WEB_COOKIE}
+    volumes:
+      - ${OPENJARVIS_CONFIG_DIR}:/home/node/.openjarvis
+      - ${OPENJARVIS_WORKSPACE_DIR}:/home/node/.openjarvis/workspace
+    stdin_open: true
+    tty: true
+    init: true
+    entrypoint: ["node", "dist/index.js"]
