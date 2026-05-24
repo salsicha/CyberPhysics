@@ -59,6 +59,8 @@ build_isaacsim: cleanup
 	APP=isaacsim ./_build_it.sh
 build_jupyter: cleanup
 	APP=jupyter ./_build_it.sh
+build_mapnav: cleanup build_ros2
+	APP=mapnav ./_build_it.sh
 build_matlab: cleanup
 	APP=matlab ./_build_it.sh
 build_navigation2: cleanup build_ros2

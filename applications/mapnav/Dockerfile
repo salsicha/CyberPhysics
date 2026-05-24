@@ -14,9 +14,22 @@ ENV LANG=en_US.UTF-8 \
 
 WORKDIR /workspace
 
-# Micro-ROS agent
+RUN apt-get update && apt-get install -y \
+    python3-pip \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    ros-$ROS_DISTRO-cv-bridge \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN . /venv/bin/activate && pip install --no-cache-dir \
+    numpy \
+    opencv-python \
+    "srtm.py"
+
+COPY src /workspace/src
+
 RUN . /venv/bin/activate && . /opt/ros/$ROS2_DISTRO/setup.bash && \
-    apt update && \
+    apt-get update && \
     rosdep update && rosdep install --from-paths src --ignore-src -y && \
     colcon build --merge-install --install-base /opt/ros/$ROS2_DISTRO
 
@@ -29,5 +42,3 @@ FROM scratch
 COPY --from=build / /
 
 ENTRYPOINT [ "/entrypoint.sh" ]
-
-

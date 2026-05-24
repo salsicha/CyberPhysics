@@ -1,0 +1,27 @@
+{
+  "name": "MapNav",
+  "description": "Terrain-relative navigation ROS2 node — matches depth images against SRTM height maps to produce corrected position estimates",
+  "icon": "",
+  "version": "0.0.1",
+  "new_page": false,
+  "webpage": "",
+  "api_version": "0.0.1",
+  "company": "CyberPhysics",
+  "website": "",
+  "permissions": {
+    "NetworkMode": "host",
+    "Binds": [
+      "/dev/shm:/dev/shm",
+      "/data/mapnav_cache:/data/mapnav_cache"
+    ],
+    "Environment": [
+      "ROS_DOMAIN_ID=0",
+      "INITIAL_LAT=0.0",
+      "INITIAL_LON=0.0",
+      "AREA_KM=10.0",
+      "SEARCH_RADIUS_M=200.0",
+      "FOV_DEG=90.0"
+    ]
+  },
+  "supported_architectures": ["linux/arm64"]
+}

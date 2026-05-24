@@ -1,0 +1,21 @@
+services:
+  mapnav:
+    network_mode: "host"
+    pull_policy: if_not_present
+    image: cyberphysics/mapnav
+    container_name: mapnav
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - INITIAL_LAT=${INITIAL_LAT:-0.0}
+      - INITIAL_LON=${INITIAL_LON:-0.0}
+    volumes:
+      - /dev/shm:/dev/shm
+      - /data/mapnav_cache:/data/mapnav_cache
+    command: >
+      stdbuf -o L
+      ros2 launch mapnav_pkg mapnav.launch.py
+        initial_lat:=${INITIAL_LAT:-0.0}
+        initial_lon:=${INITIAL_LON:-0.0}
+        area_km:=${AREA_KM:-10.0}
+        search_radius_m:=${SEARCH_RADIUS_M:-200.0}
+        fov_deg:=${FOV_DEG:-90.0}
