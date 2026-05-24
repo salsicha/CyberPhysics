@@ -45,6 +45,8 @@ build_cbfkit: cleanup
 	APP=cbfkit ./_build_it.sh
 build_comfyui: cleanup
 	APP=comfyui ./_build_it.sh
+build_depthanything: cleanup build_ros2
+	APP=depthanything ./_build_it.sh
 build_dia: cleanup
 	APP=dia ./_build_it.sh
 build_dronedemo: cleanup

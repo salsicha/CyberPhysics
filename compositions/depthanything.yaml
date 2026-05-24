@@ -1,0 +1,19 @@
+services:
+  depthanything:
+    network_mode: "host"
+    pull_policy: if_not_present
+    image: cyberphysics/depthanything
+    container_name: depthanything
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - IMAGE_TOPIC=${IMAGE_TOPIC:-/camera/color/image_raw}
+      - DEPTH_TOPIC=${DEPTH_TOPIC:-/depth_anything/depth}
+      - ENCODER=${ENCODER:-vits}
+    volumes:
+      - /dev/shm:/dev/shm
+    command: >
+      stdbuf -o L
+      ros2 launch depthanything_pkg depthanything.launch.py
+        image_topic:=${IMAGE_TOPIC:-/camera/color/image_raw}
+        depth_topic:=${DEPTH_TOPIC:-/depth_anything/depth}
+        encoder:=${ENCODER:-vits}

@@ -25,11 +25,17 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install python requirements
-RUN . /venv/bin/activate && pip install --no-cache-dir \
-    torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121 \
-    opencv-python \
-    huggingface_hub \
-    matplotlib
+ARG TARGETARCH
+RUN . /venv/bin/activate && \
+    if [ "$TARGETARCH" = "arm64" ]; then \
+        pip install --no-cache-dir torch torchvision torchaudio; \
+    else \
+        pip install --no-cache-dir torch torchvision torchaudio \
+            --index-url https://download.pytorch.org/whl/cu121; \
+    fi && \
+    pip install --no-cache-dir \
+        opencv-python \
+        matplotlib
 
 # Clone Depth Anything V2
 RUN git clone https://github.com/DepthAnything/Depth-Anything-V2.git /opt/Depth-Anything-V2

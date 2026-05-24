@@ -1,0 +1,22 @@
+{
+  "name": "Depth Anything V2",
+  "description": "Monocular depth estimation ROS2 node using Depth Anything V2",
+  "icon": "",
+  "version": "0.0.1",
+  "new_page": false,
+  "webpage": "",
+  "api_version": "0.0.1",
+  "company": "CyberPhysics",
+  "website": "",
+  "permissions": {
+    "NetworkMode": "host",
+    "Binds": ["/dev/shm:/dev/shm"],
+    "Environment": [
+      "ROS_DOMAIN_ID=0",
+      "IMAGE_TOPIC=/camera/color/image_raw",
+      "DEPTH_TOPIC=/depth_anything/depth",
+      "ENCODER=vits"
+    ]
+  },
+  "supported_architectures": ["linux/arm64"]
+}
