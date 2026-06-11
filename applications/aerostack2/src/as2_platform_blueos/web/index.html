@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CyberPhysics Aerostack Control</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    html, body, #map { height: 100%; margin: 0; }
+    .panel {
+      position: absolute;
+      z-index: 1000;
+      top: 12px;
+      right: 12px;
+      width: 250px;
+      padding: 14px;
+      border-radius: 8px;
+      background: rgba(20, 24, 30, 0.94);
+      color: #f4f6f8;
+      font: 14px system-ui, sans-serif;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+    }
+    .panel label, .panel button, .panel output { display: block; width: 100%; }
+    .panel input, .panel button {
+      box-sizing: border-box;
+      width: 100%;
+      margin: 5px 0 10px;
+      padding: 8px;
+    }
+    .panel button { cursor: pointer; }
+    #status { margin-top: 8px; color: #9dd6ff; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <section class="panel">
+    <strong>Aerostack map goal</strong>
+    <p>Click the map, set altitude, then send the local ENU goal.</p>
+    <label for="altitude">Altitude above origin (m)</label>
+    <input id="altitude" type="number" min="1" step="0.5" value="10">
+    <button id="send" disabled>Send selected goal</button>
+    <output id="selection">No goal selected</output>
+    <output id="status">Connecting to ROSBridge...</output>
+  </section>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/roslib@1/build/roslib.min.js"></script>
+  <script>
+    const map = L.map('map').setView([51.505, -0.09], 16);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    const status = document.getElementById('status');
+    const selection = document.getElementById('selection');
+    const send = document.getElementById('send');
+    const altitude = document.getElementById('altitude');
+    let selected = null;
+    let marker = null;
+    let fix = null;
+    let odometry = null;
+    let centered = false;
+
+    const ros = new ROSLIB.Ros({
+      url: `ws://${window.location.hostname}:9090`
+    });
+    ros.on('connection', () => status.value = 'ROSBridge connected');
+    ros.on('error', error => status.value = `ROSBridge error: ${error}`);
+    ros.on('close', () => status.value = 'ROSBridge disconnected');
+
+    const goalTopic = new ROSLIB.Topic({
+      ros,
+      name: '/aerostack/map_goal',
+      messageType: 'std_msgs/String'
+    });
+    new ROSLIB.Topic({
+      ros,
+      name: '/mapnav/fix',
+      messageType: 'sensor_msgs/NavSatFix'
+    }).subscribe(message => {
+      fix = message;
+      if (!centered) {
+        map.setView([fix.latitude, fix.longitude], 17);
+        centered = true;
+      }
+      updateReady();
+    });
+    new ROSLIB.Topic({
+      ros,
+      name: '/mapnav/odometry',
+      messageType: 'nav_msgs/Odometry'
+    }).subscribe(message => {
+      odometry = message;
+      updateReady();
+    });
+    new ROSLIB.Topic({
+      ros,
+      name: '/mapnav/valid',
+      messageType: 'std_msgs/Bool'
+    }).subscribe(message => {
+      status.value = message.data ?
+        'Terrain navigation valid' : 'Waiting for a valid terrain match';
+    });
+
+    function updateReady() {
+      send.disabled = !(selected && fix && odometry);
+    }
+
+    map.on('click', event => {
+      selected = event.latlng;
+      if (marker) {
+        marker.setLatLng(selected);
+      } else {
+        marker = L.marker(selected).addTo(map);
+      }
+      selection.value =
+        `${selected.lat.toFixed(7)}, ${selected.lng.toFixed(7)}`;
+      updateReady();
+    });
+
+    send.addEventListener('click', () => {
+      if (!selected || !fix || !odometry) return;
+      const metresPerDegree = 111320.0;
+      const east = (selected.lng - fix.longitude) * metresPerDegree *
+        Math.cos(fix.latitude * Math.PI / 180.0);
+      const north = (selected.lat - fix.latitude) * metresPerDegree;
+      const x = odometry.pose.pose.position.x + east;
+      const y = odometry.pose.pose.position.y + north;
+      const z = Number(altitude.value);
+      goalTopic.publish(new ROSLIB.Message({
+        data: `${x};${y};${z}`
+      }));
+      status.value = `Goal sent: ${x.toFixed(1)} E, ${y.toFixed(1)} N, ${z.toFixed(1)} m`;
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<root main_tree_to_execute="MapGoal">
+  <BehaviorTree ID="MapGoal">
+    <WaitForEvent topic_name="/aerostack/map_goal" result="{goal}">
+      <GoTo
+        max_speed="2.0"
+        pose="{goal}"
+        yaw_angle="0.0"
+        yaw_mode="1"/>
+    </WaitForEvent>
+  </BehaviorTree>
+</root>

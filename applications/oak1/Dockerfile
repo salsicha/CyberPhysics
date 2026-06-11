@@ -1,34 +1,31 @@
 ARG TAG=amd64
 
-FROM cyberphysics/ros2:${TAG} AS build
+FROM cyberphysics/aerostack2:${TAG} AS build
 
 ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US.UTF-8 \
     TERM=xterm \
     PYTHONIOENCODING=UTF-8 \
-    ROS2_DISTRO=jazzy \
+    ROS2_DISTRO=humble \
     DEBIAN_FRONTEND=noninteractive \
     PATH="/venv/bin:$PATH" \
     QT_QPA_PLATFORM=xcb \
-    ROS_DISTRO=jazzy
+    ROS_DISTRO=humble
+
+SHELL ["/bin/bash", "-c"]
 
 COPY requirements.txt /
 
-RUN apt update && apt install -y --no-install-recommends \
-    python3-rosdep python3-colcon-ros python3-pip ros-$ROS2_DISTRO-cv-bridge \
-    x11-apps qtwayland5 \
-    && . /venv/bin/activate \
-    && pip install -r /requirements.txt \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-get upgrade -y
+RUN --mount=type=cache,target=/root/.cache/pip \
+    . /venv/bin/activate && \
+    pip install --timeout 300 --retries 10 -r /requirements.txt
 
 COPY scripts/ /scripts/
+COPY models/ /models/
 WORKDIR /scripts
 
-RUN chmod +x /scripts/install_deps.sh
-RUN apt update && /scripts/install_deps.sh
-
-RUN . /venv/bin/activate && pip install depthai-viewer
+RUN test "$(stat -c %s /models/megadepth_192x256_openvino_2021.4_6shave.blob)" -gt 1000000
+RUN chmod +x /scripts/megadepth_ros.py
 
 COPY ./entrypoint.sh /
 RUN chmod +x /entrypoint.sh

@@ -1,0 +1,117 @@
+services:
+  mavros:
+    image: cyberphysics/aerostack2:${CYBERPHYSICS_TAG:-arm64}
+    container_name: mavros
+    network_mode: host
+    ipc: host
+    restart: unless-stopped
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    command: >
+      ros2 launch mavros apm.launch
+        fcu_url:=${BLUEOS_FCU_URL:-udp://0.0.0.0:14550@}
+
+  aerostack:
+    image: cyberphysics/aerostack2:${CYBERPHYSICS_TAG:-arm64}
+    container_name: aerostack
+    network_mode: host
+    ipc: host
+    restart: unless-stopped
+    depends_on:
+      - mavros
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    volumes:
+      - /dev/shm:/dev/shm
+    command: >
+      ros2 launch as2_platform_blueos blueos_autonomy.launch.py
+        namespace:=${DRONE_NAMESPACE:-drone0}
+        mavros_namespace:=/mavros
+        mapnav_odom_topic:=/mapnav/odometry
+        takeoff_altitude:=${TAKEOFF_ALTITUDE:-2.0}
+
+  oak1:
+    image: cyberphysics/oak1:${CYBERPHYSICS_TAG:-arm64}
+    container_name: oak1
+    network_mode: host
+    ipc: host
+    privileged: true
+    restart: unless-stopped
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    volumes:
+      - /dev/bus/usb:/dev/bus/usb
+      - /dev/shm:/dev/shm
+    command: >
+      python3 /scripts/megadepth_ros.py --ros-args
+        -p device_ip:=${OAK1_DEVICE_IP:-auto}
+        -p blob_path:=/models/megadepth_192x256_openvino_2021.4_6shave.blob
+        -p image_topic:=/oak1/image_raw
+        -p depth_topic:=/oak1/relative_depth
+        -p camera_info_topic:=/oak1/camera_info
+        -p frame_id:=oak1_optical_frame
+
+  mapnav:
+    image: cyberphysics/mapnav:${CYBERPHYSICS_TAG:-arm64}
+    container_name: mapnav
+    network_mode: host
+    ipc: host
+    restart: unless-stopped
+    depends_on:
+      - aerostack
+      - oak1
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    volumes:
+      - /dev/shm:/dev/shm
+      - /data/mapnav_cache:/data/mapnav_cache
+    command: >
+      ros2 launch mapnav_pkg mapnav.launch.py
+        gps_topic:=/${DRONE_NAMESPACE:-drone0}/sensor_measurements/gps
+        odom_topic:=/${DRONE_NAMESPACE:-drone0}/sensor_measurements/odom
+        depth_topic:=/oak1/relative_depth
+        camera_info_topic:=/oak1/camera_info
+        initial_lat:=${INITIAL_LAT:-0.0}
+        initial_lon:=${INITIAL_LON:-0.0}
+        origin_alt:=${ORIGIN_ALT:-0.0}
+        area_km:=${AREA_KM:-10.0}
+        search_radius_m:=${SEARCH_RADIUS_M:-200.0}
+        fov_deg:=${FOV_DEG:-69.0}
+        min_correlation:=${MIN_CORRELATION:-0.35}
+
+  behavior_tree:
+    image: cyberphysics/aerostack2:${CYBERPHYSICS_TAG:-arm64}
+    container_name: aerostack_behavior_tree
+    network_mode: host
+    ipc: host
+    restart: always
+    depends_on:
+      - aerostack
+      - mapnav
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    command: >
+      ros2 launch as2_behavior_tree behavior_trees.launch.py
+        drone_id:=${DRONE_NAMESPACE:-drone0}
+        tree:=/workspace/install/share/as2_platform_blueos/resource/map_goal.xml
+        use_sim_time:=false
+
+  rosbridge:
+    image: cyberphysics/aerostack2:${CYBERPHYSICS_TAG:-arm64}
+    container_name: rosbridge
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    command: ros2 launch rosbridge_server rosbridge_websocket_launch.xml
+
+  aerostack_gui:
+    image: cyberphysics/aerostack2:${CYBERPHYSICS_TAG:-arm64}
+    container_name: aerostack_gui
+    network_mode: host
+    restart: unless-stopped
+    depends_on:
+      - rosbridge
+    command: >
+      python3 -m http.server 8080
+        --directory /workspace/install/share/as2_platform_blueos/web

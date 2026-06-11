@@ -14,8 +14,13 @@ services:
     command: >
       stdbuf -o L
       ros2 launch mapnav_pkg mapnav.launch.py
+        gps_topic:=${GPS_TOPIC:-/drone0/sensor_measurements/gps}
+        odom_topic:=${ODOM_TOPIC:-/drone0/sensor_measurements/odom}
+        depth_topic:=${DEPTH_TOPIC:-/oak1/relative_depth}
+        camera_info_topic:=${CAMERA_INFO_TOPIC:-/oak1/camera_info}
         initial_lat:=${INITIAL_LAT:-0.0}
         initial_lon:=${INITIAL_LON:-0.0}
+        origin_alt:=${ORIGIN_ALT:-0.0}
         area_km:=${AREA_KM:-10.0}
         search_radius_m:=${SEARCH_RADIUS_M:-200.0}
         fov_deg:=${FOV_DEG:-90.0}

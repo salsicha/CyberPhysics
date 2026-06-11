@@ -1,6 +1,1 @@
-depthai
-opencv-python
-numpy
-PySimpleGUI
-blobconverter
-cv_bridge
+depthai>=2.24,<3

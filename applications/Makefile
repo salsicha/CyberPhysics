@@ -45,7 +45,7 @@ build_cbfkit: cleanup
 	APP=cbfkit ./_build_it.sh
 build_comfyui: cleanup
 	APP=comfyui ./_build_it.sh
-build_depthanything: cleanup build_ros2
+build_depthanything: cleanup build_aerostack2
 	APP=depthanything ./_build_it.sh
 build_dia: cleanup
 	APP=dia ./_build_it.sh
@@ -59,7 +59,7 @@ build_isaacsim: cleanup
 	APP=isaacsim ./_build_it.sh
 build_jupyter: cleanup
 	APP=jupyter ./_build_it.sh
-build_mapnav: cleanup build_ros2
+build_mapnav: cleanup build_aerostack2
 	APP=mapnav ./_build_it.sh
 build_matlab: cleanup
 	APP=matlab ./_build_it.sh
@@ -69,7 +69,7 @@ build_nicegui: cleanup build_ros2
 	APP=nicegui ./_build_it.sh
 build_nvblox: cleanup build_ros2
 	APP=nvblox ./_build_it.sh
-build_oak1: cleanup build_ros2
+build_oak1: cleanup build_aerostack2
 	APP=oak1 ./_build_it.sh
 build_openclaw: cleanup
 	APP=openclaw ./_build_it.sh

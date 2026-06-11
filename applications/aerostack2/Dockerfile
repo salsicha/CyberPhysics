@@ -14,21 +14,27 @@ ENV LANG=en_US.UTF-8 \
 SHELL ["/bin/bash","-c"]
 
 RUN apt update && apt install -q -y --no-install-recommends \
-    curl gnupg2 lsb-release vim wget python3-pip python3-venv python3-setuptools \
-    ros-${ROS_DISTRO}-aerostack2 ros-${ROS_DISTRO}-as2-platform-gazebo ros-${ROS_DISTRO}-as2-gazebo-assets \
-    ros-${ROS_DISTRO}-as2-platform-tello && \
+    python3-pip python3-venv python3-setuptools \
+    ros-${ROS_DISTRO}-as2-core ros-${ROS_DISTRO}-as2-msgs \
+    ros-${ROS_DISTRO}-as2-state-estimator \
+    ros-${ROS_DISTRO}-as2-motion-controller \
+    ros-${ROS_DISTRO}-as2-behaviors-motion \
+    ros-${ROS_DISTRO}-as2-behavior-tree \
+    ros-${ROS_DISTRO}-mavros ros-${ROS_DISTRO}-mavros-extras \
+    ros-${ROS_DISTRO}-rosbridge-suite \
+    geographiclib-tools python3-colcon-common-extensions && \
     rm -rf /var/lib/apt/lists/*
 
-RUN pip3 install rsa PySimpleGUI-4-foss
-
-WORKDIR /
-RUN git clone https://github.com/aerostack2/project_as2_multirotor_simulator.git
-RUN cp -r /project_as2_multirotor_simulator/* /workspace/
+RUN /opt/ros/${ROS_DISTRO}/lib/mavros/install_geographiclib_datasets.sh
 
 COPY requirements.txt /requirements.txt
-RUN python3 -m venv /venv
-RUN pip3 install setuptools --upgrade
+RUN python3 -m venv --system-site-packages /venv
 RUN . /venv/bin/activate && pip3 install -r /requirements.txt
+
+COPY src /workspace/src
+RUN . /opt/ros/${ROS_DISTRO}/setup.bash && \
+    cd /workspace && \
+    colcon build --merge-install
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

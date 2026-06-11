@@ -60,6 +60,29 @@ Published image topic:
 ```
 /oak1_driver/image_raw
 ```
+
+## MegaDepth
+
+The repository includes an OAK-1-compatible MegaDepth blob:
+
+```
+models/megadepth_192x256_openvino_2021.4_6shave.blob
+```
+
+The container also includes `scripts/models/megadepth_6.blob`. Run inference
+on the camera's Myriad X and publish the unscaled network output:
+
+```bash
+python3 /scripts/megadepth_ros.py --ros-args \
+  -p depth_topic:=/oak1/relative_depth
+```
+
+The output is deliberately published as relative `32FC1` depth. MapNav is
+responsible for estimating its metric affine scale from terrain.
+
+The model is tracked with Git LFS. Run `git lfs pull` before building; the
+Docker build rejects the pointer file if the binary has not been fetched.
+
 ## Reference:
 
 https://github.com/luxonis/depthai-python

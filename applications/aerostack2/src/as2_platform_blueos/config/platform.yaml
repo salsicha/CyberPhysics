@@ -1,0 +1,10 @@
+/**:
+  ros__parameters:
+    cmd_freq: 20.0
+    info_freq: 5.0
+    mavros_namespace: "/mavros"
+    guided_mode: "GUIDED"
+    manual_mode: "LOITER"
+    stop_mode: "BRAKE"
+    takeoff_altitude: 2.0
+    service_timeout_ms: 3000

@@ -10,9 +10,14 @@ services:
       - /tmp/.X11-unix:/tmp/.X11-unix
       - /dev/:/dev/
     privileged: true
-    command: stdbuf -o L python3 /scripts/featuretracker.py
-    
+    command: >
+      stdbuf -o L
+      python3 /scripts/megadepth_ros.py --ros-args
+        -p device_ip:=${OAK1_DEVICE_IP:-auto}
+        -p blob_path:=/models/megadepth_192x256_openvino_2021.4_6shave.blob
+        -p image_topic:=/oak1/image_raw
+        -p depth_topic:=/oak1/relative_depth
+
     # --topic-namespace oak1_right --device-ip 10.0.0.12 --rate 30 --debug
 
     # -v /dev/bus/usb:/dev/bus/usb --device-cgroup-rule='c 189:* rmw'
-    

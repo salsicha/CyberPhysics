@@ -1,0 +1,5 @@
+available_modes:
+  - 0b00010000 # HOVER
+  - 0b01000100 # SPEED, yaw speed, local FLU
+  - 0b01000101 # SPEED, yaw speed, global ENU
+  - 0b01100001 # POSITION, yaw angle, global ENU

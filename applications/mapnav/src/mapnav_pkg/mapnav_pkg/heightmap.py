@@ -11,6 +11,8 @@ class HeightMapCache:
     def __init__(self, lat: float, lon: float, area_km: float,
                  resolution_m: float = 30.0, cache_dir: str = '/data/mapnav_cache'):
         self.resolution_m = resolution_m
+        self.center_lat = lat
+        self.center_lon = lon
         os.makedirs(cache_dir, exist_ok=True)
 
         half_m = area_km * 500.0
@@ -53,6 +55,14 @@ class HeightMapCache:
         c0 = max(0, col - hw)
         c1 = min(self.grid.shape[1], col + hw)
         return self.grid[r0:r1, c0:c1].copy(), self.resolution_m
+
+    def latlon_to_local(self, lat: float, lon: float) -> tuple[float, float]:
+        """Return east/north metres from the height-map centre."""
+        metres_per_deg_lon = (
+            METERS_PER_DEG_LAT * math.cos(math.radians(self.center_lat)))
+        east = (lon - self.center_lon) * metres_per_deg_lon
+        north = (lat - self.center_lat) * METERS_PER_DEG_LAT
+        return east, north
 
     def _latlon_to_pixel(self, lat: float, lon: float) -> tuple[int, int]:
         row = int((self.max_lat - lat) / (self.max_lat - self.min_lat) * (self.grid.shape[0] - 1))
