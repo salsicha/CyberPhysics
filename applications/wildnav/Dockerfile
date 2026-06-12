@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Clone the repository
-RUN git clone https://github.com/salsicha/VI-Depth.git .
+RUN git clone https://github.com/salsicha/wildnav.git .
 
 # Install Python dependencies
 RUN if [ -f requirements.txt ]; then \
