@@ -1,19 +1,28 @@
-FROM cyberphysics/ros2
+ARG TAG=amd64
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    git \
-    python3-pip \
-    && rm -rf /var/lib/apt/lists/*
+FROM cyberphysics/aerostack2:${TAG} AS build
 
-WORKDIR /app
+ENV LANG=en_US.UTF-8 \
+    LANGUAGE=en_US.UTF-8 \
+    TERM=xterm \
+    PYTHONIOENCODING=UTF-8 \
+    ROS2_DISTRO=humble \
+    DEBIAN_FRONTEND=noninteractive \
+    PATH="/venv/bin:$PATH" \
+    ROS_DISTRO=humble
 
-# Clone the repository
-RUN git clone https://github.com/salsicha/wildnav.git .
+SHELL ["/bin/bash", "-c"]
 
-# Install Python dependencies
-RUN if [ -f requirements.txt ]; then \
-        pip3 install --no-cache-dir -r requirements.txt; \
-    fi
+WORKDIR /workspace
+COPY src /workspace/src
 
-CMD ["/bin/bash"]
+RUN . /venv/bin/activate && . /opt/ros/$ROS2_DISTRO/setup.bash && \
+    colcon build --merge-install --install-base /workspace/install
+
+COPY ./entrypoint.sh /
+RUN chmod +x /entrypoint.sh
+
+FROM scratch
+COPY --from=build / /
+
+ENTRYPOINT ["/entrypoint.sh"]

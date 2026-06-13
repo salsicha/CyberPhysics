@@ -20,7 +20,8 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument('namespace', default_value='drone0'),
         DeclareLaunchArgument('mavros_namespace', default_value='/mavros'),
-        DeclareLaunchArgument('mapnav_odom_topic', default_value='/mapnav/odometry'),
+        DeclareLaunchArgument(
+            'navigation_odom_topic', default_value='/navigation/odometry'),
         DeclareLaunchArgument('takeoff_altitude', default_value='2.0'),
         Node(
             package='as2_platform_blueos',
@@ -50,7 +51,7 @@ def generate_launch_description():
                 'global_ref_frame': 'earth',
                 'odom_frame': 'odom',
                 'map_frame': 'map',
-                'odom_topic': LaunchConfiguration('mapnav_odom_topic'),
+                'odom_topic': LaunchConfiguration('navigation_odom_topic'),
                 'use_gps': False,
                 'set_map_to_odom': True,
                 'earth_to_map.x': 0.0,

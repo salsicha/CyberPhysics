@@ -2,6 +2,7 @@
 
 import math
 from pathlib import Path
+import time
 
 import depthai as dai
 import numpy as np
@@ -24,11 +25,23 @@ class MegaDepthNode(Node):
         self.declare_parameter('image_topic', '/oak1/image_raw')
         self.declare_parameter('depth_topic', '/oak1/relative_depth')
         self.declare_parameter('camera_info_topic', '/oak1/camera_info')
+        self.declare_parameter('highres_image_topic', '/oak1/image_highres')
+        self.declare_parameter(
+            'highres_camera_info_topic',
+            '/oak1/image_highres/camera_info')
         self.declare_parameter('frame_id', 'oak1_optical_frame')
         self.declare_parameter('fps', 20.0)
+        self.declare_parameter('highres_width', 1280)
+        self.declare_parameter('highres_height', 720)
+        self.declare_parameter('highres_capture_hz', 0.5)
 
         self.width = 256
         self.height = 192
+        self.highres_width = int(self.get_parameter('highres_width').value)
+        self.highres_height = int(self.get_parameter('highres_height').value)
+        self.highres_period = 1.0 / max(
+            0.02, float(self.get_parameter('highres_capture_hz').value))
+        self.last_highres_request = 0.0
         self.frame_id = self.get_parameter('frame_id').value
         blob_path = Path(self.get_parameter('blob_path').value)
         if not blob_path.is_file():
@@ -45,6 +58,11 @@ class MegaDepthNode(Node):
             Image, self.get_parameter('depth_topic').value, 10)
         self.camera_info_pub = self.create_publisher(
             CameraInfo, self.get_parameter('camera_info_topic').value, 10)
+        self.highres_image_pub = self.create_publisher(
+            Image, self.get_parameter('highres_image_topic').value, 10)
+        self.highres_camera_info_pub = self.create_publisher(
+            CameraInfo,
+            self.get_parameter('highres_camera_info_topic').value, 10)
 
         pipeline = dai.Pipeline()
         pipeline.setOpenVINOVersion(dai.OpenVINO.VERSION_2021_4)
@@ -55,6 +73,7 @@ class MegaDepthNode(Node):
         camera.setFps(float(self.get_parameter('fps').value))
         camera.setResolution(
             dai.ColorCameraProperties.SensorResolution.THE_1080_P)
+        camera.setStillSize(self.highres_width, self.highres_height)
 
         network = pipeline.create(dai.node.NeuralNetwork)
         network.setBlobPath(str(blob_path))
@@ -66,10 +85,16 @@ class MegaDepthNode(Node):
         camera_out.setStreamName('camera')
         depth_out = pipeline.create(dai.node.XLinkOut)
         depth_out.setStreamName('depth')
+        highres_out = pipeline.create(dai.node.XLinkOut)
+        highres_out.setStreamName('highres')
+        control_in = pipeline.create(dai.node.XLinkIn)
+        control_in.setStreamName('camera_control')
 
         camera.preview.link(network.input)
         network.passthrough.link(camera_out.input)
         network.out.link(depth_out.input)
+        camera.still.link(highres_out.input)
+        control_in.out.link(camera.inputControl)
 
         device_ip = self.get_parameter('device_ip').value
         if device_ip and device_ip != 'auto':
@@ -81,26 +106,31 @@ class MegaDepthNode(Node):
             'camera', maxSize=8, blocking=False)
         self.depth_queue = self.device.getOutputQueue(
             'depth', maxSize=8, blocking=False)
+        self.highres_queue = self.device.getOutputQueue(
+            'highres', maxSize=2, blocking=False)
+        self.control_queue = self.device.getInputQueue('camera_control')
         self.camera_packets = {}
         self.depth_packets = {}
-        self.camera_info = self._read_camera_info()
+        self.camera_info = self._read_camera_info(self.width, self.height)
+        self.highres_camera_info = self._read_camera_info(
+            self.highres_width, self.highres_height)
         self.timer = self.create_timer(0.005, self._poll)
 
         self.get_logger().info(
             f'OAK-1 MegaDepth ready: {blob_path.name} at '
             f'{self.width}x{self.height}')
 
-    def _read_camera_info(self):
+    def _read_camera_info(self, width, height):
         info = CameraInfo()
-        info.width = self.width
-        info.height = self.height
+        info.width = width
+        info.height = height
         try:
             calibration = self.device.readCalibration()
             socket = getattr(dai.CameraBoardSocket, 'CAM_A', None)
             if socket is None:
                 socket = dai.CameraBoardSocket.RGB
             intrinsic = calibration.getCameraIntrinsics(
-                socket, self.width, self.height)
+                socket, width, height)
             distortion = calibration.getDistortionCoefficients(socket)
             info.k = [
                 intrinsic[0][0], intrinsic[0][1], intrinsic[0][2],
@@ -111,10 +141,10 @@ class MegaDepthNode(Node):
             info.distortion_model = 'plumb_bob'
         except Exception as exc:
             horizontal_fov = math.radians(69.0)
-            focal = self.width / (2.0 * math.tan(horizontal_fov / 2.0))
+            focal = width / (2.0 * math.tan(horizontal_fov / 2.0))
             info.k = [
-                focal, 0.0, self.width / 2.0,
-                0.0, focal, self.height / 2.0,
+                focal, 0.0, width / 2.0,
+                0.0, focal, height / 2.0,
                 0.0, 0.0, 1.0,
             ]
             self.get_logger().warning(
@@ -132,6 +162,25 @@ class MegaDepthNode(Node):
             packets.pop(min(packets))
 
     def _poll(self):
+        now = time.monotonic()
+        if now - self.last_highres_request >= self.highres_period:
+            control = dai.CameraControl()
+            control.setCaptureStill(True)
+            self.control_queue.send(control)
+            self.last_highres_request = now
+
+        highres_packet = self.highres_queue.tryGet()
+        if highres_packet is not None:
+            highres_frame = highres_packet.getCvFrame()
+            highres_stamp = self.get_clock().now().to_msg()
+            highres_msg = self.bridge.cv2_to_imgmsg(
+                highres_frame, encoding='bgr8')
+            highres_msg.header.stamp = highres_stamp
+            highres_msg.header.frame_id = self.frame_id
+            self.highres_camera_info.header = highres_msg.header
+            self.highres_image_pub.publish(highres_msg)
+            self.highres_camera_info_pub.publish(self.highres_camera_info)
+
         self._store_packet(self.camera_queue, self.camera_packets)
         self._store_packet(self.depth_queue, self.depth_packets)
         matching = sorted(

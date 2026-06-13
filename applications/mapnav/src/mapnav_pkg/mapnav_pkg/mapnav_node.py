@@ -4,6 +4,7 @@ import numpy as np
 import cv2
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import qos_profile_sensor_data
 from geometry_msgs.msg import PoseWithCovarianceStamped
 from sensor_msgs.msg import (
     CameraInfo,
@@ -93,11 +94,15 @@ class MapNavNode(Node):
             self.get_logger().warn(
                 'initial_lat/initial_lon not set — height map loads on first GPS fix')
 
-        self.create_subscription(NavSatFix, gps_topic,   self._on_fix,   10)
-        self.create_subscription(Image,     depth_topic, self._on_depth, 10)
-        self.create_subscription(Odometry,  odom_topic,  self._on_odom,  10)
         self.create_subscription(
-            CameraInfo, camera_info_topic, self._on_camera_info, 10)
+            NavSatFix, gps_topic, self._on_fix, qos_profile_sensor_data)
+        self.create_subscription(
+            Image, depth_topic, self._on_depth, qos_profile_sensor_data)
+        self.create_subscription(
+            Odometry, odom_topic, self._on_odom, qos_profile_sensor_data)
+        self.create_subscription(
+            CameraInfo, camera_info_topic, self._on_camera_info,
+            qos_profile_sensor_data)
         self.fix_publisher = self.create_publisher(
             NavSatFix, output_topic, 10)
         self.odom_publisher = self.create_publisher(
@@ -339,21 +344,20 @@ class MapNavNode(Node):
         odom.pose.covariance[21] = 0.1
         odom.pose.covariance[28] = 0.1
         odom.pose.covariance[35] = 0.2
-        self.odom_publisher.publish(odom)
-
         pose = PoseWithCovarianceStamped()
         pose.header = odom.header
         pose.pose = odom.pose
-        self.pose_publisher.publish(pose)
 
         metric_msg = self.bridge.cv2_to_imgmsg(metric_depth, encoding='32FC1')
         metric_msg.header = source_msg.header
-        self.metric_depth_publisher.publish(metric_msg)
-        self.pointcloud_publisher.publish(
-            self._make_pointcloud(metric_depth, source_msg.header))
         self.confidence_publisher.publish(Float32(data=confidence))
         self.scale_publisher.publish(Float32(data=depth_scale))
         self._publish_valid(True)
+        self.odom_publisher.publish(odom)
+        self.pose_publisher.publish(pose)
+        self.metric_depth_publisher.publish(metric_msg)
+        self.pointcloud_publisher.publish(
+            self._make_pointcloud(metric_depth, source_msg.header))
 
         self.get_logger().debug(
             f'confidence={confidence:.2f} scale={depth_scale:.3f} '

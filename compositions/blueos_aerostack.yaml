@@ -27,7 +27,7 @@ services:
       ros2 launch as2_platform_blueos blueos_autonomy.launch.py
         namespace:=${DRONE_NAMESPACE:-drone0}
         mavros_namespace:=/mavros
-        mapnav_odom_topic:=/mapnav/odometry
+        navigation_odom_topic:=/navigation/odometry
         takeoff_altitude:=${TAKEOFF_ALTITUDE:-2.0}
 
   oak1:
@@ -49,6 +49,11 @@ services:
         -p image_topic:=/oak1/image_raw
         -p depth_topic:=/oak1/relative_depth
         -p camera_info_topic:=/oak1/camera_info
+        -p highres_image_topic:=/oak1/image_highres
+        -p highres_camera_info_topic:=/oak1/image_highres/camera_info
+        -p highres_width:=${WILDNAV_IMAGE_WIDTH:-1280}
+        -p highres_height:=${WILDNAV_IMAGE_HEIGHT:-720}
+        -p highres_capture_hz:=${WILDNAV_IMAGE_RATE:-0.5}
         -p frame_id:=oak1_optical_frame
 
   mapnav:
@@ -79,6 +84,47 @@ services:
         fov_deg:=${FOV_DEG:-69.0}
         min_correlation:=${MIN_CORRELATION:-0.35}
 
+  wildnav:
+    image: cyberphysics/wildnav:${CYBERPHYSICS_TAG:-arm64}
+    container_name: wildnav
+    network_mode: host
+    ipc: host
+    restart: unless-stopped
+    depends_on:
+      - aerostack
+      - mapnav
+      - oak1
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - WILDNAV_TILE_URL
+    volumes:
+      - /dev/shm:/dev/shm
+      - /data/wildnav_cache:/data/wildnav_cache
+    command: >
+      ros2 launch wildnav_pkg wildnav.launch.py
+        image_topic:=/oak1/image_highres
+        camera_info_topic:=/oak1/image_highres/camera_info
+        prediction_odom_topic:=/navigation/odometry
+        raw_odom_topic:=/${DRONE_NAMESPACE:-drone0}/sensor_measurements/odom
+        gps_topic:=/${DRONE_NAMESPACE:-drone0}/sensor_measurements/gps
+        mapnav_odom_topic:=/mapnav/odometry
+        navigation_output_topic:=/navigation/odometry
+        initial_lat:=${INITIAL_LAT:-0.0}
+        initial_lon:=${INITIAL_LON:-0.0}
+        origin_alt:=${ORIGIN_ALT:-0.0}
+        zoom:=${WILDNAV_ZOOM:-18}
+        search_radius_m:=${WILDNAV_SEARCH_RADIUS_M:-250.0}
+        max_tiles:=${WILDNAV_MAX_TILES:-49}
+        max_tile_downloads_per_cycle:=${WILDNAV_MAX_DOWNLOADS:-8}
+        match_rate_hz:=${WILDNAV_RATE_HZ:-0.2}
+        feature_backend:=${WILDNAV_FEATURE_BACKEND:-SIFT}
+        min_matches:=${WILDNAV_MIN_MATCHES:-16}
+        min_inliers:=${WILDNAV_MIN_INLIERS:-10}
+        min_inlier_ratio:=${WILDNAV_MIN_INLIER_RATIO:-0.25}
+        max_position_jump_m:=${WILDNAV_MAX_JUMP_M:-250.0}
+        minimum_mapnav_confidence:=${MAPNAV_FUSION_CONFIDENCE:-0.35}
+        minimum_wildnav_confidence:=${WILDNAV_FUSION_CONFIDENCE:-0.20}
+
   behavior_tree:
     image: cyberphysics/aerostack2:${CYBERPHYSICS_TAG:-arm64}
     container_name: aerostack_behavior_tree
@@ -88,6 +134,7 @@ services:
     depends_on:
       - aerostack
       - mapnav
+      - wildnav
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
     command: >

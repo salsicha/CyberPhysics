@@ -1,0 +1,33 @@
+services:
+  wildnav:
+    image: cyberphysics/wildnav:${CYBERPHYSICS_TAG:-arm64}
+    container_name: wildnav
+    network_mode: host
+    ipc: host
+    restart: unless-stopped
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - WILDNAV_TILE_URL
+    volumes:
+      - /dev/shm:/dev/shm
+      - /data/wildnav_cache:/data/wildnav_cache
+    command: >
+      ros2 launch wildnav_pkg wildnav.launch.py
+        image_topic:=${WILDNAV_IMAGE_TOPIC:-/oak1/image_highres}
+        camera_info_topic:=${WILDNAV_CAMERA_INFO_TOPIC:-/oak1/image_highres/camera_info}
+        prediction_odom_topic:=${NAVIGATION_ODOM_TOPIC:-/navigation/odometry}
+        raw_odom_topic:=${RAW_ODOM_TOPIC:-/drone0/sensor_measurements/odom}
+        gps_topic:=${GPS_TOPIC:-/drone0/sensor_measurements/gps}
+        mapnav_odom_topic:=${MAPNAV_ODOM_TOPIC:-/mapnav/odometry}
+        navigation_output_topic:=${NAVIGATION_ODOM_TOPIC:-/navigation/odometry}
+        initial_lat:=${INITIAL_LAT:-0.0}
+        initial_lon:=${INITIAL_LON:-0.0}
+        origin_alt:=${ORIGIN_ALT:-0.0}
+        zoom:=${WILDNAV_ZOOM:-18}
+        search_radius_m:=${WILDNAV_SEARCH_RADIUS_M:-250.0}
+        max_tiles:=${WILDNAV_MAX_TILES:-49}
+        max_tile_downloads_per_cycle:=${WILDNAV_MAX_DOWNLOADS:-8}
+        match_rate_hz:=${WILDNAV_RATE_HZ:-0.2}
+        min_matches:=${WILDNAV_MIN_MATCHES:-16}
+        min_inliers:=${WILDNAV_MIN_INLIERS:-10}
+        min_inlier_ratio:=${WILDNAV_MIN_INLIER_RATIO:-0.25}

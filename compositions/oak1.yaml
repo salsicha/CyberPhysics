@@ -5,10 +5,9 @@ services:
     network_mode: "host"
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
-      - DISPLAY=${DISPLAY}
     volumes:
-      - /tmp/.X11-unix:/tmp/.X11-unix
       - /dev/:/dev/
+      - /dev/shm:/dev/shm
     privileged: true
     command: >
       stdbuf -o L
@@ -17,6 +16,10 @@ services:
         -p blob_path:=/models/megadepth_192x256_openvino_2021.4_6shave.blob
         -p image_topic:=/oak1/image_raw
         -p depth_topic:=/oak1/relative_depth
+        -p camera_info_topic:=/oak1/camera_info
+        -p highres_image_topic:=/oak1/image_highres
+        -p highres_camera_info_topic:=/oak1/image_highres/camera_info
+        -p highres_capture_hz:=${WILDNAV_IMAGE_RATE:-0.5}
 
     # --topic-namespace oak1_right --device-ip 10.0.0.12 --rate 30 --debug
 

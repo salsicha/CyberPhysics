@@ -12,7 +12,7 @@ MapNav also fits an affine metric scale to the relative depth values using the
 matched DEM window. It publishes:
 
 - `/mapnav/fix`: corrected GPS with covariance
-- `/mapnav/odometry`: metric local odometry for the Aerostack2 estimator
+- `/mapnav/odometry`: metric local correction input for navigation fusion
 - `/mapnav/metric_depth`: terrain-scaled `32FC1` depth
 - `/mapnav/points`: metric camera-frame point cloud
 - `/mapnav/confidence`, `/mapnav/depth_scale`, and `/mapnav/valid`

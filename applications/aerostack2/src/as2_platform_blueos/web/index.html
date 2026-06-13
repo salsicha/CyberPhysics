@@ -76,7 +76,7 @@
     });
     new ROSLIB.Topic({
       ros,
-      name: '/mapnav/fix',
+      name: '/navigation/fix',
       messageType: 'sensor_msgs/NavSatFix'
     }).subscribe(message => {
       fix = message;
@@ -88,7 +88,7 @@
     });
     new ROSLIB.Topic({
       ros,
-      name: '/mapnav/odometry',
+      name: '/navigation/odometry',
       messageType: 'nav_msgs/Odometry'
     }).subscribe(message => {
       odometry = message;
@@ -96,11 +96,10 @@
     });
     new ROSLIB.Topic({
       ros,
-      name: '/mapnav/valid',
-      messageType: 'std_msgs/Bool'
+      name: '/navigation/correction_source',
+      messageType: 'std_msgs/String'
     }).subscribe(message => {
-      status.value = message.data ?
-        'Terrain navigation valid' : 'Waiting for a valid terrain match';
+      status.value = `Navigation source: ${message.data}`;
     });
 
     function updateReady() {

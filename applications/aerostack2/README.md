@@ -29,6 +29,10 @@ The platform republishes MAVROS odometry, IMU, GPS, and battery data on the
 standard Aerostack2 `sensor_measurements/*` topics. Aerostack2 commands are
 translated to ArduPilot GUIDED-mode velocity or local-position setpoints.
 
+The autonomy launch consumes `/navigation/odometry`. The WildNav navigation
+fusion node publishes that topic at the MAVROS odometry rate while applying
+accepted MapNav and WildNav horizontal corrections.
+
 ArduPilot remains responsible for stabilization, motor mixing, EKF operation,
 RC override, and vehicle failsafes.
 

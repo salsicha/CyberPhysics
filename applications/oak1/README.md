@@ -80,6 +80,17 @@ python3 /scripts/megadepth_ros.py --ros-args \
 The output is deliberately published as relative `32FC1` depth. MapNav is
 responsible for estimating its metric affine scale from terrain.
 
+The same node triggers a separate 1280x720 still capture at 0.5 Hz for visual
+geolocation:
+
+```text
+/oak1/image_highres
+/oak1/image_highres/camera_info
+```
+
+Using triggered stills avoids continuously transporting high-resolution video.
+The capture dimensions and rate are ROS parameters.
+
 The model is tracked with Git LFS. Run `git lfs pull` before building; the
 Docker build rejects the pointer file if the binary has not been fetched.
 
