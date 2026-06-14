@@ -1,0 +1,285 @@
+<?xml version='1.0' encoding='utf-8'?>
+<robot name="so101">
+  <material name="so101_gray">
+    <color rgba="0.22 0.24 0.27 1" />
+  </material>
+  <material name="so101_blue">
+    <color rgba="0.08 0.38 0.72 1" />
+  </material>
+  <material name="so101_black">
+    <color rgba="0.03 0.03 0.03 1" />
+  </material>
+  <link name="world" />
+  <link name="base_link">
+    <inertial>
+      <origin xyz="0 0 0" />
+      <mass value="0.42" />
+      <inertia ixx="0.000574875" ixy="0" ixz="0" iyy="0.000574875" iyz="0" izz="0.001008" />
+    </inertial>
+    <visual>
+      <geometry>
+        <box size="0.12 0.12 0.045" />
+      </geometry>
+      <material name="so101_black" />
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.12 0.12 0.045" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="world_to_base" type="fixed">
+    <parent link="world" />
+    <child link="base_link" />
+    <origin xyz="0 0 0.0225" />
+  </joint>
+  <link name="shoulder_link">
+    <inertial>
+      <origin xyz="0 0 0" />
+      <mass value="0.22" />
+      <inertia ixx="0.00022229166666666673" ixy="0" ixz="0" iyy="0.00022229166666666673" iyz="0" izz="0.0001796666666666667" />
+    </inertial>
+    <visual>
+      <geometry>
+        <box size="0.07 0.07 0.085" />
+      </geometry>
+      <material name="so101_blue" />
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.07 0.07 0.085" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="shoulder_pan" type="revolute">
+    <parent link="base_link" />
+    <child link="shoulder_link" />
+    <origin xyz="0 0 0.065" />
+    <axis xyz="0 0 1" />
+    <limit lower="-1.9199" upper="1.9199" effort="6.0" velocity="3.0" />
+    <dynamics damping="0.08" friction="0.02" />
+  </joint>
+  <link name="upper_arm_link">
+    <inertial>
+      <origin xyz="0 0 0.07" />
+      <mass value="0.28" />
+      <inertia ixx="0.00055" ixy="0" ixz="0" iyy="0.00055" iyz="0" izz="0.00012" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0.07" />
+      <geometry>
+        <box size="0.055 0.055 0.14" />
+      </geometry>
+      <material name="so101_gray" />
+    </visual>
+    <collision>
+      <origin xyz="0 0 0.07" />
+      <geometry>
+        <box size="0.055 0.055 0.14" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="shoulder_lift" type="revolute">
+    <parent link="shoulder_link" />
+    <child link="upper_arm_link" />
+    <origin xyz="0 0 0.045" />
+    <axis xyz="0 1 0" />
+    <limit lower="-1.7453" upper="1.7453" effort="6.0" velocity="3.0" />
+    <dynamics damping="0.08" friction="0.02" />
+  </joint>
+  <link name="forearm_link">
+    <inertial>
+      <origin xyz="0 0 0.065" />
+      <mass value="0.24" />
+      <inertia ixx="0.00040" ixy="0" ixz="0" iyy="0.00040" iyz="0" izz="0.00010" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0.065" />
+      <geometry>
+        <box size="0.05 0.05 0.13" />
+      </geometry>
+      <material name="so101_blue" />
+    </visual>
+    <collision>
+      <origin xyz="0 0 0.065" />
+      <geometry>
+        <box size="0.05 0.05 0.13" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="elbow_flex" type="revolute">
+    <parent link="upper_arm_link" />
+    <child link="forearm_link" />
+    <origin xyz="0 0 0.14" />
+    <axis xyz="0 1 0" />
+    <limit lower="-1.7453" upper="1.7453" effort="6.0" velocity="3.0" />
+    <dynamics damping="0.07" friction="0.02" />
+  </joint>
+  <link name="wrist_pitch_link">
+    <inertial>
+      <origin xyz="0 0 0" />
+      <mass value="0.13" />
+      <inertia ixx="7.285416666666668e-05" ixy="0" ixz="0" iyy="7.285416666666668e-05" iyz="0" izz="5.4166666666666685e-05" />
+    </inertial>
+    <visual>
+      <geometry>
+        <box size="0.05 0.05 0.065" />
+      </geometry>
+      <material name="so101_gray" />
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.05 0.05 0.065" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="wrist_flex" type="revolute">
+    <parent link="forearm_link" />
+    <child link="wrist_pitch_link" />
+    <origin xyz="0 0 0.13" />
+    <axis xyz="0 1 0" />
+    <limit lower="-1.6581" upper="1.6581" effort="3.0" velocity="4.0" />
+    <dynamics damping="0.05" friction="0.01" />
+  </joint>
+  <link name="wrist_roll_link">
+    <inertial>
+      <origin xyz="0 0 0" />
+      <mass value="0.11" />
+      <inertia ixx="5.156249999999999e-05" ixy="0" ixz="0" iyy="5.156249999999999e-05" iyz="0" izz="3.7125e-05" />
+    </inertial>
+    <visual>
+      <geometry>
+        <box size="0.045 0.045 0.06" />
+      </geometry>
+      <material name="so101_blue" />
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.045 0.045 0.06" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="wrist_roll" type="revolute">
+    <parent link="wrist_pitch_link" />
+    <child link="wrist_roll_link" />
+    <origin xyz="0 0 0.055" />
+    <axis xyz="0 0 1" />
+    <limit lower="-2.7439" upper="2.7439" effort="3.0" velocity="4.0" />
+    <dynamics damping="0.04" friction="0.01" />
+  </joint>
+  <link name="gripper_base_link">
+    <inertial>
+      <origin xyz="0 0 0" />
+      <mass value="0.1" />
+      <inertia ixx="3.375e-05" ixy="0" ixz="0" iyy="6.375e-05" iyz="0" izz="6.375e-05" />
+    </inertial>
+    <visual>
+      <geometry>
+        <box size="0.075 0.045 0.045" />
+      </geometry>
+      <material name="so101_black" />
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.075 0.045 0.045" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="wrist_to_gripper" type="fixed">
+    <parent link="wrist_roll_link" />
+    <child link="gripper_base_link" />
+    <origin xyz="0 0 0.052" />
+  </joint>
+  <link name="gripper_jaw_link">
+    <inertial>
+      <origin xyz="0 0 0" />
+      <mass value="0.035" />
+      <inertia ixx="1.8229166666666668e-05" ixy="0" ixz="0" iyy="1.735125e-05" iyz="0" izz="2.7679166666666673e-06" />
+    </inertial>
+    <visual>
+      <geometry>
+        <box size="0.018 0.025 0.075" />
+      </geometry>
+      <material name="so101_blue" />
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.018 0.025 0.075" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="gripper" type="prismatic">
+    <parent link="gripper_base_link" />
+    <child link="gripper_jaw_link" />
+    <origin xyz="0.025 0 0.035" />
+    <axis xyz="1 0 0" />
+    <limit lower="0.0" upper="0.04" effort="2.0" velocity="0.15" />
+    <dynamics damping="0.05" friction="0.01" />
+  </joint>
+  <link name="fixed_jaw_link">
+    <visual>
+      <origin xyz="-0.025 0 0.035" />
+      <geometry>
+        <box size="0.018 0.025 0.075" />
+      </geometry>
+      <material name="so101_blue" />
+    </visual>
+    <collision>
+      <origin xyz="-0.025 0 0.035" />
+      <geometry>
+        <box size="0.018 0.025 0.075" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="fixed_jaw_joint" type="fixed">
+    <parent link="gripper_base_link" />
+    <child link="fixed_jaw_link" />
+  </joint>
+  <ros2_control name="SO101System" type="system">
+    <hardware>
+      <plugin>gz_ros2_control/GazeboSimSystem</plugin>
+    </hardware>
+    <joint name="shoulder_pan">
+      <command_interface name="position" />
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="velocity" />
+    </joint>
+    <joint name="shoulder_lift">
+      <command_interface name="position" />
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="velocity" />
+    </joint>
+    <joint name="elbow_flex">
+      <command_interface name="position" />
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="velocity" />
+    </joint>
+    <joint name="wrist_flex">
+      <command_interface name="position" />
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="velocity" />
+    </joint>
+    <joint name="wrist_roll">
+      <command_interface name="position" />
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="velocity" />
+    </joint>
+    <joint name="gripper">
+      <command_interface name="position" />
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="velocity" />
+    </joint>
+  </ros2_control>
+</robot>

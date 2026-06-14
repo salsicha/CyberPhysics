@@ -1,0 +1,22 @@
+services:
+  gazebo:
+    image: cyberphysics/so101
+    container_name: so101_gazebo
+    network_mode: host
+    ipc: host
+    environment:
+      - DISPLAY=${DISPLAY}
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix
+    command: ros2 launch so101_description gazebo.launch.py
+
+  controller:
+    image: cyberphysics/so101
+    container_name: so101_controller
+    network_mode: host
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    depends_on:
+      - gazebo
+    command: ros2 run so101_description so101_cbf_control.py

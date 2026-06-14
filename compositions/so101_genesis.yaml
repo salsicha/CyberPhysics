@@ -1,0 +1,34 @@
+services:
+  genesis:
+    image: cyberphysics/genesis
+    container_name: so101_genesis
+    network_mode: host
+    ipc: host
+    privileged: true
+    environment:
+      - DISPLAY=${DISPLAY}
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - NVIDIA_DRIVER_CAPABILITIES=all
+    volumes:
+      - /dev/shm:/dev/shm
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - /dev/dri:/dev/dri
+      - ../applications/so101:/workspace/so101:ro
+    command: python3 /workspace/so101/scripts/genesis_so101.py
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  controller:
+    image: cyberphysics/so101
+    container_name: so101_controller
+    network_mode: host
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    depends_on:
+      - genesis
+    command: ros2 run so101_description so101_cbf_control.py

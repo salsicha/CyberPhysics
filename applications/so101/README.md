@@ -1,48 +1,86 @@
+# SO-101 simulation
 
+This package provides one SO-101 description and adapters for Gazebo Harmonic,
+Genesis, and NVIDIA Isaac Sim. All backends expose the same ROS 2 interface:
 
+- State: `sensor_msgs/msg/JointState` on `/joint_states`
+- Position command: `std_msgs/msg/Float64MultiArray` on `/so101/joint_commands`
+- Joint order: `shoulder_pan`, `shoulder_lift`, `elbow_flex`, `wrist_flex`,
+  `wrist_roll`, `gripper`
 
-https://github.com/msf4-0/so101_ros2
+The model uses measured-scale primitive geometry and conservative inertial
+estimates. It is appropriate for controller integration, joint-limit testing,
+ROS graph validation, and initial policy evaluation. Replace the primitives and
+inertias with production CAD and identified parameters before using contact
+results or sim-to-real metrics as hardware predictions.
 
+## Build
 
+From the repository root:
 
-Update:
-SO-101 with IsaacSim
-https://lycheeai-hub.com/isaac-sim/ros2/so-arm101-moveit-in-isaac-sim-with-ros2
+```bash
+make -C applications build_so101
+```
 
+The image build regenerates `urdf/so101.urdf` from the canonical
+`urdf/so101.urdf.xacro` before building the ROS package. After editing the
+Xacro, regenerate the plain URDF in an
+environment with ROS 2 Xacro installed:
 
+```bash
+applications/so101/scripts/regenerate_urdf.sh
+```
 
-Make lerobot run in simulation with pi0 and SO-100
+## Gazebo Harmonic
 
-https://github.com/huggingface/lerobot/blob/main/lerobot/scripts/control_sim_robot.py
+```bash
+docker compose -f compositions/so101_gazebo.yaml up
+```
 
-python lerobot/scripts/control_robot.py record \
-    --fps 30 \
-    --robot-path lerobot/configs/robot/your_robot_config.yaml \
-    --sim-config lerobot/configs/env/your_sim_config.yaml
-    --pretrained_policy_name_or_path=/path/to/pretrained/pi0
+Gazebo uses `gz_ros2_control` and a joint-group position controller. The relay
+maps the common command topic to the Gazebo controller topic.
 
+## Genesis
 
-Make lerobot control real SO-100 with pi0
+Build the SO-101 controller image and the Genesis image, then run:
 
-https://github.com/huggingface/lerobot/blob/main/lerobot/scripts/control_robot.py
+```bash
+make -C applications build_so101 build_genesis
+docker compose -f compositions/so101_genesis.yaml up
+```
 
-python lerobot/scripts/control_robot.py \
-    --robot.type=so100 \
-    --control.type=teleoperate
-    --control.policy.path=/path/to/pretrained/pi0
+Use `--headless` by appending it to the Genesis service command for server runs.
+Use `--backend cpu` on machines without a compatible GPU. The adapter loads the
+plain URDF as a fixed-base robot and applies PD position control at each
+simulation step.
 
+## Isaac Sim
 
+The composition uses the repository's Isaac Sim 5.1.0 image selection:
 
-https://github.com/huggingface/lerobot
+```bash
+docker compose -f compositions/so101_isaacsim.yaml up
+```
 
-https://github.com/TheRobotStudio/SO-ARM100
+The standalone script enables the URDF importer and Isaac ROS 2 bridge, imports
+the URDF as a fixed-base USD articulation, drives articulation position targets,
+and publishes joint states. NVIDIA marks Isaac Sim 5.1 as unsupported, so
+validate the importer API before changing the pinned image version.
 
-https://github.com/huggingface/lerobot/blob/main/examples/10_use_so100.md
+## Manual motion test
 
-https://huggingface.co/lerobot/pi0
+With any backend running, publish one six-joint target:
 
+```bash
+ros2 topic pub --once /so101/joint_commands std_msgs/msg/Float64MultiArray \
+  "{data: [0.4, -0.5, 0.8, -0.3, 0.5, 0.02]}"
+```
 
+Inspect feedback with:
 
-Hardware used to train and evaluate SO-100/101: https://github.com/TheRobotStudio/SO-ARM100
+```bash
+ros2 topic echo /joint_states
+```
 
-Base model https://huggingface.co/lerobot/smolvla_base
+The optional controller service in each composition returns the arm toward its
+configured `goal` while keeping commands inside a margin from the URDF limits.
