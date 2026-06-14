@@ -12,9 +12,10 @@ services:
     volumes:
       - /dev/shm:/dev/shm
       - /tmp/.X11-unix:/tmp/.X11-unix
+      - ../systems:/workspace/systems:ro
       - /dev/dri:/dev/dri
       - ../applications/so101:/workspace/so101:ro
-    command: python3 /workspace/so101/scripts/genesis_so101.py
+    command: python3 /workspace/so101/scripts/genesis_so101.py --urdf /workspace/systems/so101/urdf/so101.urdf
     deploy:
       resources:
         reservations:

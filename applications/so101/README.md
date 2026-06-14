@@ -22,14 +22,17 @@ From the repository root:
 make -C applications build_so101
 ```
 
-The image build regenerates `urdf/so101.urdf` from the canonical
-`urdf/so101.urdf.xacro` before building the ROS package. After editing the
-Xacro, regenerate the plain URDF in an
-environment with ROS 2 Xacro installed:
+The SO-101 hardware-specific description and simulator configuration live in
+`systems/so101/`. The application image contains only the reusable ROS package
+and adapter scripts. After editing `systems/so101/urdf/so101.urdf.xacro`,
+regenerate the plain URDF in an environment with ROS 2 Xacro installed:
 
 ```bash
 applications/so101/scripts/regenerate_urdf.sh
 ```
+
+The compose files mount `systems/` at `/workspace/systems`, and the default
+launch/script paths point at `/workspace/systems/so101`.
 
 ## Gazebo Harmonic
 
@@ -50,9 +53,9 @@ docker compose -f compositions/so101_genesis.yaml up
 ```
 
 Use `--headless` by appending it to the Genesis service command for server runs.
-Use `--backend cpu` on machines without a compatible GPU. The adapter loads the
-plain URDF as a fixed-base robot and applies PD position control at each
-simulation step.
+Use `--backend cpu` on machines without a compatible GPU. The adapter loads
+`systems/so101/urdf/so101.urdf` as a fixed-base robot and applies PD position
+control at each simulation step.
 
 ## Isaac Sim
 
@@ -63,9 +66,10 @@ docker compose -f compositions/so101_isaacsim.yaml up
 ```
 
 The standalone script enables the URDF importer and Isaac ROS 2 bridge, imports
-the URDF as a fixed-base USD articulation, drives articulation position targets,
-and publishes joint states. NVIDIA marks Isaac Sim 5.1 as unsupported, so
-validate the importer API before changing the pinned image version.
+`systems/so101/urdf/so101.urdf` as a fixed-base USD articulation, drives
+articulation position targets, and publishes joint states. NVIDIA marks Isaac
+Sim 5.1 as unsupported, so validate the importer API before changing the pinned
+image version.
 
 ## Manual motion test
 

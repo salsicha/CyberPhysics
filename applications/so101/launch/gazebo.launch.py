@@ -12,21 +12,20 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
-    package_dir = Path(get_package_share_directory("so101_description"))
     ros_gz_dir = Path(get_package_share_directory("ros_gz_sim"))
-    xacro_file = package_dir / "urdf" / "so101.urdf.xacro"
-    controllers = package_dir / "config" / "controllers.yaml"
-    world = package_dir / "worlds" / "empty.sdf"
+    xacro_file = LaunchConfiguration("xacro_file")
+    controllers = LaunchConfiguration("controllers_file")
+    world = LaunchConfiguration("world_file")
 
     robot_description = Command([
-        "xacro ", str(xacro_file),
+        "xacro ", xacro_file,
         " use_gazebo:=true",
-        " controllers_file:=", str(controllers),
+        " controllers_file:=", controllers,
     ])
     gz_args = IfElseSubstitution(
         LaunchConfiguration("headless"),
-        if_value=f"-s -r {world}",
-        else_value=f"-r {world}",
+        if_value=["-s -r ", world],
+        else_value=["-r ", world],
     )
     gazebo = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(str(ros_gz_dir / "launch" / "gz_sim.launch.py")),
@@ -70,6 +69,18 @@ def generate_launch_description():
 
     return LaunchDescription([
         DeclareLaunchArgument("headless", default_value="false"),
+        DeclareLaunchArgument(
+            "xacro_file",
+            default_value="/workspace/systems/so101/urdf/so101.urdf.xacro",
+        ),
+        DeclareLaunchArgument(
+            "controllers_file",
+            default_value="/workspace/systems/so101/config/controllers.yaml",
+        ),
+        DeclareLaunchArgument(
+            "world_file",
+            default_value="/workspace/systems/so101/worlds/empty.sdf",
+        ),
         gazebo,
         state_publisher,
         clock_bridge,

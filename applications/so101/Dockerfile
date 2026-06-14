@@ -31,7 +31,6 @@ COPY . .
 
 WORKDIR /workspace
 RUN source /opt/ros/$ROS_DISTRO/setup.bash && \
-    xacro src/so101_description/urdf/so101.urdf.xacro use_gazebo:=false -o src/so101_description/urdf/so101.urdf && \
     colcon build --packages-select so101_description --symlink-install
 
 COPY entrypoint.sh /entrypoint.sh

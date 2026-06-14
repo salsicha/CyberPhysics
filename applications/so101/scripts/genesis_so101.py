@@ -43,7 +43,7 @@ class GenesisBridge(Node):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--urdf", default="/workspace/so101/urdf/so101.urdf")
+    parser.add_argument("--urdf", default="/workspace/systems/so101/urdf/so101.urdf")
     parser.add_argument("--headless", action="store_true")
     parser.add_argument("--backend", choices=("gpu", "cpu"), default="gpu")
     args = parser.parse_args()

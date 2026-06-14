@@ -10,7 +10,7 @@ from isaacsim import SimulationApp
 from so101_common import JOINT_NAMES, LOWER_LIMITS, UPPER_LIMITS
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--urdf", default="/workspace/so101/urdf/so101.urdf")
+parser.add_argument("--urdf", default="/workspace/systems/so101/urdf/so101.urdf")
 parser.add_argument("--usd", default="/tmp/so101.usd")
 parser.add_argument("--headless", action="store_true")
 args, _ = parser.parse_known_args()

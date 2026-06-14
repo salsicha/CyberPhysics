@@ -9,6 +9,7 @@ services:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix
+      - ../systems:/workspace/systems:ro
     command: ros2 launch so101_description gazebo.launch.py
 
   controller:
