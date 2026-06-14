@@ -77,7 +77,7 @@ python3 /scripts/megadepth_ros.py --ros-args \
   -p depth_topic:=/oak1/relative_depth
 ```
 
-The output is deliberately published as relative `32FC1` depth. MapNav is
+The output is deliberately published as relative `32FC1` depth. DemNav is
 responsible for estimating its metric affine scale from terrain.
 
 The same node triggers a separate 1280x720 still capture at 0.5 Hz for visual

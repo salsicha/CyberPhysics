@@ -5,8 +5,8 @@ This image provides the ROS 2 Humble Aerostack2 autonomy layer used by
 CyberPhysics. It includes the runtime state estimator, motion controller,
 motion behaviors, behavior-tree executor, and the `as2_platform_blueos` package
 for controlling an ArduPilot vehicle through a BlueOS MAVLink endpoint and
-MAVROS. Gazebo simulation packages are intentionally excluded from the Pi
-runtime image.
+MAVROS. Gazebo simulation packages are included for workstation simulation. The Pi/BlueOS
+runtime should still run only the services it needs in compose.
 
 See original project:
 https://github.com/aerostack2/aerostack2/tree/main
@@ -31,7 +31,7 @@ translated to ArduPilot GUIDED-mode velocity or local-position setpoints.
 
 The autonomy launch consumes `/navigation/odometry`. The WildNav navigation
 fusion node publishes that topic at the MAVROS odometry rate while applying
-accepted MapNav and WildNav horizontal corrections.
+accepted DemNav and WildNav horizontal corrections.
 
 ArduPilot remains responsible for stabilization, motor mixing, EKF operation,
 RC override, and vehicle failsafes.
@@ -40,9 +40,30 @@ RC override, and vehicle failsafes.
 
 `compositions/blueos_aerostack.yaml` runs the complete Humble stack. Open
 `http://<blueos-host>:8080`, click a map location, choose an altitude, and send
-the goal. The page converts the click to the MapNav local ENU frame and
+the goal. The page converts the click to the DemNav local ENU frame and
 publishes it to `/aerostack/map_goal`. An Aerostack2 behavior tree consumes the
 goal and invokes the `GoTo` behavior.
 
 The map page loads Leaflet, OpenStreetMap tiles, and roslib.js from their public
 CDNs, so the browser needs network access.
+
+
+## Gazebo Simulation
+
+The hardware/simulation-specific Aerostack2 Gazebo files live in
+`systems/aerostack2_gazebo/`. Start the base simulation with:
+
+```bash
+docker compose -f compositions/aerostack2_sim.yaml up
+```
+
+Start the same simulation with DemNav and WildNav consumers enabled:
+
+```bash
+docker compose --profile navsim -f compositions/aerostack2_sim.yaml up
+```
+
+The `navsim` profile uses simulated GPS, odometry, RGB, depth, and camera-info
+topics. Override topic names with the variables documented in
+`systems/aerostack2_gazebo/config/nav_topics.env` if the installed AS2 Gazebo
+assets publish different names.

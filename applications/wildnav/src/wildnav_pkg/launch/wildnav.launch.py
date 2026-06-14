@@ -28,9 +28,9 @@ def generate_launch_description():
         ('min_inlier_ratio', '0.25'),
         ('max_reprojection_error_px', '8.0'),
         ('max_position_jump_m', '250.0'),
-        ('mapnav_odom_topic', '/mapnav/odometry'),
+        ('demnav_odom_topic', '/demnav/odometry'),
         ('navigation_output_topic', '/navigation/odometry'),
-        ('minimum_mapnav_confidence', '0.35'),
+        ('minimum_demnav_confidence', '0.35'),
         ('minimum_wildnav_confidence', '0.20'),
         ('correction_timeout_s', '30.0'),
     ]
@@ -87,10 +87,10 @@ def generate_launch_description():
         output='screen',
         parameters=[{
             'raw_odom_topic': values['raw_odom_topic'],
-            'mapnav_odom_topic': values['mapnav_odom_topic'],
+            'demnav_odom_topic': values['demnav_odom_topic'],
             'output_topic': values['navigation_output_topic'],
-            'minimum_mapnav_confidence':
-                values['minimum_mapnav_confidence'],
+            'minimum_demnav_confidence':
+                values['minimum_demnav_confidence'],
             'minimum_wildnav_confidence':
                 values['minimum_wildnav_confidence'],
             'correction_timeout_s': values['correction_timeout_s'],

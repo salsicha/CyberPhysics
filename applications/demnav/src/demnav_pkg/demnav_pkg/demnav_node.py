@@ -28,22 +28,22 @@ def _yaw_from_quaternion(q) -> float:
                       1.0 - 2.0 * (q.y * q.y + q.z * q.z))
 
 
-class MapNavNode(Node):
+class DemNavNode(Node):
     def __init__(self):
-        super().__init__('mapnav_node')
+        super().__init__('demnav_node')
 
         self.declare_parameter('gps_topic',        '/fix')
         self.declare_parameter('depth_topic',      '/oak1/relative_depth')
         self.declare_parameter('camera_info_topic', '/oak1/camera_info')
         self.declare_parameter('odom_topic',       '/odom')
-        self.declare_parameter('output_topic',     '/mapnav/fix')
-        self.declare_parameter('odometry_output_topic', '/mapnav/odometry')
-        self.declare_parameter('pose_output_topic', '/mapnav/pose')
-        self.declare_parameter('metric_depth_topic', '/mapnav/metric_depth')
-        self.declare_parameter('pointcloud_topic', '/mapnav/points')
-        self.declare_parameter('confidence_topic', '/mapnav/confidence')
-        self.declare_parameter('scale_topic', '/mapnav/depth_scale')
-        self.declare_parameter('valid_topic', '/mapnav/valid')
+        self.declare_parameter('output_topic',     '/demnav/fix')
+        self.declare_parameter('odometry_output_topic', '/demnav/odometry')
+        self.declare_parameter('pose_output_topic', '/demnav/pose')
+        self.declare_parameter('metric_depth_topic', '/demnav/metric_depth')
+        self.declare_parameter('pointcloud_topic', '/demnav/points')
+        self.declare_parameter('confidence_topic', '/demnav/confidence')
+        self.declare_parameter('scale_topic', '/demnav/depth_scale')
+        self.declare_parameter('valid_topic', '/demnav/valid')
         self.declare_parameter('initial_lat',      0.0)
         self.declare_parameter('initial_lon',      0.0)
         self.declare_parameter('origin_alt',       0.0)
@@ -52,7 +52,7 @@ class MapNavNode(Node):
         self.declare_parameter('fov_deg',          90.0)
         self.declare_parameter('dem_resolution_m', 30.0)
         self.declare_parameter('min_correlation',  0.3)
-        self.declare_parameter('cache_dir',        '/data/mapnav_cache')
+        self.declare_parameter('cache_dir',        '/data/demnav_cache')
         self.declare_parameter('pointcloud_stride', 4)
         self.declare_parameter('min_dem_footprint_pixels', 5)
         self.declare_parameter('min_metric_depth_m', 0.2)
@@ -121,7 +121,7 @@ class MapNavNode(Node):
         self.valid_publisher = self.create_publisher(
             Bool, self.get_parameter('valid_topic').value, 10)
         self.get_logger().info(
-            f'MapNav ready | gps={gps_topic} depth={depth_topic} out={output_topic}')
+            f'DemNav ready | gps={gps_topic} depth={depth_topic} out={output_topic}')
 
     def _load_heightmap(self, lat: float, lon: float):
         try:
@@ -410,7 +410,7 @@ class MapNavNode(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = MapNavNode()
+    node = DemNavNode()
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:

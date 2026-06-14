@@ -14,12 +14,17 @@ ENV LANG=en_US.UTF-8 \
 SHELL ["/bin/bash","-c"]
 
 RUN apt update && apt install -q -y --no-install-recommends \
-    python3-pip python3-venv python3-setuptools \
+    python3-pip python3-venv python3-setuptools libgl1-mesa-dri \
     ros-${ROS_DISTRO}-as2-core ros-${ROS_DISTRO}-as2-msgs \
     ros-${ROS_DISTRO}-as2-state-estimator \
     ros-${ROS_DISTRO}-as2-motion-controller \
     ros-${ROS_DISTRO}-as2-behaviors-motion \
+    ros-${ROS_DISTRO}-as2-behaviors-trajectory-generation \
+    ros-${ROS_DISTRO}-as2-behaviors-perception \
     ros-${ROS_DISTRO}-as2-behavior-tree \
+    ros-${ROS_DISTRO}-as2-platform-gazebo \
+    ros-${ROS_DISTRO}-as2-gazebo-assets \
+    ros-${ROS_DISTRO}-ros-gz \
     ros-${ROS_DISTRO}-mavros ros-${ROS_DISTRO}-mavros-extras \
     ros-${ROS_DISTRO}-rosbridge-suite \
     geographiclib-tools python3-colcon-common-extensions && \

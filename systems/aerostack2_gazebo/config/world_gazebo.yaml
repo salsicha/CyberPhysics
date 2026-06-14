@@ -1,0 +1,18 @@
+world_name: grass
+drones:
+  - model_type: quadrotor_base
+    model_name: drone_sim_0
+    xyz: [0.0, 0.0, 0.3]
+    rpy: [0.0, 0.0, 0.0]
+    payload:
+      - model_type: gps
+        model_name: gps
+      - model_type: hd_camera
+        model_name: downward_rgb
+        xyz: [0.0, 0.0, -0.05]
+        rpy: [0.0, 1.57079632679, 0.0]
+      - model_type: rgbd_camera
+        model_name: downward_rgbd
+        xyz: [0.0, 0.0, -0.06]
+        rpy: [0.0, 1.57079632679, 0.0]
+objects: []

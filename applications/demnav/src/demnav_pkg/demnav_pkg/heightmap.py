@@ -9,7 +9,7 @@ class HeightMapCache:
     """Downloads and caches an SRTM DEM grid for a given area."""
 
     def __init__(self, lat: float, lon: float, area_km: float,
-                 resolution_m: float = 30.0, cache_dir: str = '/data/mapnav_cache'):
+                 resolution_m: float = 30.0, cache_dir: str = '/data/demnav_cache'):
         self.resolution_m = resolution_m
         self.center_lat = lat
         self.center_lon = lon

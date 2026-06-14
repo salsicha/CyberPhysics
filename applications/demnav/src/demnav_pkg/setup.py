@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 import os
 from glob import glob
 
-package_name = 'mapnav_pkg'
+package_name = 'demnav_pkg'
 
 setup(
     name=package_name,
@@ -24,7 +24,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'mapnav_node = mapnav_pkg.mapnav_node:main',
+            'demnav_node = demnav_pkg.demnav_node:main',
+            'demnav_seed_cache = demnav_pkg.seed_cache:main',
         ],
     },
 )

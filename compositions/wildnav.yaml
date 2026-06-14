@@ -18,7 +18,7 @@ services:
         prediction_odom_topic:=${NAVIGATION_ODOM_TOPIC:-/navigation/odometry}
         raw_odom_topic:=${RAW_ODOM_TOPIC:-/drone0/sensor_measurements/odom}
         gps_topic:=${GPS_TOPIC:-/drone0/sensor_measurements/gps}
-        mapnav_odom_topic:=${MAPNAV_ODOM_TOPIC:-/mapnav/odometry}
+        demnav_odom_topic:=${DEMNAV_ODOM_TOPIC:-/demnav/odometry}
         navigation_output_topic:=${NAVIGATION_ODOM_TOPIC:-/navigation/odometry}
         initial_lat:=${INITIAL_LAT:-0.0}
         initial_lon:=${INITIAL_LON:-0.0}

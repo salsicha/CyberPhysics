@@ -1,5 +1,5 @@
 {
-  "name": "MapNav",
+  "name": "DemNav",
   "description": "Terrain-relative navigation ROS2 node — matches depth images against SRTM height maps to produce corrected position estimates",
   "icon": "",
   "version": "0.0.1",
@@ -12,7 +12,7 @@
     "NetworkMode": "host",
     "Binds": [
       "/dev/shm:/dev/shm",
-      "/data/mapnav_cache:/data/mapnav_cache"
+      "/data/demnav_cache:/data/demnav_cache"
     ],
     "Environment": [
       "ROS_DOMAIN_ID=0",

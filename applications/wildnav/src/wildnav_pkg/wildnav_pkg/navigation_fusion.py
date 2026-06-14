@@ -34,10 +34,10 @@ class NavigationFusionNode(Node):
         super().__init__('navigation_fusion_node')
         defaults = {
             'raw_odom_topic': '/drone0/sensor_measurements/odom',
-            'mapnav_odom_topic': '/mapnav/odometry',
-            'mapnav_fix_topic': '/mapnav/fix',
-            'mapnav_confidence_topic': '/mapnav/confidence',
-            'mapnav_valid_topic': '/mapnav/valid',
+            'demnav_odom_topic': '/demnav/odometry',
+            'demnav_fix_topic': '/demnav/fix',
+            'demnav_confidence_topic': '/demnav/confidence',
+            'demnav_valid_topic': '/demnav/valid',
             'wildnav_odom_topic': '/wildnav/odometry',
             'wildnav_fix_topic': '/wildnav/fix',
             'wildnav_confidence_topic': '/wildnav/confidence',
@@ -46,7 +46,7 @@ class NavigationFusionNode(Node):
             'fix_output_topic': '/navigation/fix',
             'source_topic': '/navigation/correction_source',
             'confidence_topic': '/navigation/correction_confidence',
-            'minimum_mapnav_confidence': 0.35,
+            'minimum_demnav_confidence': 0.35,
             'minimum_wildnav_confidence': 0.20,
             'correction_timeout_s': 30.0,
             'correction_time_constant_s': 2.0,
@@ -58,7 +58,7 @@ class NavigationFusionNode(Node):
 
         self.raw_history = deque()
         self.latest_raw = None
-        self.mapnav = Correction()
+        self.demnav = Correction()
         self.wildnav = Correction()
         self.offset_east = 0.0
         self.offset_north = 0.0
@@ -77,7 +77,7 @@ class NavigationFusionNode(Node):
         self.create_subscription(
             Odometry, self.get_parameter('raw_odom_topic').value,
             self._on_raw, qos_profile_sensor_data)
-        self._create_source_subscriptions('mapnav', self.mapnav)
+        self._create_source_subscriptions('demnav', self.demnav)
         self._create_source_subscriptions('wildnav', self.wildnav)
         self.get_logger().info(
             'Navigation fusion ready; publishing corrected high-rate odometry')
@@ -252,7 +252,7 @@ class NavigationFusionNode(Node):
             float(self.get_parameter('correction_timeout_s').value) * 1e9)
         active = []
         for name, state in (
-                ('mapnav', self.mapnav), ('wildnav', self.wildnav)):
+                ('demnav', self.demnav), ('wildnav', self.wildnav)):
             minimum = float(
                 self.get_parameter(f'minimum_{name}_confidence').value)
             if (

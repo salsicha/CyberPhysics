@@ -1,0 +1,204 @@
+services:
+  isaacsim:
+    profiles: ["navsim"]
+    image: nvcr.io/nvidia/isaac-sim:5.1.0
+    container_name: aerostack2_isaacsim
+    network_mode: host
+    ipc: host
+    runtime: nvidia
+    environment:
+      - ACCEPT_EULA=Y
+      - PRIVACY_CONSENT=Y
+      - DISPLAY=${DISPLAY}
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - ROS_DISTRO=${ISAAC_ROS_DISTRO:-humble}
+      - RMW_IMPLEMENTATION=${RMW_IMPLEMENTATION:-rmw_fastrtps_cpp}
+      - LD_LIBRARY_PATH=/isaac-sim/exts/isaacsim.ros2.bridge/${ISAAC_ROS_DISTRO:-humble}/lib
+      - PYTHONPATH=/isaac-sim/exts/isaacsim.ros2.bridge/${ISAAC_ROS_DISTRO:-humble}
+      - NVIDIA_DRIVER_CAPABILITIES=all
+      - OMNI_KIT_ALLOW_ROOT=1
+    env_file:
+      - ../systems/aerostack2_isaac/config/nav_topics.env
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - ../systems/aerostack2_isaac:/workspace/systems/aerostack2_isaac:ro
+      - ~/docker/isaac-sim/cache/kit:/isaac-sim/kit/cache:rw
+      - ~/docker/isaac-sim/cache/ov:/root/.cache/ov:rw
+      - ~/docker/isaac-sim/cache/pip:/root/.cache/pip:rw
+      - ~/docker/isaac-sim/cache/glcache:/root/.cache/nvidia/GLCache:rw
+      - ~/docker/isaac-sim/cache/computecache:/root/.nv/ComputeCache:rw
+      - ~/docker/isaac-sim/logs:/root/.nvidia-omniverse/logs:rw
+      - ~/docker/isaac-sim/config:/root/.nvidia-omniverse/config:rw
+      - ~/docker/isaac-sim/data:/root/.local/share/ov/data:rw
+    entrypoint: []
+    command: >
+      ./python.sh /workspace/systems/aerostack2_isaac/scripts/isaac_aerostack2_navsim.py
+        --headless
+        --lat ${INITIAL_LAT:-37.8044}
+        --lon ${INITIAL_LON:--122.4661}
+        --origin-alt ${ORIGIN_ALT:-0.0}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  stateestimator:
+    profiles: ["navsim"]
+    network_mode: "host"
+    image: cyberphysics/aerostack2:${CYBERPHYSICS_TAG:-latest}
+    privileged: true
+    devices:
+      - /dev:/dev
+    volumes:
+      - /dev/shm:/dev/shm
+      - ../systems/aerostack2_isaac/config:/workspace/config:ro
+    command: >
+      ros2 launch as2_state_estimator state_estimator_launch.py namespace:=drone_sim_0 config_file:=/workspace/config/config_isaac.yaml plugin_name:=ground_truth
+
+  motioncontroller:
+    profiles: ["navsim"]
+    network_mode: "host"
+    image: cyberphysics/aerostack2:${CYBERPHYSICS_TAG:-latest}
+    privileged: true
+    devices:
+      - /dev:/dev
+    volumes:
+      - /dev/shm:/dev/shm
+      - ../systems/aerostack2_isaac/config:/workspace/config:ro
+    command: >
+      ros2 launch as2_motion_controller controller_launch.py namespace:=drone_sim_0 config_file:=/workspace/config/config_isaac.yaml plugin_name:=pid_speed_controller plugin_config_file:=/workspace/config/pid_speed_controller.yaml
+
+  demnav_assets:
+    profiles: ["navsim"]
+    network_mode: host
+    image: cyberphysics/demnav:${CYBERPHYSICS_TAG:-latest}
+    container_name: demnav_isaac_assets
+    environment:
+      - INITIAL_LAT=${INITIAL_LAT:-37.8044}
+      - INITIAL_LON=${INITIAL_LON:--122.4661}
+    env_file:
+      - ../systems/aerostack2_isaac/config/nav_topics.env
+    volumes:
+      - demnav_isaac_cache:/data/demnav_cache
+    command: >
+      /venv/bin/python3 -m demnav_pkg.seed_cache
+        --lat ${INITIAL_LAT:-37.8044}
+        --lon ${INITIAL_LON:--122.4661}
+        --area-km ${AREA_KM:-10.0}
+        --resolution-m ${DEM_RESOLUTION_M:-30.0}
+        --cache-dir /data/demnav_cache
+    restart: "no"
+
+  wildnav_assets:
+    profiles: ["navsim"]
+    network_mode: host
+    image: cyberphysics/wildnav:${CYBERPHYSICS_TAG:-latest}
+    container_name: wildnav_isaac_assets
+    environment:
+      - INITIAL_LAT=${INITIAL_LAT:-37.8044}
+      - INITIAL_LON=${INITIAL_LON:--122.4661}
+      - WILDNAV_FEATURE_BACKEND=${WILDNAV_FEATURE_BACKEND:-SIFT}
+      - WILDNAV_TILE_URL=${WILDNAV_TILE_URL:-https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}}
+    env_file:
+      - ../systems/aerostack2_isaac/config/nav_topics.env
+    volumes:
+      - wildnav_isaac_cache:/data/wildnav_cache
+    command: >
+      /venv/bin/python3 -m wildnav_pkg.seed_cache
+        --lat ${INITIAL_LAT:-37.8044}
+        --lon ${INITIAL_LON:--122.4661}
+        --zoom ${WILDNAV_ZOOM:-18}
+        --search-radius-m ${WILDNAV_SEARCH_RADIUS_M:-250.0}
+        --max-tiles ${WILDNAV_MAX_TILES:-49}
+        --feature-backend ${WILDNAV_FEATURE_BACKEND:-SIFT}
+        --tile-url-template ${WILDNAV_TILE_URL:-https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}}
+        --cache-dir /data/wildnav_cache
+    restart: "no"
+
+  demnav:
+    profiles: ["navsim"]
+    network_mode: "host"
+    image: cyberphysics/demnav:${CYBERPHYSICS_TAG:-latest}
+    container_name: demnav_isaac
+    depends_on:
+      isaacsim:
+        condition: service_started
+      stateestimator:
+        condition: service_started
+      demnav_assets:
+        condition: service_completed_successfully
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - INITIAL_LAT=${INITIAL_LAT:-37.8044}
+      - INITIAL_LON=${INITIAL_LON:--122.4661}
+    env_file:
+      - ../systems/aerostack2_isaac/config/nav_topics.env
+    volumes:
+      - /dev/shm:/dev/shm
+      - demnav_isaac_cache:/data/demnav_cache
+    command: >
+      stdbuf -o L
+      ros2 launch demnav_pkg demnav.launch.py
+        gps_topic:=${GPS_TOPIC:-/drone_sim_0/sensor_measurements/gps}
+        odom_topic:=${ODOM_TOPIC:-/drone_sim_0/sensor_measurements/odom}
+        depth_topic:=${DEPTH_TOPIC:-/drone_sim_0/downward_rgbd/depth/image}
+        camera_info_topic:=${CAMERA_INFO_TOPIC:-/drone_sim_0/downward_rgbd/camera_info}
+        initial_lat:=${INITIAL_LAT:-37.8044}
+        initial_lon:=${INITIAL_LON:--122.4661}
+        origin_alt:=${ORIGIN_ALT:-0.0}
+        area_km:=${AREA_KM:-10.0}
+        search_radius_m:=${SEARCH_RADIUS_M:-200.0}
+        dem_resolution_m:=${DEM_RESOLUTION_M:-30.0}
+        fov_deg:=${FOV_DEG:-90.0}
+        cache_dir:=/data/demnav_cache
+
+  wildnav:
+    profiles: ["navsim"]
+    image: cyberphysics/wildnav:${CYBERPHYSICS_TAG:-latest}
+    container_name: wildnav_isaac
+    network_mode: host
+    ipc: host
+    depends_on:
+      isaacsim:
+        condition: service_started
+      stateestimator:
+        condition: service_started
+      demnav:
+        condition: service_started
+      wildnav_assets:
+        condition: service_completed_successfully
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    env_file:
+      - ../systems/aerostack2_isaac/config/nav_topics.env
+    volumes:
+      - /dev/shm:/dev/shm
+      - wildnav_isaac_cache:/data/wildnav_cache
+    command: >
+      ros2 launch wildnav_pkg wildnav.launch.py
+        image_topic:=${WILDNAV_IMAGE_TOPIC:-/drone_sim_0/downward_rgb/image}
+        camera_info_topic:=${WILDNAV_CAMERA_INFO_TOPIC:-/drone_sim_0/downward_rgb/camera_info}
+        prediction_odom_topic:=${NAVIGATION_ODOM_TOPIC:-/navigation/odometry}
+        raw_odom_topic:=${RAW_ODOM_TOPIC:-/drone_sim_0/sensor_measurements/odom}
+        gps_topic:=${GPS_TOPIC:-/drone_sim_0/sensor_measurements/gps}
+        demnav_odom_topic:=${DEMNAV_ODOM_TOPIC:-/demnav/odometry}
+        navigation_output_topic:=${NAVIGATION_ODOM_TOPIC:-/navigation/odometry}
+        initial_lat:=${INITIAL_LAT:-37.8044}
+        initial_lon:=${INITIAL_LON:--122.4661}
+        origin_alt:=${ORIGIN_ALT:-0.0}
+        zoom:=${WILDNAV_ZOOM:-18}
+        search_radius_m:=${WILDNAV_SEARCH_RADIUS_M:-250.0}
+        max_tiles:=${WILDNAV_MAX_TILES:-49}
+        max_tile_downloads_per_cycle:=${WILDNAV_MAX_DOWNLOADS:-8}
+        match_rate_hz:=${WILDNAV_RATE_HZ:-0.2}
+        min_matches:=${WILDNAV_MIN_MATCHES:-16}
+        min_inliers:=${WILDNAV_MIN_INLIERS:-10}
+        min_inlier_ratio:=${WILDNAV_MIN_INLIER_RATIO:-0.25}
+        cache_dir:=/data/wildnav_cache
+
+volumes:
+  demnav_isaac_cache:
+  wildnav_isaac_cache:

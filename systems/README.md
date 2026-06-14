@@ -12,9 +12,11 @@ arguments, environment variables, or compose mounts.
 Current systems:
 
 - `so101/`: SO-101 arm description, controller config, and simulator world.
+- `aerostack2_gazebo/`: Aerostack2 Gazebo drone simulation config.
+- `aerostack2_isaac/`: Aerostack2 Isaac Sim drone nav simulation config.
 - `realsense/`: RealSense-specific example config.
 
 Expected future systems:
 
-- A downward-OAK-1 drone for MapNav/WildNav.
+- A physical downward-OAK-1 drone for DemNav/WildNav.
 - MIT RACECAR Neo.

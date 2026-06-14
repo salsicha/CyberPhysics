@@ -56,9 +56,9 @@ services:
         -p highres_capture_hz:=${WILDNAV_IMAGE_RATE:-0.5}
         -p frame_id:=oak1_optical_frame
 
-  mapnav:
-    image: cyberphysics/mapnav:${CYBERPHYSICS_TAG:-arm64}
-    container_name: mapnav
+  demnav:
+    image: cyberphysics/demnav:${CYBERPHYSICS_TAG:-arm64}
+    container_name: demnav
     network_mode: host
     ipc: host
     restart: unless-stopped
@@ -69,9 +69,9 @@ services:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
     volumes:
       - /dev/shm:/dev/shm
-      - /data/mapnav_cache:/data/mapnav_cache
+      - /data/demnav_cache:/data/demnav_cache
     command: >
-      ros2 launch mapnav_pkg mapnav.launch.py
+      ros2 launch demnav_pkg demnav.launch.py
         gps_topic:=/${DRONE_NAMESPACE:-drone0}/sensor_measurements/gps
         odom_topic:=/${DRONE_NAMESPACE:-drone0}/sensor_measurements/odom
         depth_topic:=/oak1/relative_depth
@@ -92,7 +92,7 @@ services:
     restart: unless-stopped
     depends_on:
       - aerostack
-      - mapnav
+      - demnav
       - oak1
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
@@ -107,7 +107,7 @@ services:
         prediction_odom_topic:=/navigation/odometry
         raw_odom_topic:=/${DRONE_NAMESPACE:-drone0}/sensor_measurements/odom
         gps_topic:=/${DRONE_NAMESPACE:-drone0}/sensor_measurements/gps
-        mapnav_odom_topic:=/mapnav/odometry
+        demnav_odom_topic:=/demnav/odometry
         navigation_output_topic:=/navigation/odometry
         initial_lat:=${INITIAL_LAT:-0.0}
         initial_lon:=${INITIAL_LON:-0.0}
@@ -122,7 +122,7 @@ services:
         min_inliers:=${WILDNAV_MIN_INLIERS:-10}
         min_inlier_ratio:=${WILDNAV_MIN_INLIER_RATIO:-0.25}
         max_position_jump_m:=${WILDNAV_MAX_JUMP_M:-250.0}
-        minimum_mapnav_confidence:=${MAPNAV_FUSION_CONFIDENCE:-0.35}
+        minimum_demnav_confidence:=${DEMNAV_FUSION_CONFIDENCE:-0.35}
         minimum_wildnav_confidence:=${WILDNAV_FUSION_CONFIDENCE:-0.20}
 
   behavior_tree:
@@ -133,7 +133,7 @@ services:
     restart: always
     depends_on:
       - aerostack
-      - mapnav
+      - demnav
       - wildnav
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}

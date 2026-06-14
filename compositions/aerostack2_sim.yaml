@@ -3,20 +3,17 @@ services:
   simassets:
     network_mode: "host"
     image: cyberphysics/aerostack2
-    privileged: true
-    devices:
-      - /dev:/dev
     volumes:
       - /dev/shm:/dev/shm
-      - "/tmp/.X11-unix:/tmp/.X11-unix"
-      - ../applications/aerostack2/config:/workspace/config/
+      - ../systems/aerostack2_gazebo/config:/workspace/config:ro
     environment:
-      - "DISPLAY=${DISPLAY}"
-      - XAUTHORITY
-      - NVIDIA_DRIVER_CAPABILITIES=all
-      - EGL_PLATFORM=surfaceless
+      - QT_QPA_PLATFORM=offscreen
+      - LIBGL_ALWAYS_SOFTWARE=1
+      - MESA_GL_VERSION_OVERRIDE=3.3
+      - MESA_LOADER_DRIVER_OVERRIDE=swrast
+      - IGN_RENDERING_ENGINE=ogre
     command: >
-      ros2 launch as2_gazebo_assets launch_simulation.py use_sim_time:=true simulation_config_file:=config/world_gazebo.yaml
+      ros2 launch as2_gazebo_assets launch_simulation.py use_sim_time:=true simulation_config_file:=/workspace/config/world_gazebo.yaml headless:=true
   simulator:
     network_mode: "host"
     image: cyberphysics/aerostack2
@@ -26,14 +23,14 @@ services:
     volumes:
       - /dev/shm:/dev/shm
       - "/tmp/.X11-unix:/tmp/.X11-unix"
-      - ../applications/aerostack2/config:/workspace/config/
+      - ../systems/aerostack2_gazebo/config:/workspace/config:ro
     environment:
       - "DISPLAY=${DISPLAY}"
       - XAUTHORITY
       - NVIDIA_DRIVER_CAPABILITIES=all
       - EGL_PLATFORM=surfaceless
     command: >
-      ros2 launch as2_platform_gazebo platform_gazebo_launch.py namespace:=drone_sim_0 platform_config_file:=config/config_gazebo.yaml simulation_config_file:=config/world_gazebo.yaml
+      ros2 launch as2_platform_gazebo platform_gazebo_launch.py namespace:=drone_sim_0 platform_config_file:=/workspace/config/config_gazebo.yaml simulation_config_file:=/workspace/config/world_gazebo.yaml
   stateestimator:
     network_mode: "host"
     image: cyberphysics/aerostack2
@@ -42,9 +39,9 @@ services:
       - /dev:/dev
     volumes:
       - /dev/shm:/dev/shm
-      - ../applications/aerostack2/config:/workspace/config/
+      - ../systems/aerostack2_gazebo/config:/workspace/config:ro
     command: >
-      ros2 launch as2_state_estimator state_estimator_launch.py namespace:=drone_sim_0 config_file:=config/config_gazebo.yaml
+      ros2 launch as2_state_estimator state_estimator_launch.py namespace:=drone_sim_0 config_file:=/workspace/config/config_gazebo.yaml plugin_name:=ground_truth
   motioncontroller:
     network_mode: "host"
     image: cyberphysics/aerostack2
@@ -53,11 +50,12 @@ services:
       - /dev:/dev
     volumes:
       - /dev/shm:/dev/shm
-      - ../applications/aerostack2/config:/workspace/config/
+      - ../systems/aerostack2_gazebo/config:/workspace/config:ro
     command: >
-      ros2 launch as2_motion_controller controller_launch.py namespace:=drone_sim_0 config_file:=config/config_gazebo.yaml plugin_name:=pid_speed_controller plugin_config_file:=config/pid_speed_controller.yaml
+      ros2 launch as2_motion_controller controller_launch.py namespace:=drone_sim_0 config_file:=/workspace/config/config_gazebo.yaml plugin_name:=pid_speed_controller plugin_config_file:=/workspace/config/pid_speed_controller.yaml
   # Motion Behaviors
   motionbehaviors:
+    profiles: ["behaviors"]
     network_mode: "host"
     image: cyberphysics/aerostack2
     privileged: true
@@ -65,11 +63,12 @@ services:
       - /dev:/dev
     volumes:
       - /dev/shm:/dev/shm
-      - ../applications/aerostack2/config:/workspace/config/
+      - ../systems/aerostack2_gazebo/config:/workspace/config:ro
     command: >
-      ros2 launch as2_behaviors_motion motion_behaviors_launch.py namespace:=drone_sim_0 config_file:=config/config_gazebo.yaml
+      ros2 launch as2_behaviors_motion motion_behaviors_launch.py namespace:=drone_sim_0 config_file:=/workspace/config/config_gazebo.yaml
   # Trajectory Generation Behavior
   trajectorygeneration:
+    profiles: ["behaviors"]
     network_mode: "host"
     image: cyberphysics/aerostack2
     privileged: true
@@ -77,11 +76,12 @@ services:
       - /dev:/dev
     volumes:
       - /dev/shm:/dev/shm
-      - ../applications/aerostack2/config:/workspace/config/
+      - ../systems/aerostack2_gazebo/config:/workspace/config:ro
     command: >
-      ros2 launch as2_behaviors_trajectory_generation generate_polynomial_trajectory_behavior_launch.py namespace:=drone_sim_0 config_file:=config/config_gazebo.yaml
+      ros2 launch as2_behaviors_trajectory_generation generate_polynomial_trajectory_behavior_launch.py namespace:=drone_sim_0 config_file:=/workspace/config/config_gazebo.yaml
   # Point Gimbal Behavior
   gimbalbehavior:
+    profiles: ["behaviors"]
     network_mode: "host"
     image: cyberphysics/aerostack2
     privileged: true
@@ -89,10 +89,11 @@ services:
       - /dev:/dev
     volumes:
       - /dev/shm:/dev/shm
-      - ../applications/aerostack2/config:/workspace/config/
+      - ../systems/aerostack2_gazebo/config:/workspace/config:ro
     command: >
-      ros2 launch as2_behaviors_perception point_gimbal_behavior.launch.py namespace:=drone_sim_0 config_file:=config/config_gazebo.yaml
+      ros2 launch as2_behaviors_perception point_gimbal_behavior.launch.py namespace:=drone_sim_0 config_file:=/workspace/config/config_gazebo.yaml
   keyboardteleoperation:
+    profiles: ["teleop"]
     network_mode: "host"
     image: cyberphysics/aerostack2
     privileged: true
@@ -101,7 +102,7 @@ services:
     volumes:
       - /dev/shm:/dev/shm
       - "/tmp/.X11-unix:/tmp/.X11-unix"
-      - ../applications/aerostack2/config:/workspace/config/
+      - ../systems/aerostack2_gazebo/config:/workspace/config:ro
     environment:
       - "DISPLAY=${DISPLAY}"
       - XAUTHORITY
@@ -117,6 +118,73 @@ services:
   #     - /dev:/dev
   #   volumes:
   #     - /dev/shm:/dev/shm
-  #     - ../applications/aerostack2/config:/workspace/config/
+  #     - ../systems/aerostack2_gazebo/config:/workspace/config:ro
   #   command: >
   #     ros2 launch as2_behavior_tree behavior_trees.launch.py drone_id:=drone_sim_0 tree:=./trees/square.xml
+
+  demnav:
+    profiles: ["navsim"]
+    network_mode: "host"
+    image: cyberphysics/demnav:${CYBERPHYSICS_TAG:-latest}
+    container_name: demnav_sim
+    depends_on:
+      - simulator
+      - stateestimator
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - INITIAL_LAT=${INITIAL_LAT:-37.7694}
+      - INITIAL_LON=${INITIAL_LON:--122.4862}
+    env_file:
+      - ../systems/aerostack2_gazebo/config/nav_topics.env
+    volumes:
+      - /dev/shm:/dev/shm
+    command: >
+      stdbuf -o L
+      ros2 launch demnav_pkg demnav.launch.py
+        gps_topic:=${GPS_TOPIC:-/drone_sim_0/sensor_measurements/gps}
+        odom_topic:=${ODOM_TOPIC:-/drone_sim_0/sensor_measurements/odom}
+        depth_topic:=${DEPTH_TOPIC:-/drone_sim_0/downward_rgbd/depth/image}
+        camera_info_topic:=${CAMERA_INFO_TOPIC:-/drone_sim_0/downward_rgbd/camera_info}
+        initial_lat:=${INITIAL_LAT:-37.7694}
+        initial_lon:=${INITIAL_LON:--122.4862}
+        origin_alt:=${ORIGIN_ALT:-0.0}
+        area_km:=${AREA_KM:-10.0}
+        search_radius_m:=${SEARCH_RADIUS_M:-200.0}
+        fov_deg:=${FOV_DEG:-90.0}
+
+  wildnav:
+    profiles: ["navsim"]
+    image: cyberphysics/wildnav:${CYBERPHYSICS_TAG:-latest}
+    container_name: wildnav_sim
+    network_mode: host
+    ipc: host
+    depends_on:
+      - simulator
+      - stateestimator
+      - demnav
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    env_file:
+      - ../systems/aerostack2_gazebo/config/nav_topics.env
+    volumes:
+      - /dev/shm:/dev/shm
+    command: >
+      ros2 launch wildnav_pkg wildnav.launch.py
+        image_topic:=${WILDNAV_IMAGE_TOPIC:-/drone_sim_0/downward_rgb/image}
+        camera_info_topic:=${WILDNAV_CAMERA_INFO_TOPIC:-/drone_sim_0/downward_rgb/camera_info}
+        prediction_odom_topic:=${NAVIGATION_ODOM_TOPIC:-/navigation/odometry}
+        raw_odom_topic:=${RAW_ODOM_TOPIC:-/drone_sim_0/sensor_measurements/odom}
+        gps_topic:=${GPS_TOPIC:-/drone_sim_0/sensor_measurements/gps}
+        demnav_odom_topic:=${DEMNAV_ODOM_TOPIC:-/demnav/odometry}
+        navigation_output_topic:=${NAVIGATION_ODOM_TOPIC:-/navigation/odometry}
+        initial_lat:=${INITIAL_LAT:-37.7694}
+        initial_lon:=${INITIAL_LON:--122.4862}
+        origin_alt:=${ORIGIN_ALT:-0.0}
+        zoom:=${WILDNAV_ZOOM:-18}
+        search_radius_m:=${WILDNAV_SEARCH_RADIUS_M:-250.0}
+        max_tiles:=${WILDNAV_MAX_TILES:-49}
+        max_tile_downloads_per_cycle:=${WILDNAV_MAX_DOWNLOADS:-8}
+        match_rate_hz:=${WILDNAV_RATE_HZ:-0.2}
+        min_matches:=${WILDNAV_MIN_MATCHES:-16}
+        min_inliers:=${WILDNAV_MIN_INLIERS:-10}
+        min_inlier_ratio:=${WILDNAV_MIN_INLIER_RATIO:-0.25}

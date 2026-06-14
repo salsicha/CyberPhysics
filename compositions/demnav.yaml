@@ -1,19 +1,19 @@
 services:
-  mapnav:
+  demnav:
     network_mode: "host"
     pull_policy: if_not_present
-    image: cyberphysics/mapnav
-    container_name: mapnav
+    image: cyberphysics/demnav
+    container_name: demnav
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
       - INITIAL_LAT=${INITIAL_LAT:-0.0}
       - INITIAL_LON=${INITIAL_LON:-0.0}
     volumes:
       - /dev/shm:/dev/shm
-      - /data/mapnav_cache:/data/mapnav_cache
+      - /data/demnav_cache:/data/demnav_cache
     command: >
       stdbuf -o L
-      ros2 launch mapnav_pkg mapnav.launch.py
+      ros2 launch demnav_pkg demnav.launch.py
         gps_topic:=${GPS_TOPIC:-/drone0/sensor_measurements/gps}
         odom_topic:=${ODOM_TOPIC:-/drone0/sensor_measurements/odom}
         depth_topic:=${DEPTH_TOPIC:-/oak1/relative_depth}

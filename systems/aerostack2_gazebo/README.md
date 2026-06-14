@@ -1,0 +1,68 @@
+# Aerostack2 Gazebo System
+
+This system describes a Gazebo-starting simulation setup for an Aerostack2
+quadrotor with GPS, a downward RGB camera, and a downward RGB-D camera. The
+payload is intended to provide the ROS topics needed by DemNav and WildNav.
+
+Files:
+
+- `config/world_gazebo.yaml`: AS2 Gazebo world, drone, and payload selection.
+- `config/config_gazebo.yaml`: shared ROS parameters for Aerostack2 nodes.
+- `config/pid_speed_controller.yaml`: PID speed-controller parameters.
+- `config/nav_topics.env`: expected simulated topic names for DemNav/WildNav.
+
+Start the base Aerostack2 simulation:
+
+```bash
+docker compose -f compositions/aerostack2_sim.yaml up
+```
+
+Start it with DemNav and WildNav enabled:
+
+```bash
+docker compose --profile navsim -f compositions/aerostack2_sim.yaml up
+```
+
+If the AS2 Gazebo assets publish camera topics under different names on your
+installed package version, override the topic variables from `nav_topics.env`
+or edit the compose environment.
+
+
+## DemNav/WildNav Simulation Notes
+
+Gazebo is the starting point for Aerostack2 integration because AS2 already
+ships Gazebo platform and asset packages. This setup is good for verifying ROS
+topic flow, timing, odometry/GPS plumbing, controller behavior, and whether
+DemNav/WildNav nodes can consume simulated camera topics.
+
+For algorithm-quality DemNav tests, replace `empty_gps` with a georeferenced
+terrain world and align `INITIAL_LAT`, `INITIAL_LON`, and `ORIGIN_ALT` with that
+world. DemNav compares downward depth against terrain elevation, so a flat empty
+world only validates wiring.
+
+For algorithm-quality WildNav tests, the downward RGB stream must visually match
+the satellite tile cache. The default Gazebo world is not enough; use textured
+terrain/orthophoto tiles, AirSim/Unreal, or Isaac Sim with georeferenced terrain
+assets when evaluating matching quality.
+
+Practical simulator choices:
+
+- Gazebo/GZ Sim: best first target for Aerostack2 because AS2 provides Gazebo
+  assets and a Gazebo platform plugin. Good for ROS integration and DemNav depth
+  plumbing.
+- AirSim/Unreal: useful for photorealistic downward RGB/depth and external
+  flight-controller workflows, but upstream AirSim is effectively legacy.
+- Isaac Sim: useful when high-fidelity sensors, ROS 2 bridging, and synthetic
+  data matter more than direct Aerostack2 support.
+- Bag replay: still the fastest regression path for DemNav/WildNav once real or
+  simulator image/depth/GPS/odom topics have been recorded.
+
+## Golden Gate Park navsim default
+
+The `navsim` Compose profile uses a small San Francisco test origin near Golden Gate Park:
+
+- `INITIAL_LAT=37.7694`
+- `INITIAL_LON=-122.4862`
+- `ORIGIN_ALT=0.0`
+
+`cyberphysics/demnav:latest` seeds `/data/demnav_cache` during Docker build, and `cyberphysics/wildnav:latest` seeds `/data/wildnav_cache` during Docker build. Do not add generated DEMs, satellite tiles, or feature descriptors to this repository; change the Docker build args when a different test area is needed.
