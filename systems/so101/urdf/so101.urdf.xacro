@@ -96,6 +96,20 @@
     <parent link="gripper_base_link"/><child link="fixed_jaw_link"/>
   </joint>
 
+  <link name="groot_camera_link">
+    <visual><geometry><box size="0.035 0.025 0.025"/></geometry><material name="so101_black"/></visual>
+    <collision><geometry><box size="0.035 0.025 0.025"/></geometry></collision>
+  </link>
+  <joint name="base_to_groot_camera" type="fixed">
+    <parent link="base_link"/><child link="groot_camera_link"/>
+    <origin xyz="0.24 -0.28 0.34" rpy="0.0 0.72 2.36"/>
+  </joint>
+  <link name="groot_camera_rgb_optical_frame"/>
+  <joint name="groot_camera_optical_joint" type="fixed">
+    <parent link="groot_camera_link"/><child link="groot_camera_rgb_optical_frame"/>
+    <origin xyz="0 0 0" rpy="-1.57079632679 0 -1.57079632679"/>
+  </joint>
+
   <ros2_control name="SO101System" type="system">
     <hardware><plugin>gz_ros2_control/GazeboSimSystem</plugin></hardware>
     <joint name="shoulder_pan"><command_interface name="position"/><state_interface name="position"><param name="initial_value">0.0</param></state_interface><state_interface name="velocity"/></joint>

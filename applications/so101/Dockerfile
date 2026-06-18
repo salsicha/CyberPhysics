@@ -12,6 +12,7 @@ SHELL ["/bin/bash", "-c"]
 RUN apt-get update && apt-get install -q -y --no-install-recommends \
     python3-colcon-common-extensions \
     python3-numpy \
+    python3-pip \
     ros-$ROS_DISTRO-controller-manager \
     ros-$ROS_DISTRO-controller-manager-msgs \
     ros-$ROS_DISTRO-controller-interface \
@@ -25,6 +26,8 @@ RUN apt-get update && apt-get install -q -y --no-install-recommends \
     ros-$ROS_DISTRO-transmission-interface \
     ros-$ROS_DISTRO-xacro \
     && rm -rf /var/lib/apt/lists/*
+
+RUN pip3 install --break-system-packages --no-cache-dir msgpack msgpack-numpy pyzmq
 
 WORKDIR /workspace/src/so101_description
 COPY . .

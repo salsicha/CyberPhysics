@@ -1,0 +1,73 @@
+services:
+  isaacsim:
+    image: nvcr.io/nvidia/isaac-sim:5.1.0
+    container_name: so101_groot_isaacsim
+    network_mode: host
+    ipc: host
+    environment:
+      - ACCEPT_EULA=Y
+      - PRIVACY_CONSENT=Y
+      - ROS_DISTRO=jazzy
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+    volumes:
+      - /dev/shm:/dev/shm
+      - ../systems:/workspace/systems:ro
+      - ../applications/so101:/workspace/so101:ro
+      - ${CYBERPHYSICS_ISAAC_CACHE:-/tmp/cyberphysics/isaac-sim/so101}/kit:/isaac-sim/kit/cache:rw
+      - ${CYBERPHYSICS_ISAAC_CACHE:-/tmp/cyberphysics/isaac-sim/so101}/ov:/root/.cache/ov:rw
+      - ${CYBERPHYSICS_ISAAC_CACHE:-/tmp/cyberphysics/isaac-sim/so101}/pip:/root/.cache/pip:rw
+      - ${CYBERPHYSICS_ISAAC_CACHE:-/tmp/cyberphysics/isaac-sim/so101}/glcache:/root/.cache/nvidia/GLCache:rw
+      - ${CYBERPHYSICS_ISAAC_CACHE:-/tmp/cyberphysics/isaac-sim/so101}/computecache:/root/.nv/ComputeCache:rw
+    command: >
+      ./python.sh /workspace/so101/scripts/isaacsim_so101.py
+        --headless
+        --experience /isaac-sim/apps/isaacsim.exp.base.python.kit
+        --urdf /workspace/systems/so101/urdf/so101.urdf
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  groot_policy:
+    image: cyberphysics/groot:${CYBERPHYSICS_TAG:-latest}
+    container_name: so101_groot_policy
+    network_mode: host
+    ipc: host
+    gpus: all
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=${NVIDIA_VISIBLE_DEVICES:-all}
+      - NVIDIA_DRIVER_CAPABILITIES=${NVIDIA_DRIVER_CAPABILITIES:-graphics,utility,compute}
+      - HF_HOME=/workspace/cache/huggingface
+      - TORCH_HOME=/workspace/cache/torch
+      - SO101_GROOT_MODE=${SO101_GROOT_MODE:-mock}
+      - GR00T_MODEL_PATH=${GR00T_MODEL_PATH:-}
+      - GR00T_EMBODIMENT_TAG=${GR00T_EMBODIMENT_TAG:-new_embodiment}
+      - GR00T_DEVICE=${GR00T_DEVICE:-cuda}
+    volumes:
+      - ../data/groot:/workspace/data
+      - ../cache/groot:/workspace/cache
+    command: >
+      python /workspace/so101_policy_server.py
+        --mode ${SO101_GROOT_MODE:-mock}
+        --port ${SO101_GROOT_PORT:-5555}
+
+  so101_groot_bridge:
+    image: cyberphysics/so101:${CYBERPHYSICS_TAG:-latest}
+    container_name: so101_groot_bridge
+    network_mode: host
+    depends_on:
+      - isaacsim
+      - groot_policy
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+    volumes:
+      - ../systems:/workspace/systems:ro
+    command: >
+      python3 /workspace/src/so101_description/scripts/groot_so101_bridge.py
+        --ros-args
+        --params-file /workspace/systems/so101/config/groot_demo.yaml

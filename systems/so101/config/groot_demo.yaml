@@ -1,0 +1,16 @@
+so101_groot_bridge:
+  ros__parameters:
+    policy_host: 127.0.0.1
+    policy_port: 5555
+    policy_timeout_ms: 15000
+    command_rate_hz: 5.0
+    instruction: "move the SO-101 gripper through a small inspection motion"
+    camera_topic: /so101/camera/image_raw
+    joint_state_topic: /joint_states
+    command_topic: /so101/joint_commands
+    video_key: front
+    state_key: joint_positions
+    action_key: joint_positions
+    image_width: 224
+    image_height: 224
+    max_joint_step: 0.08

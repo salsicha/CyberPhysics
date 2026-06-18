@@ -13,9 +13,14 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--urdf", default="/workspace/systems/so101/urdf/so101.urdf")
 parser.add_argument("--usd", default="/tmp/so101.usd")
 parser.add_argument("--headless", action="store_true")
+parser.add_argument(
+    "--experience",
+    default="/isaac-sim/apps/isaacsim.exp.base.python.kit",
+    help="Isaac Sim .kit experience to launch. The base Python experience avoids streaming/RTX UI startup for headless ROS demos.",
+)
 args, _ = parser.parse_known_args()
 
-simulation_app = SimulationApp({"headless": args.headless})
+simulation_app = SimulationApp({"headless": args.headless}, experience=args.experience)
 
 import omni.kit.app
 import omni.kit.commands
@@ -34,7 +39,7 @@ from isaacsim.core.prims import Articulation
 try:
     import rclpy
     from rclpy.node import Node
-    from sensor_msgs.msg import JointState
+    from sensor_msgs.msg import CameraInfo, Image, JointState
     from std_msgs.msg import Float64MultiArray
 except ImportError as exc:
     simulation_app.close()
@@ -49,6 +54,10 @@ class IsaacBridge(Node):
         super().__init__("so101_isaacsim_bridge")
         self.target = np.zeros(len(JOINT_NAMES), dtype=np.float32)
         self.publisher = self.create_publisher(JointState, "/joint_states", 10)
+        self.image_pub = self.create_publisher(Image, "/so101/camera/image_raw", 5)
+        self.camera_info_pub = self.create_publisher(CameraInfo, "/so101/camera/camera_info", 5)
+        self.camera_width = 640
+        self.camera_height = 480
         self.subscription = self.create_subscription(
             Float64MultiArray, "/so101/joint_commands", self._command, 10
         )
@@ -63,11 +72,54 @@ class IsaacBridge(Node):
 
     def publish_state(self, positions, velocities):
         msg = JointState()
-        msg.header.stamp = self.get_clock().now().to_msg()
+        stamp = self.get_clock().now().to_msg()
+        msg.header.stamp = stamp
         msg.name = JOINT_NAMES
         msg.position = np.asarray(positions).tolist()
         msg.velocity = np.asarray(velocities).tolist()
         self.publisher.publish(msg)
+        self.publish_camera(stamp, positions)
+
+    def publish_camera(self, stamp, positions):
+        positions = np.asarray(positions, dtype=np.float32)
+        h = self.camera_height
+        w = self.camera_width
+        y = np.linspace(0, 255, h, dtype=np.uint8)[:, None]
+        x = np.linspace(0, 255, w, dtype=np.uint8)[None, :]
+        image = np.zeros((h, w, 3), dtype=np.uint8)
+        image[:, :, 0] = (x + int((positions[0] + 2.0) * 35.0)) % 255
+        image[:, :, 1] = (y + int((positions[1] + 2.0) * 35.0)) % 255
+        image[:, :, 2] = 80
+
+        # Draw a small target marker so policy input visibly changes with the arm state.
+        cx = int(w * (0.5 + 0.22 * np.sin(float(positions[2]))))
+        cy = int(h * (0.5 - 0.22 * np.sin(float(positions[3]))))
+        image[max(0, cy - 12):min(h, cy + 12), max(0, cx - 12):min(w, cx + 12), :] = [255, 220, 30]
+
+        msg = Image()
+        msg.header.stamp = stamp
+        msg.header.frame_id = "groot_camera_rgb_optical_frame"
+        msg.height = h
+        msg.width = w
+        msg.encoding = "rgb8"
+        msg.is_bigendian = 0
+        msg.step = w * 3
+        msg.data = image.tobytes()
+        self.image_pub.publish(msg)
+
+        info = CameraInfo()
+        info.header = msg.header
+        info.width = w
+        info.height = h
+        fx = fy = 554.0
+        cx0 = w / 2.0
+        cy0 = h / 2.0
+        info.distortion_model = "plumb_bob"
+        info.d = [0.0, 0.0, 0.0, 0.0, 0.0]
+        info.k = [fx, 0.0, cx0, 0.0, fy, cy0, 0.0, 0.0, 1.0]
+        info.r = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+        info.p = [fx, 0.0, cx0, 0.0, 0.0, fy, cy0, 0.0, 0.0, 0.0, 1.0, 0.0]
+        self.camera_info_pub.publish(info)
 
 
 def import_robot(urdf_path):

@@ -51,8 +51,9 @@ RUN --mount=type=cache,target=/root/.cache/uv,sharing=locked \
     uv pip install --python /opt/Isaac-GR00T/.venv/bin/python -e . --no-deps
 
 COPY scripts/smoke_test.py /workspace/smoke_test.py
+COPY scripts/so101_policy_server.py /workspace/so101_policy_server.py
 COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh /workspace/smoke_test.py
+RUN chmod +x /entrypoint.sh /workspace/smoke_test.py /workspace/so101_policy_server.py
 
 RUN mkdir -p /usr/share/glvnd/egl_vendor.d && \
     printf '%s\n' \
