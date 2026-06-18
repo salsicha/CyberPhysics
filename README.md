@@ -11,6 +11,7 @@ CyberPhysics is a platform for deploying robotic and ML applications.
 
 ## Features
 
+- run state-of-the-art algorithms on entry level hardware  
 - browser-based graphical user interface  
 - access to latest ROS tools  
 - deployable to kubernetes  
@@ -40,6 +41,7 @@ cd applications && make target_arm64 build_ros2
 
 
 ## TorchStudio
+
 https://www.torchstudio.ai/getstarted/
 Don't install new Python environment, select ~/venv/bin/python
 
@@ -53,7 +55,7 @@ Compose your applications together using docker compose in the compositions fold
 Launch it with docker compose. For example:  
 
 ```bash
-docker compose -f compositions/jupyter.yaml up
+docker compose -f compositions/marimo.yaml up
 ```
 
 For viewing ROS data, run the Foxglove compose file, and launch Foxglove on your host machine.  
@@ -166,86 +168,8 @@ sudo apt install python3-rpi-lgpio
 git lfs migrate import --include="*.exe, *.iso" --everything
 ```
 
+## Example applications
 
-## Gen AI notes:
-Code gen
-
-I need to implement [specific functionality] in [programming language].
-Key requirements:
-1. [Requirement 1]
-2. [Requirement 2]
-3. [Requirement 3]
-Please consider:
-- Error handling
-- Edge cases
-- Performance optimization
-- Best practices for [language/framework]
-Please do not unnecessarily remove any comments or code.
-Generate the code with clear comments explaining the logic.
-
-—
-
-Review code
-
-Can you explain the following part of the code in detail:
-[paste code section]
-Specifically:
-1. What is the purpose of this section?
-2. How does it work step-by-step?
-3. Are there any potential issues or limitations with this approach?
-
-—
-
-Improvements 
-
-Please review the following code:
-[paste your code]
-Consider:
-1. Code quality and adherence to best practices
-2. Potential bugs or edge cases
-3. Performance optimizations
-4. Readability and maintainability
-5. Any security concerns
-Suggest improvements and explain your reasoning for each suggestion.
-
-—
-
-Algorithm 
-
-Implement a [name of algorithm] in [programming language]. Please include:
-1. The main function with clear parameter and return types
-2. Helper functions if necessary
-3. Time and space complexity analysis
-4. Example usage
-
-—
-
-Class
-
-Create a [class/module] for [specific functionality] in [programming language].
-Include:
-1. Constructor/initialization
-2. Main methods with clear docstrings
-3. Any necessary private helper methods
-4. Proper encapsulation and adherence to OOP principles
-
-—
-
-Optimizing
-
-Here's a piece of code that needs optimization:
-[paste code]
-Please suggest optimizations to improve its performance. For each suggestion, explain the expected improvement and any trade-offs.
-
-—
-
-Tests
-
-Generate unit tests for the following function:
-[paste function]
-Include tests for:
-1. Normal expected inputs
-2. Edge cases
-3. Invalid inputs
-Use [preferred testing framework] syntax.
-
+- Unjammable drone that uses elevation and color maps to supplement navigation  
+- VLA powered arm for manipulation  
+- TSDF and deep learning autonomous high speed racecar  

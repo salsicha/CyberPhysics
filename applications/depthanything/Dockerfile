@@ -1,32 +1,33 @@
 ARG TAG=amd64
 
-FROM cyberphysics/aerostack2:${TAG} AS build
+FROM cyberphysics/ros2:${TAG} AS build
 
 ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US.UTF-8 \
     TERM=xterm \
     PYTHONIOENCODING=UTF-8 \
-    ROS2_DISTRO=humble \
+    ROS2_DISTRO=jazzy \
+    ROS_DISTRO=jazzy \
     DEBIAN_FRONTEND=noninteractive \
     PATH="/venv/bin:$PATH" \
-    QT_QPA_PLATFORM=xcb \
-    ROS_DISTRO=humble
+    QT_QPA_PLATFORM=offscreen
 
 SHELL ["/bin/bash", "-c"]
-
 WORKDIR /workspace
 
-# Install dependencies for Depth Anything V2
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     git \
     python3-pip \
-    libgl1-mesa-glx \
+    python3-venv \
+    libgl1 \
     libglib2.0-0 \
-    ros-$ROS_DISTRO-cv-bridge \
+    ros-${ROS_DISTRO}-cv-bridge \
+    ros-${ROS_DISTRO}-sensor-msgs-py \
     && rm -rf /var/lib/apt/lists/*
 
-# Install python requirements
+RUN python3 -m venv --system-site-packages /venv
+
 ARG TARGETARCH
 RUN . /venv/bin/activate && \
     if [ "$TARGETARCH" = "arm64" ]; then \
@@ -37,23 +38,21 @@ RUN . /venv/bin/activate && \
     fi && \
     pip install --no-cache-dir \
         "numpy<2" \
-        opencv-python \
+        opencv-python-headless \
         matplotlib
 
-# Clone Depth Anything V2
 RUN git clone https://github.com/DepthAnything/Depth-Anything-V2.git /opt/Depth-Anything-V2
 
-# Download weights (vits)
 RUN mkdir -p /opt/Depth-Anything-V2/checkpoints && \
-    wget -O /opt/Depth-Anything-V2/checkpoints/depth_anything_v2_vits.pth https://huggingface.co/depth-anything/Depth-Anything-V2-Small/resolve/main/depth_anything_v2_vits.pth
+    wget -O /opt/Depth-Anything-V2/checkpoints/depth_anything_v2_metric_vkitti_vits.pth \
+      https://huggingface.co/depth-anything/Depth-Anything-V2-Metric-VKITTI-Small/resolve/main/depth_anything_v2_metric_vkitti_vits.pth
 
-ENV PYTHONPATH="/opt/Depth-Anything-V2:$PYTHONPATH"
+ENV PYTHONPATH="/opt/Depth-Anything-V2/metric_depth:/opt/Depth-Anything-V2"
 
-# Copy source code
+RUN rm -rf /workspace/src /workspace/build /workspace/install /workspace/log
 COPY src /workspace/src
 
-# Micro-ROS agent and package build
-RUN . /venv/bin/activate && . /opt/ros/$ROS2_DISTRO/setup.bash && \
+RUN . /venv/bin/activate && . /opt/ros/${ROS_DISTRO}/setup.bash && \
     apt-get update && \
     rosdep update && rosdep install --from-paths src --ignore-src -y && \
     colcon build --merge-install --install-base /workspace/install
@@ -61,9 +60,7 @@ RUN . /venv/bin/activate && . /opt/ros/$ROS2_DISTRO/setup.bash && \
 COPY ./entrypoint.sh /
 RUN chmod +x /entrypoint.sh
 
-#####################################################################
 FROM scratch
-
 COPY --from=build / /
-
-ENTRYPOINT [ "/entrypoint.sh" ]
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["ros2", "launch", "depthanything_pkg", "depthanything.launch.py"]

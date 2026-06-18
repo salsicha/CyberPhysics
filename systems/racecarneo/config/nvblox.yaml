@@ -1,0 +1,28 @@
+/**:
+  ros__parameters:
+    num_cameras: 1
+    use_tf_transforms: true
+    mapping_type: static_tsdf
+    use_depth: true
+    use_color: true
+    use_lidar: false
+    input_qos: SYSTEM_DEFAULT
+    voxel_size: 0.05
+    map_clearing_radius_m: 12.0
+    map_clearing_frame_id: base_link
+    esdf_mode: 2d
+    publish_esdf_distance_slice: true
+    publish_layer_rate_hz: 5.0
+    update_esdf_rate_hz: 10.0
+    layer_visualization_exclusion_radius_m: 12.0
+    esdf_slice_bounds_visualization_attachment_frame_id: base_link
+    workspace_height_bounds_visualization_attachment_frame_id: base_link
+    max_back_projection_distance: 12.0
+
+    static_mapper:
+      projective_integrator_max_integration_distance_m: 12.0
+      esdf_slice_height: 0.10
+      esdf_slice_min_height: 0.02
+      esdf_slice_max_height: 0.55
+      esdf_integrator_max_distance_m: 3.0
+      layer_streamer_exclusion_radius_m: 12.0

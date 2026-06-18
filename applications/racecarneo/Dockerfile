@@ -43,8 +43,14 @@ RUN apt update && apt install -q -y --no-install-recommends \
     python3-venv \
     ros-${ROS_DISTRO}-ackermann-msgs \
     ros-${ROS_DISTRO}-cv-bridge \
+    ros-${ROS_DISTRO}-diagnostic-updater \
     ros-${ROS_DISTRO}-image-transport \
+    ros-${ROS_DISTRO}-nav-msgs \
+    ros-${ROS_DISTRO}-nav2-bringup \
+    ros-${ROS_DISTRO}-navigation2 \
+    ros-${ROS_DISTRO}-robot-state-publisher \
     ros-${ROS_DISTRO}-sensor-msgs \
+    ros-${ROS_DISTRO}-slam-toolbox \
     ros-${ROS_DISTRO}-tf2-ros \
     xvfb \
     && rm -rf /var/lib/apt/lists/*
@@ -69,9 +75,10 @@ RUN mkdir -p ${RACECAR_HOME} && \
     chmod +x ${RACECAR_SIM_DIR}/RacecarSim_Linux_v2.8.3.x86_64
 
 COPY scripts/racecarneo_ros_bridge.py /workspace/racecarneo_ros_bridge.py
+COPY scripts/cmd_vel_to_ackermann.py /workspace/cmd_vel_to_ackermann.py
 COPY scripts/run_headless_sim.sh /workspace/run_headless_sim.sh
 COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh /workspace/racecarneo_ros_bridge.py /workspace/run_headless_sim.sh
+RUN chmod +x /entrypoint.sh /workspace/racecarneo_ros_bridge.py /workspace/cmd_vel_to_ackermann.py /workspace/run_headless_sim.sh
 
 FROM scratch
 

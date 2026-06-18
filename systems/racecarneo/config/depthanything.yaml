@@ -1,0 +1,12 @@
+depth_anything_v2_node:
+  ros__parameters:
+    image_topic: /camera/color/image_raw
+    camera_info_topic: /camera/color/camera_info
+    depth_topic: /depth_anything/depth/image
+    pointcloud_topic: /depth_anything/points
+    encoder: vits
+    metric_dataset: vkitti
+    max_depth: 80.0
+    min_depth: 0.05
+    publish_pointcloud: true
+    pointcloud_stride: 4

@@ -9,3 +9,10 @@ racecarneo_bridge:
     camera_fov_degrees: 60.0
     auto_start_user_program: true
     auto_start_duration_sec: 20.0
+    publish_odom: true
+    publish_tf: true
+    base_frame: base_link
+    odom_frame: odom
+    map_frame: map
+    wheelbase: 0.33
+    max_steering_angle: 0.42

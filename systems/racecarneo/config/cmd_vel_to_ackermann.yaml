@@ -1,0 +1,7 @@
+racecarneo_cmd_vel_to_ackermann:
+  ros__parameters:
+    wheelbase: 0.33
+    max_speed: 0.35
+    max_steering_angle: 0.42
+    cmd_vel_topic: cmd_vel
+    ackermann_topic: ackermann_cmd

@@ -40,6 +40,7 @@ COPY setup.sh /setup.sh
 RUN chmod +x /setup.sh && /setup.sh
 
 COPY entrypoint.sh /entrypoint.sh
+COPY racecarneo_nvblox.launch.py /workspace/racecarneo_nvblox.launch.py
 RUN chmod +x /entrypoint.sh
 
 FROM scratch
@@ -59,4 +60,4 @@ COPY --from=build / /
 WORKDIR /workspace
 
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["ros2", "launch", "nvblox_examples_bringup", "isaac_sim_example.launch.py", "rosbag:=/workspace/isaac_ros_assets/isaac_ros_nvblox/quickstart", "navigation:=False", "run_rviz:=False"]
+CMD ["ros2", "launch", "/workspace/racecarneo_nvblox.launch.py"]

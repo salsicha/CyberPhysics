@@ -20,6 +20,7 @@ services:
       - racecarneo_sim
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
       - RACECAR_SIM_IP=${RACECAR_SIM_IP:-127.0.0.1}
     volumes:
       - ../systems/racecarneo/config:/workspace/config:ro
@@ -27,6 +28,122 @@ services:
       python3 /workspace/racecarneo_ros_bridge.py
         --ros-args
         --params-file /workspace/config/bridge.yaml
+
+  racecarneo_cmd_vel_to_ackermann:
+    network_mode: host
+    pull_policy: if_not_present
+    image: cyberphysics/racecarneo:${CYBERPHYSICS_TAG:-latest}
+    container_name: racecarneo_cmd_vel_to_ackermann
+    depends_on:
+      - racecarneo_bridge
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+    volumes:
+      - ../systems/racecarneo/config:/workspace/config:ro
+    command: >
+      python3 /workspace/cmd_vel_to_ackermann.py
+        --ros-args
+        --params-file /workspace/config/cmd_vel_to_ackermann.yaml
+
+
+  racecarneo_depthanything:
+    network_mode: host
+    pull_policy: if_not_present
+    image: cyberphysics/depthanything:${CYBERPHYSICS_TAG:-latest}
+    container_name: racecarneo_depthanything
+    depends_on:
+      - racecarneo_bridge
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+      - NVIDIA_VISIBLE_DEVICES=${NVIDIA_VISIBLE_DEVICES:-all}
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    volumes:
+      - ../systems/racecarneo/config:/workspace/config:ro
+    command: >
+      ros2 launch depthanything_pkg depthanything.launch.py
+        image_topic:=/camera/color/image_raw
+        camera_info_topic:=/camera/color/camera_info
+        depth_topic:=/depth_anything/depth/image
+        pointcloud_topic:=/depth_anything/points
+        metric_dataset:=vkitti
+        encoder:=vits
+        max_depth:=80.0
+        publish_pointcloud:=true
+        pointcloud_stride:=4
+
+  racecarneo_nvblox:
+    network_mode: host
+    pull_policy: if_not_present
+    image: cyberphysics/nvblox:${CYBERPHYSICS_TAG:-latest}
+    container_name: racecarneo_nvblox
+    depends_on:
+      - racecarneo_bridge
+      - racecarneo_depthanything
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+      - NVIDIA_VISIBLE_DEVICES=${NVIDIA_VISIBLE_DEVICES:-all}
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics,video
+    volumes:
+      - ../systems/racecarneo/config:/workspace/config:ro
+      - ../applications/nvblox/racecarneo_nvblox.launch.py:/workspace/racecarneo_nvblox.launch.py:ro
+    command: >
+      ros2 launch /workspace/racecarneo_nvblox.launch.py
+        config_file:=/workspace/config/nvblox.yaml
+
+  racecarneo_slam:
+    network_mode: host
+    pull_policy: if_not_present
+    image: cyberphysics/racecarneo:${CYBERPHYSICS_TAG:-latest}
+    container_name: racecarneo_slam
+    depends_on:
+      - racecarneo_bridge
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+    volumes:
+      - ../systems/racecarneo/config:/workspace/config:ro
+    command: >
+      ros2 launch slam_toolbox online_async_launch.py
+        use_sim_time:=false
+        slam_params_file:=/workspace/config/slam_toolbox.yaml
+
+  racecarneo_nav2:
+    network_mode: host
+    pull_policy: if_not_present
+    image: cyberphysics/racecarneo:${CYBERPHYSICS_TAG:-latest}
+    container_name: racecarneo_nav2
+    depends_on:
+      - racecarneo_bridge
+      - racecarneo_slam
+      - racecarneo_cmd_vel_to_ackermann
+      - racecarneo_nvblox
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+    volumes:
+      - ../systems/racecarneo/config:/workspace/config:ro
+    command: >
+      ros2 launch nav2_bringup navigation_launch.py
+        use_sim_time:=false
+        params_file:=/workspace/config/nav2.yaml
+        autostart:=true
+
+
+  racecarneo_nicegui:
+    network_mode: host
+    pull_policy: if_not_present
+    image: cyberphysics/nicegui:${CYBERPHYSICS_TAG:-latest}
+    container_name: racecarneo_nicegui
+    depends_on:
+      - racecarneo_nav2
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+    command: >
+      python3 /workspace/scripts/main.py
 
   foxglove_bridge:
     network_mode: host

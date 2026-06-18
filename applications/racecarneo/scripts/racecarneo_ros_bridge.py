@@ -11,9 +11,12 @@ from typing import Optional
 import numpy as np
 import rclpy
 from ackermann_msgs.msg import AckermannDriveStamped
+from geometry_msgs.msg import TransformStamped
+from nav_msgs.msg import Odometry
 from rclpy.node import Node
 from sensor_msgs.msg import CameraInfo, Image, Imu, LaserScan
 from std_msgs.msg import Header
+from tf2_ros import TransformBroadcaster
 
 
 class RacecarNeoBridge(Node):
@@ -28,6 +31,13 @@ class RacecarNeoBridge(Node):
         self.declare_parameter('camera_fov_degrees', 60.0)
         self.declare_parameter('auto_start_user_program', True)
         self.declare_parameter('auto_start_duration_sec', 20.0)
+        self.declare_parameter('publish_odom', True)
+        self.declare_parameter('publish_tf', True)
+        self.declare_parameter('base_frame', 'base_link')
+        self.declare_parameter('odom_frame', 'odom')
+        self.declare_parameter('map_frame', 'map')
+        self.declare_parameter('wheelbase', 0.33)
+        self.declare_parameter('max_steering_angle', 0.42)
 
         self.frame_prefix = self.get_parameter('frame_prefix').value
         self.max_speed = float(self.get_parameter('max_speed').value)
@@ -38,6 +48,18 @@ class RacecarNeoBridge(Node):
         self.camera_fov_degrees = float(self.get_parameter('camera_fov_degrees').value)
         self.auto_start_user_program = bool(self.get_parameter('auto_start_user_program').value)
         self.auto_start_duration_sec = float(self.get_parameter('auto_start_duration_sec').value)
+        self.publish_odom = bool(self.get_parameter('publish_odom').value)
+        self.publish_tf = bool(self.get_parameter('publish_tf').value)
+        self.base_frame = self.get_parameter('base_frame').value
+        self.odom_frame = self.get_parameter('odom_frame').value
+        self.map_frame = self.get_parameter('map_frame').value
+        self.wheelbase = float(self.get_parameter('wheelbase').value)
+        self.max_steering_angle = float(self.get_parameter('max_steering_angle').value)
+
+        self._x = 0.0
+        self._y = 0.0
+        self._yaw = 0.0
+        self._last_update_time = None
 
         self._cmd_lock = threading.Lock()
         self._speed = 0.0
@@ -52,6 +74,8 @@ class RacecarNeoBridge(Node):
         self.camera_info_pub = self.create_publisher(CameraInfo, 'camera/color/camera_info', 5)
         self.lidar_pub = self.create_publisher(LaserScan, 'scan', 5)
         self.imu_pub = self.create_publisher(Imu, 'imu/data_raw', 5)
+        self.odom_pub = self.create_publisher(Odometry, 'odom', 10)
+        self.tf_broadcaster = TransformBroadcaster(self)
         self.create_subscription(AckermannDriveStamped, 'ackermann_cmd', self._cmd_callback, 10)
 
     def _cmd_callback(self, msg: AckermannDriveStamped) -> None:
@@ -124,7 +148,9 @@ class RacecarNeoBridge(Node):
             steering = self._steering
         self._rc.drive.set_speed_angle(speed, steering)
 
-        stamp = self.get_clock().now().to_msg()
+        now = self.get_clock().now()
+        stamp = now.to_msg()
+        self._update_odometry(now, speed, steering)
         if self.publish_camera:
             self._publish_color(stamp)
             self._publish_camera_info(stamp)
@@ -134,12 +160,112 @@ class RacecarNeoBridge(Node):
             self._publish_scan(stamp)
         if self.publish_imu:
             self._publish_imu(stamp)
+        if self.publish_odom:
+            self._publish_odom(stamp, speed, steering)
+        if self.publish_tf:
+            self._publish_tf(stamp)
 
     def _header(self, stamp, frame: str) -> Header:
         header = Header()
         header.stamp = stamp
-        header.frame_id = f'{self.frame_prefix}/{frame}'
+        header.frame_id = self._frame(frame)
         return header
+
+
+    def _frame(self, frame: str) -> str:
+        if frame in (self.map_frame, self.odom_frame, self.base_frame):
+            return frame
+        return f'{self.frame_prefix}/{frame}'
+
+    def _update_odometry(self, now, speed_cmd: float, steering_cmd: float) -> None:
+        if self._last_update_time is None:
+            self._last_update_time = now
+            return
+        dt = max(0.0, (now - self._last_update_time).nanoseconds * 1e-9)
+        self._last_update_time = now
+        if dt <= 0.0:
+            return
+        speed = float(speed_cmd) * self.max_speed
+        steering_angle = float(steering_cmd) * self.max_steering_angle
+        yaw_rate = 0.0
+        if abs(self.wheelbase) > 1e-6:
+            yaw_rate = speed * math.tan(steering_angle) / self.wheelbase
+        self._yaw = math.atan2(math.sin(self._yaw + yaw_rate * dt), math.cos(self._yaw + yaw_rate * dt))
+        self._x += speed * math.cos(self._yaw) * dt
+        self._y += speed * math.sin(self._yaw) * dt
+
+    def _yaw_quaternion(self):
+        half = 0.5 * self._yaw
+        return (0.0, 0.0, math.sin(half), math.cos(half))
+
+    def _publish_odom(self, stamp, speed_cmd: float, steering_cmd: float) -> None:
+        speed = float(speed_cmd) * self.max_speed
+        steering_angle = float(steering_cmd) * self.max_steering_angle
+        yaw_rate = 0.0
+        if abs(self.wheelbase) > 1e-6:
+            yaw_rate = speed * math.tan(steering_angle) / self.wheelbase
+        qx, qy, qz, qw = self._yaw_quaternion()
+        msg = Odometry()
+        msg.header.stamp = stamp
+        msg.header.frame_id = self.odom_frame
+        msg.child_frame_id = self.base_frame
+        msg.pose.pose.position.x = self._x
+        msg.pose.pose.position.y = self._y
+        msg.pose.pose.position.z = 0.0
+        msg.pose.pose.orientation.x = qx
+        msg.pose.pose.orientation.y = qy
+        msg.pose.pose.orientation.z = qz
+        msg.pose.pose.orientation.w = qw
+        msg.twist.twist.linear.x = speed
+        msg.twist.twist.angular.z = yaw_rate
+        msg.pose.covariance[0] = 0.05
+        msg.pose.covariance[7] = 0.05
+        msg.pose.covariance[35] = 0.2
+        msg.twist.covariance[0] = 0.1
+        msg.twist.covariance[35] = 0.2
+        self.odom_pub.publish(msg)
+
+    def _publish_tf(self, stamp) -> None:
+        qx, qy, qz, qw = self._yaw_quaternion()
+        transforms = []
+
+        odom_to_base = TransformStamped()
+        odom_to_base.header.stamp = stamp
+        odom_to_base.header.frame_id = self.odom_frame
+        odom_to_base.child_frame_id = self.base_frame
+        odom_to_base.transform.translation.x = self._x
+        odom_to_base.transform.translation.y = self._y
+        odom_to_base.transform.translation.z = 0.0
+        odom_to_base.transform.rotation.x = qx
+        odom_to_base.transform.rotation.y = qy
+        odom_to_base.transform.rotation.z = qz
+        odom_to_base.transform.rotation.w = qw
+        transforms.append(odom_to_base)
+
+        sensor_frames = [
+            ('camera_color_optical_frame', 0.18, 0.0, 0.22, -math.pi / 2.0, 0.0, -math.pi / 2.0),
+            ('camera_depth_optical_frame', 0.18, 0.0, 0.22, -math.pi / 2.0, 0.0, -math.pi / 2.0),
+            ('lidar_link', 0.08, 0.0, 0.18, 0.0, 0.0, 0.0),
+            ('imu_link', 0.0, 0.0, 0.08, 0.0, 0.0, 0.0),
+        ]
+        for child, x, y, z, roll, pitch, yaw in sensor_frames:
+            tf = TransformStamped()
+            tf.header.stamp = stamp
+            tf.header.frame_id = self.base_frame
+            tf.child_frame_id = self._frame(child)
+            tf.transform.translation.x = x
+            tf.transform.translation.y = y
+            tf.transform.translation.z = z
+            cr, sr = math.cos(roll / 2.0), math.sin(roll / 2.0)
+            cp, sp = math.cos(pitch / 2.0), math.sin(pitch / 2.0)
+            cy, sy = math.cos(yaw / 2.0), math.sin(yaw / 2.0)
+            tf.transform.rotation.x = sr * cp * cy - cr * sp * sy
+            tf.transform.rotation.y = cr * sp * cy + sr * cp * sy
+            tf.transform.rotation.z = cr * cp * sy - sr * sp * cy
+            tf.transform.rotation.w = cr * cp * cy + sr * sp * sy
+            transforms.append(tf)
+
+        self.tf_broadcaster.sendTransform(transforms)
 
     def _publish_color(self, stamp) -> None:
         image = self._rc.camera.get_color_image_no_copy()

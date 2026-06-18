@@ -2,9 +2,13 @@ topics:
   command: /ackermann_cmd
   color_image: /camera/color/image_raw
   depth_image: /camera/depth/image_rect_raw
+  metric_depth_image: /depth_anything/depth/image
+  metric_pointcloud: /depth_anything/points
   camera_info: /camera/color/camera_info
   lidar: /scan
   imu: /imu/data_raw
+  nvblox_static_slice: /nvblox_node/static_map_slice
+  nvblox_combined_slice: /nvblox_node/combined_map_slice
 frames:
   base: racecarneo/base_link
   camera_color: racecarneo/camera_color_optical_frame
