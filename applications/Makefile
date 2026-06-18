@@ -77,8 +77,6 @@ build_roboticstoolbox: cleanup
 	APP=roboticstoolbox ./_build_it.sh
 build_ros2: cleanup
 	APP=ros2 ./_build_it.sh
-build_rtx2: cleanup
-	APP=rtx2 ./_build_it.sh
 build_simstudio: cleanup
 	APP=simstudio ./_build_it.sh
 build_so101: cleanup
