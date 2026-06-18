@@ -1,27 +1,81 @@
-
 services:
   realsense:
-    network_mode: "host"
+    network_mode: host
     pull_policy: if_not_present
     privileged: true
-    image: cyberphysics/realsense
+    image: cyberphysics/realsense:${CYBERPHYSICS_TAG:-latest}
     container_name: realsense
     devices:
       - /dev:/dev
-    volumes:
-      - /dev/shm:/dev/shm
-    command: >
-      stdbuf -o L
-      ros2 launch realsense2_camera rs_launch.py
-  nvblox:
-    network_mode: "host"
-    pull_policy: if_not_present
-    image: cyberphysics/nvblox
-    container_name: nvblox
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
     volumes:
       - /dev/shm:/dev/shm
     command: >
       stdbuf -o L
+      ros2 launch realsense2_camera rs_launch.py
+
+  nvblox:
+    network_mode: host
+    pull_policy: if_not_present
+    image: cyberphysics/nvblox:${CYBERPHYSICS_TAG:-latest}
+    container_name: nvblox
+    ipc: host
+    privileged: true
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics,video
+    volumes:
+      - /dev/shm:/dev/shm
+    command: >
+      stdbuf -o L
       ros2 launch nvblox_examples_bringup realsense_example.launch.py
+        run_rviz:=False
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu, compute, utility]
+
+  nvblox_quickstart:
+    network_mode: host
+    pull_policy: if_not_present
+    image: cyberphysics/nvblox:${CYBERPHYSICS_TAG:-latest}
+    container_name: nvblox_quickstart
+    ipc: host
+    privileged: true
+    profiles: [quickstart]
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics,video
+    volumes:
+      - /dev/shm:/dev/shm
+    command: >
+      stdbuf -o L
+      ros2 launch nvblox_examples_bringup isaac_sim_example.launch.py
+        rosbag:=/workspace/isaac_ros_assets/isaac_ros_nvblox/quickstart
+        navigation:=False
+        run_rviz:=False
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu, compute, utility]
+
+  foxglove_bridge:
+    network_mode: host
+    image: cyberphysics/ros2:${CYBERPHYSICS_TAG:-latest}
+    container_name: foxglove_bridge
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    volumes:
+      - /dev/shm:/dev/shm
+    command: >
+      stdbuf -o L
+      ros2 launch rosbridge_server rosbridge_websocket_launch.xml
