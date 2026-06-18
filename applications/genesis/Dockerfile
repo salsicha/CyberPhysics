@@ -1,10 +1,10 @@
-FROM cyberphysics/ros2:latest AS build
+FROM cyberphysics/aerostack2:latest AS build
 
 ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US.UTF-8 \
     TERM=xterm \
     PYTHONIOENCODING=UTF-8 \
-    ROS2_DISTRO=jazzy \
+    ROS2_DISTRO=humble \
     DEBIAN_FRONTEND=noninteractive \
     PATH="/venv/bin:$PATH"
 

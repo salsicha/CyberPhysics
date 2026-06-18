@@ -11,13 +11,24 @@ Files:
 - `config/pid_speed_controller.yaml`: PID speed-controller parameters.
 - `config/nav_topics.env`: expected simulated topic names for DemNav/WildNav.
 
-Start the base Aerostack2 simulation:
+Start the base Aerostack2 simulation headlessly:
 
 ```bash
 docker compose -f compositions/aerostack2_sim.yaml up
 ```
 
-Start it with DemNav and WildNav enabled:
+The Gazebo services run without X11 and publish ROS 2 topics for GPS, odometry,
+downward RGB, downward depth, and camera calibration. Expected topic names are
+listed in `config/nav_topics.env`; the default sensor topics are:
+
+- `/drone_sim_0/sensor_measurements/gps`
+- `/drone_sim_0/sensor_measurements/odom`
+- `/drone_sim_0/sensor_measurements/downward_rgb/image_raw`
+- `/drone_sim_0/sensor_measurements/downward_rgb/camera_info`
+- `/drone_sim_0/sensor_measurements/downward_rgbd/depth`
+- `/drone_sim_0/sensor_measurements/downward_rgbd/depth/camera_info`
+
+Start it with DemNav and WildNav consumers enabled:
 
 ```bash
 docker compose --profile navsim -f compositions/aerostack2_sim.yaml up

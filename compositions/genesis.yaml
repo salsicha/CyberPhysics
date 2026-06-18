@@ -1,23 +1,18 @@
-# Genesis World simulator
+# Genesis headless ROS 2 simulator
 services:
-  genesis: # simulator
+  genesis:
     network_mode: "host"
-    image: cyberphysics/genesis
-    privileged: true
+    image: cyberphysics/genesis:${CYBERPHYSICS_TAG:-latest}
+    container_name: genesis
+    ipc: host
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - GENESIS_BACKEND=${GENESIS_BACKEND:-cpu}
+      - PYOPENGL_PLATFORM=${PYOPENGL_PLATFORM:-egl}
+      - NVIDIA_DRIVER_CAPABILITIES=all
     volumes:
       - /dev/shm:/dev/shm
-      - "/tmp/.X11-unix:/tmp/.X11-unix"
-      - /dev/dri:/dev/dri
-    environment:
-      - "DISPLAY=${DISPLAY}"
-      - XAUTHORITY
-      - NVIDIA_DRIVER_CAPABILITIES=all
+      - ../systems/aerostack2_genesis:/workspace/systems/aerostack2_genesis:ro
     command: >
-      python3 /scripts/vehicle.py
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
+      python3 /workspace/systems/aerostack2_genesis/scripts/genesis_aerostack2_navsim.py
+        --backend ${GENESIS_BACKEND:-cpu}

@@ -63,6 +63,8 @@ build_demnav: cleanup build_aerostack2
 	APP=demnav ./_build_it.sh
 build_matlab: cleanup
 	APP=matlab ./_build_it.sh
+build_marimo: cleanup
+	APP=marimo ./_build_it.sh
 build_navigation2: cleanup build_ros2
 	APP=navigation2 ./_build_it.sh
 build_nicegui: cleanup build_ros2
@@ -71,12 +73,6 @@ build_nvblox: cleanup build_ros2
 	APP=nvblox ./_build_it.sh
 build_oak1: cleanup build_aerostack2
 	APP=oak1 ./_build_it.sh
-build_openclaw: cleanup
-	APP=openclaw ./_build_it.sh
-build_openjarvis: cleanup
-	APP=openjarvis ./_build_it.sh
-build_ozzmaker: cleanup build_ros2
-	APP=ozzmaker ./_build_it.sh
 build_pysimcoder: cleanup
 	APP=pysimcoder ./_build_it.sh
 build_qgroundcontrol: cleanup
@@ -91,8 +87,6 @@ build_record: cleanup build_ros2
 	APP=record ./_build_it.sh
 build_roboticstoolbox: cleanup
 	APP=roboticstoolbox ./_build_it.sh
-build_robotransformers: cleanup
-	APP=robotransformers ./_build_it.sh
 build_ros2: cleanup
 	APP=ros2 ./_build_it.sh
 build_rtx2: cleanup
@@ -109,8 +103,6 @@ build_tello: cleanup build_ros2
 	APP=tello ./_build_it.sh
 build_unrealengine: cleanup
 	APP=unrealengine ./_build_it.sh
-build_videpth: cleanup
-	APP=videpth ./_build_it.sh
 build_vinsmono: cleanup
 	APP=vinsmono ./_build_it.sh
 build_whereami: cleanup

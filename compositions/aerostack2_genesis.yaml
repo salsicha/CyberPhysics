@@ -1,78 +1,27 @@
-
-
-# TODO: not working yet
-
-
-# RViz
-# On by default
-
-# Launch aerostack2 simulated drone platform (gazebo needs to be running)
-# CMD ["ros2", "launch", "as2_platform_gazebo", "platform_gazebo_launch.py", "namespace:=drone_sim_0", "simulation_config_file:=world_json_path"]
-
-# Keyboard teleoperation:
-# ros2 launch as2_keyboard_teleoperation as2_keyboard_teleoperation_launch.py namespace:=<%= drone_namespace %>
-
-# Platform
-# ros2 launch as2_platform_multirotor_simulator as2_platform_multirotor_simulator.launch.py namespace:=<%= drone_namespace %> config_file:=config/config.yaml uav_config:=config/uav_config.yaml world_config:=<%= simulation_config_file %>
-
-# State Estimation:
-# ros2 launch as2_state_estimator state_estimator_launch.py namespace:=<%= drone_namespace %> config_file:=config/config.yaml
-
-# Motion Control:
-# ros2 launch as2_motion_controller controller_launch.py namespace:=<%= drone_namespace %> config_file:=config/config.yaml plugin_name:=<%= motion_controller_plugin %> plugin_config_file:=config/<%= motion_controller_plugin %>.yaml
-
-# Motion behaviors
-# ros2 launch as2_behaviors_motion motion_behaviors_launch.py namespace:=<%= drone_namespace %> config_file:=config/config.yaml
-
-# Trajectory Generation Behavior
-# ros2 launch as2_behaviors_trajectory_generation generate_polynomial_trajectory_behavior_launch.py namespace:=<%= drone_namespace %> config_file:=config/config.yaml
-
-# Point Gimbal Behavior
-# ros2 launch as2_behaviors_perception point_gimbal_behavior.launch.py namespace:=<%= drone_namespace %> config_file:=config/config.yaml
-
-# Behavior tree
-# ros2 launch as2_behavior_tree behavior_trees.launch.py drone_id:=<%= drone_namespace %> tree:=./trees/square.xml
-
-# Mission monitoring
-# ros2 run as2_alphanumeric_viewer as2_alphanumeric_viewer_node --ros-args -r  __ns:=/<%= drone_namespace %>
-
-
-
-
 services:
-  keyboardpublisher: # keyboard input
+  genesis:
     network_mode: "host"
-    image: cyberphysics/pyflightcontroller
-    privileged: true
-    devices:
-      - /dev:/dev
-    volumes:
-      - /dev/shm:/dev/shm
-    command: >
-      python3 /flightcontroller/python/keyboard_publisher.py
-  pyflightcontroller: # FlightController subscribers
-    network_mode: "host"
-    image: cyberphysics/rpiflightcontroller
-    privileged: true
-    devices:
-      - /dev:/dev
-    volumes:
-      - /dev/shm:/dev/shm
-    command: >
-      python3 /scripts/scout/python/ros_flight_controller.py True
-  genesis: # simulator
-    network_mode: "host"
-    image: cyberphysics/genesis
-    privileged: true
-    volumes:
-      - /dev/shm:/dev/shm
-      - "/tmp/.X11-unix:/tmp/.X11-unix"
+    image: cyberphysics/genesis:${CYBERPHYSICS_TAG:-latest}
+    container_name: aerostack2_genesis
+    ipc: host
+    env_file:
+      - ../systems/aerostack2_genesis/config/nav_topics.env
     environment:
-      - "DISPLAY=${DISPLAY}"
-      - XAUTHORITY
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - GENESIS_BACKEND=${GENESIS_BACKEND:-cpu}
+      - PYOPENGL_PLATFORM=${PYOPENGL_PLATFORM:-egl}
       - NVIDIA_DRIVER_CAPABILITIES=all
+    volumes:
+      - /dev/shm:/dev/shm
+      - ../systems/aerostack2_genesis:/workspace/systems/aerostack2_genesis:ro
     command: >
-      python3 /scripts/vehicle.py
+      python3 /workspace/systems/aerostack2_genesis/scripts/genesis_aerostack2_navsim.py
+        --backend ${GENESIS_BACKEND:-cpu}
+        --lat ${INITIAL_LAT:-37.8044}
+        --lon ${INITIAL_LON:--122.4661}
+        --origin-alt ${ORIGIN_ALT:-0.0}
+        --altitude-m ${GENESIS_FLIGHT_ALTITUDE_M:-300.0}
+        --radius-m ${GENESIS_FLIGHT_RADIUS_M:-60.0}
     deploy:
       resources:
         reservations:
@@ -80,3 +29,71 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
+
+  demnav:
+    profiles: ["navsim"]
+    network_mode: "host"
+    image: cyberphysics/demnav:${CYBERPHYSICS_TAG:-latest}
+    container_name: demnav_genesis
+    depends_on:
+      - genesis
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - INITIAL_LAT=${INITIAL_LAT:-37.8044}
+      - INITIAL_LON=${INITIAL_LON:--122.4661}
+    env_file:
+      - ../systems/aerostack2_genesis/config/nav_topics.env
+    volumes:
+      - /dev/shm:/dev/shm
+    command: >
+      stdbuf -o L
+      ros2 launch demnav_pkg demnav.launch.py
+        gps_topic:=${GPS_TOPIC:-/drone_sim_0/sensor_measurements/gps}
+        odom_topic:=${ODOM_TOPIC:-/drone_sim_0/sensor_measurements/odom}
+        depth_topic:=${DEPTH_TOPIC:-/drone_sim_0/sensor_measurements/downward_rgbd/depth}
+        camera_info_topic:=${CAMERA_INFO_TOPIC:-/drone_sim_0/sensor_measurements/downward_rgbd/depth/camera_info}
+        initial_lat:=${INITIAL_LAT:-37.8044}
+        initial_lon:=${INITIAL_LON:--122.4661}
+        origin_alt:=${ORIGIN_ALT:-0.0}
+        area_km:=${AREA_KM:-10.0}
+        search_radius_m:=${SEARCH_RADIUS_M:-1000.0}
+        dem_resolution_m:=${DEM_RESOLUTION_M:-30.0}
+        fov_deg:=${FOV_DEG:-90.0}
+        min_correlation:=${DEMNAV_MIN_CORRELATION:--1.0}
+        min_dem_footprint_pixels:=${DEMNAV_MIN_FOOTPRINT_PIXELS:-3}
+
+  wildnav:
+    profiles: ["navsim"]
+    image: cyberphysics/wildnav:${CYBERPHYSICS_TAG:-latest}
+    container_name: wildnav_genesis
+    network_mode: host
+    ipc: host
+    depends_on:
+      - genesis
+      - demnav
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    env_file:
+      - ../systems/aerostack2_genesis/config/nav_topics.env
+    volumes:
+      - /dev/shm:/dev/shm
+    command: >
+      ros2 launch wildnav_pkg wildnav.launch.py
+        image_topic:=${WILDNAV_IMAGE_TOPIC:-/drone_sim_0/sensor_measurements/downward_rgb/image_raw}
+        camera_info_topic:=${WILDNAV_CAMERA_INFO_TOPIC:-/drone_sim_0/sensor_measurements/downward_rgb/camera_info}
+        prediction_odom_topic:=${NAVIGATION_ODOM_TOPIC:-/navigation/odometry}
+        raw_odom_topic:=${RAW_ODOM_TOPIC:-/drone_sim_0/sensor_measurements/odom}
+        gps_topic:=${GPS_TOPIC:-/drone_sim_0/sensor_measurements/gps}
+        demnav_odom_topic:=${DEMNAV_ODOM_TOPIC:-/demnav/odometry}
+        navigation_output_topic:=${NAVIGATION_ODOM_TOPIC:-/navigation/odometry}
+        initial_lat:=${INITIAL_LAT:-37.8044}
+        initial_lon:=${INITIAL_LON:--122.4661}
+        origin_alt:=${ORIGIN_ALT:-0.0}
+        zoom:=${WILDNAV_ZOOM:-18}
+        search_radius_m:=${WILDNAV_SEARCH_RADIUS_M:-250.0}
+        max_tiles:=${WILDNAV_MAX_TILES:-49}
+        max_tile_downloads_per_cycle:=${WILDNAV_MAX_DOWNLOADS:-8}
+        match_rate_hz:=${WILDNAV_RATE_HZ:-0.2}
+        min_matches:=${WILDNAV_MIN_MATCHES:-16}
+        min_inliers:=${WILDNAV_MIN_INLIERS:-10}
+        min_inlier_ratio:=${WILDNAV_MIN_INLIER_RATIO:-0.25}
