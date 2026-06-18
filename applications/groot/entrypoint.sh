@@ -1,4 +1,4 @@
 #!/bin/bash
 set -e
-source /venv/bin/activate
+source /opt/Isaac-GR00T/.venv/bin/activate
 exec "$@"

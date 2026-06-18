@@ -1,18 +1,22 @@
-
-# GROOT
-
 services:
   groot:
-    network_mode: "host"
-    image: cyberphysics/groot
+    network_mode: host
+    image: cyberphysics/groot:${CYBERPHYSICS_TAG:-latest}
     container_name: groot
+    pull_policy: if_not_present
+    gpus: all
+    ipc: host
+    shm_size: 16gb
+    ulimits:
+      memlock: -1
+      stack: 67108864
     environment:
-      - "DISPLAY=${DISPLAY}"
-      - XAUTHORITY=/tmp/.XAuthority
-      - "/tmp/.X11-unix:/tmp/.X11-unix"
+      - NVIDIA_VISIBLE_DEVICES=${NVIDIA_VISIBLE_DEVICES:-all}
+      - NVIDIA_DRIVER_CAPABILITIES=${NVIDIA_DRIVER_CAPABILITIES:-graphics,utility,compute}
+      - HF_HOME=/workspace/cache/huggingface
+      - TORCH_HOME=/workspace/cache/torch
     volumes:
-      - /dev/shm:/dev/shm
-      - $XAUTHORITY:/tmp/.XAuthority
-    # command: >
-    #   stdbuf -o L
-      
+      - ../data/groot:/workspace/data
+      - ../cache/groot:/workspace/cache
+    command: >
+      python /workspace/smoke_test.py

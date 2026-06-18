@@ -43,6 +43,8 @@ build_gazebo: cleanup build_ros2
 	APP=gazebo ./_build_it.sh
 build_genesis: cleanup
 	APP=genesis ./_build_it.sh
+build_groot: cleanup
+	APP=groot ./_build_it.sh
 build_isaacsim: cleanup
 	APP=isaacsim ./_build_it.sh
 build_demnav: cleanup build_aerostack2
