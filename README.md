@@ -1,130 +1,90 @@
 <a href="">
   <img src="https://media.githubusercontent.com/media/salsicha/CyberPhysics/main/icon.png"
-    height="70" align="right" alt="" />
+    height="70" align="right" alt="CyberPhysics" />
 </a>
 
 # CyberPhysics
 
-CyberPhysics is a platform for deploying robotic and ML applications.  
+CyberPhysics is a container-first workspace for robotics, simulation, and ML applications. It keeps reusable application images in `applications/`, robot-specific calibration and configuration in `systems/`, and runnable multi-container stacks in `compositions/`.
 
+The repository is designed for Ubuntu 24.04 and ROS 2 Jazzy unless an application README says otherwise.
 
+## Repository Layout
 
-## Features
+- `applications/`: reusable Dockerized tools such as ROS 2, Gazebo, Isaac Sim integrations, nvblox, Depth Anything, NiceGUI, DemNav, WildNav, and robot-specific bridges.
+- `systems/`: hardware or simulation setups, including URDF/Xacro files, calibration, controller YAML, topic conventions, and robot-specific navigation config.
+- `compositions/`: Docker Compose files that combine applications into working systems.
 
-- run state-of-the-art algorithms on entry level hardware  
-- browser-based graphical user interface  
-- access to latest ROS tools  
-- deployable to kubernetes  
-- and more...  
+Keep large generated assets out of git. Docker images may download model weights, simulator assets, or example datasets during build; runtime maps should be downloaded or generated outside the repository.
 
-
-## Installation
-
-(This project is designed for Ubuntu 24.04)  
+## Install
 
 ```bash
 ./install.sh
 ```
 
-## Building images
+## Build Images
 
-From the applications folder run "make build_<app_name>". For example:  
+Build from the `applications/` directory with `make build_<app_name>`:
 
 ```bash
-cd applications && make build_ros2
+make -C applications build_ros2
+make -C applications build_racecarneo
+make -C applications build_depthanything
 ```
 
-!!! Targeting ARM64 (Raspberry Pi, Jetson) !!!
+For ARM64 targets such as Raspberry Pi or Jetson:
+
 ```bash
-cd applications && make target_arm64 build_ros2
+cd applications
+make target_arm64 build_ros2
 ```
 
-
-## TorchStudio
-
-https://www.torchstudio.ai/getstarted/
-Don't install new Python environment, select ~/venv/bin/python
-
-
-## Usage
-
-Write new applications and put them in the applications folder.  
-
-Compose your applications together using docker compose in the compositions folder.  
-
-Launch it with docker compose. For example:  
+## Run A Composition
 
 ```bash
 docker compose -f compositions/marimo.yaml up
 ```
 
-For viewing ROS data, run the Foxglove compose file, and launch Foxglove on your host machine.  
+The RACECAR Neo simulation and navigation stack is a representative full pipeline:
+
 ```bash
+docker compose -f compositions/racecarneo.yaml up
+```
+
+That stack runs the headless MIT RACECAR Neo simulator, publishes ROS 2 camera/lidar/IMU/odometry topics, estimates metric monocular depth with Depth Anything, builds nvblox TSDF/ESDF slices, runs Nav2, and serves a NiceGUI waypoint interface at `http://localhost:8080`.
+
+## Observe ROS Data
+
+Foxglove can be launched through a compose stack or on the host:
+
+```bash
+docker compose -f compositions/foxglove.yaml up
 foxglove-studio
 ```
 
-A web based GUI can be built with NiceGUI, and then accessed through your host machine's browser:  
-http://localhost:8080/  
+For nvblox visualization in Foxglove, install NVIDIA's Foxglove extension on the host:
 
-
-## Nvblox extension for Foxglove (on host)
-
-Reference:  
-https://github.com/NVIDIA-ISAAC-ROS/isaac_ros_nvblox/tree/main/nvblox_foxglove  
-
-1. git clone https://github.com/NVIDIA-ISAAC-ROS/isaac_ros_nvblox.git  
-2. cd nvblox_foxglove  
-3. (install npm==20.10.0, see below)  
-4. npm install  
-5. npm run local-install  
-
-To install npm==20.10.0:
 ```bash
-curl https://raw.githubusercontent.com/creationix/nvm/master/install.sh | bash
-nvm install 20.10.0
-nvm use 20.10.0
+git clone https://github.com/NVIDIA-ISAAC-ROS/isaac_ros_nvblox.git
+cd isaac_ros_nvblox/nvblox_foxglove
+npm install
+npm run local-install
 ```
 
+The extension expects Node/npm compatible with NVIDIA's instructions; Node 20.10.0 has worked for this setup.
 
-## Examples
+## Development Conventions
 
-ARDUINO:  
- - Connect Arduino Teensy 4.1 to USB port on host computer.  
- - Launch "foxglove-studio" from command line.  
-```bash
-cd compositions
-docker compose -f arduino.yaml up
-```
- - Messages from the Arduino board should now be visible  
+- Put reusable software in `applications/<name>`.
+- Put robot-specific configuration in `systems/<system>`.
+- Put runnable stacks in `compositions/<stack>.yaml`.
+- Prefer headless simulation containers that publish ROS 2 topics.
+- Do not commit downloaded models, simulator assets, maps, logs, or bags.
 
-SPATIAL RECONSTRUCTION:  
- - Connect Realsense 435i to USB port on host computer.  
-```bash  
-cd compositions  
-docker compose -f reconstruction.yaml up  
-```  
- - Launch "foxglove-studio" from command line.  
- - Select "Open connection" -> "Rosbridge" -> "Open"  
- - Messages from the Nvblox board should now be visible  
+## Real-Time Notes
 
-
-## Documentation
-
-Have a look at the README in each application's folder for explanations of what they do.  
-
-
-## Why?
-
-Many cyber-physical systems quickly become unamangeable as complexity and dependency conflicts scale exponentially with the number of components. This project should help with that.  
-
-
-## Real time ROS2 image for RPi4
-https://github.com/ros-realtime/ros-realtime-rpi4-image
-
-
-## Note on real time performance
-
-Real time performance can be achieved by pinning a process to a core:  
+Pin latency-sensitive containers to dedicated CPU cores when needed:
 
 ```bash
 docker run --cpuset-cpus="0,1" -it your_image your_command
@@ -137,39 +97,14 @@ services:
     cpuset: "0,1"
 ```
 
-Then reserve the cores needed before running the containers:  
+Reserve the cores on the host before launching containers:
 
 ```bash
-cset shield --cpu 0,1 --kthread on 
+cset shield --cpu 0,1 --kthread on
 ```
 
-Then set cgroup-parent in dockerd config "/etc/docker/daemon.json":  
-```json 
-{
-  "cgroup-parent": "/system"
-}
-```
+Restore the host when finished:
 
-Then to restore the host system:  
 ```bash
 cset shield --reset
 ```
-
-## Raspberry Pi 5 fix
-
-```bash
-sudo apt remove python3-rpi.gpio
-sudo apt install python3-rpi-lgpio
-```
-
-
-## Migrating to LFS
-```bash
-git lfs migrate import --include="*.exe, *.iso" --everything
-```
-
-## Example applications
-
-- Unjammable drone that uses elevation and color maps to supplement navigation  
-- VLA powered arm for manipulation  
-- TSDF and deep learning autonomous high speed racecar  

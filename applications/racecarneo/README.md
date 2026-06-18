@@ -1,8 +1,8 @@
-# MIT RACECAR Neo
+# MIT RACECAR Neo Application
 
 This application packages the official MIT RACECAR Neo Linux simulator and Python library, then exposes the simulator through ROS 2.
 
-The Docker image downloads upstream assets at build time:
+The image downloads upstream assets at build time:
 
 - `MITRacecarNeo/RacecarNeo-Simulator`, `linux` branch
 - `MITRacecarNeo/racecar-neo-library`, `main` branch
@@ -15,51 +15,62 @@ Simulator assets are not stored in this repository.
 make -C applications build_racecarneo
 ```
 
-## Run The Official Simulator Headlessly And Publish ROS 2 Topics
+## Headless Simulator Bridge
+
+Run only the simulator and ROS bridge:
 
 ```bash
 docker compose -f compositions/racecarneo.yaml up racecarneo_sim racecarneo_bridge
 ```
 
-The Unity simulator runs headlessly under `xvfb-run` in `racecarneo_sim`, so it does not need a host X11 display mount. The Python bridge connects to the simulator over UDP ports `5064` and `5065` and publishes ROS 2 messages.
+The Unity simulator runs under `xvfb-run` in `racecarneo_sim`, so it does not need a host X11 display. The bridge connects over UDP ports `5064` and `5065`, publishes ROS 2 sensor/state topics, and subscribes to Ackermann drive commands.
 
-The bridge publishes:
+Published topics:
 
-- `camera/color/image_raw` (`sensor_msgs/Image`, `bgr8`)
-- `camera/depth/image_rect_raw` (`sensor_msgs/Image`, `32FC1`, meters)
-- `camera/color/camera_info` (`sensor_msgs/CameraInfo`)
-- `scan` (`sensor_msgs/LaserScan`)
-- `imu/data_raw` (`sensor_msgs/Imu`)
-- `odom` (`nav_msgs/Odometry`)
-- TF for `odom -> base_link` and the simulated camera, lidar, and IMU frames
+- `/camera/color/image_raw` (`sensor_msgs/Image`, `bgr8`)
+- `/camera/depth/image_rect_raw` (`sensor_msgs/Image`, `32FC1`, meters)
+- `/camera/color/camera_info` (`sensor_msgs/CameraInfo`)
+- `/scan` (`sensor_msgs/LaserScan`)
+- `/imu/data_raw` (`sensor_msgs/Imu`)
+- `/odom` (`nav_msgs/Odometry`)
+- TF for `odom -> base_link` and simulated sensor frames
 
-The bridge subscribes to:
+Subscribed topics:
 
-- `ackermann_cmd` (`ackermann_msgs/AckermannDriveStamped`)
+- `/ackermann_cmd` (`ackermann_msgs/AckermannDriveStamped`)
 
-The bridge sends the MIT protocol `racecar_go` autostart packet for the first 20 seconds of startup. Simulator builds that honor this packet can begin publishing without UI interaction. If a particular Unity build still waits for an in-window click, that is an upstream simulator limitation rather than a ROS transport issue; the ROS bridge is already ready to publish as soon as RacecarSim emits update frames.
+The bridge sends the MIT `racecar_go` autostart packet during startup. If a simulator build still waits for an in-window click, the bridge will publish as soon as the simulator emits update frames.
 
-## Navigation2
+## Full Navigation Stack
 
-Before the Navigation2 setup, RACECAR Neo navigation was only a low-level ROS bridge: simulator sensors were published to ROS 2, and the car accepted normalized Ackermann commands on `ackermann_cmd`. There was no planner, controller, map frame, or goal-driven navigation stack.
-
-The current composition runs Navigation2 with online SLAM:
-
-- `racecarneo_bridge` publishes lidar, odometry, and TF.
-- `racecarneo_slam` runs SLAM Toolbox and publishes `map -> odom` from `/scan` and `/odom`.
-- `racecarneo_nav2` runs Nav2 planner, controller, smoother, behavior, route, collision monitor, BT navigator, waypoint follower, and docking lifecycle nodes.
-- `racecarneo_cmd_vel_to_ackermann` converts the final Nav2 `cmd_vel` output into the simulator's normalized `ackermann_cmd` input.
-
-Run the full navigation stack:
+Run the full RACECAR Neo stack:
 
 ```bash
-docker compose -f compositions/racecarneo.yaml up \
-  racecarneo_sim \
-  racecarneo_bridge \
-  racecarneo_slam \
-  racecarneo_nav2 \
-  racecarneo_cmd_vel_to_ackermann \
-  foxglove_bridge
+docker compose -f compositions/racecarneo.yaml up
 ```
 
-Nav2 goals can be sent with any ROS 2 client that talks to `NavigateToPose`, RViz, or Foxglove. The stack builds the map online with SLAM Toolbox; no map files are stored in the repository.
+The composition runs this pipeline:
+
+1. `racecarneo_bridge` publishes camera, lidar, IMU, odometry, and TF.
+2. `racecarneo_depthanything` estimates metric monocular depth from `/camera/color/image_raw`.
+3. `racecarneo_nvblox` consumes the estimated depth image and camera info, then publishes TSDF/ESDF map slices.
+4. `racecarneo_slam` runs SLAM Toolbox to provide `map -> odom`.
+5. `racecarneo_nav2` plans and controls with Nav2 using nvblox costmap layers plus lidar fallback.
+6. `racecarneo_cmd_vel_to_ackermann` converts Nav2 `/cmd_vel` into `/ackermann_cmd`.
+7. `racecarneo_nicegui` serves a browser UI for observation and waypoint commands.
+
+NiceGUI is available at `http://localhost:8080`.
+
+## Configuration
+
+Robot-specific config lives in `systems/racecarneo/`:
+
+- `config/bridge.yaml`: simulator bridge parameters
+- `config/depthanything.yaml`: metric depth parameters
+- `config/nvblox.yaml`: nvblox mapper overrides
+- `config/nav2.yaml`: Nav2 parameters and nvblox costmap layers
+- `config/slam_toolbox.yaml`: online SLAM parameters
+- `config/topics.yaml`: topic and frame conventions
+- `urdf/racecarneo.urdf.xacro`: lightweight visualization model
+
+No maps or simulator assets are committed to the repo.

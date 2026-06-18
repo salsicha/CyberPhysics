@@ -1,78 +1,71 @@
-# Dependencies
-* Run this script (You must read output and follow manual instructions!!!)
-    ```
-    tools/install/install.sh
-    ```
-# Add an app
-1. Navigate to the apps folder and create a new directory. Assuming starting from monorepo folder
-    ```
-    cd apps
-    mkdir <your_app_name>
-    ```
-    where <your_app_name> is replaced by the name of the app you are creating formatted lower case and with underscores instead of spaces
+# Applications
 
-2. Navigate to your newly created directory and create a dockerfile
-    ```cd your_app_name
-    touch dockerfile
-    #to learn more about docker visit their documentation
-    ```
-3. Setup your docker file to run the application for a simple starting point look at the lostlink dockerfile
-4. Test out the docker container
-    ```
-    make your_app_name
-    docker run -t your_app_name
-    ```
-If no errors then you can go write your app and update the docker file as needed.
-6. Setting up the build tools. Open the /cyberphysics/apps/Makefile go to the #Build section add
-```build_your_app_name: cleanup
-APP=your_app_name ./_build_it.sh
+`applications/` contains reusable Docker images. Each application should be able to run without knowing a specific robot; robot-specific files should be mounted from `systems/` or configured through launch arguments, environment variables, or compose files.
+
+## Build
+
+From the repository root:
+
+```bash
+make -C applications build_<app_name>
 ```
-to the end of the #Build section
 
-7. Create a docker compose yaml file
-    1. Navigate to /cyberphysics/deployment/ assuming you were in apps before from step 6
-        ```
-        cd ../deployment
-        ```
-    2. Create a docker yml file for your application
-        ```
-        touch your_app_name.yml
-        ```
-    3. Populate your yaml file. The claw.yml can be used as an example. General but not exhaustive descriptions are listed below
+Examples:
 
-8. Test everything
-    1. Return to the app directory and run ```make build_your_app_name```
-    2. If there were no errors return to the deployment file and run ```docker compose -f your_app_name.yml up --remove-orphans```
-9. Add a README.md in your app directory describing purpose and usage
+```bash
+make -C applications build_ros2
+make -C applications build_racecarneo
+make -C applications build_depthanything
+make -C applications build_nicegui
+```
 
-# About Docker multi-stage build
-See https://docs.docker.com/build/building/multi-stage/.
+For ARM64 targets:
 
-We make use of multi-stage build to reduce the final image size. In a Dockerfile whenenver you call a RUN statement that installs some software (eg. compiler) it will increase the image size, even if you remove it later on in a different RUN. The only way to not increase the image size is to install your tools, do your thing, then remove the tool, in a single RUN. This cam get unwieldy and limits the use of layer caching.
+```bash
+cd applications
+make target_arm64 build_ros2
+```
 
-# Build images
-* How to build images
-    * To build a app (e.g., `rviz`)
-        ```bash
-        make build_rviz
-        ```
+## Add An Application
 
-# Run individual containers
-* How to run containers
-    * To run bash from a ROS2 container
-        ```bash
-        docker run -ti --rm cyberphysics/ros2 /bin/bash
-        ```
+1. Create `applications/<app_name>/` using lowercase words with underscores only when needed.
+2. Add a `Dockerfile` and an `entrypoint.sh` if the app needs one.
+3. Add a `build_<app_name>` target to `applications/Makefile`.
+4. Add a short `README.md` describing what the app provides, how to build it, and the topics/ports/assets it uses.
+5. Add or update a compose file in `compositions/` if the app is part of a runnable stack.
 
-# Run containers with orchestration
-* Docker compose blackfly example:
-    * From the "deployments" folder:
-        * Start:
-            ```bash
-            docker compose -f blackfly.yml up
-            ```
-        * Stop:
-            ```bash
-            docker compose -f blackfly.yml down --remove-orphans
-            ```
+A minimal Makefile target looks like this:
 
+```make
+build_<app_name>: cleanup build_ros2
+	APP=<app_name> ./_build_it.sh
+```
+
+Use the closest existing Dockerfile as the template. ROS 2 Jazzy apps should normally inherit from `cyberphysics/ros2:${TAG}` unless they need a specialized base image.
+
+## Run A Container Directly
+
+```bash
+docker run -it --rm cyberphysics/ros2:latest /bin/bash
+```
+
+## Run With Compose
+
+Compose files live in `compositions/`:
+
+```bash
+docker compose -f compositions/racecarneo.yaml up
+```
+
+Use `down --remove-orphans` when changing service sets:
+
+```bash
+docker compose -f compositions/racecarneo.yaml down --remove-orphans
+```
+
+## Image Hygiene
+
+- Download third-party assets during image build or at runtime; do not commit them.
+- Keep generated maps, bags, logs, and model caches out of git.
+- Prefer `--no-install-recommends` for apt installs.
+- Keep final images runnable headlessly whenever practical.

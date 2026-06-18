@@ -1,14 +1,41 @@
 # RACECAR Neo System
 
-This system folder is the hardware and simulation configuration home for MIT RACECAR Neo.
+This folder contains configuration for the MIT RACECAR Neo hardware/simulation setup. The reusable application code lives in `applications/`; this directory holds the files that are specific to this vehicle.
 
-Current contents:
+## Contents
 
-- `config/bridge.yaml`: ROS parameters for the official simulator bridge.
-- `config/topics.yaml`: topic and frame names used by the bridge.
-- `calibration/camera.yaml`: placeholder camera calibration for the simulator.
-- `urdf/racecarneo.urdf.xacro`: lightweight frame model for ROS visualization and future Gazebo/Isaac work.
+- `config/bridge.yaml`: ROS parameters for the official Unity simulator bridge.
+- `config/cmd_vel_to_ackermann.yaml`: conversion from Nav2 velocity commands to normalized Ackermann commands.
+- `config/depthanything.yaml`: metric Depth Anything topic/model settings.
+- `config/nav2.yaml`: Nav2 planner, controller, behavior, and nvblox costmap-layer settings.
+- `config/nvblox.yaml`: nvblox TSDF/ESDF mapper overrides for the RACECAR camera setup.
+- `config/slam_toolbox.yaml`: online SLAM Toolbox settings for `map -> odom`.
+- `config/topics.yaml`: canonical topics and frames for this system.
+- `calibration/camera.yaml`: simulator camera calibration placeholder.
+- `urdf/racecarneo.urdf.xacro`: lightweight frame model for ROS visualization.
 
-The official MIT Unity simulator assets are downloaded into the `cyberphysics/racecarneo` Docker image at build time. They are not committed here.
+## Runtime Pipeline
 
-A full ROS-native Gazebo model can be added next by extending the URDF with wheel joints, Ackermann steering, gazebo sensor tags, and controller parameters. The official simulator bridge is the initial working model because it matches the current MIT RACECAR Neo student tooling.
+The full composition is `compositions/racecarneo.yaml`:
+
+```bash
+docker compose -f compositions/racecarneo.yaml up
+```
+
+Data flow:
+
+```text
+Unity simulator -> racecarneo_bridge -> /camera/color/image_raw
+/camera/color/image_raw -> Depth Anything -> /depth_anything/depth/image
+/depth_anything/depth/image + /camera/color/camera_info -> nvblox -> map slices
+nvblox map slices + SLAM map frame -> Nav2 -> /cmd_vel
+/cmd_vel -> cmd_vel_to_ackermann -> /ackermann_cmd -> simulator
+```
+
+The NiceGUI frontend observes odometry, camera, and depth status and sends Nav2 waypoints through `NavigateToPose`.
+
+## Asset Policy
+
+The official MIT Unity simulator and Python library are downloaded into the `cyberphysics/racecarneo` image during build. Generated maps, bags, logs, and simulator assets should not be committed here.
+
+A more detailed Gazebo or Isaac model can be added here later by extending the URDF with wheel joints, Ackermann steering controllers, sensors, and simulator-specific tags.
