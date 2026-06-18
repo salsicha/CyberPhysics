@@ -1,1 +1,41 @@
-# TODO
+services:
+  racecarneo_sim:
+    network_mode: host
+    pull_policy: if_not_present
+    image: cyberphysics/racecarneo:${CYBERPHYSICS_TAG:-latest}
+    container_name: racecarneo_sim
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - RACECAR_XVFB_SERVER_ARGS=${RACECAR_XVFB_SERVER_ARGS:--screen 0 1280x720x24}
+      - RACECAR_SIM_LOG_FILE=${RACECAR_SIM_LOG_FILE:-/dev/stdout}
+    command: >
+      /workspace/run_headless_sim.sh
+
+  racecarneo_bridge:
+    network_mode: host
+    pull_policy: if_not_present
+    image: cyberphysics/racecarneo:${CYBERPHYSICS_TAG:-latest}
+    container_name: racecarneo_bridge
+    depends_on:
+      - racecarneo_sim
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - RACECAR_SIM_IP=${RACECAR_SIM_IP:-127.0.0.1}
+    volumes:
+      - ../systems/racecarneo/config:/workspace/config:ro
+    command: >
+      python3 /workspace/racecarneo_ros_bridge.py
+        --ros-args
+        --params-file /workspace/config/bridge.yaml
+
+  foxglove_bridge:
+    network_mode: host
+    image: cyberphysics/ros2:${CYBERPHYSICS_TAG:-latest}
+    container_name: racecarneo_foxglove_bridge
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    volumes:
+      - /dev/shm:/dev/shm
+    command: >
+      stdbuf -o L
+      ros2 launch rosbridge_server rosbridge_websocket_launch.xml

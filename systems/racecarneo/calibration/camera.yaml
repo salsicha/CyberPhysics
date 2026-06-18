@@ -1,0 +1,9 @@
+camera:
+  width: 640
+  height: 480
+  fov_degrees: 60.0
+  distortion_model: plumb_bob
+  distortion_coefficients: [0.0, 0.0, 0.0, 0.0, 0.0]
+notes: >
+  Placeholder intrinsics for the official RACECAR Neo simulator bridge. Replace with
+  calibrated physical camera intrinsics for a hardware-specific deployment.

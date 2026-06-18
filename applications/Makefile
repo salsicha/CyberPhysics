@@ -35,30 +35,16 @@ build_aerostack2: cleanup
 	APP=aerostack2 ./_build_it.sh
 build_arduino: cleanup
 	APP=arduino ./_build_it.sh
-build_bcflight: cleanup
-	APP=bcflight ./_build_it.sh
-build_bcflightcontroller: cleanup
-	APP=bcflightcontroller ./_build_it.sh
 build_blackfly: cleanup build_ros2
 	APP=blackfly ./_build_it.sh
-build_cbfkit: cleanup
-	APP=cbfkit ./_build_it.sh
-build_comfyui: cleanup
-	APP=comfyui ./_build_it.sh
 build_depthanything: cleanup build_aerostack2
 	APP=depthanything ./_build_it.sh
-build_dia: cleanup
-	APP=dia ./_build_it.sh
-build_dronedemo: cleanup
-	APP=dronedemo ./_build_it.sh
 build_gazebo: cleanup build_ros2
 	APP=gazebo ./_build_it.sh
 build_genesis: cleanup
 	APP=genesis ./_build_it.sh
 build_isaacsim: cleanup
 	APP=isaacsim ./_build_it.sh
-build_jupyter: cleanup
-	APP=jupyter ./_build_it.sh
 build_demnav: cleanup build_aerostack2
 	APP=demnav ./_build_it.sh
 build_matlab: cleanup
@@ -77,12 +63,12 @@ build_pysimcoder: cleanup
 	APP=pysimcoder ./_build_it.sh
 build_qgroundcontrol: cleanup
 	APP=qgroundcontrol ./_build_it.sh
-build_racecarneo: cleanup
-	APP=racecarneo ./_build_it.sh
 build_rai: cleanup
 	APP=rai ./_build_it.sh
 build_realsense: cleanup
 	APP=realsense ./_build_it.sh
+build_racecarneo: cleanup build_ros2
+	APP=racecarneo ./_build_it.sh
 build_record: cleanup build_ros2
 	APP=record ./_build_it.sh
 build_roboticstoolbox: cleanup
@@ -91,8 +77,6 @@ build_ros2: cleanup
 	APP=ros2 ./_build_it.sh
 build_rtx2: cleanup
 	APP=rtx2 ./_build_it.sh
-build_sdfnmpc: cleanup
-	APP=sdfnmpc ./_build_it.sh
 build_simstudio: cleanup
 	APP=simstudio ./_build_it.sh
 build_so101: cleanup

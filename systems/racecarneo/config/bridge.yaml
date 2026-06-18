@@ -1,0 +1,11 @@
+racecarneo_bridge:
+  ros__parameters:
+    frame_prefix: racecarneo
+    max_speed: 0.35
+    publish_camera: true
+    publish_depth: true
+    publish_lidar: true
+    publish_imu: true
+    camera_fov_degrees: 60.0
+    auto_start_user_program: true
+    auto_start_duration_sec: 20.0

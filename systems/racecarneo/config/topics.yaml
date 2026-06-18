@@ -1,0 +1,13 @@
+topics:
+  command: /ackermann_cmd
+  color_image: /camera/color/image_raw
+  depth_image: /camera/depth/image_rect_raw
+  camera_info: /camera/color/camera_info
+  lidar: /scan
+  imu: /imu/data_raw
+frames:
+  base: racecarneo/base_link
+  camera_color: racecarneo/camera_color_optical_frame
+  camera_depth: racecarneo/camera_depth_optical_frame
+  lidar: racecarneo/lidar_link
+  imu: racecarneo/imu_link
