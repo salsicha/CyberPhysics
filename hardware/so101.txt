@@ -1,0 +1,79 @@
+# SO-101 With Depth Camera Hardware Shopping List
+
+Goal: build a physical SO-101 arm station that matches the CyberPhysics SO-101
+simulation interface while adding a depth camera for tabletop perception.
+
+Quick-buy baseline
+
+- 1 x SO-101 follower arm kit, assembled if speed matters. Buy a full kit from
+  one of the vendors listed by TheRobotStudio/LeRobot, such as PartaBot, Seeed
+  Studio, WowRobo, RoboSEasy, NeoBot, or Autodiscovery.
+- 1 x SO-101 leader arm kit if teleoperation or LeRobot data collection is part
+  of the first milestone. For simple policy playback or scripted control, one
+  follower arm is enough.
+- 1 x RealSense D435i depth camera for general tabletop manipulation. It provides
+  RGB, depth, and IMU in one USB device and is a good default for 0.3 m to 3 m
+  working distances.
+- 1 x RealSense D405 depth camera if the priority is close-range wrist/table
+  inspection rather than whole-workspace coverage. Buy this instead of, not in
+  addition to, the D435i unless there is a multi-camera plan.
+- 1 x camera mount. Recommended: small tripod, articulating desk clamp, or
+  3D-printed SO-101/world-frame mount that keeps the camera rigid during arm
+  motion.
+- 1 x USB 3.0 cable for the RealSense camera, 1 m to 2 m, with strain relief.
+- 1 x dedicated control computer. Minimum: existing Ubuntu workstation/laptop
+  with USB 3. Recommended standalone option: mini PC with Ubuntu 24.04, 16 GB
+  RAM, and 512 GB SSD. Use a Jetson Orin Nano/Orin NX only if perception or
+  policy inference must run onboard.
+- 1 x powered USB hub if using leader arm, follower arm, and depth camera from
+  one host.
+- 1 x rigid table or mounting board for the arm base.
+- 1 x table clamp set if not included with the SO-101 kit.
+- 1 x calibration target kit: checkerboard or AprilTag board, tape measure, and
+  printed frame markers.
+- 1 x small parts tray and spare servo hardware: M2/M3 screws, horns, spare
+  3-pin servo cables, USB-C cables, and heat-set inserts.
+- 1 x cable management kit: adhesive anchors, flexible cable sleeve, Velcro
+  straps, and strain relief clips.
+
+DIY SO-101 parts if buying a complete kit is not available
+
+- For one follower arm:
+  - 6 x STS3215 7.4 V servos with 1/345 gearing.
+  - 1 x Feetech/Waveshare-compatible motor control board.
+  - 1 x USB-C cable.
+  - 1 x 5 V or 7.4 V power supply matching the selected motor/control-board BOM.
+  - 1 x printed SO-101 follower part set.
+  - 1 x screwdriver set with #0 and #1 Phillips drivers.
+- For a leader + follower teleoperation pair:
+  - 7 x STS3215 7.4 V servos with 1/345 gearing.
+  - 2 x STS3215 7.4 V servos with 1/191 gearing.
+  - 3 x STS3215 7.4 V servos with 1/147 gearing.
+  - 2 x motor control boards.
+  - 2 x USB-C cables.
+  - 2 x motor power supplies.
+  - 1 x printed leader part set and 1 x printed follower part set.
+  - 1 x table clamp set and small screwdriver set.
+
+Recommended assembly order
+
+1. Build or buy the SO-101 follower arm first.
+2. Configure motor IDs and baud rate before routing cables permanently.
+3. Mount the depth camera rigidly and leave room for full arm reach.
+4. Verify these ROS topics before adding higher-level policies:
+   - /joint_states
+   - /so101/joint_commands
+   - /so101/camera/image_raw or the selected RealSense RGB topic
+   - selected depth image and camera_info topics
+5. Perform camera intrinsics and hand-eye/extrinsic calibration before collecting
+   training data or evaluating grasping.
+
+Useful purchase references
+
+- Project SO-101 simulation interface: applications/so101/README.md
+- Hugging Face SO-101 assembly documentation:
+  https://huggingface.co/docs/lerobot/so101
+- TheRobotStudio SO-ARM100/SO-101 BOM and vendor links:
+  https://github.com/TheRobotStudio/SO-ARM100
+- RealSense D435i camera:
+  https://www.realsenseai.com/products/depth-camera-d435i/

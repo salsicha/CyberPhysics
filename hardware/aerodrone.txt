@@ -1,0 +1,85 @@
+# Aerodrone Hardware Shopping List
+
+Goal: build a quadrotor that can mirror the CyberPhysics Aerostack2 navigation
+simulation: GPS/odom, downward RGB for WildNav, and downward depth for DemNav.
+
+Important compatibility note
+
+- The user-requested target is Raspberry Pi 5 plus a Blue Robotics flight
+  controller hat. Blue Robotics currently sells the Navigator as a Raspberry Pi
+  4 flight-controller expansion board. Before purchasing for a Pi 5 build,
+  confirm Pi 5 mechanical/header/software compatibility with Blue Robotics or
+  buy a Raspberry Pi 4 specifically for the Navigator. The rest of this list
+  assumes the Navigator-style I/O stack: PWM motor outputs, SBUS RC input,
+  onboard IMU/compass/barometer, and BlueOS/ArduPilot setup.
+
+Quick-buy baseline
+
+- 1 x 450 mm to 500 mm quadcopter frame kit with landing gear and enough top-deck
+  room for Raspberry Pi, Navigator, battery, and downward cameras. Recommended
+  quick route: Holybro X500 V2 or equivalent ArduPilot-friendly quad frame.
+- 4 x matched brushless motors appropriate for the frame, commonly 2216-920 kV
+  or similar for a 450/500 mm 4S build.
+- 4 x PWM-capable ESCs, 30 A to 40 A, compatible with the selected motors and
+  props. The Navigator has PWM outputs, so avoid ESCs that require a flight-
+  controller protocol the stack cannot drive.
+- 2 x full prop sets, clockwise and counter-clockwise, sized for the motor/frame
+  combination. Buy extra props for first-flight tuning.
+- 1 x power distribution board or harness with XT60/XT90 main connector.
+- 2 x 4S LiPo batteries, 4000 mAh to 6000 mAh, with a discharge rating suitable
+  for the motor/prop setup.
+- 1 x LiPo balance charger and fire-safe charging bag.
+- 1 x Raspberry Pi 5, preferably 8 GB or 16 GB.
+- 1 x Raspberry Pi 5 active cooler.
+- 1 x high-endurance 128 GB or larger microSD card, or an M.2/NVMe HAT if the
+  software image and vibration budget support it.
+- 1 x 5 V/5 A to 5 V/6 A regulated power supply for the Raspberry Pi/flight
+  controller stack, fed from the main battery.
+- 1 x Blue Robotics Navigator Flight Controller kit, plus the vendor-recommended
+  Power Sense Module and 5 V 6 A supply option.
+- 1 x GPS + compass module with JST-GH cabling. Recommended: u-blox M9N/M10N or
+  Here3+/Here4-class module supported by ArduPilot.
+- 1 x RC transmitter and SBUS/ELRS receiver for manual control and failsafe.
+- 1 x telemetry link for setup and field debugging. Use USB/Ethernet/Wi-Fi on the
+  bench and a 915 MHz/868 MHz telemetry radio or equivalent for the field.
+- 1 x downward RGB camera for WildNav. Recommended: Raspberry Pi Global Shutter
+  Camera with a wide-angle lens and short CSI cable, mounted nadir-facing.
+- 1 x downward depth camera for DemNav. Recommended: RealSense D435i for low-
+  altitude testing, or RealSense D455 if the drone will fly higher and can carry
+  the extra size/weight.
+- 1 x short USB 3.0 cable and vibration-isolated mount for the RealSense camera.
+- 1 x downward rangefinder for landing and altitude sanity checks. Recommended:
+  Benewake TFmini-S/TF-Luna for budget builds, or LightWare SF11/C for higher
+  confidence.
+- 1 x vibration isolation kit for flight controller and camera deck.
+- 1 x prop guards for indoor/first tests, if payload clearance allows.
+- 1 x small hardware kit: M2.5/M3 screws, nylon lock nuts, standoffs, threadlocker,
+  battery straps, foam tape, zip ties, cable sleeving, and heat-shrink tubing.
+- 1 x field safety kit: LiPo voltage checker, spare props, spare arms, spare ESC,
+  spare motor, smoke stopper, multimeter, and first-flight landing pad.
+
+Recommended assembly order
+
+1. Assemble frame, motors, ESCs, and power distribution with props removed.
+2. Mount the Raspberry Pi/Navigator stack near the center of gravity and wire
+   PWM outputs, power sense, GPS/compass, RC receiver, and telemetry.
+3. Verify ArduPilot motor order, RC failsafe, battery monitor, compass, and IMU
+   calibration before installing propellers.
+4. Mount cameras rigidly downward:
+   - WildNav RGB topic should correspond to downward_rgb/image_raw.
+   - DemNav depth topic should correspond to downward_rgbd/depth.
+5. Run tethered or prop-off bench tests until GPS, odom, RGB, depth, and camera
+   calibration topics are stable.
+6. Perform manual hover and failsafe tests before enabling any autonomous
+   waypoint, DemNav, or WildNav behavior.
+
+Useful purchase references
+
+- Project Aerostack2 nav topics: systems/aerostack2_gazebo/config/nav_topics.env
+- Project Aerostack2 simulation notes: systems/aerostack2_gazebo/README.md
+- Raspberry Pi 5:
+  https://www.raspberrypi.com/products/raspberry-pi-5/
+- Blue Robotics Navigator Flight Controller:
+  https://bluerobotics.com/store/comm-control-power/control/navigator/
+- RealSense D435i camera:
+  https://www.realsenseai.com/products/depth-camera-d435i/

@@ -1,0 +1,79 @@
+# RACECAR Neo Hardware Shopping List
+
+Goal: build a physical 1/10-scale RACECAR Neo that can match the simulated
+CyberPhysics pipeline: forward RGB camera -> Depth Anything -> nvblox/Nav2,
+with lidar, IMU, odometry, and Ackermann command output.
+
+Quick-buy baseline
+
+- 1 x 1/10 4WD RC car platform, preferably a Traxxas Slash 4x4, Traxxas Rally,
+  or equivalent 1/10 brushless short-course/rally chassis with spare parts
+  readily available.
+- 1 x NVIDIA Jetson Orin Nano Super Developer Kit, 8 GB.
+- 1 x 128 GB or larger NVMe SSD for the Jetson, plus a compatible M.2 carrier
+  if the selected Jetson carrier does not expose NVMe directly.
+- 1 x regulated Jetson power rail from the drive battery, sized for the carrier
+  board input. Use a 19 V/5 A buck-boost module for the developer kit barrel
+  input, or the carrier vendor's recommended automotive DC input.
+- 1 x forward-facing RGB-D camera. Recommended: RealSense D455 for mobile/outdoor
+  range, or RealSense D435i for shorter indoor testing with built-in IMU.
+  A plain USB global-shutter RGB camera is enough for the Depth Anything path,
+  but RGB-D gives a useful fallback depth topic.
+- 1 x USB 3.0 short locking cable for the camera, plus strain relief.
+- 1 x 2D lidar for /scan. Recommended budget option: Slamtec RPLIDAR C1/S2/A2.
+  Recommended robust option: Hokuyo UST-10LX or UST-20LX.
+- 1 x IMU if the selected camera IMU is not used for vehicle state estimation.
+  Recommended: BNO085/BNO086 breakout, WitMotion WT901C, or equivalent ROS-
+  friendly 6/9-axis IMU.
+- 1 x VESC 6-class motor controller, or equivalent VESC-compatible ESC with
+  UART/USB/CAN telemetry.
+- 1 x steering servo interface. Use the vehicle's included steering servo if it
+  is reliable; otherwise buy a 20 kg-cm or stronger metal-gear waterproof servo.
+- 1 x microcontroller bridge for servo/PWM, encoder, and safety I/O. Recommended:
+  Teensy 4.1, Arduino Nano 33 IoT, or similar board with ROS 2 micro-ROS support.
+- 1 x wheel speed/odometry kit. Use motor encoder telemetry from the VESC when
+  available; otherwise add a magnetic wheel encoder or optical encoder.
+- 1 x RC transmitter and receiver for manual override and first-drive testing.
+  Recommended: ELRS or Spektrum/Futaba receiver with PWM/SBUS output.
+- 1 x physical emergency-stop switch that cuts motor power while leaving compute
+  power available for clean logs.
+- 1 x main power switch, inline fuse, XT60/XT90 connectors, and power
+  distribution board.
+- 2 x drive batteries compatible with the chassis and VESC, usually 2S or 3S
+  LiPo packs. Buy at least two packs so one can charge while one is installed.
+- 1 x balance charger rated for the selected LiPo packs.
+- 1 x 5 V/5 A buck converter for USB hubs, microcontroller, and low-voltage
+  accessories.
+- 1 x powered USB 3 hub if the Jetson carrier does not have enough stable USB
+  ports for camera, lidar, microcontroller, and setup peripherals.
+- 1 x Wi-Fi 6 or Ethernet bridge. Prefer Ethernet for lab bring-up; use Wi-Fi
+  only after the ROS graph is stable.
+- 1 x top electronics plate. Use carbon fiber, G10, acrylic, or 3D printed
+  standoffs that isolate electronics from chassis vibration.
+- 1 x forward camera mount with adjustable pitch and vibration isolation.
+- 1 x lidar mast or top-deck mount with a clear 360 degree view.
+- 1 x small hardware kit: M2.5/M3 screws, standoffs, heat-set inserts, zip ties,
+  cable sleeving, adhesive cable anchors, threadlocker, and Velcro straps.
+
+Recommended assembly order
+
+1. Assemble and test the RC car in manual mode with the stock radio.
+2. Install VESC/control electronics and verify throttle/steering with wheels off
+   the ground.
+3. Add Jetson, camera, lidar, and IMU on a removable top plate.
+4. Verify ROS topics before autonomous driving:
+   - /camera/color/image_raw
+   - /camera/color/camera_info
+   - /scan
+   - /imu/data_raw
+   - /ackermann_cmd
+5. Add the emergency stop before enabling Nav2 or autonomous throttle.
+
+Useful purchase references
+
+- Project sensor topics: systems/racecarneo/config/topics.yaml
+- Project runtime pipeline: systems/racecarneo/README.md
+- NVIDIA Jetson Orin Nano Super Developer Kit:
+  https://www.nvidia.com/en-us/autonomous-machines/embedded-systems/jetson-orin/nano-super-developer-kit/
+- RealSense D435i camera:
+  https://www.realsenseai.com/products/depth-camera-d435i/
