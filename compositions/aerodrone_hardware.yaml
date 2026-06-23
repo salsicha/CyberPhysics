@@ -1,0 +1,9 @@
+# Physical Aerodrone stack.
+#
+# This is the Raspberry Pi/BlueOS/OAK-1 hardware composition for the aerodrone
+# described in hardware/aerodrone.txt. It reuses the existing BlueOS Aerostack2
+# stack, which runs MAVROS, Aerostack2, OAK-1 MegaDepth, DemNav, WildNav,
+# behavior tree, rosbridge, and the lightweight web GUI.
+
+include:
+  - blueos_aerostack.yaml

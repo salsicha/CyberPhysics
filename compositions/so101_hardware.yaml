@@ -1,0 +1,84 @@
+# Physical SO-101 station stack.
+#
+# The repository currently provides the SO-101 ROS contract, simulated adapters,
+# camera/GROOT bridge, and safety/control helpers. A physical motor driver still
+# needs to run on the host or in another compose file and should:
+#   publish /joint_states
+#   subscribe to /so101/joint_commands
+
+services:
+  so101_depth_camera:
+    network_mode: host
+    pull_policy: if_not_present
+    privileged: true
+    image: cyberphysics/realsense:${CYBERPHYSICS_TAG:-latest}
+    container_name: so101_depth_camera
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+    volumes:
+      - /dev/bus/usb:/dev/bus/usb
+      - /dev/shm:/dev/shm
+    command: >
+      stdbuf -o L
+      ros2 launch realsense2_camera rs_launch.py
+        camera_name:=depth_camera
+        camera_namespace:=so101
+        enable_color:=true
+        enable_depth:=true
+        align_depth.enable:=true
+        pointcloud.enable:=true
+
+  groot_policy:
+    profiles:
+      - policy
+    image: cyberphysics/groot:${CYBERPHYSICS_TAG:-latest}
+    container_name: so101_hardware_groot_policy
+    network_mode: host
+    ipc: host
+    environment:
+      - HF_HOME=/workspace/cache/huggingface
+      - TORCH_HOME=/workspace/cache/torch
+      - SO101_GROOT_MODE=${SO101_GROOT_MODE:-mock}
+      - GR00T_MODEL_PATH=${GR00T_MODEL_PATH:-}
+      - GR00T_EMBODIMENT_TAG=${GR00T_EMBODIMENT_TAG:-so101}
+      - GR00T_DEVICE=${GR00T_DEVICE:-cuda}
+    volumes:
+      - ../data/groot:/workspace/data
+      - ../cache/groot:/workspace/cache
+    command: >
+      python /workspace/so101_policy_server.py
+        --mode ${SO101_GROOT_MODE:-mock}
+        --port ${SO101_GROOT_PORT:-5555}
+
+  so101_groot_bridge:
+    profiles:
+      - policy
+    image: cyberphysics/so101:${CYBERPHYSICS_TAG:-latest}
+    container_name: so101_hardware_groot_bridge
+    network_mode: host
+    depends_on:
+      - so101_depth_camera
+      - groot_policy
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+    volumes:
+      - ../systems:/workspace/systems:ro
+    command: >
+      python3 /workspace/src/so101_description/scripts/groot_so101_bridge.py
+        --ros-args
+        --params-file /workspace/systems/so101/config/groot_demo.yaml
+        -p camera_topic:=${SO101_CAMERA_TOPIC:-/so101/depth_camera/color/image_raw}
+
+  so101_foxglove_bridge:
+    network_mode: host
+    image: cyberphysics/ros2:${CYBERPHYSICS_TAG:-latest}
+    container_name: so101_foxglove_bridge
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    volumes:
+      - /dev/shm:/dev/shm
+    command: >
+      stdbuf -o L
+      ros2 launch rosbridge_server rosbridge_websocket_launch.xml
