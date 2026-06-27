@@ -1,0 +1,72 @@
+{
+  "name": "racecarneo_sensor_behavior_tests",
+  "scenario": "systems/racecarneo/scenarios/campus_closed_course.json",
+  "mission_file": "systems/racecarneo/missions/nav2_waypoints.json",
+  "ground_truth_policy": {
+    "allowed_for_scoring_only": true,
+    "forbidden_runtime_topics": ["/ground_truth", "/sim/pose", "/gazebo/model_states", "/tf_ground_truth"]
+  },
+  "tests": [
+    {
+      "id": "nominal_sensor_navigation",
+      "mission_id": "simple_loop",
+      "variant": "outdoor_campus_nominal",
+      "degradations": [],
+      "success": {
+        "requires_localization": true,
+        "requires_map_consumption": true,
+        "max_collision_count": 0,
+        "max_lateral_error_m": 0.45,
+        "max_localization_drift_m": 0.45,
+        "max_costmap_age_s": 1.0
+      }
+    },
+    {
+      "id": "camera_dropout_recovery",
+      "mission_id": "simple_loop",
+      "variant": "outdoor_campus_dynamic",
+      "degradations": [{"sensor": "camera", "start_s": 18.0, "duration_s": 4.0}],
+      "success": {
+        "requires_recovery": true,
+        "max_collision_count": 0,
+        "max_recovery_time_s": 12.0,
+        "max_stale_depth_speed_mps": 0.08
+      }
+    },
+    {
+      "id": "lidar_dropout_obstacle_avoidance",
+      "mission_id": "lane_change_obstacle_avoidance",
+      "variant": "outdoor_campus_dynamic",
+      "degradations": [{"sensor": "lidar", "start_s": 10.0, "duration_s": 3.0}],
+      "success": {
+        "min_obstacle_clearance_m": 0.20,
+        "max_collision_count": 0,
+        "requires_map_consumption": true
+      }
+    },
+    {
+      "id": "imu_bias_recovery",
+      "mission_id": "reverse_recovery",
+      "variant": "outdoor_campus_dynamic",
+      "degradations": [{"sensor": "imu", "bias_scale": 3.0, "duration_s": 20.0}],
+      "success": {
+        "requires_recovery": true,
+        "max_recovery_count": 3,
+        "max_localization_drift_m": 0.65,
+        "max_collision_count": 0
+      }
+    },
+    {
+      "id": "odom_slip_relocalization",
+      "mission_id": "multi_lap_endurance",
+      "variant": "outdoor_campus_nominal",
+      "degradations": [{"sensor": "wheel_odometry", "slip_std": 0.12, "duration_s": 60.0}],
+      "success": {
+        "requires_localization": true,
+        "max_localization_drift_m": 0.70,
+        "max_collision_count": 0,
+        "max_costmap_age_s": 1.25
+      }
+    }
+  ]
+}

@@ -95,6 +95,24 @@ tolerance, speed limit, expected route length, and success criteria. Supported
 missions are `simple_loop`, `cone_slalom`, `lane_change_obstacle_avoidance`,
 `reverse_recovery`, and `multi_lap_endurance`.
 
+## Sensor-Driven Behavior Tests
+
+Score mission telemetry against the sensor-behavior test manifest:
+
+```bash
+python3 applications/racecarneo/scripts/score_sensor_behavior.py \
+  --manifest systems/racecarneo/validation/sensor_behavior_tests.json \
+  --telemetry /tmp/racecarneo_behavior_run.json \
+  --test-id nominal_sensor_navigation
+```
+
+Telemetry should report planner input topics, localization/map-consumption flags,
+collision and recovery counts, and per-sample lateral error, localization drift,
+costmap age, obstacle clearance, depth age, and speed. The scorer fails if
+runtime planner inputs include simulator ground truth, if localization or map
+consumption is missing, if recovery does not complete, or if stale/degraded depth
+permits unsafe throttle.
+
 ## Configuration
 
 Robot-specific config lives in `systems/racecarneo/`:
