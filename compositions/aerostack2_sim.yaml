@@ -139,13 +139,21 @@ services:
     network_mode: "host"
     image: cyberphysics/aerostack2
     depends_on:
-      - simulator
-      - odom_bridge
+      simulator:
+        condition: service_started
+      odom_bridge:
+        condition: service_started
+      demnav_assets:
+        condition: service_completed_successfully
+      wildnav_assets:
+        condition: service_completed_successfully
     env_file:
       - ../systems/aerostack2_gazebo/config/nav_topics.env
     volumes:
       - /dev/shm:/dev/shm
       - ../systems/aerostack2_gazebo/scripts:/workspace/scripts:ro
+      - demnav_gazebo_cache:/data/demnav_cache:ro
+      - wildnav_gazebo_cache:/data/wildnav_cache:ro
     command: >
       python3 /workspace/scripts/aerodrone_sensor_sim.py
 
@@ -189,7 +197,7 @@ services:
         --lat ${INITIAL_LAT:-37.9234}
         --lon ${INITIAL_LON:--122.5967}
         --zoom ${WILDNAV_ZOOM:-18}
-        --search-radius-m ${WILDNAV_SEARCH_RADIUS_M:-300.0}
+        --search-radius-m ${WILDNAV_SEARCH_RADIUS_M:-900.0}
         --max-tiles ${WILDNAV_MAX_TILES:-64}
         --feature-backend ${WILDNAV_FEATURE_BACKEND:-SIFT}
         --tile-url-template ${WILDNAV_TILE_URL:-https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}}
@@ -230,9 +238,9 @@ services:
         camera_info_topic:=${OAK_DEPTH_INFO_TOPIC:-/oak1/camera_info}
         initial_lat:=${INITIAL_LAT:-37.9234}
         initial_lon:=${INITIAL_LON:--122.5967}
-        origin_alt:=${ORIGIN_ALT:-280.0}
+        origin_alt:=${ORIGIN_ALT:-850.0}
         area_km:=${AREA_KM:-8.0}
-        search_radius_m:=${SEARCH_RADIUS_M:-300.0}
+        search_radius_m:=${SEARCH_RADIUS_M:-900.0}
         dem_resolution_m:=${DEM_RESOLUTION_M:-10.0}
         fov_deg:=${FOV_DEG:-69.0}
         min_correlation:=${MIN_CORRELATION:-0.35}
@@ -276,9 +284,9 @@ services:
         navigation_output_topic:=${NAVIGATION_ODOM_TOPIC:-/navigation/odometry}
         initial_lat:=${INITIAL_LAT:-37.9234}
         initial_lon:=${INITIAL_LON:--122.5967}
-        origin_alt:=${ORIGIN_ALT:-280.0}
+        origin_alt:=${ORIGIN_ALT:-850.0}
         zoom:=${WILDNAV_ZOOM:-18}
-        search_radius_m:=${WILDNAV_SEARCH_RADIUS_M:-300.0}
+        search_radius_m:=${WILDNAV_SEARCH_RADIUS_M:-900.0}
         max_tiles:=${WILDNAV_MAX_TILES:-64}
         max_tile_downloads_per_cycle:=${WILDNAV_MAX_DOWNLOADS:-8}
         match_rate_hz:=${WILDNAV_RATE_HZ:-0.2}

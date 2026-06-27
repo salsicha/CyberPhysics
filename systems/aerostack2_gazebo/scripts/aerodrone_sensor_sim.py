@@ -4,10 +4,12 @@
 import math
 import os
 import time
+from glob import glob
 
 import numpy as np
 import rclpy
 from nav_msgs.msg import Odometry
+from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import (
@@ -18,9 +20,26 @@ from sensor_msgs.msg import (
     Imu,
     MagneticField,
     NavSatFix,
+    NavSatStatus,
     Range,
 )
 from std_msgs.msg import Bool, Float32
+
+try:
+    import cv2
+except ImportError:  # pragma: no cover - the runtime image carries OpenCV.
+    cv2 = None
+
+
+METERS_PER_DEG_LAT = 111_320.0
+WEB_MERCATOR_LIMIT = 85.05112878
+
+
+def _env_bool(name, default):
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip().lower() not in {'0', 'false', 'no', 'off'}
 
 
 def _rotate_vector_by_quaternion(vector, quat):
@@ -34,6 +53,12 @@ def _rotate_vector_by_quaternion(vector, quat):
 class AerodroneSensorSim(Node):
     def __init__(self):
         super().__init__('aerodrone_sensor_sim')
+        self.declare_parameter(
+            'synthetic_wilderness_sensors',
+            _env_bool('AERODRONE_SYNTHETIC_WILDERNESS_SENSORS', True))
+        self.declare_parameter(
+            'georeference_gps_from_odom',
+            _env_bool('AERODRONE_GEOREFERENCE_GPS_FROM_ODOM', True))
         self.declare_parameter('gps_noise_std_m', 1.5)
         self.declare_parameter('gps_degraded_noise_std_m', 12.0)
         self.declare_parameter('gps_degraded', False)
@@ -60,13 +85,29 @@ class AerodroneSensorSim(Node):
 
         seed = int(self.get_parameter('random_seed').value)
         self.rng = np.random.default_rng(seed)
+        self.synthetic_sensors = bool(
+            self.get_parameter('synthetic_wilderness_sensors').value)
+        self.georeference_gps = bool(
+            self.get_parameter('georeference_gps_from_odom').value)
         self.latest_odom = None
         self.latest_depth = None
         self.latest_depth_stamp = None
         self.latest_velocity = None
         self.latest_velocity_time = None
         self.start_time = time.monotonic()
-        self.origin_alt_m = float(os.environ.get('ORIGIN_ALT', '280.0'))
+        self.origin_lat = float(os.environ.get('INITIAL_LAT', '37.9234'))
+        self.origin_lon = float(os.environ.get('INITIAL_LON', '-122.5967'))
+        self.origin_alt_m = float(os.environ.get('ORIGIN_ALT', '850.0'))
+        self.area_km = float(os.environ.get('AREA_KM', '8.0'))
+        self.dem_resolution_m = float(os.environ.get('DEM_RESOLUTION_M', '10.0'))
+        self.fov_deg = float(os.environ.get('FOV_DEG', '69.0'))
+        self.synthetic_width = int(os.environ.get('SYNTHETIC_CAMERA_WIDTH', '640'))
+        self.synthetic_height = int(os.environ.get('SYNTHETIC_CAMERA_HEIGHT', '480'))
+        self.dem_cache_dir = os.environ.get('DEMNAV_CACHE_DIR', '/data/demnav_cache')
+        self.satellite_cache_dir = os.environ.get('WILDNAV_CACHE_DIR', '/data/wildnav_cache')
+        self.wildnav_zoom = int(os.environ.get('WILDNAV_ZOOM', '18'))
+        self.dem_grid = None
+        self.dem_path = None
 
         self.gps_pub = self.create_publisher(
             NavSatFix,
@@ -165,23 +206,38 @@ class AerodroneSensorSim(Node):
             qos_profile_sensor_data)
         self.imu_timer = self.create_timer(0.02, self._flight_controller_tick)
         self.timer = self.create_timer(0.2, self._status_tick)
+        if self.synthetic_sensors:
+            self.synthetic_timer = self.create_timer(0.2, self._synthetic_sensor_tick)
+            self.get_logger().info(
+                'Synthetic wilderness camera/depth enabled from DEM and satellite caches')
 
     def _gps(self, msg):
         out = NavSatFix()
         out.header = msg.header
-        out.status = msg.status
+        out.status.status = NavSatStatus.STATUS_FIX
+        out.status.service = NavSatStatus.SERVICE_GPS
         std_m = float(
             self.get_parameter('gps_degraded_noise_std_m').value
             if self.get_parameter('gps_degraded').value
             else self.get_parameter('gps_noise_std_m').value)
         north_m, east_m = self.rng.normal(0.0, std_m, size=2)
-        lat_rad = math.radians(msg.latitude if math.isfinite(msg.latitude) else 0.0)
-        lat_scale = 111_320.0
-        lon_scale = max(1e-3, lat_scale * math.cos(lat_rad))
-        out.latitude = msg.latitude + north_m / lat_scale
-        out.longitude = msg.longitude + east_m / lon_scale
-        out.altitude = msg.altitude + float(
-            self.rng.normal(0.0, max(0.5, std_m * 0.25)))
+        if self.georeference_gps and self.latest_odom is not None:
+            position = self.latest_odom.pose.pose.position
+            lat, lon = self._local_to_latlon(
+                float(position.x) + east_m,
+                float(position.y) + north_m)
+            out.latitude = lat
+            out.longitude = lon
+            out.altitude = self.origin_alt_m + float(position.z) + float(
+                self.rng.normal(0.0, max(0.5, std_m * 0.25)))
+            out.header.frame_id = 'map'
+        else:
+            lat_rad = math.radians(msg.latitude if math.isfinite(msg.latitude) else 0.0)
+            lon_scale = max(1e-3, METERS_PER_DEG_LAT * math.cos(lat_rad))
+            out.latitude = msg.latitude + north_m / METERS_PER_DEG_LAT
+            out.longitude = msg.longitude + east_m / lon_scale
+            out.altitude = msg.altitude + float(
+                self.rng.normal(0.0, max(0.5, std_m * 0.25)))
         out.position_covariance = [
             std_m ** 2, 0.0, 0.0,
             0.0, std_m ** 2, 0.0,
@@ -296,14 +352,20 @@ class AerodroneSensorSim(Node):
         self.barometer_pub.publish(msg)
 
     def _rgb(self, msg):
+        if self.synthetic_sensors:
+            return
         msg.header.frame_id = 'oak1_image_highres_optical_frame'
         self.rgb_pub.publish(msg)
 
     def _rgb_info(self, msg):
+        if self.synthetic_sensors:
+            return
         msg.header.frame_id = 'oak1_image_highres_optical_frame'
         self.rgb_info_pub.publish(msg)
 
     def _depth(self, msg):
+        if self.synthetic_sensors:
+            return
         self.latest_depth = msg
         self.latest_depth_stamp = self.get_clock().now()
         msg.header.frame_id = 'oak1_relative_depth_optical_frame'
@@ -311,6 +373,8 @@ class AerodroneSensorSim(Node):
         self._publish_range_from_depth(msg)
 
     def _depth_info(self, msg):
+        if self.synthetic_sensors:
+            return
         msg.header.frame_id = 'oak1_relative_depth_optical_frame'
         self.depth_info_pub.publish(msg)
 
@@ -340,6 +404,200 @@ class AerodroneSensorSim(Node):
         out.max_range = float(self.get_parameter('range_max_m').value)
         out.range = float(np.clip(np.nanmedian(valid), out.min_range, out.max_range))
         self.range_pub.publish(out)
+
+    def _synthetic_sensor_tick(self):
+        if self.latest_odom is None:
+            return
+        now = self.get_clock().now().to_msg()
+        rgb = self._synthetic_satellite_image()
+        depth = self._synthetic_dem_depth()
+        if rgb is not None:
+            rgb_msg = Image()
+            rgb_msg.header.stamp = now
+            rgb_msg.header.frame_id = 'oak1_image_highres_optical_frame'
+            rgb_msg.height, rgb_msg.width = rgb.shape[:2]
+            rgb_msg.encoding = 'bgr8'
+            rgb_msg.is_bigendian = False
+            rgb_msg.step = int(rgb_msg.width * 3)
+            rgb_msg.data = rgb.astype(np.uint8, copy=False).tobytes()
+            self.rgb_pub.publish(rgb_msg)
+            self.rgb_info_pub.publish(self._camera_info(
+                now, rgb_msg.width, rgb_msg.height,
+                'oak1_image_highres_optical_frame'))
+        if depth is not None:
+            depth_msg = Image()
+            depth_msg.header.stamp = now
+            depth_msg.header.frame_id = 'oak1_relative_depth_optical_frame'
+            depth_msg.height, depth_msg.width = depth.shape[:2]
+            depth_msg.encoding = '32FC1'
+            depth_msg.is_bigendian = False
+            depth_msg.step = int(depth_msg.width * 4)
+            depth_msg.data = depth.astype(np.float32, copy=False).tobytes()
+            self.depth_pub.publish(depth_msg)
+            self.depth_info_pub.publish(self._camera_info(
+                now, depth_msg.width, depth_msg.height,
+                'oak1_relative_depth_optical_frame'))
+            self._publish_range_from_depth(depth_msg)
+
+    def _camera_info(self, stamp, width, height, frame_id):
+        info = CameraInfo()
+        info.header.stamp = stamp
+        info.header.frame_id = frame_id
+        info.width = int(width)
+        info.height = int(height)
+        focal = width / (2.0 * math.tan(math.radians(self.fov_deg / 2.0)))
+        cx = width * 0.5
+        cy = height * 0.5
+        info.distortion_model = 'plumb_bob'
+        info.d = [0.0, 0.0, 0.0, 0.0, 0.0]
+        info.k = [focal, 0.0, cx, 0.0, focal, cy, 0.0, 0.0, 1.0]
+        info.r = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+        info.p = [
+            focal, 0.0, cx, 0.0,
+            0.0, focal, cy, 0.0,
+            0.0, 0.0, 1.0, 0.0,
+        ]
+        return info
+
+    def _local_to_latlon(self, east_m, north_m):
+        metres_per_deg_lon = (
+            METERS_PER_DEG_LAT * math.cos(math.radians(self.origin_lat)))
+        lat = self.origin_lat + north_m / METERS_PER_DEG_LAT
+        lon = self.origin_lon + east_m / metres_per_deg_lon
+        return lat, lon
+
+    def _latest_local_position(self):
+        position = self.latest_odom.pose.pose.position
+        return float(position.x), float(position.y), float(position.z)
+
+    def _latest_yaw(self):
+        q = self.latest_odom.pose.pose.orientation
+        return math.atan2(
+            2.0 * (q.w * q.z + q.x * q.y),
+            1.0 - 2.0 * (q.y * q.y + q.z * q.z))
+
+    def _load_dem_grid(self):
+        if self.dem_grid is not None:
+            return True
+        preferred = os.path.join(
+            self.dem_cache_dir,
+            f'dem_{self.origin_lat:.4f}_{self.origin_lon:.4f}_'
+            f'{self.area_km:.1f}_{self.dem_resolution_m:.0f}.npy')
+        candidates = [preferred] + sorted(glob(os.path.join(self.dem_cache_dir, '*.npy')))
+        for path in candidates:
+            if not os.path.exists(path):
+                continue
+            try:
+                self.dem_grid = np.load(path).astype(np.float32)
+                self.dem_path = path
+                self.get_logger().info(f'Loaded synthetic DEM source {path}')
+                return True
+            except Exception as exc:
+                self.get_logger().warning(f'Failed to load DEM cache {path}: {exc}')
+        return False
+
+    def _synthetic_dem_depth(self):
+        if cv2 is None or not self._load_dem_grid():
+            return None
+        east, north, local_z = self._latest_local_position()
+        altitude_m = self.origin_alt_m + local_z
+        ground_width_m = 2.0 * altitude_m * math.tan(math.radians(self.fov_deg / 2.0))
+        ground_height_m = ground_width_m * self.synthetic_height / self.synthetic_width
+        cols = max(3, int(ground_width_m / self.dem_resolution_m))
+        rows = max(3, int(ground_height_m / self.dem_resolution_m))
+        half_m = self.area_km * 500.0
+        row_center = (half_m - north) / self.dem_resolution_m
+        col_center = (east + half_m) / self.dem_resolution_m
+        patch = self._crop_grid(self.dem_grid, row_center, col_center, rows, cols)
+        terrain = cv2.resize(
+            patch, (self.synthetic_width, self.synthetic_height),
+            interpolation=cv2.INTER_CUBIC)
+        yaw = self._latest_yaw()
+        if abs(yaw) > 1e-3:
+            matrix = cv2.getRotationMatrix2D(
+                (self.synthetic_width * 0.5, self.synthetic_height * 0.5),
+                math.degrees(yaw),
+                1.0)
+            terrain = cv2.warpAffine(
+                terrain, matrix, (self.synthetic_width, self.synthetic_height),
+                flags=cv2.INTER_LINEAR,
+                borderMode=cv2.BORDER_REFLECT)
+        depth = (altitude_m - terrain).astype(np.float32)
+        depth += self.rng.normal(0.0, 0.35, size=depth.shape).astype(np.float32)
+        depth[(~np.isfinite(depth)) | (depth <= 0.2) | (depth > 500.0)] = np.nan
+        return depth
+
+    def _crop_grid(self, grid, row_center, col_center, rows, cols):
+        rows = min(max(3, rows), grid.shape[0])
+        cols = min(max(3, cols), grid.shape[1])
+        r0 = int(round(row_center - rows * 0.5))
+        c0 = int(round(col_center - cols * 0.5))
+        r1 = r0 + rows
+        c1 = c0 + cols
+        pad_top = max(0, -r0)
+        pad_left = max(0, -c0)
+        pad_bottom = max(0, r1 - grid.shape[0])
+        pad_right = max(0, c1 - grid.shape[1])
+        if pad_top or pad_bottom or pad_left or pad_right:
+            grid = np.pad(
+                grid,
+                ((pad_top, pad_bottom), (pad_left, pad_right)),
+                mode='edge')
+            r0 += pad_top
+            r1 += pad_top
+            c0 += pad_left
+            c1 += pad_left
+        return grid[r0:r1, c0:c1].copy()
+
+    def _synthetic_satellite_image(self):
+        if cv2 is None:
+            return None
+        east, north, _ = self._latest_local_position()
+        lat, lon = self._local_to_latlon(east, north)
+        tile_x, tile_y, pixel_x, pixel_y = self._latlon_to_tile_pixel(
+            lat, lon, self.wildnav_zoom)
+        path = os.path.join(
+            self.satellite_cache_dir,
+            f'{self.wildnav_zoom}_{tile_x}_{tile_y}.jpg')
+        tile = cv2.imread(path, cv2.IMREAD_COLOR)
+        if tile is None:
+            candidates = sorted(glob(os.path.join(
+                self.satellite_cache_dir, f'{self.wildnav_zoom}_*.jpg')))
+            if not candidates:
+                return None
+            tile = cv2.imread(candidates[0], cv2.IMREAD_COLOR)
+            if tile is None:
+                return None
+        crop_w, crop_h = 128, 96
+        center_x = int(np.clip(pixel_x, crop_w * 0.5, 256 - crop_w * 0.5))
+        center_y = int(np.clip(pixel_y, crop_h * 0.5, 256 - crop_h * 0.5))
+        x0 = center_x - crop_w // 2
+        y0 = center_y - crop_h // 2
+        crop = tile[y0:y0 + crop_h, x0:x0 + crop_w]
+        image = cv2.resize(
+            crop, (self.synthetic_width, self.synthetic_height),
+            interpolation=cv2.INTER_CUBIC)
+        yaw = self._latest_yaw()
+        if abs(yaw) > 1e-3:
+            matrix = cv2.getRotationMatrix2D(
+                (self.synthetic_width * 0.5, self.synthetic_height * 0.5),
+                math.degrees(yaw),
+                1.0)
+            image = cv2.warpAffine(
+                image, matrix, (self.synthetic_width, self.synthetic_height),
+                flags=cv2.INTER_LINEAR,
+                borderMode=cv2.BORDER_REFLECT)
+        return image
+
+    def _latlon_to_tile_pixel(self, lat, lon, zoom):
+        lat = max(-WEB_MERCATOR_LIMIT, min(WEB_MERCATOR_LIMIT, lat))
+        scale = 2 ** zoom
+        x = (lon + 180.0) / 360.0 * scale
+        lat_rad = math.radians(lat)
+        y = (1.0 - math.asinh(math.tan(lat_rad)) / math.pi) / 2.0 * scale
+        tile_x = int(x) % scale
+        tile_y = max(0, min(scale - 1, int(y)))
+        return tile_x, tile_y, (x - int(x)) * 256.0, (y - int(y)) * 256.0
 
     def _status_tick(self):
         battery = Float32()
@@ -393,11 +651,12 @@ def main():
     node = AerodroneSensorSim()
     try:
         rclpy.spin(node)
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == '__main__':
