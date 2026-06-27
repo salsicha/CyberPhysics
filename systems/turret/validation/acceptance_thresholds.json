@@ -1,0 +1,15 @@
+{
+  "min_lock_fraction": 0.82,
+  "max_mean_pixel_error_px": 34.0,
+  "max_p95_pixel_error_px": 70.0,
+  "max_mean_angular_error_deg": 3.2,
+  "max_p95_angular_error_deg": 6.5,
+  "min_target_detection_fraction": 0.88,
+  "min_target_mean_iou": 0.68,
+  "max_false_lock_count": 0,
+  "max_reacquire_time_s": 1.2,
+  "max_command_saturation_fraction": 0.08,
+  "max_joint_limit_violation_count": 0,
+  "max_emergency_stop_violation_count": 0,
+  "max_yolo_latency_ms": 35.0
+}

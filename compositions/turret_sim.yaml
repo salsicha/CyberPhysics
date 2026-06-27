@@ -1,0 +1,28 @@
+# Turret PanTiltROS-compatible headless tracking simulation.
+
+services:
+  turret_sim:
+    network_mode: "host"
+    image: cyberphysics/aerostack2
+    volumes:
+      - ../systems/turret:/workspace/systems/turret:ro
+      - ../generated/turret:/workspace/generated/turret
+    command: >
+      python3 /workspace/systems/turret/scripts/turret_sim.py
+        --scenario /workspace/systems/turret/scenarios/warehouse_tracking.json
+        --output /workspace/generated/turret/turret_tracking_metrics.json
+
+  turret_score:
+    profiles: ["validation"]
+    network_mode: "host"
+    image: cyberphysics/aerostack2
+    depends_on:
+      turret_sim:
+        condition: service_completed_successfully
+    volumes:
+      - ../systems/turret:/workspace/systems/turret:ro
+      - ../generated/turret:/workspace/generated/turret
+    command: >
+      python3 /workspace/systems/turret/scripts/score_tracking_task.py
+        --metrics /workspace/generated/turret/turret_tracking_metrics.json
+        --thresholds /workspace/systems/turret/validation/acceptance_thresholds.json

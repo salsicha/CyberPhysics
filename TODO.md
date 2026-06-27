@@ -208,6 +208,12 @@ satellite maps.
 
 ## Turret realistic object-tracking simulation
 
+Implementation status: CPU smoke simulation and validation are implemented in
+`systems/turret`, with a compose entry at `compositions/turret_sim.yaml`. The
+GPU/nightly path should replace the deterministic smoke segmentation backend
+with the latest installed Ultralytics YOLO26 segmentation checkpoint and record
+the exact checkpoint in run metadata.
+
 Goal: validate a PanTiltROS-based pan/tilt turret that segments a realistic
 scene, selects a configured target object, and tracks that object with closed
 loop pan/tilt control while distractors and occluders move through the camera

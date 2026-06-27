@@ -1,0 +1,361 @@
+{
+  "name": "turret_warehouse_tracking_v1",
+  "description": "PanTiltROS-compatible turret tracks a selected blue cart through a textured warehouse/lab aisle while people, boxes, a drone, and a second cart cross the view.",
+  "seed": 260626,
+  "duration_s": 18.0,
+  "dt_s": 0.05,
+  "environment": {
+    "type": "indoor_warehouse_lab_aisle",
+    "features": [
+      "textured concrete floor",
+      "shelves with tools and bins",
+      "work benches",
+      "windows with glare bands",
+      "reflective safety signs",
+      "partial pallet occluders",
+      "moving shadows",
+      "background clutter"
+    ],
+    "lighting_variants": [
+      "nominal",
+      "low_light",
+      "glare",
+      "motion_blur"
+    ],
+    "background_texture_seed": 1147
+  },
+  "topics": {
+    "camera_image": "/turret/camera/image_raw",
+    "camera_info": "/turret/camera/camera_info",
+    "segments": "/turret/yolo/segments",
+    "target_mask": "/turret/yolo/target_mask",
+    "target_bbox": "/turret/yolo/target_bbox",
+    "target_confidence": "/turret/yolo/target_confidence",
+    "pixel_error": "/turret/target/pixel_error",
+    "angular_error": "/turret/target/angular_error",
+    "selected_id": "/turret/target/selected_id",
+    "locked": "/turret/target/locked",
+    "joint_commands": "/turret/joint_commands",
+    "joint_states": "/turret/joint_states",
+    "diagnostics": "/turret/diagnostics",
+    "emergency_stop": "/turret/emergency_stop"
+  },
+  "camera": {
+    "width": 640,
+    "height": 480,
+    "horizontal_fov_deg": 62.0,
+    "vertical_fov_deg": 48.0,
+    "frame_id": "turret_camera_optical_frame",
+    "fps": 20.0,
+    "latency_ms": 24.0,
+    "rolling_shutter_ms": 5.0
+  },
+  "pantilt": {
+    "joint_names": [
+      "pan_joint",
+      "tilt_joint"
+    ],
+    "pan_limit_rad": [
+      -1.5708,
+      1.5708
+    ],
+    "tilt_limit_rad": [
+      -0.65,
+      0.75
+    ],
+    "max_velocity_rad_s": [
+      2.6,
+      2.0
+    ],
+    "max_acceleration_rad_s2": [
+      8.0,
+      6.0
+    ],
+    "command_latency_s": 0.04,
+    "quantization_rad": 0.00153,
+    "backlash_rad": 0.003,
+    "deadband_rad": 0.0025,
+    "emergency_stop_intervals_s": []
+  },
+  "yolo": {
+    "family": "YOLO26",
+    "task": "instance_segmentation",
+    "cpu_smoke_backend": "simulated_yolo26_seg",
+    "cpu_smoke_checkpoint": "yolo26n-seg.pt",
+    "gpu_validation_checkpoint_pattern": "yolo26*-seg.pt",
+    "min_confidence": 0.35,
+    "min_target_iou": 0.6,
+    "max_cpu_smoke_latency_ms": 35.0,
+    "model_check": "Before GPU/nightly runs, query the installed Ultralytics release for the newest available YOLO26 segmentation checkpoint and record the exact checkpoint in run metadata."
+  },
+  "target": {
+    "id": "cart_blue_01",
+    "class": "cart",
+    "description": "Blue rolling parts cart selected before the run."
+  },
+  "objects": [
+    {
+      "id": "cart_blue_01",
+      "class": "cart",
+      "color": [
+        40,
+        110,
+        220
+      ],
+      "size_px_at_5m": [
+        96,
+        62
+      ],
+      "trajectory": [
+        {
+          "t": 0.0,
+          "azimuth_deg": -24.0,
+          "elevation_deg": -3.0,
+          "distance_m": 7.0
+        },
+        {
+          "t": 4.0,
+          "azimuth_deg": -8.0,
+          "elevation_deg": -2.0,
+          "distance_m": 6.2
+        },
+        {
+          "t": 8.0,
+          "azimuth_deg": 11.0,
+          "elevation_deg": -1.5,
+          "distance_m": 5.6
+        },
+        {
+          "t": 12.0,
+          "azimuth_deg": 27.0,
+          "elevation_deg": -2.5,
+          "distance_m": 6.4
+        },
+        {
+          "t": 18.0,
+          "azimuth_deg": 8.0,
+          "elevation_deg": -3.0,
+          "distance_m": 7.4
+        }
+      ],
+      "occlusion_intervals_s": [
+        {
+          "start": 6.2,
+          "end": 6.85,
+          "fraction": 0.65,
+          "occluder_id": "person_01"
+        },
+        {
+          "start": 13.4,
+          "end": 14.1,
+          "fraction": 0.55,
+          "occluder_id": "forklift_shadow_01"
+        }
+      ]
+    },
+    {
+      "id": "person_01",
+      "class": "person",
+      "color": [
+        230,
+        170,
+        80
+      ],
+      "size_px_at_5m": [
+        48,
+        150
+      ],
+      "trajectory": [
+        {
+          "t": 0.0,
+          "azimuth_deg": 18.0,
+          "elevation_deg": 1.0,
+          "distance_m": 7.5
+        },
+        {
+          "t": 6.5,
+          "azimuth_deg": -4.0,
+          "elevation_deg": 0.5,
+          "distance_m": 5.7
+        },
+        {
+          "t": 10.0,
+          "azimuth_deg": -28.0,
+          "elevation_deg": 0.0,
+          "distance_m": 7.0
+        },
+        {
+          "t": 18.0,
+          "azimuth_deg": -35.0,
+          "elevation_deg": 0.0,
+          "distance_m": 9.0
+        }
+      ],
+      "occlusion_intervals_s": []
+    },
+    {
+      "id": "box_red_01",
+      "class": "box",
+      "color": [
+        210,
+        70,
+        65
+      ],
+      "size_px_at_5m": [
+        62,
+        58
+      ],
+      "trajectory": [
+        {
+          "t": 0.0,
+          "azimuth_deg": -8.0,
+          "elevation_deg": -8.0,
+          "distance_m": 4.8
+        },
+        {
+          "t": 9.0,
+          "azimuth_deg": -2.0,
+          "elevation_deg": -8.5,
+          "distance_m": 4.6
+        },
+        {
+          "t": 18.0,
+          "azimuth_deg": 3.0,
+          "elevation_deg": -8.0,
+          "distance_m": 4.8
+        }
+      ],
+      "occlusion_intervals_s": []
+    },
+    {
+      "id": "drone_yellow_01",
+      "class": "drone",
+      "color": [
+        220,
+        200,
+        60
+      ],
+      "size_px_at_5m": [
+        70,
+        35
+      ],
+      "trajectory": [
+        {
+          "t": 0.0,
+          "azimuth_deg": 35.0,
+          "elevation_deg": 9.0,
+          "distance_m": 8.0
+        },
+        {
+          "t": 7.0,
+          "azimuth_deg": 20.0,
+          "elevation_deg": 7.0,
+          "distance_m": 7.0
+        },
+        {
+          "t": 13.0,
+          "azimuth_deg": -12.0,
+          "elevation_deg": 8.0,
+          "distance_m": 6.8
+        },
+        {
+          "t": 18.0,
+          "azimuth_deg": -20.0,
+          "elevation_deg": 6.0,
+          "distance_m": 7.5
+        }
+      ],
+      "occlusion_intervals_s": []
+    },
+    {
+      "id": "cart_green_02",
+      "class": "cart",
+      "color": [
+        50,
+        170,
+        90
+      ],
+      "size_px_at_5m": [
+        90,
+        60
+      ],
+      "trajectory": [
+        {
+          "t": 0.0,
+          "azimuth_deg": 32.0,
+          "elevation_deg": -3.5,
+          "distance_m": 6.0
+        },
+        {
+          "t": 5.0,
+          "azimuth_deg": 18.0,
+          "elevation_deg": -3.5,
+          "distance_m": 6.0
+        },
+        {
+          "t": 11.0,
+          "azimuth_deg": 2.0,
+          "elevation_deg": -3.5,
+          "distance_m": 6.0
+        },
+        {
+          "t": 18.0,
+          "azimuth_deg": -16.0,
+          "elevation_deg": -3.5,
+          "distance_m": 6.0
+        }
+      ],
+      "occlusion_intervals_s": []
+    }
+  ],
+  "scoring": {
+    "lock_center_tolerance_px": 36.0,
+    "reacquire_timeout_s": 1.2,
+    "ignore_initial_s": 1.0,
+    "max_visible_unlocked_gap_s": 1.0
+  },
+  "variants": {
+    "nominal": {
+      "description": "Nominal warehouse tracking with partial target occlusions."
+    },
+    "low_light": {
+      "description": "Reduced exposure lowers segmentation confidence and mask quality.",
+      "segmentation_confidence_penalty": 0.08,
+      "mask_iou_penalty": 0.05,
+      "yolo_latency_penalty_ms": 2.5
+    },
+    "glare_motion_blur": {
+      "description": "Window glare and fast pan motion reduce mask quality and increase latency.",
+      "segmentation_confidence_penalty": 0.1,
+      "mask_iou_penalty": 0.07,
+      "yolo_latency_penalty_ms": 4.0
+    },
+    "camera_dropout": {
+      "description": "Short dropped camera segment while the tracker must coast safely.",
+      "camera_frame_drop_intervals_s": [
+        {
+          "start": 9.1,
+          "end": 9.65
+        }
+      ]
+    },
+    "command_dropout": {
+      "description": "Dropped command interval validates bounded actuator behavior.",
+      "command_drop_intervals_s": [
+        {
+          "start": 10.0,
+          "end": 10.55
+        }
+      ]
+    },
+    "emergency_stop": {
+      "description": "Emergency stop freezes commanded joints and disables motion.",
+      "emergency_stop_intervals_s": [
+        {
+          "start": 7.25,
+          "end": 7.75
+        }
+      ]
+    }
+  }
+}

@@ -19,6 +19,7 @@ docker compose -f compositions/<stack>.yaml down --remove-orphans
 ```bash
 docker compose -f compositions/marimo.yaml up
 docker compose -f compositions/racecarneo.yaml up
+docker compose -f compositions/turret_sim.yaml --profile validation up
 docker compose -f compositions/nvblox.yaml up
 ```
 
@@ -28,6 +29,7 @@ docker compose -f compositions/nvblox.yaml up
 
 ```bash
 docker compose -f compositions/racecarneo.yaml up
+docker compose -f compositions/turret_sim.yaml --profile validation up
 ```
 
 NiceGUI is served on `http://localhost:8080`.
