@@ -34,6 +34,25 @@ GPU/nightly validation should replace that backend with the current installed
 Ultralytics YOLO26 `-seg` checkpoint and compare the model masks against the
 same scenario masks and telemetry contract.
 
+## Hardware Run
+
+```bash
+docker compose --env-file systems/turret/config/arduino.env \
+  -f compositions/turret_hardware.yaml up
+```
+
+Use the `arduino` profile to open the Arduino application container for
+firmware work:
+
+```bash
+docker compose --env-file systems/turret/config/arduino.env \
+  -f compositions/turret_hardware.yaml --profile arduino up turret_arduino
+```
+
+The default hardware stack starts the PanTiltROS-compatible Arduino serial
+bridge. The Arduino firmware should own the ST3215/STS3215 electrical bus and
+return actuator feedback over the configured serial device.
+
 ## Topic Contract
 
 The telemetry samples use these canonical names:

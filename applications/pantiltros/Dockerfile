@@ -13,7 +13,7 @@ ENV LANG=en_US.UTF-8 \
 SHELL ["/bin/bash","-c"]
 
 RUN apt update && apt install -q -y --no-install-recommends \
-    curl gnupg2 lsb-release python3-pip python3-venv vim wget && \
+    curl gnupg2 lsb-release python3-pip python3-serial python3-venv vim wget && \
     rm -rf /var/lib/apt/lists/*
 
 RUN python3 -m venv /venv
@@ -23,6 +23,8 @@ RUN . /venv/bin/activate && pip3 install rai-core && rai-config-init
 # TODO:
 # https://github.com/adityakamath/pan_tilt_ros
 
+COPY scripts/ /scripts/
+RUN chmod +x /scripts/*.py
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
@@ -44,4 +46,3 @@ COPY --from=build / /
 WORKDIR /workspace
 
 ENTRYPOINT ["/entrypoint.sh"]
-

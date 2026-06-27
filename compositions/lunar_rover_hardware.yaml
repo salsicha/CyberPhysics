@@ -1,0 +1,28 @@
+# Physical Space ROS lunar rover stack.
+#
+# The repository provides the Space ROS runtime, hardware topic contract, and
+# simulation validation scenario. Vehicle-specific motor, camera, power, and
+# safety drivers should be added here or launched on the host while preserving
+# the topics in systems/lunar_rover/config/topics.yaml.
+
+services:
+  lunar_rover_spaceros:
+    image: cyberphysics/spaceros:${CYBERPHYSICS_TAG:-latest}
+    container_name: lunar_rover_spaceros
+    network_mode: host
+    ipc: host
+    privileged: true
+    restart: unless-stopped
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+    devices:
+      - /dev:/dev
+    volumes:
+      - ../systems/lunar_rover/config:/workspace/config:ro
+      - /dev/shm:/dev/shm
+    command: >
+      bash -lc
+      "echo 'Space ROS lunar rover hardware runtime ready.
+      Connect hardware drivers to the /lunar_rover topic contract.';
+      exec sleep infinity"

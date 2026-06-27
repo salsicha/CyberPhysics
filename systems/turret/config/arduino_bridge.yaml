@@ -1,0 +1,8 @@
+turret_arduino_bridge:
+  ros__parameters:
+    joint_command_topic: /turret/joint_commands
+    joint_state_topic: /turret/joint_states
+    diagnostics_topic: /turret/diagnostics
+    # Serial settings come from systems/turret/config/arduino.env so field
+    # teams can override the device path without editing this ROS params file.
+    diagnostic_rate_hz: 1.0

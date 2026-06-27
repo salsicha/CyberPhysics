@@ -22,6 +22,12 @@ does not claim flight qualification.
 docker compose -f compositions/lunar_rover_sim.yaml up
 ```
 
+For the physical runtime skeleton:
+
+```bash
+docker compose -f compositions/lunar_rover_hardware.yaml up
+```
+
 ## Simulation Scenario
 
 The scenario in `config/south_pole_traverse.yaml` drives a lunar rover through a
