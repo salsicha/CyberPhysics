@@ -27,3 +27,15 @@ docker compose --env-file systems/submarine/config/blueos.env \
 
 Bridge parameters live in `config/bridge.yaml`; topic names live in
 `config/topics.yaml`.
+
+## Simulation Scenario
+
+```bash
+docker compose -f compositions/submarine_sim.yaml up
+```
+
+The simulated scenario in `config/pipeline_inspection.yaml` drives an autonomous
+submerged pipeline inspection with horizontal waypoints, commanded depth changes,
+current drift, pressure telemetry, and battery discharge. The simulator
+publishes MAVROS-like telemetry and consumes the same velocity setpoint topic
+used by the hardware bridge.

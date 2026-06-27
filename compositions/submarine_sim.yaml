@@ -1,0 +1,63 @@
+# Closed-loop BlueROV2 simulation.
+
+services:
+  submarine_sim:
+    image: cyberphysics/submarine:${CYBERPHYSICS_TAG:-latest}
+    container_name: submarine_sim
+    network_mode: host
+    ipc: host
+    restart: unless-stopped
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    volumes:
+      - ../systems/submarine/config:/workspace/config:ro
+      - /dev/shm:/dev/shm
+    command: >
+      python3 /scripts/bluerov2_sim.py
+        --ros-args
+        --params-file /workspace/config/simulation.yaml
+
+  submarine_bridge:
+    image: cyberphysics/submarine:${CYBERPHYSICS_TAG:-latest}
+    container_name: submarine_sim_bridge
+    network_mode: host
+    ipc: host
+    restart: unless-stopped
+    depends_on:
+      - submarine_sim
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    volumes:
+      - ../systems/submarine/config:/workspace/config:ro
+      - /dev/shm:/dev/shm
+    command: >
+      python3 /scripts/bluerov2_bridge.py
+        --ros-args
+        --params-file /workspace/config/bridge_sim.yaml
+
+  pipeline_waypoint_nav:
+    image: cyberphysics/submarine:${CYBERPHYSICS_TAG:-latest}
+    container_name: submarine_pipeline_waypoint_nav
+    network_mode: host
+    ipc: host
+    restart: unless-stopped
+    depends_on:
+      - submarine_bridge
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    volumes:
+      - ../systems/submarine/config:/workspace/config:ro
+      - /dev/shm:/dev/shm
+    command: >
+      python3 /scripts/pipeline_waypoint_nav.py
+        --ros-args
+        --params-file /workspace/config/pipeline_inspection.yaml
+
+  submarine_rosbridge:
+    image: cyberphysics/submarine:${CYBERPHYSICS_TAG:-latest}
+    container_name: submarine_sim_rosbridge
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    command: ros2 launch rosbridge_server rosbridge_websocket_launch.xml

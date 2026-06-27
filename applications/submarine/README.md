@@ -36,3 +36,18 @@ docker compose --env-file systems/submarine/config/blueos.env \
 ```
 
 System-specific parameters live in `systems/submarine/config`.
+
+## Simulation
+
+The closed-loop simulation validates the same bridge and command path without
+BlueOS hardware:
+
+```bash
+docker compose -f compositions/submarine_sim.yaml up
+```
+
+The scenario is a submerged pipeline inspection in
+`systems/submarine/config/pipeline_inspection.yaml`. `bluerov2_sim.py`
+publishes MAVROS-like GPS, odometry, IMU, pressure, and battery topics, while
+`pipeline_waypoint_nav.py` consumes the bridged submarine odometry and publishes
+`/sub0/cmd_vel`.

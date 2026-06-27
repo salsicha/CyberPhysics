@@ -1,0 +1,25 @@
+pipeline_waypoint_nav:
+  ros__parameters:
+    odom_topic: /sub0/sensor_measurements/odom
+    cmd_vel_topic: /sub0/cmd_vel
+    # Pier-side pipeline inspection: descend, follow a pipe route at 3-5 m
+    # depth, pass a bend and riser, then return near launch.
+    waypoints_x_y_depth: [
+      0.0, 0.0, 1.5,
+      8.0, 0.0, 3.0,
+      18.0, 4.0, 3.5,
+      30.0, 4.0, 4.5,
+      42.0, -4.0, 4.5,
+      30.0, -10.0, 3.5,
+      12.0, -8.0, 2.5,
+      0.0, 0.0, 1.5
+    ]
+    loop: false
+    acceptance_radius_m: 0.9
+    depth_tolerance_m: 0.35
+    desired_speed_mps: 0.45
+    slow_radius_m: 4.0
+    heading_gain: 1.2
+    depth_gain: 0.45
+    max_yaw_rate_rps: 0.4
+    max_vertical_speed_mps: 0.25

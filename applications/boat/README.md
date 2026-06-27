@@ -35,3 +35,17 @@ docker compose --env-file systems/boat/config/blueos.env \
 ```
 
 System-specific parameters live in `systems/boat/config`.
+
+## Simulation
+
+The closed-loop simulation validates the same bridge and command path without
+BlueOS hardware:
+
+```bash
+docker compose -f compositions/boat_sim.yaml up
+```
+
+The scenario is a harbor survey in `systems/boat/config/harbor_survey.yaml`.
+`blueboat_sim.py` publishes MAVROS-like GPS, odometry, IMU, and battery topics,
+while `harbor_waypoint_nav.py` consumes the bridged boat odometry and publishes
+`/boat0/cmd_vel`.

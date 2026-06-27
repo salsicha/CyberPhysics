@@ -26,3 +26,14 @@ docker compose --env-file systems/boat/config/blueos.env \
 
 Bridge parameters live in `config/bridge.yaml`; topic names live in
 `config/topics.yaml`.
+
+## Simulation Scenario
+
+```bash
+docker compose -f compositions/boat_sim.yaml up
+```
+
+The simulated scenario in `config/harbor_survey.yaml` drives an autonomous
+harbor survey through a rectangular marina basin with wind/current drift. The
+simulator publishes MAVROS-like telemetry and consumes the same velocity
+setpoint topic used by the hardware bridge.

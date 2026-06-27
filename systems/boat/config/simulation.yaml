@@ -1,0 +1,17 @@
+blueboat_sim:
+  ros__parameters:
+    rate_hz: 30.0
+    origin_lat: 37.79552
+    origin_lon: -122.28134
+    initial_x_m: 0.0
+    initial_y_m: 0.0
+    initial_yaw_rad: 0.0
+    current_x_mps: 0.08
+    current_y_mps: -0.03
+    wave_sway_mps: 0.04
+    max_speed_mps: 1.8
+    max_yaw_rate_rps: 0.65
+    speed_time_constant_s: 1.4
+    yaw_time_constant_s: 0.8
+    battery_runtime_s: 3600.0
+    mavros_velocity_topic: /mavros/setpoint_velocity/cmd_vel

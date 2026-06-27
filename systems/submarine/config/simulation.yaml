@@ -1,0 +1,17 @@
+bluerov2_sim:
+  ros__parameters:
+    rate_hz: 30.0
+    origin_lat: 37.80750
+    origin_lon: -122.41700
+    initial_x_m: 0.0
+    initial_y_m: 0.0
+    initial_depth_m: 1.0
+    initial_yaw_rad: 0.0
+    current_x_mps: 0.04
+    current_y_mps: 0.02
+    max_forward_speed_mps: 0.75
+    max_vertical_speed_mps: 0.35
+    max_yaw_rate_rps: 0.45
+    velocity_time_constant_s: 1.2
+    battery_runtime_s: 2700.0
+    mavros_velocity_topic: /mavros/setpoint_velocity/cmd_vel

@@ -1,0 +1,22 @@
+harbor_waypoint_nav:
+  ros__parameters:
+    odom_topic: /boat0/sensor_measurements/odom
+    cmd_vel_topic: /boat0/cmd_vel
+    # Alameda marina basin survey: depart dock, run a rectangular survey lane,
+    # cross the channel, and return to launch while compensating for drift.
+    waypoints_xy: [
+      0.0, 0.0,
+      18.0, 0.0,
+      36.0, 8.0,
+      36.0, 26.0,
+      18.0, 34.0,
+      0.0, 26.0,
+      -8.0, 8.0,
+      0.0, 0.0
+    ]
+    loop: false
+    acceptance_radius_m: 1.5
+    desired_speed_mps: 1.1
+    slow_radius_m: 8.0
+    heading_gain: 1.4
+    max_yaw_rate_rps: 0.55
