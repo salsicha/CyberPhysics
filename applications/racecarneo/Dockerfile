@@ -76,9 +76,10 @@ RUN mkdir -p ${RACECAR_HOME} && \
 
 COPY scripts/racecarneo_ros_bridge.py /workspace/racecarneo_ros_bridge.py
 COPY scripts/cmd_vel_to_ackermann.py /workspace/cmd_vel_to_ackermann.py
+COPY scripts/run_nav2_mission.py /workspace/run_nav2_mission.py
 COPY scripts/run_headless_sim.sh /workspace/run_headless_sim.sh
 COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh /workspace/racecarneo_ros_bridge.py /workspace/cmd_vel_to_ackermann.py /workspace/run_headless_sim.sh
+RUN chmod +x /entrypoint.sh /workspace/racecarneo_ros_bridge.py /workspace/cmd_vel_to_ackermann.py /workspace/run_nav2_mission.py /workspace/run_headless_sim.sh
 
 FROM scratch
 

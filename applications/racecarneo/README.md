@@ -61,6 +61,22 @@ The composition runs this pipeline:
 
 NiceGUI is available at `http://localhost:8080`.
 
+## Waypoint Missions
+
+Run the full stack and send a tracked mission through Nav2's
+`NavigateThroughPoses` action:
+
+```bash
+RACECAR_MISSION_ID=simple_loop \
+  docker compose --profile missions -f compositions/racecarneo.yaml up racecarneo_mission_runner
+```
+
+Mission definitions live in
+`systems/racecarneo/missions/nav2_waypoints.json` and include route frame, pose,
+tolerance, speed limit, expected route length, and success criteria. Supported
+missions are `simple_loop`, `cone_slalom`, `lane_change_obstacle_avoidance`,
+`reverse_recovery`, and `multi_lap_endurance`.
+
 ## Configuration
 
 Robot-specific config lives in `systems/racecarneo/`:

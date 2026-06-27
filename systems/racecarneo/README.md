@@ -14,6 +14,7 @@ This folder contains configuration for the MIT RACECAR Neo hardware/simulation s
 - `calibration/camera.yaml`: simulator camera calibration placeholder.
 - `urdf/racecarneo.urdf.xacro`: lightweight frame model for ROS visualization.
 - `scenarios/campus_closed_course.json`: tracked source-of-truth contract for the realistic outdoor/indoor closed-course environment, semantic labels, collision geometry, dynamic actors, spawn poses, and scenario variants.
+- `missions/nav2_waypoints.json`: Nav2 waypoint missions for loop, slalom, lane-change, obstacle-avoidance, recovery, and multi-lap validation.
 
 ## Runtime Pipeline
 

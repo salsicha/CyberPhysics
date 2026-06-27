@@ -132,6 +132,25 @@ services:
         autostart:=true
 
 
+  racecarneo_mission_runner:
+    profiles: ["missions"]
+    network_mode: host
+    pull_policy: if_not_present
+    image: cyberphysics/racecarneo:${CYBERPHYSICS_TAG:-latest}
+    container_name: racecarneo_mission_runner
+    depends_on:
+      - racecarneo_nav2
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+      - RACECAR_MISSION_ID=${RACECAR_MISSION_ID:-simple_loop}
+    volumes:
+      - ../systems:/workspace/systems:ro
+    command: >
+      python3 /workspace/run_nav2_mission.py
+        --mission-file /workspace/systems/racecarneo/missions/nav2_waypoints.json
+        --mission-id ${RACECAR_MISSION_ID:-simple_loop}
+
   racecarneo_nicegui:
     network_mode: host
     pull_policy: if_not_present

@@ -1,0 +1,99 @@
+{
+  "name": "racecarneo_nav2_waypoints",
+  "scenario": "systems/racecarneo/scenarios/campus_closed_course.json",
+  "default_frame_id": "map",
+  "action": "NavigateThroughPoses",
+  "missions": [
+    {
+      "id": "simple_loop",
+      "description": "One nominal lap around the campus closed course.",
+      "variant": "outdoor_campus_nominal",
+      "spawn_pose_id": "start_grid",
+      "tolerance": {"xy_m": 0.25, "yaw_rad": 0.35},
+      "speed_limit_mps": 0.35,
+      "expected_route_length_m": 29.5,
+      "success": {"max_duration_s": 150.0, "max_lateral_error_m": 0.45, "max_stop_line_error_m": 0.35, "max_collision_count": 0},
+      "waypoints": [
+        {"id": "start_exit", "pose": [1.6, 0.0, 0.0]},
+        {"id": "east_straight", "pose": [4.8, 0.45, 0.2]},
+        {"id": "southeast_turn", "pose": [8.3, 1.6, 0.7]},
+        {"id": "east_apex", "pose": [10.1, 4.6, 1.6]},
+        {"id": "north_turn", "pose": [8.9, 7.7, 2.55]},
+        {"id": "northwest_straight", "pose": [4.5, 8.5, -3.05]},
+        {"id": "west_return", "pose": [0.8, 5.8, -1.9]},
+        {"id": "finish", "pose": [0.35, 0.4, -1.55]}
+      ]
+    },
+    {
+      "id": "cone_slalom",
+      "description": "Slalom through cones and narrow passage while keeping lidar and nvblox obstacles active.",
+      "variant": "outdoor_campus_nominal",
+      "spawn_pose_id": "slalom_entry",
+      "tolerance": {"xy_m": 0.18, "yaw_rad": 0.30},
+      "speed_limit_mps": 0.22,
+      "expected_route_length_m": 7.0,
+      "success": {"max_duration_s": 65.0, "max_lateral_error_m": 0.22, "max_collision_count": 0},
+      "waypoints": [
+        {"id": "slalom_gate_1", "pose": [3.6, 0.20, 0.16]},
+        {"id": "slalom_gate_2", "pose": [4.2, 0.70, 0.45]},
+        {"id": "slalom_gate_3", "pose": [4.8, 0.25, -0.15]},
+        {"id": "narrow_exit", "pose": [5.7, 0.95, 0.35]},
+        {"id": "route_rejoin", "pose": [7.2, 1.4, 0.55]}
+      ]
+    },
+    {
+      "id": "lane_change_obstacle_avoidance",
+      "description": "Lane change around parked vehicle and temporary obstacle with sensor-derived costmaps.",
+      "variant": "outdoor_campus_dynamic",
+      "spawn_pose_id": "start_grid",
+      "tolerance": {"xy_m": 0.22, "yaw_rad": 0.35},
+      "speed_limit_mps": 0.28,
+      "expected_route_length_m": 13.2,
+      "success": {"max_duration_s": 85.0, "max_lateral_error_m": 0.35, "min_obstacle_clearance_m": 0.20, "max_collision_count": 0},
+      "waypoints": [
+        {"id": "approach_vehicle", "pose": [4.6, 0.45, 0.18]},
+        {"id": "lane_change_left", "pose": [5.8, 1.15, 0.25]},
+        {"id": "clear_vehicle", "pose": [7.1, 1.35, 0.45]},
+        {"id": "return_lane", "pose": [8.7, 2.6, 0.82]},
+        {"id": "safe_stop", "pose": [9.8, 4.5, 1.35]}
+      ]
+    },
+    {
+      "id": "reverse_recovery",
+      "description": "Recovery mission starting near the north crosswalk and returning to the loop after a blocked local path.",
+      "variant": "outdoor_campus_dynamic",
+      "spawn_pose_id": "north_recovery",
+      "tolerance": {"xy_m": 0.25, "yaw_rad": 0.40},
+      "speed_limit_mps": 0.20,
+      "expected_route_length_m": 8.6,
+      "success": {"max_duration_s": 90.0, "max_recovery_count": 3, "max_collision_count": 0},
+      "waypoints": [
+        {"id": "backup_clearance", "pose": [7.2, 7.8, -2.9], "requires_recovery": true},
+        {"id": "west_clear", "pose": [5.6, 8.3, -3.0]},
+        {"id": "loop_rejoin", "pose": [3.7, 8.3, -2.9]},
+        {"id": "southbound", "pose": [1.3, 6.8, -2.0]}
+      ]
+    },
+    {
+      "id": "multi_lap_endurance",
+      "description": "Three seeded nominal laps for map freshness, localization drift, and actuator saturation checks.",
+      "variant": "outdoor_campus_nominal",
+      "spawn_pose_id": "start_grid",
+      "tolerance": {"xy_m": 0.28, "yaw_rad": 0.40},
+      "speed_limit_mps": 0.32,
+      "laps": 3,
+      "expected_route_length_m": 88.5,
+      "success": {"max_duration_s": 420.0, "max_lateral_error_m": 0.50, "max_localization_drift_m": 0.45, "max_collision_count": 0},
+      "waypoints": [
+        {"id": "lap_start", "pose": [1.6, 0.0, 0.0]},
+        {"id": "east_straight", "pose": [4.8, 0.45, 0.2]},
+        {"id": "southeast_turn", "pose": [8.3, 1.6, 0.7]},
+        {"id": "east_apex", "pose": [10.1, 4.6, 1.6]},
+        {"id": "north_turn", "pose": [8.9, 7.7, 2.55]},
+        {"id": "northwest_straight", "pose": [4.5, 8.5, -3.05]},
+        {"id": "west_return", "pose": [0.8, 5.8, -1.9]},
+        {"id": "lap_finish", "pose": [0.35, 0.4, -1.55]}
+      ]
+    }
+  ]
+}
