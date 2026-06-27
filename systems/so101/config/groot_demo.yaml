@@ -4,15 +4,19 @@ so101_groot_bridge:
     policy_port: 5555
     policy_timeout_ms: 15000
     command_rate_hz: 5.0
-    instruction: "move the SO-101 gripper through a small inspection motion"
+    instruction: "pick the red block and place it in the left bin"
+    scenario_file: /workspace/systems/so101/scenarios/picking_table.json
+    task_id: pick_red_block_left_bin
     camera_topic: /so101/camera/image_raw
     depth_topic: /so101/camera/depth/image_rect_raw
     camera_info_topic: /so101/camera/camera_info
     joint_state_topic: /joint_states
     command_topic: /so101/joint_commands
     video_key: front
+    depth_key: front_depth
     state_key: joint_positions
     action_key: joint_positions
     image_width: 224
     image_height: 224
+    joint_history_size: 4
     max_joint_step: 0.08

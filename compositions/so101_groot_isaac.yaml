@@ -24,6 +24,8 @@ services:
         --headless
         --experience /isaac-sim/apps/isaacsim.exp.base.python.kit
         --urdf /workspace/systems/so101/urdf/so101.urdf
+        --scenario /workspace/systems/so101/scenarios/picking_table.json
+        --camera-source ${SO101_ISAAC_CAMERA_SOURCE:-rendered}
     deploy:
       resources:
         reservations:

@@ -2,7 +2,9 @@
 """Import and run SO-101 in Isaac Sim using the common ROS 2 interface."""
 
 import argparse
+import json
 import os
+from pathlib import Path
 
 import numpy as np
 from isaacsim import SimulationApp
@@ -23,6 +25,7 @@ from so101_common import (
     UPPER_LIMITS,
     camera_info_values,
     quantize,
+    quaternion_from_euler,
     synthetic_rgbd,
 )
 
@@ -30,6 +33,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--urdf", default="/workspace/systems/so101/urdf/so101.urdf")
 parser.add_argument("--usd", default="/tmp/so101.usd")
 parser.add_argument("--headless", action="store_true")
+parser.add_argument("--scenario", default="/workspace/systems/so101/scenarios/picking_table.json")
+parser.add_argument("--camera-source", choices=("rendered", "synthetic"), default="rendered")
 parser.add_argument(
     "--experience",
     default="/isaac-sim/apps/isaacsim.exp.base.python.kit",
@@ -54,6 +59,16 @@ from isaacsim.core.api import World
 from isaacsim.core.prims import Articulation
 
 try:
+    from isaacsim.sensors.camera import Camera
+except ImportError:
+    Camera = None
+
+try:
+    from isaacsim.core.utils.rotations import euler_angles_to_quat
+except ImportError:
+    euler_angles_to_quat = None
+
+try:
     import rclpy
     from rclpy.node import Node
     from sensor_msgs.msg import CameraInfo, Image, Imu, JointState
@@ -66,10 +81,60 @@ except ImportError as exc:
     ) from exc
 
 
+def load_scenario_camera(path):
+    defaults = {
+        "xyz": [0.17, -0.52, 0.92],
+        "rpy": [1.10, 0.0, 0.0],
+        "resolution": [CAMERA_WIDTH, CAMERA_HEIGHT],
+        "horizontal_fov_deg": 69.0,
+    }
+    if not path:
+        return defaults
+    try:
+        data = json.loads(Path(path).read_text())
+    except (OSError, json.JSONDecodeError):
+        return defaults
+    camera = data.get("camera", {})
+    return {**defaults, **camera}
+
+
+def isaac_orientation_from_rpy(rpy):
+    rpy = np.asarray(rpy, dtype=np.float64)
+    if euler_angles_to_quat is not None:
+        return np.asarray(euler_angles_to_quat(rpy), dtype=np.float64)
+    qx, qy, qz, qw = quaternion_from_euler(float(rpy[0]), float(rpy[1]), float(rpy[2]))
+    return np.asarray([qw, qx, qy, qz], dtype=np.float64)
+
+
+def create_rendered_camera(camera_config):
+    if Camera is None:
+        return None
+    width, height = camera_config.get("resolution", [CAMERA_WIDTH, CAMERA_HEIGHT])
+    camera = Camera(
+        prim_path="/World/groot_camera",
+        position=np.asarray(camera_config.get("xyz"), dtype=np.float64),
+        orientation=isaac_orientation_from_rpy(camera_config.get("rpy")),
+        frequency=30,
+        resolution=(int(width), int(height)),
+    )
+    camera.initialize()
+    if hasattr(camera, "set_horizontal_aperture"):
+        # Keep the camera close to the RealSense D435i/D405 tabletop FOV.
+        camera.set_horizontal_aperture(float(camera_config.get("horizontal_fov_deg", 69.0)))
+    if hasattr(camera, "add_distance_to_image_plane_to_frame"):
+        camera.add_distance_to_image_plane_to_frame()
+    elif hasattr(camera, "add_distance_to_camera_to_frame"):
+        camera.add_distance_to_camera_to_frame()
+    return camera
+
+
 class IsaacBridge(Node):
-    def __init__(self):
+    def __init__(self, rendered_camera=None, camera_source="rendered"):
         super().__init__("so101_isaacsim_bridge")
         self.target = np.zeros(len(JOINT_NAMES), dtype=np.float32)
+        self.rendered_camera = rendered_camera
+        self.camera_source = camera_source
+        self.warned_camera_fallback = False
         self.publisher = self.create_publisher(JointState, "/joint_states", 10)
         self.image_pub = self.create_publisher(Image, RGB_TOPIC, 5)
         self.camera_info_pub = self.create_publisher(CameraInfo, RGB_CAMERA_INFO_TOPIC, 5)
@@ -105,7 +170,7 @@ class IsaacBridge(Node):
     def publish_camera(self, stamp, positions):
         h = self.camera_height
         w = self.camera_width
-        image, depth = synthetic_rgbd(positions, w, h)
+        image, depth = self._camera_frame(positions)
 
         msg = Image()
         msg.header.stamp = stamp
@@ -130,6 +195,27 @@ class IsaacBridge(Node):
         depth_msg.data = depth.tobytes()
         self.depth_pub.publish(depth_msg)
         self.depth_info_pub.publish(self.camera_info(stamp, DEPTH_FRAME_ID))
+
+    def _camera_frame(self, positions):
+        if self.camera_source == "rendered" and self.rendered_camera is not None:
+            frame = self.rendered_camera.get_current_frame()
+            rgba = frame.get("rgba") if isinstance(frame, dict) else None
+            depth = None
+            if isinstance(frame, dict):
+                depth = frame.get("distance_to_image_plane")
+                if depth is None:
+                    depth = frame.get("distance_to_camera")
+                if depth is None:
+                    depth = frame.get("depth")
+            if rgba is not None:
+                image = np.asarray(rgba)[:, :, :3].astype(np.uint8)
+                if depth is None:
+                    depth = np.full(image.shape[:2], np.nan, dtype=np.float32)
+                return image, np.asarray(depth, dtype=np.float32)
+        if self.camera_source == "rendered" and not self.warned_camera_fallback:
+            self.get_logger().warning("Rendered Isaac camera frame unavailable; using synthetic RGB-D fallback")
+            self.warned_camera_fallback = True
+        return synthetic_rgbd(positions, self.camera_width, self.camera_height)
 
     def publish_imu(self, stamp, velocities):
         msg = Imu()
@@ -188,6 +274,10 @@ def main():
 
     world = World(stage_units_in_meters=1.0)
     world.scene.add_default_ground_plane()
+    camera_config = load_scenario_camera(args.scenario)
+    rendered_camera = None
+    if args.camera_source == "rendered":
+        rendered_camera = create_rendered_camera(camera_config)
     prim_path = import_robot(args.urdf)
     robot = world.scene.add(Articulation(prim_path=prim_path, name="so101"))
     world.reset()
@@ -202,12 +292,12 @@ def main():
     indices = np.array([index_by_name[name] for name in JOINT_NAMES])
 
     rclpy.init()
-    bridge = IsaacBridge()
+    bridge = IsaacBridge(rendered_camera=rendered_camera, camera_source=args.camera_source)
     try:
         while simulation_app.is_running() and rclpy.ok():
             rclpy.spin_once(bridge, timeout_sec=0.0)
             robot.set_joint_position_targets(bridge.target, joint_indices=indices)
-            world.step(render=not args.headless)
+            world.step(render=(not args.headless) or args.camera_source == "rendered")
             bridge.publish_state(
                 robot.get_joint_positions(joint_indices=indices),
                 robot.get_joint_velocities(joint_indices=indices),

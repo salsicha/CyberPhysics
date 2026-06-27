@@ -116,10 +116,17 @@ GR00T_EMBODIMENT_TAG=so101 \
 docker compose -f compositions/so101_groot_isaac.yaml up
 ```
 
-The bridge reads `/so101/camera/image_raw` and `/joint_states`, sends batched
-observations to the policy server, clips returned joint targets to the SO-101
-URDF limits, and publishes `std_msgs/msg/Float64MultiArray` commands. Camera and
-bridge parameters live in `systems/so101/config/groot_demo.yaml`.
+The Isaac adapter loads `/workspace/systems/so101/scenarios/picking_table.json`,
+creates a rendered camera from its camera pose, and publishes RGB, depth, camera
+info, IMU, and joint state topics. Set `SO101_ISAAC_CAMERA_SOURCE=synthetic` to
+force deterministic generated images when the Isaac camera sensor cannot start.
+
+The bridge reads `/so101/camera/image_raw`, optional depth, camera calibration,
+and `/joint_states`, loads the selected task language from the scenario file,
+sends joint history and observation metadata to the policy server, clips returned
+joint targets to the SO-101 URDF limits, and publishes
+`std_msgs/msg/Float64MultiArray` commands. Camera, scenario, and bridge
+parameters live in `systems/so101/config/groot_demo.yaml`.
 
 On this host, bounded startup testing reached Isaac Sim initialization but Isaac
 Sim 5.1 crashed in `librtx.scenedb.plugin.so` before the SO-101 script could run.

@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
+import json
 import time
+from collections import deque
+from pathlib import Path
 from typing import Any
 
 import msgpack
@@ -7,7 +10,7 @@ import msgpack_numpy as mnp
 import numpy as np
 import rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import Image, JointState
+from sensor_msgs.msg import CameraInfo, Image, JointState
 from std_msgs.msg import Float64MultiArray
 import zmq
 
@@ -67,23 +70,32 @@ class SO101GrootBridge(Node):
         self.declare_parameter("policy_timeout_ms", 15000)
         self.declare_parameter("command_rate_hz", 5.0)
         self.declare_parameter("instruction", "move the SO-101 arm")
+        self.declare_parameter("scenario_file", "")
+        self.declare_parameter("task_id", "")
         self.declare_parameter("camera_topic", "/so101/camera/image_raw")
+        self.declare_parameter("depth_topic", "/so101/camera/depth/image_rect_raw")
+        self.declare_parameter("camera_info_topic", "/so101/camera/camera_info")
         self.declare_parameter("joint_state_topic", "/joint_states")
         self.declare_parameter("command_topic", "/so101/joint_commands")
         self.declare_parameter("video_key", "front")
+        self.declare_parameter("depth_key", "front_depth")
         self.declare_parameter("state_key", "joint_positions")
         self.declare_parameter("action_key", "joint_positions")
         self.declare_parameter("image_width", 224)
         self.declare_parameter("image_height", 224)
+        self.declare_parameter("joint_history_size", 4)
         self.declare_parameter("max_joint_step", 0.08)
 
         self.video_key = self.get_parameter("video_key").value
+        self.depth_key = self.get_parameter("depth_key").value
         self.state_key = self.get_parameter("state_key").value
         self.action_key = self.get_parameter("action_key").value
         self.instruction = self.get_parameter("instruction").value
         self.image_width = int(self.get_parameter("image_width").value)
         self.image_height = int(self.get_parameter("image_height").value)
+        self.joint_history_size = max(1, int(self.get_parameter("joint_history_size").value))
         self.max_joint_step = float(self.get_parameter("max_joint_step").value)
+        self.scenario = self._load_scenario()
 
         host = self.get_parameter("policy_host").value
         port = int(self.get_parameter("policy_port").value)
@@ -91,13 +103,22 @@ class SO101GrootBridge(Node):
         self.client = PolicyClient(host, port, timeout_ms)
 
         self.latest_image = None
+        self.latest_depth = None
+        self.latest_camera_info = None
         self.latest_positions = np.zeros(len(JOINT_NAMES), dtype=np.float32)
+        self.joint_history = deque(maxlen=self.joint_history_size)
         self.have_joint_state = False
 
         self.command_pub = self.create_publisher(
             Float64MultiArray, self.get_parameter("command_topic").value, 10
         )
         self.create_subscription(Image, self.get_parameter("camera_topic").value, self._image_cb, 5)
+        depth_topic = self.get_parameter("depth_topic").value
+        if depth_topic:
+            self.create_subscription(Image, depth_topic, self._depth_cb, 5)
+        camera_info_topic = self.get_parameter("camera_info_topic").value
+        if camera_info_topic:
+            self.create_subscription(CameraInfo, camera_info_topic, self._camera_info_cb, 5)
         self.create_subscription(
             JointState, self.get_parameter("joint_state_topic").value, self._joint_cb, 10
         )
@@ -105,21 +126,75 @@ class SO101GrootBridge(Node):
         self.timer = self.create_timer(period, self._tick)
         print("SO-101 GR00T bridge initialized", flush=True)
 
+    def _load_scenario(self):
+        scenario_file = self.get_parameter("scenario_file").value
+        task_id = self.get_parameter("task_id").value
+        if not scenario_file:
+            return {}
+        path = Path(scenario_file)
+        try:
+            scenario = json.loads(path.read_text())
+        except OSError as exc:
+            self.get_logger().warning(f"Unable to read scenario file {path}: {exc}")
+            return {}
+        except json.JSONDecodeError as exc:
+            self.get_logger().warning(f"Invalid scenario JSON {path}: {exc}")
+            return {}
+
+        tasks = scenario.get("tasks", [])
+        selected = None
+        if task_id:
+            selected = next((task for task in tasks if task.get("id") == task_id), None)
+            if selected is None:
+                self.get_logger().warning(f"Task {task_id!r} not found in scenario {path}")
+        elif tasks:
+            selected = tasks[0]
+        if selected:
+            self.instruction = selected.get("language", self.instruction)
+            scenario["selected_task"] = selected
+        return scenario
+
     def _image_cb(self, msg: Image):
-        if msg.encoding not in ("rgb8", "bgr8"):
-            self.get_logger().warn(f"Unsupported image encoding {msg.encoding}; expected rgb8/bgr8")
+        if msg.encoding not in ("rgb8", "bgr8", "rgba8", "bgra8"):
+            self.get_logger().warn(f"Unsupported image encoding {msg.encoding}; expected rgb8/bgr8/rgba8/bgra8")
             return
-        arr = np.frombuffer(msg.data, dtype=np.uint8).reshape(msg.height, msg.step // 3, 3)
-        arr = arr[:, :msg.width, :]
-        if msg.encoding == "bgr8":
+        channels = 4 if msg.encoding in ("rgba8", "bgra8") else 3
+        arr = np.frombuffer(msg.data, dtype=np.uint8).reshape(msg.height, msg.step // channels, channels)
+        arr = arr[:, :msg.width, :3]
+        if msg.encoding in ("bgr8", "bgra8"):
             arr = arr[:, :, ::-1]
         self.latest_image = self._resize_nearest(arr, self.image_height, self.image_width)
+
+    def _depth_cb(self, msg: Image):
+        if msg.encoding == "32FC1":
+            depth = np.frombuffer(msg.data, dtype=np.float32).reshape(msg.height, msg.step // 4)
+        elif msg.encoding == "16UC1":
+            depth = np.frombuffer(msg.data, dtype=np.uint16).reshape(msg.height, msg.step // 2).astype(np.float32)
+            depth *= 0.001
+        else:
+            self.get_logger().warn(f"Unsupported depth encoding {msg.encoding}; expected 32FC1/16UC1")
+            return
+        depth = depth[:, :msg.width]
+        self.latest_depth = self._resize_nearest(depth, self.image_height, self.image_width).astype(np.float32)
+
+    def _camera_info_cb(self, msg: CameraInfo):
+        self.latest_camera_info = {
+            "frame_id": msg.header.frame_id,
+            "width": msg.width,
+            "height": msg.height,
+            "distortion_model": msg.distortion_model,
+            "d": list(msg.d),
+            "k": list(msg.k),
+            "r": list(msg.r),
+            "p": list(msg.p),
+        }
 
     def _joint_cb(self, msg: JointState):
         by_name = {name: i for i, name in enumerate(msg.name)}
         if not all(name in by_name for name in JOINT_NAMES):
             return
         self.latest_positions = np.asarray([msg.position[by_name[name]] for name in JOINT_NAMES], dtype=np.float32)
+        self.joint_history.append(self.latest_positions.copy())
         self.have_joint_state = True
 
     def _resize_nearest(self, image: np.ndarray, height: int, width: int) -> np.ndarray:
@@ -127,14 +202,40 @@ class SO101GrootBridge(Node):
         x = np.linspace(0, image.shape[1] - 1, width).astype(np.int32)
         return image[y][:, x]
 
+    def _joint_history_array(self) -> np.ndarray:
+        if not self.joint_history:
+            self.joint_history.append(self.latest_positions.copy())
+        while len(self.joint_history) < self.joint_history_size:
+            self.joint_history.appendleft(self.joint_history[0].copy())
+        return np.stack(tuple(self.joint_history), axis=0).reshape(1, self.joint_history_size, -1)
+
     def _observation(self) -> dict:
         image = self.latest_image
         if image is None:
             image = np.zeros((self.image_height, self.image_width, 3), dtype=np.uint8)
-        return {
+        observation = {
             "video": {self.video_key: image.reshape(1, 1, self.image_height, self.image_width, 3)},
-            "state": {self.state_key: self.latest_positions.reshape(1, 1, -1)},
+            "state": {self.state_key: self._joint_history_array()},
             "language": {"task": [[self.instruction]]},
+            "metadata": {
+                "joint_names": JOINT_NAMES,
+                "camera_info": self.latest_camera_info,
+                "scenario": self._scenario_metadata(),
+                "observation_time": time.time(),
+            },
+        }
+        if self.latest_depth is not None and self.depth_key:
+            observation["depth"] = {self.depth_key: self.latest_depth.reshape(1, 1, self.image_height, self.image_width, 1)}
+        return observation
+
+    def _scenario_metadata(self):
+        if not self.scenario:
+            return None
+        return {
+            "name": self.scenario.get("name"),
+            "frame_id": self.scenario.get("frame_id"),
+            "selected_task": self.scenario.get("selected_task"),
+            "objects": self.scenario.get("objects", []),
         }
 
     def _extract_action(self, response) -> np.ndarray:
