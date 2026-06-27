@@ -13,6 +13,7 @@ This folder contains configuration for the MIT RACECAR Neo hardware/simulation s
 - `config/topics.yaml`: canonical topics and frames for this system.
 - `calibration/camera.yaml`: simulator camera calibration placeholder.
 - `urdf/racecarneo.urdf.xacro`: lightweight frame model for ROS visualization.
+- `scenarios/campus_closed_course.json`: tracked source-of-truth contract for the realistic outdoor/indoor closed-course environment, semantic labels, collision geometry, dynamic actors, spawn poses, and scenario variants.
 
 ## Runtime Pipeline
 
@@ -32,7 +33,7 @@ nvblox map slices + SLAM map frame -> Nav2 -> /cmd_vel
 /cmd_vel -> cmd_vel_to_ackermann -> /ackermann_cmd -> simulator
 ```
 
-The NiceGUI frontend observes odometry, camera, and depth status and sends Nav2 waypoints through `NavigateToPose`.
+The NiceGUI frontend observes odometry, camera, and depth status and sends Nav2 waypoints through `NavigateToPose`. The closed-course scenario contract in `systems/racecarneo/scenarios/campus_closed_course.json` defines the environment geometry that Unity/Gazebo/Isaac assets should instantiate for validation.
 
 ## Asset Policy
 
