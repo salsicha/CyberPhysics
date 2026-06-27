@@ -187,6 +187,21 @@ python3 applications/so101/scripts/score_picking_task.py \
   --seed 101
 ```
 
+## Acceptance Report
+
+Aggregate scored SO-101 runs into the acceptance metrics from
+`systems/so101/validation/acceptance_thresholds.json`:
+
+```bash
+python3 applications/so101/scripts/so101_acceptance_report.py \
+  --metrics /tmp/so101_metrics/*.json \
+  --thresholds systems/so101/validation/acceptance_thresholds.json
+```
+
+The report checks success rate by object class and clutter level, mean and worst
+place error, total collisions, joint-limit violations, command saturation,
+failed-grasp recovery rate, policy latency, and observation age.
+
 ## Manual motion test
 
 With any backend running, publish one six-joint target:

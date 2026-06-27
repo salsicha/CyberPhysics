@@ -15,6 +15,7 @@ install(
     scripts/isaacsim_so101.py
     scripts/so101_cbf_control.py
     scripts/score_picking_task.py
+    scripts/so101_acceptance_report.py
     scripts/validate_calibration_and_dataset.py
     scripts/record_groot_demo_bag.sh
   DESTINATION lib/${PROJECT_NAME}
