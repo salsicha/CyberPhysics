@@ -23,6 +23,9 @@ RUN git clone https://github.com/space-ros/demos.git /demos
 WORKDIR /demos/curiosity_rover
 RUN ./build.sh
 
+COPY scripts/ /scripts/
+RUN chmod +x /scripts/*.py
+
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 

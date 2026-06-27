@@ -1,0 +1,36 @@
+# Closed-loop Space ROS lunar rover simulation.
+
+services:
+  lunar_rover_sim:
+    image: cyberphysics/spaceros:${CYBERPHYSICS_TAG:-latest}
+    container_name: lunar_rover_sim
+    network_mode: host
+    ipc: host
+    restart: unless-stopped
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    volumes:
+      - ../systems/lunar_rover/config:/workspace/config:ro
+      - /dev/shm:/dev/shm
+    command: >
+      python3 /scripts/lunar_rover_sim.py
+        --ros-args
+        --params-file /workspace/config/simulation.yaml
+
+  lunar_waypoint_nav:
+    image: cyberphysics/spaceros:${CYBERPHYSICS_TAG:-latest}
+    container_name: lunar_waypoint_nav
+    network_mode: host
+    ipc: host
+    restart: unless-stopped
+    depends_on:
+      - lunar_rover_sim
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    volumes:
+      - ../systems/lunar_rover/config:/workspace/config:ro
+      - /dev/shm:/dev/shm
+    command: >
+      python3 /scripts/lunar_waypoint_nav.py
+        --ros-args
+        --params-file /workspace/config/south_pole_traverse.yaml

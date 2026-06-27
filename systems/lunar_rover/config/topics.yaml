@@ -1,0 +1,17 @@
+lunar_rover:
+  ros__parameters:
+    odom_topic: /lunar_rover/odom
+    imu_topic: /lunar_rover/imu
+    battery_topic: /lunar_rover/battery
+    joint_state_topic: /lunar_rover/wheel_states
+    cmd_vel_topic: /lunar_rover/cmd_vel
+    slope_topic: /lunar_rover/terrain/slope_deg
+    slip_topic: /lunar_rover/terrain/slip_ratio
+    illumination_topic: /lunar_rover/solar/illumination
+    temperature_topic: /lunar_rover/thermal/body
+    mission_status_topic: /lunar_rover/mission_status
+    map_frame: lunar_map
+    base_frame: lunar_rover/base_link
+    imu_frame: lunar_rover/imu_link
+    battery_frame: lunar_rover/battery
+    solar_frame: lunar_rover/solar_panel

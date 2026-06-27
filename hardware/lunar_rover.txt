@@ -1,0 +1,94 @@
+# Lunar Rover Hardware Shopping List
+
+Goal: build a CyberPhysics lunar rover development platform around Space ROS,
+the existing `applications/spaceros` image, and a six-wheel rover that can be
+validated in simulation before a terrestrial regolith testbed run.
+
+Important scope note
+
+- This is a terrestrial prototype and software validation platform, not a
+  flight-ready lunar vehicle. Actual lunar hardware needs mission-specific
+  radiation, vacuum, thermal, launch-load, contamination-control, reliability,
+  and planetary-protection engineering that cannot be satisfied by a quick COTS
+  shopping list.
+- The simulation is intentionally patterned after NASA lunar rover use cases:
+  crater-rim traverse, south-pole illumination/shadow, power/thermal management,
+  regolith slip, and supervised autonomous waypoint operations.
+
+Quick-buy baseline
+
+- 1 x six-wheel rover chassis with rocker-bogie or articulated suspension,
+  skid-steer/differential-drive kinematics, and at least 20 kg payload capacity.
+- 6 x high-torque geared brushless or brushed DC wheel motors sized for low
+  speed, high traction, and outdoor regolith/sand analog testing.
+- 6 x wheel encoders or integrated smart motor controllers with velocity
+  feedback.
+- 6 x compliant grousers/cleated wheels or replaceable tread wheels for sand,
+  gravel, and regolith simulant.
+- 2 x motor controller banks with current sensing and ROS 2-compatible control
+  interfaces, such as CAN, RS-485, or USB.
+- 1 x onboard compute module capable of running Space ROS and ROS 2 Humble,
+  preferably an x86-64 rugged mini PC or Jetson-class computer with 16 GB RAM.
+- 1 x safety microcontroller or watchdog board for motor inhibit, e-stop,
+  heartbeat monitoring, and power sequencing.
+- 1 x 9-axis IMU with temperature compensation.
+- 1 x wheel odometry interface wired into the motor/encoder stack.
+- 1 x forward stereo camera or depth camera for hazard perception in the
+  terrestrial prototype.
+- 1 x mast or front hazard camera pair for low-sun shadow and obstacle tests.
+- 1 x downward terrain camera for slip/soil visual odometry experiments.
+- 1 x 2D or 3D lidar for lab and field validation if the test environment is
+  not camera-only.
+- 1 x GNSS receiver for Earth outdoor testing only; disable or replace with
+  simulated/localization inputs for lunar mission validation.
+- 1 x 24 V or 28 V battery pack with BMS, service disconnect, fuse block, and
+  current/voltage telemetry.
+- 1 x solar panel simulator or removable solar panel for power-management
+  tests; size it as a payload input, not as the primary field safety power.
+- 1 x thermal sensor set for electronics bay, battery, motor drivers, and
+  external body temperature.
+- 1 x onboard Ethernet switch for cameras, lidar, and payload compute.
+- 1 x Wi-Fi 6, private LTE, or long-range Ethernet radio for supervised field
+  operations.
+- 1 x operator laptop with Docker, Space ROS image builds, RViz/Foxglove, and
+  manual teleoperation tools.
+- 1 x gamepad or hardware joystick for manual recovery.
+- 1 x physical e-stop and remote e-stop receiver.
+- 1 x field kit: spare wheels, spare motor controller, fuses, cabling, crimp
+  tools, fasteners, threadlocker, multimeter, battery-safe storage, and PPE.
+- 1 x terrain testbed or field area with sand/regolith simulant, slopes,
+  shadows, rocks, and clearly marked safety boundaries.
+
+Software stack
+
+- Space ROS / ROS 2 Humble in `applications/spaceros`.
+- Space ROS Curiosity rover demo for baseline rover workflows.
+- CyberPhysics `lunar_rover_sim.py` for deterministic south-pole terrain,
+  slip, illumination, thermal, battery, IMU, wheel-state, and odometry topics.
+- CyberPhysics `lunar_waypoint_nav.py` for autonomous waypoint traverse and
+  terrain-aware speed limiting.
+- Optional RViz or Foxglove for telemetry inspection.
+
+ROS 2 topic contract
+
+- `/lunar_rover/odom`
+- `/lunar_rover/imu`
+- `/lunar_rover/battery`
+- `/lunar_rover/wheel_states`
+- `/lunar_rover/cmd_vel`
+- `/lunar_rover/terrain/slope_deg`
+- `/lunar_rover/terrain/slip_ratio`
+- `/lunar_rover/solar/illumination`
+- `/lunar_rover/thermal/body`
+- `/lunar_rover/mission_status`
+
+Useful references
+
+- Space ROS:
+  https://github.com/space-ros/space-ros
+- Space ROS Curiosity rover demo:
+  https://github.com/space-ros/demos/blob/main/curiosity_rover/README.md
+- NASA Lunar Terrain Vehicle Services:
+  https://www.nasa.gov/news-release/nasa-selects-companies-to-advance-moon-mobility-for-artemis-missions/
+- NASA VIPER lunar rover:
+  https://www.nasa.gov/viper/

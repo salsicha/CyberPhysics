@@ -1,0 +1,25 @@
+lunar_rover_sim:
+  ros__parameters:
+    rate_hz: 20.0
+    odom_topic: /lunar_rover/odom
+    cmd_vel_topic: /lunar_rover/cmd_vel
+    imu_topic: /lunar_rover/imu
+    battery_topic: /lunar_rover/battery
+    joint_state_topic: /lunar_rover/wheel_states
+    slope_topic: /lunar_rover/terrain/slope_deg
+    slip_topic: /lunar_rover/terrain/slip_ratio
+    illumination_topic: /lunar_rover/solar/illumination
+    temperature_topic: /lunar_rover/thermal/body
+    initial_x_m: 0.0
+    initial_y_m: -4.0
+    initial_yaw_rad: 0.0
+    max_speed_mps: 0.38
+    max_yaw_rate_rps: 0.42
+    speed_time_constant_s: 2.0
+    yaw_time_constant_s: 1.4
+    wheel_radius_m: 0.18
+    battery_capacity_wh: 650.0
+    initial_battery_wh: 585.0
+    idle_power_w: 42.0
+    drive_power_w: 115.0
+    solar_charge_w: 38.0
