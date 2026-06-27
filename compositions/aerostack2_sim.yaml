@@ -149,37 +149,94 @@ services:
     command: >
       python3 /workspace/scripts/aerodrone_sensor_sim.py
 
+  demnav_assets:
+    profiles: ["navsim"]
+    network_mode: host
+    image: cyberphysics/demnav:${CYBERPHYSICS_TAG:-latest}
+    container_name: demnav_gazebo_assets
+    environment:
+      - INITIAL_LAT=${INITIAL_LAT:-37.9234}
+      - INITIAL_LON=${INITIAL_LON:--122.5967}
+    env_file:
+      - ../systems/aerostack2_gazebo/config/nav_topics.env
+    volumes:
+      - demnav_gazebo_cache:/data/demnav_cache
+    command: >
+      /venv/bin/python3 -m demnav_pkg.seed_cache
+        --lat ${INITIAL_LAT:-37.9234}
+        --lon ${INITIAL_LON:--122.5967}
+        --area-km ${AREA_KM:-8.0}
+        --resolution-m ${DEM_RESOLUTION_M:-10.0}
+        --cache-dir /data/demnav_cache
+    restart: "no"
+
+  wildnav_assets:
+    profiles: ["navsim"]
+    network_mode: host
+    image: cyberphysics/wildnav:${CYBERPHYSICS_TAG:-latest}
+    container_name: wildnav_gazebo_assets
+    environment:
+      - INITIAL_LAT=${INITIAL_LAT:-37.9234}
+      - INITIAL_LON=${INITIAL_LON:--122.5967}
+      - WILDNAV_FEATURE_BACKEND=${WILDNAV_FEATURE_BACKEND:-SIFT}
+      - WILDNAV_TILE_URL=${WILDNAV_TILE_URL:-https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}}
+    env_file:
+      - ../systems/aerostack2_gazebo/config/nav_topics.env
+    volumes:
+      - wildnav_gazebo_cache:/data/wildnav_cache
+    command: >
+      /venv/bin/python3 -m wildnav_pkg.seed_cache
+        --lat ${INITIAL_LAT:-37.9234}
+        --lon ${INITIAL_LON:--122.5967}
+        --zoom ${WILDNAV_ZOOM:-18}
+        --search-radius-m ${WILDNAV_SEARCH_RADIUS_M:-300.0}
+        --max-tiles ${WILDNAV_MAX_TILES:-64}
+        --feature-backend ${WILDNAV_FEATURE_BACKEND:-SIFT}
+        --tile-url-template ${WILDNAV_TILE_URL:-https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}}
+        --cache-dir /data/wildnav_cache
+    restart: "no"
+
   demnav:
     profiles: ["navsim"]
     network_mode: "host"
     image: cyberphysics/demnav:${CYBERPHYSICS_TAG:-latest}
     container_name: demnav_sim
     depends_on:
-      - simulator
-      - stateestimator
-      - odom_bridge
-      - aerodrone_sensor_sim
+      simulator:
+        condition: service_started
+      stateestimator:
+        condition: service_started
+      odom_bridge:
+        condition: service_started
+      aerodrone_sensor_sim:
+        condition: service_started
+      demnav_assets:
+        condition: service_completed_successfully
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
-      - INITIAL_LAT=${INITIAL_LAT:-37.7694}
-      - INITIAL_LON=${INITIAL_LON:--122.4862}
+      - INITIAL_LAT=${INITIAL_LAT:-37.9234}
+      - INITIAL_LON=${INITIAL_LON:--122.5967}
     env_file:
       - ../systems/aerostack2_gazebo/config/nav_topics.env
     volumes:
       - /dev/shm:/dev/shm
+      - demnav_gazebo_cache:/data/demnav_cache
     command: >
       stdbuf -o L
       ros2 launch demnav_pkg demnav.launch.py
-        gps_topic:=${GPS_TOPIC:-/drone_sim_0/sensor_measurements/gps}
+        gps_topic:=${GPS_STANDARD_TOPIC:-/navigation/gps_standard}
         odom_topic:=${ODOM_TOPIC:-/drone_sim_0/sensor_measurements/odom}
-        depth_topic:=${DEPTH_TOPIC:-/drone_sim_0/sensor_measurements/downward_rgbd/depth}
-        camera_info_topic:=${CAMERA_INFO_TOPIC:-/drone_sim_0/sensor_measurements/downward_rgbd/depth/camera_info}
-        initial_lat:=${INITIAL_LAT:-37.7694}
-        initial_lon:=${INITIAL_LON:--122.4862}
-        origin_alt:=${ORIGIN_ALT:-0.0}
-        area_km:=${AREA_KM:-10.0}
-        search_radius_m:=${SEARCH_RADIUS_M:-200.0}
-        fov_deg:=${FOV_DEG:-90.0}
+        depth_topic:=${OAK_RELATIVE_DEPTH_TOPIC:-/oak1/relative_depth}
+        camera_info_topic:=${OAK_DEPTH_INFO_TOPIC:-/oak1/camera_info}
+        initial_lat:=${INITIAL_LAT:-37.9234}
+        initial_lon:=${INITIAL_LON:--122.5967}
+        origin_alt:=${ORIGIN_ALT:-280.0}
+        area_km:=${AREA_KM:-8.0}
+        search_radius_m:=${SEARCH_RADIUS_M:-300.0}
+        dem_resolution_m:=${DEM_RESOLUTION_M:-10.0}
+        fov_deg:=${FOV_DEG:-69.0}
+        min_correlation:=${MIN_CORRELATION:-0.35}
+        cache_dir:=/data/demnav_cache
 
   wildnav:
     profiles: ["navsim"]
@@ -188,34 +245,69 @@ services:
     network_mode: host
     ipc: host
     depends_on:
-      - simulator
-      - stateestimator
-      - odom_bridge
-      - aerodrone_sensor_sim
-      - demnav
+      simulator:
+        condition: service_started
+      stateestimator:
+        condition: service_started
+      odom_bridge:
+        condition: service_started
+      aerodrone_sensor_sim:
+        condition: service_started
+      demnav:
+        condition: service_started
+      wildnav_assets:
+        condition: service_completed_successfully
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - WILDNAV_TILE_URL=${WILDNAV_TILE_URL:-https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}}
     env_file:
       - ../systems/aerostack2_gazebo/config/nav_topics.env
     volumes:
       - /dev/shm:/dev/shm
+      - wildnav_gazebo_cache:/data/wildnav_cache
     command: >
       ros2 launch wildnav_pkg wildnav.launch.py
-        image_topic:=${WILDNAV_IMAGE_TOPIC:-/drone_sim_0/sensor_measurements/downward_rgb/image_raw}
-        camera_info_topic:=${WILDNAV_CAMERA_INFO_TOPIC:-/drone_sim_0/sensor_measurements/downward_rgb/camera_info}
+        image_topic:=${OAK_IMAGE_TOPIC:-/oak1/image_highres}
+        camera_info_topic:=${OAK_IMAGE_INFO_TOPIC:-/oak1/image_highres/camera_info}
         prediction_odom_topic:=${NAVIGATION_ODOM_TOPIC:-/navigation/odometry}
         raw_odom_topic:=${RAW_ODOM_TOPIC:-/drone_sim_0/sensor_measurements/odom}
-        gps_topic:=${GPS_TOPIC:-/drone_sim_0/sensor_measurements/gps}
+        gps_topic:=${GPS_STANDARD_TOPIC:-/navigation/gps_standard}
         demnav_odom_topic:=${DEMNAV_ODOM_TOPIC:-/demnav/odometry}
         navigation_output_topic:=${NAVIGATION_ODOM_TOPIC:-/navigation/odometry}
-        initial_lat:=${INITIAL_LAT:-37.7694}
-        initial_lon:=${INITIAL_LON:--122.4862}
-        origin_alt:=${ORIGIN_ALT:-0.0}
+        initial_lat:=${INITIAL_LAT:-37.9234}
+        initial_lon:=${INITIAL_LON:--122.5967}
+        origin_alt:=${ORIGIN_ALT:-280.0}
         zoom:=${WILDNAV_ZOOM:-18}
-        search_radius_m:=${WILDNAV_SEARCH_RADIUS_M:-250.0}
-        max_tiles:=${WILDNAV_MAX_TILES:-49}
+        search_radius_m:=${WILDNAV_SEARCH_RADIUS_M:-300.0}
+        max_tiles:=${WILDNAV_MAX_TILES:-64}
         max_tile_downloads_per_cycle:=${WILDNAV_MAX_DOWNLOADS:-8}
         match_rate_hz:=${WILDNAV_RATE_HZ:-0.2}
+        feature_backend:=${WILDNAV_FEATURE_BACKEND:-SIFT}
         min_matches:=${WILDNAV_MIN_MATCHES:-16}
         min_inliers:=${WILDNAV_MIN_INLIERS:-10}
         min_inlier_ratio:=${WILDNAV_MIN_INLIER_RATIO:-0.25}
+        max_position_jump_m:=${WILDNAV_MAX_JUMP_M:-250.0}
+        minimum_demnav_confidence:=${DEMNAV_FUSION_CONFIDENCE:-0.35}
+        minimum_wildnav_confidence:=${WILDNAV_FUSION_CONFIDENCE:-0.20}
+        cache_dir:=/data/wildnav_cache
+
+  aerodrone_nav_validator:
+    profiles: ["validation"]
+    network_mode: "host"
+    image: cyberphysics/aerostack2
+    depends_on:
+      - demnav
+      - wildnav
+    env_file:
+      - ../systems/aerostack2_gazebo/config/nav_topics.env
+    volumes:
+      - /dev/shm:/dev/shm
+      - ../systems/aerostack2_gazebo/scripts:/workspace/scripts:ro
+    command: >
+      python3 /workspace/scripts/validate_aerodrone_navsim.py
+        --timeout-s ${AERODRONE_NAVSIM_VALIDATE_TIMEOUT:-180}
+        --freshness-s ${AERODRONE_NAVSIM_FRESHNESS:-10}
+
+volumes:
+  demnav_gazebo_cache:
+  wildnav_gazebo_cache:

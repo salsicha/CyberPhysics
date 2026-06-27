@@ -50,6 +50,15 @@ Start it with DemNav and WildNav consumers enabled:
 docker compose --profile navsim -f compositions/aerostack2_sim.yaml up
 ```
 
+The `navsim` profile seeds named Docker volumes for `/data/demnav_cache` and
+`/data/wildnav_cache`, starts the simulated Aerodrone hardware topic bridge,
+then runs DemNav and WildNav against `/navigation/gps_standard`, `/oak1/*`, and
+the raw Aerostack odometry topic. To run the topic-level validator as well:
+
+```bash
+docker compose --profile navsim --profile validation -f compositions/aerostack2_sim.yaml up aerodrone_nav_validator
+```
+
 If the AS2 Gazebo assets publish camera topics under different names on your
 installed package version, override the topic variables from `nav_topics.env`
 or edit the compose environment.
@@ -96,8 +105,9 @@ evaluated against the same area:
 
 The tracked scenario contract is
 `systems/aerostack2_gazebo/scenarios/mount_tamalpais_wilderness.json`.
-`cyberphysics/demnav:latest` seeds `/data/demnav_cache` during Docker build, and
-`cyberphysics/wildnav:latest` seeds `/data/wildnav_cache` during Docker build.
-Do not add generated DEMs, satellite tiles, feature descriptors, terrain meshes,
-bags, or logs to this repository; change Docker build args or runtime volumes
-when evaluating a different test area.
+The Gazebo compose file includes `demnav_assets` and `wildnav_assets` services
+that seed named Docker volumes before the navigation nodes start. This keeps DEM
+data, satellite tiles, descriptors, terrain meshes, bags, and logs out of git.
+Confirm the terms for the configured `WILDNAV_TILE_URL` provider before caching
+or replaying satellite imagery offline. Change Docker build args, runtime
+environment variables, or cache volumes when evaluating a different test area.
