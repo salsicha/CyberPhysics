@@ -7,7 +7,24 @@ import os
 import numpy as np
 from isaacsim import SimulationApp
 
-from so101_common import JOINT_NAMES, LOWER_LIMITS, UPPER_LIMITS
+from so101_common import (
+    CAMERA_FRAME_ID,
+    CAMERA_HEIGHT,
+    CAMERA_IMU_TOPIC,
+    CAMERA_WIDTH,
+    DEPTH_CAMERA_INFO_TOPIC,
+    DEPTH_FRAME_ID,
+    DEPTH_TOPIC,
+    JOINT_NAMES,
+    JOINT_QUANTIZATION,
+    LOWER_LIMITS,
+    RGB_CAMERA_INFO_TOPIC,
+    RGB_TOPIC,
+    UPPER_LIMITS,
+    camera_info_values,
+    quantize,
+    synthetic_rgbd,
+)
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--urdf", default="/workspace/systems/so101/urdf/so101.urdf")
@@ -39,7 +56,7 @@ from isaacsim.core.prims import Articulation
 try:
     import rclpy
     from rclpy.node import Node
-    from sensor_msgs.msg import CameraInfo, Image, JointState
+    from sensor_msgs.msg import CameraInfo, Image, Imu, JointState
     from std_msgs.msg import Float64MultiArray
 except ImportError as exc:
     simulation_app.close()
@@ -54,10 +71,13 @@ class IsaacBridge(Node):
         super().__init__("so101_isaacsim_bridge")
         self.target = np.zeros(len(JOINT_NAMES), dtype=np.float32)
         self.publisher = self.create_publisher(JointState, "/joint_states", 10)
-        self.image_pub = self.create_publisher(Image, "/so101/camera/image_raw", 5)
-        self.camera_info_pub = self.create_publisher(CameraInfo, "/so101/camera/camera_info", 5)
-        self.camera_width = 640
-        self.camera_height = 480
+        self.image_pub = self.create_publisher(Image, RGB_TOPIC, 5)
+        self.camera_info_pub = self.create_publisher(CameraInfo, RGB_CAMERA_INFO_TOPIC, 5)
+        self.depth_pub = self.create_publisher(Image, DEPTH_TOPIC, 5)
+        self.depth_info_pub = self.create_publisher(CameraInfo, DEPTH_CAMERA_INFO_TOPIC, 5)
+        self.imu_pub = self.create_publisher(Imu, CAMERA_IMU_TOPIC, 20)
+        self.camera_width = CAMERA_WIDTH
+        self.camera_height = CAMERA_HEIGHT
         self.subscription = self.create_subscription(
             Float64MultiArray, "/so101/joint_commands", self._command, 10
         )
@@ -75,30 +95,21 @@ class IsaacBridge(Node):
         stamp = self.get_clock().now().to_msg()
         msg.header.stamp = stamp
         msg.name = JOINT_NAMES
-        msg.position = np.asarray(positions).tolist()
-        msg.velocity = np.asarray(velocities).tolist()
+        measured_positions = quantize(np.asarray(positions), JOINT_QUANTIZATION)
+        msg.position = measured_positions.tolist()
+        msg.velocity = quantize(np.asarray(velocities), JOINT_QUANTIZATION).tolist()
         self.publisher.publish(msg)
-        self.publish_camera(stamp, positions)
+        self.publish_camera(stamp, measured_positions)
+        self.publish_imu(stamp, velocities)
 
     def publish_camera(self, stamp, positions):
-        positions = np.asarray(positions, dtype=np.float32)
         h = self.camera_height
         w = self.camera_width
-        y = np.linspace(0, 255, h, dtype=np.uint8)[:, None]
-        x = np.linspace(0, 255, w, dtype=np.uint8)[None, :]
-        image = np.zeros((h, w, 3), dtype=np.uint8)
-        image[:, :, 0] = (x + int((positions[0] + 2.0) * 35.0)) % 255
-        image[:, :, 1] = (y + int((positions[1] + 2.0) * 35.0)) % 255
-        image[:, :, 2] = 80
-
-        # Draw a small target marker so policy input visibly changes with the arm state.
-        cx = int(w * (0.5 + 0.22 * np.sin(float(positions[2]))))
-        cy = int(h * (0.5 - 0.22 * np.sin(float(positions[3]))))
-        image[max(0, cy - 12):min(h, cy + 12), max(0, cx - 12):min(w, cx + 12), :] = [255, 220, 30]
+        image, depth = synthetic_rgbd(positions, w, h)
 
         msg = Image()
         msg.header.stamp = stamp
-        msg.header.frame_id = "groot_camera_rgb_optical_frame"
+        msg.header.frame_id = CAMERA_FRAME_ID
         msg.height = h
         msg.width = w
         msg.encoding = "rgb8"
@@ -106,20 +117,44 @@ class IsaacBridge(Node):
         msg.step = w * 3
         msg.data = image.tobytes()
         self.image_pub.publish(msg)
+        self.camera_info_pub.publish(self.camera_info(stamp, CAMERA_FRAME_ID))
 
+        depth_msg = Image()
+        depth_msg.header.stamp = stamp
+        depth_msg.header.frame_id = DEPTH_FRAME_ID
+        depth_msg.height = h
+        depth_msg.width = w
+        depth_msg.encoding = "32FC1"
+        depth_msg.is_bigendian = 0
+        depth_msg.step = w * 4
+        depth_msg.data = depth.tobytes()
+        self.depth_pub.publish(depth_msg)
+        self.depth_info_pub.publish(self.camera_info(stamp, DEPTH_FRAME_ID))
+
+    def publish_imu(self, stamp, velocities):
+        msg = Imu()
+        msg.header.stamp = stamp
+        msg.header.frame_id = CAMERA_FRAME_ID
+        msg.orientation_covariance[0] = -1.0
+        msg.angular_velocity.z = float(np.asarray(velocities)[0])
+        msg.angular_velocity_covariance = [0.0004, 0.0, 0.0, 0.0, 0.0004, 0.0, 0.0, 0.0, 0.0008]
+        msg.linear_acceleration.z = 9.80665
+        msg.linear_acceleration_covariance = [0.01, 0.0, 0.0, 0.0, 0.01, 0.0, 0.0, 0.0, 0.02]
+        self.imu_pub.publish(msg)
+
+    def camera_info(self, stamp, frame_id):
+        values = camera_info_values(self.camera_width, self.camera_height)
         info = CameraInfo()
-        info.header = msg.header
-        info.width = w
-        info.height = h
-        fx = fy = 554.0
-        cx0 = w / 2.0
-        cy0 = h / 2.0
-        info.distortion_model = "plumb_bob"
-        info.d = [0.0, 0.0, 0.0, 0.0, 0.0]
-        info.k = [fx, 0.0, cx0, 0.0, fy, cy0, 0.0, 0.0, 1.0]
-        info.r = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
-        info.p = [fx, 0.0, cx0, 0.0, 0.0, fy, cy0, 0.0, 0.0, 0.0, 1.0, 0.0]
-        self.camera_info_pub.publish(info)
+        info.header.stamp = stamp
+        info.header.frame_id = frame_id
+        info.width = values["width"]
+        info.height = values["height"]
+        info.distortion_model = values["distortion_model"]
+        info.d = values["d"]
+        info.k = values["k"]
+        info.r = values["r"]
+        info.p = values["p"]
+        return info
 
 
 def import_robot(urdf_path):

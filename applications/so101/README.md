@@ -7,6 +7,9 @@ expose the same ROS 2 interface:
 - State: `sensor_msgs/msg/JointState` on `/joint_states`
 - Position command: `std_msgs/msg/Float64MultiArray` on `/so101/joint_commands`
 - Simulated RGB camera: `sensor_msgs/msg/Image` on `/so101/camera/image_raw`
+- Simulated depth camera: `sensor_msgs/msg/Image` on `/so101/camera/depth/image_rect_raw`
+- Camera calibration: `sensor_msgs/msg/CameraInfo` on `/so101/camera/camera_info` and `/so101/camera/depth/camera_info`
+- Camera IMU: `sensor_msgs/msg/Imu` on `/so101/camera/imu`
 - Joint order: `shoulder_pan`, `shoulder_lift`, `elbow_flex`, `wrist_flex`,
   `wrist_roll`, `gripper`
 
@@ -85,8 +88,7 @@ make -C applications build_so101 build_groot
 docker compose -f compositions/so101_groot_demo.yaml up
 ```
 
-It publishes `/joint_states`, `/so101/camera/image_raw`, and
-`/so101/camera/camera_info`, consumes `/so101/joint_commands`, and drives those
+It publishes `/joint_states`, `/so101/camera/image_raw`, `/so101/camera/camera_info`, `/so101/camera/depth/image_rect_raw`, `/so101/camera/depth/camera_info`, `/so101/camera/imu`, and calibration TF, consumes `/so101/joint_commands`, and drives those
 commands from the GR00T policy server through the bridge. The compose file sets
 `FASTDDS_BUILTIN_TRANSPORTS=UDPv4` so ROS samples flow reliably between Docker
 host-network containers.

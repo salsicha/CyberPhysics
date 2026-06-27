@@ -6,6 +6,8 @@ so101_groot_bridge:
     command_rate_hz: 5.0
     instruction: "move the SO-101 gripper through a small inspection motion"
     camera_topic: /so101/camera/image_raw
+    depth_topic: /so101/camera/depth/image_rect_raw
+    camera_info_topic: /so101/camera/camera_info
     joint_state_topic: /joint_states
     command_topic: /so101/joint_commands
     video_key: front
