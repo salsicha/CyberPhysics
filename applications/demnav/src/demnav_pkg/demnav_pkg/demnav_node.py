@@ -53,6 +53,7 @@ class DemNavNode(Node):
         self.declare_parameter('dem_resolution_m', 30.0)
         self.declare_parameter('min_correlation',  0.3)
         self.declare_parameter('cache_dir',        '/data/demnav_cache')
+        self.declare_parameter('synthetic_terrain', False)
         self.declare_parameter('pointcloud_stride', 4)
         self.declare_parameter('min_dem_footprint_pixels', 5)
         self.declare_parameter('min_metric_depth_m', 0.2)
@@ -78,6 +79,11 @@ class DemNavNode(Node):
             3, int(self.get_parameter('min_dem_footprint_pixels').value))
         self.min_metric_depth = self.get_parameter('min_metric_depth_m').value
         self.max_metric_depth = self.get_parameter('max_metric_depth_m').value
+        synthetic_terrain = self.get_parameter('synthetic_terrain').value
+        self.synthetic_terrain = (
+            synthetic_terrain
+            if isinstance(synthetic_terrain, bool)
+            else str(synthetic_terrain).lower() in ('1', 'true', 'yes', 'on'))
 
         self.bridge       = CvBridge()
         self.latest_fix   = None
@@ -129,7 +135,8 @@ class DemNavNode(Node):
                 lat, lon,
                 self.get_parameter('area_km').value,
                 self.get_parameter('dem_resolution_m').value,
-                self.get_parameter('cache_dir').value)
+                self.get_parameter('cache_dir').value,
+                self.synthetic_terrain)
             self.get_logger().info('Height map ready.')
         except Exception as e:
             self.get_logger().error(f'Failed to load height map: {e}')

@@ -93,7 +93,9 @@ class WildNavNode(Node):
             int(self.get_parameter('zoom').value),
             self.get_parameter('feature_backend').value,
             int(self.get_parameter('max_features').value),
-            float(self.get_parameter('request_timeout_s').value))
+            float(self.get_parameter('request_timeout_s').value),
+            self.origin_lat,
+            self.origin_lon)
 
         self.create_subscription(
             Image, self.get_parameter('image_topic').value,

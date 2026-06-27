@@ -8,6 +8,7 @@ import numpy as np
 
 
 WEB_MERCATOR_LIMIT = 85.05112878
+METERS_PER_DEG_LAT = 111320.0
 
 
 def latlon_to_tile(lat, lon, zoom):
@@ -36,13 +37,17 @@ def ground_resolution_m(lat, zoom):
 
 class SatelliteTileCache:
     def __init__(self, cache_dir, url_template, zoom, feature_backend='SIFT',
-                 max_features=1500, request_timeout=5.0):
+                 max_features=1500, request_timeout=5.0,
+                 origin_lat=0.0, origin_lon=0.0):
         self.cache_dir = cache_dir
         self.url_template = url_template
         self.zoom = zoom
         self.feature_backend = feature_backend.upper()
         self.max_features = max_features
         self.request_timeout = request_timeout
+        self.origin_lat = float(origin_lat)
+        self.origin_lon = float(origin_lon)
+        self.synthetic = str(url_template).startswith('synthetic://')
         self.failed_until = {}
         os.makedirs(cache_dir, exist_ok=True)
 
@@ -115,6 +120,11 @@ class SatelliteTileCache:
         return os.path.exists(os.path.join(self.cache_dir, stem + '.jpg'))
 
     def _download(self, x, y, image_path):
+        if self.synthetic:
+            image = self._generate_synthetic_tile(x, y)
+            cv2.imwrite(image_path, image)
+            return image
+
         key = (x, y)
         now = time.monotonic()
         if self.failed_until.get(key, 0.0) > now:
@@ -135,3 +145,49 @@ class SatelliteTileCache:
         except Exception:
             self.failed_until[key] = now + 60.0
             return None
+
+    def _generate_synthetic_tile(self, x, y, size=256):
+        rows, cols = np.indices((size, size), dtype=np.float64)
+        scale = 2 ** self.zoom
+        world_x = (x + (cols + 0.5) / size) / scale
+        world_y = (y + (rows + 0.5) / size) / scale
+        lon = world_x * 360.0 - 180.0
+        lat = np.degrees(np.arctan(np.sinh(math.pi * (1.0 - 2.0 * world_y))))
+        metres_per_deg_lon = (
+            METERS_PER_DEG_LAT * math.cos(math.radians(self.origin_lat)))
+        east = (lon - self.origin_lon) * metres_per_deg_lon
+        north = (lat - self.origin_lat) * METERS_PER_DEG_LAT
+        rgb = _synthetic_satellite_rgb(east, north)
+        return cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
+
+
+def _synthetic_satellite_rgb(east, north):
+    coast = north < -420.0 + 45.0 * np.sin(east / 210.0)
+    road_a = np.abs((north + 0.22 * east + 35.0) % 180.0 - 90.0) < 4.5
+    road_b = np.abs((east - 0.35 * north - 20.0) % 240.0 - 120.0) < 3.5
+    trail = np.abs((north - 90.0 * np.sin(east / 180.0)) % 130.0 - 65.0) < 2.0
+    parcel = ((np.floor(east / 95.0) + np.floor(north / 85.0)) % 2) == 1
+    noise = ((np.sin(east * 0.19 + north * 0.11) + 1.0) * 9.0).astype(np.uint8)
+
+    image = np.empty((*east.shape, 3), dtype=np.uint8)
+    image[..., 0] = 57 + noise
+    image[..., 1] = 108 + noise
+    image[..., 2] = 64
+
+    image[parcel, 0] = 84 + noise[parcel]
+    image[parcel, 1] = 126 + noise[parcel]
+    image[parcel, 2] = 72
+
+    image[trail, 0] = 132 + noise[trail]
+    image[trail, 1] = 104 + noise[trail]
+    image[trail, 2] = 76
+
+    roads = road_a | road_b
+    image[roads, 0] = 128 + noise[roads]
+    image[roads, 1] = 124 + noise[roads]
+    image[roads, 2] = 112 + noise[roads]
+
+    image[coast, 0] = 34
+    image[coast, 1] = 82 + noise[coast]
+    image[coast, 2] = 128 + noise[coast]
+    return image

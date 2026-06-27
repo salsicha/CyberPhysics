@@ -24,10 +24,13 @@ docker compose --env-file systems/airplane/config/sitl.env \
   -f compositions/airplane_sim.yaml up
 ```
 
-The simulation stack uses ArduPilot Plane SITL with JSBSim for fixed-wing flight
-dynamics and autopilot behavior. It also starts a synthetic nadir satellite-map
-camera so WildNav and DemNav can be wired and tested without a full Unreal,
-FlightGear, or Gazebo terrain scene.
+The simulation stack uses ArduPilot Plane SITL for fixed-wing autopilot
+behavior. JSBSim can be selected with `AIRPLANE_SITL_MODEL=jsbsim` when a local
+JSBSim build is desired, but the default uses ArduPilot's built-in plane model
+because it is stable under Docker Desktop emulation on Mac. The stack also
+starts a synthetic georeferenced nadir camera, DEM, and satellite-tile source so
+WildNav and DemNav can be fully exercised without a full Unreal, FlightGear, or
+Gazebo terrain scene.
 
 On first run, the SITL service uses the ArduPilot dev-base container and clones
 ArduPilot into `cache/ardupilot` so `Tools/autotest/sim_vehicle.py` is available
@@ -40,6 +43,7 @@ Tamalpais region. The aircraft climbs to a mapping altitude, flies a lawnmower
 survey, tolerates GPS degradation by leaning on WildNav/DemNav corrections, and
 returns toward the launch corridor.
 
-Full photorealistic validation should replace the synthetic nadir camera with a
-terrain simulator that can render georeferenced orthophoto/DEM tiles under the
-same `INITIAL_LAT`, `INITIAL_LON`, and `ORIGIN_ALT` values.
+Full photorealistic validation should replace the synthetic nadir camera and
+map backends with a terrain simulator that can render georeferenced
+orthophoto/DEM tiles under the same `INITIAL_LAT`, `INITIAL_LON`, and
+`ORIGIN_ALT` values.

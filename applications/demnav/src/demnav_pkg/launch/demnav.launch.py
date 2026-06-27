@@ -27,6 +27,7 @@ def generate_launch_description():
         ('dem_resolution_m', '30.0',                   'DEM grid resolution in metres'),
         ('min_correlation',  '0.3',                    'Minimum NCC score to publish a fix'),
         ('cache_dir',        '/data/demnav_cache',     'Directory for cached DEM tiles'),
+        ('synthetic_terrain', 'false',                  'Use simulator terrain instead of SRTM'),
         ('pointcloud_stride', '4',                     'Depth pixels skipped per point'),
         ('min_dem_footprint_pixels', '5',              'Minimum DEM cells across a match'),
         ('min_metric_depth_m', '0.2',                  'Minimum valid metric depth'),

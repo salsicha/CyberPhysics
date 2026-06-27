@@ -1,4 +1,4 @@
-# High-fidelity ArduPlane SITL + JSBSim navigation simulation.
+# ArduPlane SITL navigation simulation with optional JSBSim support.
 
 services:
   airplane_sitl:
@@ -10,21 +10,37 @@ services:
       - ../systems/airplane/config/sitl.env
     volumes:
       - ../cache/ardupilot:/workspace/ardupilot
+      - ../cache/jsbsim:/root/jsbsim
       - ../systems/airplane:/workspace/systems/airplane:ro
     working_dir: /workspace
-    command: >
-      bash -lc
-      "if [ ! -x /workspace/ardupilot/Tools/autotest/sim_vehicle.py ]; then
-        git clone --recurse-submodules --depth=1
-          https://github.com/ArduPilot/ardupilot.git /workspace/ardupilot;
-      fi;
-      cd /workspace/ardupilot;
-      python3 Tools/autotest/sim_vehicle.py -v ArduPlane
-        -f ${AIRPLANE_SITL_MODEL:-jsbsim}
-        --no-mavproxy
-        --location=${AIRPLANE_SITL_LOCATION:-CMAC}
-        --add-param-file=/workspace/systems/airplane/config/ardupilot_plane.params
-        --out=udp:127.0.0.1:14550"
+    command:
+      - bash
+      - -lc
+      - >
+        set -e;
+        ARDUPILOT_REF="$${ARDUPILOT_REF:-Plane-4.6.3}";
+        if [ ! -d /workspace/ardupilot/.git ]; then
+          git clone --recurse-submodules --depth=1 --branch "$$ARDUPILOT_REF" https://github.com/ArduPilot/ardupilot.git /workspace/ardupilot;
+        else
+          if ! git -C /workspace/ardupilot rev-parse --verify "refs/tags/$$ARDUPILOT_REF^{commit}" >/dev/null 2>&1; then
+            git -C /workspace/ardupilot fetch --depth=1 origin "refs/tags/$$ARDUPILOT_REF:refs/tags/$$ARDUPILOT_REF";
+          fi;
+          if [ "$$(git -C /workspace/ardupilot rev-parse HEAD)" != "$$(git -C /workspace/ardupilot rev-parse "refs/tags/$$ARDUPILOT_REF^{commit}")" ]; then
+            git -C /workspace/ardupilot checkout --detach "refs/tags/$$ARDUPILOT_REF";
+            git -C /workspace/ardupilot submodule update --init --recursive --depth=1;
+          fi;
+        fi;
+        cd /workspace/ardupilot;
+        export PATH="$$PATH:/root/jsbsim/build/src";
+        if [ "${AIRPLANE_SITL_MODEL:-jsbsim}" = "jsbsim" ] && ! command -v JSBSim >/dev/null 2>&1; then
+          if [ ! -d /root/jsbsim/.git ]; then
+            git clone https://github.com/JSBSim-Team/jsbsim.git /root/jsbsim;
+          fi;
+          cmake -S /root/jsbsim -B /root/jsbsim/build -DCMAKE_BUILD_TYPE=Release;
+          cmake --build /root/jsbsim/build -j2;
+          export PATH="$$PATH:/root/jsbsim/build/src";
+        fi;
+        python3 Tools/autotest/sim_vehicle.py -v ArduPlane -f ${AIRPLANE_SITL_MODEL:-jsbsim} --no-mavproxy --custom-location=${INITIAL_LAT:-37.9234},${INITIAL_LON:--122.5967},${ORIGIN_ALT:-280.0},0 --add-param-file=/workspace/systems/airplane/config/ardupilot_plane.params
 
   airplane_mavros:
     image: cyberphysics/aerostack2:${CYBERPHYSICS_TAG:-latest}
@@ -101,7 +117,7 @@ services:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
     volumes:
       - /dev/shm:/dev/shm
-      - /data/airplane_demnav_cache:/data/demnav_cache
+      - ../cache/airplane_demnav_cache:/data/demnav_cache
     command: >
       ros2 launch demnav_pkg demnav.launch.py
         gps_topic:=/${AIRPLANE_NAMESPACE:-plane0}/sensor_measurements/gps
@@ -114,7 +130,9 @@ services:
         area_km:=${AREA_KM:-12.0}
         search_radius_m:=${SEARCH_RADIUS_M:-1200.0}
         fov_deg:=${FOV_DEG:-69.0}
+        dem_resolution_m:=${DEMNAV_RESOLUTION_M:-10.0}
         min_correlation:=${MIN_CORRELATION:-0.35}
+        synthetic_terrain:=${DEMNAV_SYNTHETIC_TERRAIN:-false}
 
   airplane_wildnav:
     image: cyberphysics/wildnav:${CYBERPHYSICS_TAG:-latest}
@@ -130,10 +148,9 @@ services:
       - ../systems/airplane/config/sitl.env
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
-      - WILDNAV_TILE_URL
     volumes:
       - /dev/shm:/dev/shm
-      - /data/airplane_wildnav_cache:/data/wildnav_cache
+      - ../cache/airplane_wildnav_cache:/data/wildnav_cache
     command: >
       ros2 launch wildnav_pkg wildnav.launch.py
         image_topic:=/airplane/downward/image_highres

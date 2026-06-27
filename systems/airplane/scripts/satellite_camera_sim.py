@@ -9,6 +9,7 @@ from array import array
 import rclpy
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
+from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import CameraInfo, Image, NavSatFix
 
 
@@ -59,28 +60,46 @@ class SatelliteCameraSim(Node):
         self.start_time = time.monotonic()
 
         self.image_pub = self.create_publisher(
-            Image, str(self.get_parameter("image_topic").value), 10
+            Image,
+            str(self.get_parameter("image_topic").value),
+            qos_profile_sensor_data,
         )
         self.camera_info_pub = self.create_publisher(
-            CameraInfo, str(self.get_parameter("camera_info_topic").value), 10
+            CameraInfo,
+            str(self.get_parameter("camera_info_topic").value),
+            qos_profile_sensor_data,
         )
         self.preview_pub = self.create_publisher(
-            Image, str(self.get_parameter("preview_image_topic").value), 10
+            Image,
+            str(self.get_parameter("preview_image_topic").value),
+            qos_profile_sensor_data,
         )
         self.preview_info_pub = self.create_publisher(
-            CameraInfo, str(self.get_parameter("preview_camera_info_topic").value), 10
+            CameraInfo,
+            str(self.get_parameter("preview_camera_info_topic").value),
+            qos_profile_sensor_data,
         )
         self.depth_pub = self.create_publisher(
-            Image, str(self.get_parameter("depth_topic").value), 10
+            Image,
+            str(self.get_parameter("depth_topic").value),
+            qos_profile_sensor_data,
         )
         self.depth_info_pub = self.create_publisher(
-            CameraInfo, str(self.get_parameter("depth_camera_info_topic").value), 10
+            CameraInfo,
+            str(self.get_parameter("depth_camera_info_topic").value),
+            qos_profile_sensor_data,
         )
         self.create_subscription(
-            NavSatFix, str(self.get_parameter("gps_topic").value), self._gps, 10
+            NavSatFix,
+            str(self.get_parameter("gps_topic").value),
+            self._gps,
+            qos_profile_sensor_data,
         )
         self.create_subscription(
-            Odometry, str(self.get_parameter("odom_topic").value), self._odom, 10
+            Odometry,
+            str(self.get_parameter("odom_topic").value),
+            self._odom,
+            qos_profile_sensor_data,
         )
 
         rate_hz = max(0.1, float(self.get_parameter("rate_hz").value))
@@ -94,6 +113,8 @@ class SatelliteCameraSim(Node):
         )
         self.north_m = (float(msg.latitude) - self.origin_lat) * metres_per_deg_lat
         self.east_m = (float(msg.longitude) - self.origin_lon) * metres_per_deg_lon
+        if math.isfinite(float(msg.altitude)) and float(msg.altitude) > 0.0:
+            self.altitude_agl = float(msg.altitude)
         self.last_external_update = time.monotonic()
 
     def _odom(self, msg: Odometry) -> None:
@@ -196,10 +217,14 @@ class SatelliteCameraSim(Node):
         hill_shape = ((east + 240.0) / 380.0) ** 2
         hill_shape += ((north - 80.0) / 300.0) ** 2
         hill = 36.0 * math.exp(-hill_shape)
+        marker_rise = 65.0 * math.exp(-((east - 45.0) / 115.0) ** 2 -
+                                       ((north + 55.0) / 85.0) ** 2)
+        marker_cut = -42.0 * math.exp(-((east + 120.0) / 75.0) ** 2 -
+                                      ((north - 95.0) / 105.0) ** 2)
         coast_line = -420.0 + 45.0 * math.sin(east / 210.0)
         coast_drop = -22.0 if north < coast_line else 0.0
         texture = 4.0 * math.sin(east / 95.0) * math.cos(north / 120.0)
-        return ridge + hill + coast_drop + texture
+        return ridge + hill + marker_rise + marker_cut + coast_drop + texture
 
     def _camera_info(self, width: int, height: int, stamp) -> CameraInfo:
         info = CameraInfo()
