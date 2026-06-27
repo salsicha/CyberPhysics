@@ -1,0 +1,8 @@
+blueboat_bridge:
+  ros__parameters:
+    namespace: boat0
+    mavros_namespace: /mavros
+    enable_velocity_setpoints: false
+    cmd_vel_topic: /boat0/cmd_vel
+    mavros_velocity_topic: /mavros/setpoint_velocity/cmd_vel
+    velocity_frame_id: map

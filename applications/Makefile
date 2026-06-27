@@ -37,6 +37,8 @@ build_arduino: cleanup
 	APP=arduino ./_build_it.sh
 build_blackfly: cleanup build_ros2
 	APP=blackfly ./_build_it.sh
+build_boat: cleanup build_aerostack2
+	APP=boat ./_build_it.sh
 build_depthanything: cleanup build_ros2
 	APP=depthanything ./_build_it.sh
 build_gazebo: cleanup build_ros2
@@ -83,6 +85,8 @@ build_so101: cleanup
 	APP=so101 ./_build_it.sh
 build_spaceros: cleanup
 	APP=spaceros ./_build_it.sh
+build_submarine: cleanup build_aerostack2
+	APP=submarine ./_build_it.sh
 build_tello: cleanup build_ros2
 	APP=tello ./_build_it.sh
 build_unrealengine: cleanup

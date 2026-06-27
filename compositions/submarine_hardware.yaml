@@ -1,0 +1,42 @@
+# Physical BlueROV2 stack.
+
+services:
+  submarine_mavros:
+    image: cyberphysics/submarine:${CYBERPHYSICS_TAG:-arm64}
+    container_name: submarine_mavros
+    network_mode: host
+    ipc: host
+    restart: unless-stopped
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    command: >
+      ros2 launch mavros apm.launch
+        fcu_url:=${BLUEOS_FCU_URL:-udp://0.0.0.0:14550@}
+
+  submarine_bridge:
+    image: cyberphysics/submarine:${CYBERPHYSICS_TAG:-arm64}
+    container_name: submarine_bridge
+    network_mode: host
+    ipc: host
+    restart: unless-stopped
+    depends_on:
+      - submarine_mavros
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    volumes:
+      - ../systems/submarine/config:/workspace/config:ro
+      - /dev/shm:/dev/shm
+    command: >
+      python3 /scripts/bluerov2_bridge.py
+        --ros-args
+        --params-file /workspace/config/bridge.yaml
+        -p namespace:=${SUBMARINE_NAMESPACE:-sub0}
+
+  submarine_rosbridge:
+    image: cyberphysics/submarine:${CYBERPHYSICS_TAG:-arm64}
+    container_name: submarine_rosbridge
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    command: ros2 launch rosbridge_server rosbridge_websocket_launch.xml

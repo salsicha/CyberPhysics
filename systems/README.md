@@ -22,6 +22,8 @@ Applications should stay generic and accept paths into `systems/` through launch
 - `aerostack2_gazebo/`: Aerostack2 drone simulation configuration for Gazebo.
 - `aerostack2_isaac/`: Aerostack2 drone navigation simulation configuration for Isaac Sim.
 - `aerostack2_genesis/`: Aerostack2 headless drone navigation simulation configuration for Genesis.
+- `boat/`: BlueBoat/BlueOS/ArduRover topic conventions and bridge parameters.
+- `submarine/`: BlueROV2/BlueOS/ArduSub topic conventions and bridge parameters.
 - `turret/`: PanTiltROS-compatible turret tracking scenario, simulator, and acceptance validation.
 - `realsense/`: RealSense-specific example configuration.
 

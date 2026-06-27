@@ -1,0 +1,70 @@
+# BlueBoat Hardware Shopping List
+
+Goal: build a CyberPhysics surface vessel around Blue Robotics BlueBoat,
+Raspberry Pi 5, BlueOS, Navigator, ArduRover, and the `applications/boat` ROS 2
+bridge.
+
+Compatibility note
+
+- The requested platform is Raspberry Pi 5 plus Navigator. BlueOS documentation
+  lists Raspberry Pi 5 support, but the Navigator flight-controller page still
+  names Raspberry Pi 4B in its recommended-controller entry. Treat Pi 5 +
+  Navigator as a BlueOS-supported custom integration and verify the BlueOS image,
+  GPIO/header fit, power budget, and Navigator service before field deployment.
+
+Quick-buy baseline
+
+- 1 x Blue Robotics BlueBoat base package or ready-to-run package.
+- 1 x Raspberry Pi 5, preferably 8 GB or 16 GB.
+- 1 x Raspberry Pi 5 active cooler and high-endurance 128 GB or larger microSD
+  card, or an NVMe HAT if the BlueOS image and enclosure layout support it.
+- 1 x Blue Robotics Navigator Flight Controller.
+- 1 x BlueOS image for Raspberry Pi 5.
+- 1 x ArduRover firmware configured through BlueOS.
+- 1 x GPS/compass module if not included in the selected BlueBoat package.
+- 1 x BlueBoat BaseStation or equivalent long-range network link.
+- 1 x laptop running Cockpit, QGroundControl, or another MAVLink-capable control
+  station.
+- 1 x gamepad controller for manual operation and recovery.
+- 2 x or more BlueBoat-compatible 14.8 V lithium-ion batteries for field swaps.
+- 1 x compatible battery charger.
+- 1 x payload power and network expansion kit if adding sonar or science
+  payloads.
+- 1 x Ethernet switch if using Ethernet sonars or multiple onboard network
+  payloads.
+- 1 x Ping2 single-beam echosounder or other survey sonar if bathymetry is a
+  first mission.
+- 1 x external camera if visual inspection or remote docking is a first mission.
+- 1 x spare propeller and shaft hardware set.
+- 1 x field kit: dry bag, hand tools, dielectric grease, threadlocker, spare
+  fasteners, tape, corrosion control supplies, multimeter, and towels.
+
+Software stack
+
+- BlueOS on the onboard Raspberry Pi.
+- ArduRover on the Navigator.
+- MAVROS inside `cyberphysics/boat`.
+- CyberPhysics `blueboat_bridge.py` for ROS 2 telemetry topics.
+- Cockpit or QGroundControl for vehicle setup, manual operation, and missions.
+
+ROS 2 topic contract
+
+- `/boat0/sensor_measurements/gps`
+- `/boat0/sensor_measurements/odom`
+- `/boat0/sensor_measurements/imu`
+- `/boat0/sensor_measurements/battery`
+- `/boat0/cmd_vel` only after velocity setpoints are explicitly enabled and
+  tested.
+
+Useful purchase and software references
+
+- BlueBoat:
+  https://bluerobotics.com/store/boat/blueboat/blueboat/
+- Navigator Flight Controller:
+  https://bluerobotics.com/store/comm-control-power/control/navigator/
+- BlueOS documentation:
+  https://blueos.cloud/docs/latest/usage/overview/
+- ArduRover:
+  https://ardupilot.org/rover/
+- QGroundControl:
+  https://docs.qgroundcontrol.com/

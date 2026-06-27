@@ -1,0 +1,13 @@
+topics:
+  command_velocity: /boat0/cmd_vel
+  gps: /boat0/sensor_measurements/gps
+  odom: /boat0/sensor_measurements/odom
+  imu: /boat0/sensor_measurements/imu
+  battery: /boat0/sensor_measurements/battery
+  mavros_state: /mavros/state
+  mavros_velocity_setpoint: /mavros/setpoint_velocity/cmd_vel
+frames:
+  map: map
+  base: boat0/base_link
+  gps: boat0/gps_link
+  imu: boat0/imu_link

@@ -1,0 +1,42 @@
+# Physical BlueBoat stack.
+
+services:
+  boat_mavros:
+    image: cyberphysics/boat:${CYBERPHYSICS_TAG:-arm64}
+    container_name: boat_mavros
+    network_mode: host
+    ipc: host
+    restart: unless-stopped
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    command: >
+      ros2 launch mavros apm.launch
+        fcu_url:=${BLUEOS_FCU_URL:-udp://0.0.0.0:14550@}
+
+  boat_bridge:
+    image: cyberphysics/boat:${CYBERPHYSICS_TAG:-arm64}
+    container_name: boat_bridge
+    network_mode: host
+    ipc: host
+    restart: unless-stopped
+    depends_on:
+      - boat_mavros
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    volumes:
+      - ../systems/boat/config:/workspace/config:ro
+      - /dev/shm:/dev/shm
+    command: >
+      python3 /scripts/blueboat_bridge.py
+        --ros-args
+        --params-file /workspace/config/bridge.yaml
+        -p namespace:=${BOAT_NAMESPACE:-boat0}
+
+  boat_rosbridge:
+    image: cyberphysics/boat:${CYBERPHYSICS_TAG:-arm64}
+    container_name: boat_rosbridge
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    command: ros2 launch rosbridge_server rosbridge_websocket_launch.xml

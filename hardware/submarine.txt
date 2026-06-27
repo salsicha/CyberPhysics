@@ -1,0 +1,77 @@
+# BlueROV2 Submarine Hardware Shopping List
+
+Goal: build a CyberPhysics submarine around Blue Robotics BlueROV2, Raspberry
+Pi 5, BlueOS, Navigator, ArduSub, and the `applications/submarine` ROS 2 bridge.
+
+Compatibility note
+
+- The requested platform is Raspberry Pi 5 plus Navigator. BlueOS documentation
+  lists Raspberry Pi 5 support, but the BlueROV2 product page and Navigator
+  flight-controller documentation still describe the standard stack as Navigator
+  plus Raspberry Pi 4. Treat Pi 5 + Navigator as a custom BlueOS integration and
+  validate fit, thermal performance, power, camera streaming, and Navigator
+  service startup before sealing the electronics enclosure.
+
+Quick-buy baseline
+
+- 1 x Blue Robotics BlueROV2 base package. Choose acrylic for 100 m class work
+  or aluminum for deeper operations.
+- 1 x Heavy Configuration Upgrade if full six-degree-of-freedom control,
+  additional stability, or heavier payloads are required.
+- 1 x Raspberry Pi 5, preferably 8 GB or 16 GB.
+- 1 x Raspberry Pi 5 active cooler and high-endurance 128 GB or larger microSD
+  card, or an NVMe HAT only if the enclosure and BlueOS image support it.
+- 1 x Blue Robotics Navigator Flight Controller.
+- 1 x BlueOS image for Raspberry Pi 5.
+- 1 x ArduSub firmware configured through BlueOS.
+- 1 x Fathom tether of the required operating length.
+- 1 x Fathom-X or approved topside/tether interface.
+- 1 x tether spool sized for the tether length.
+- 1 x laptop running Cockpit, QGroundControl, or another MAVLink-capable control
+  station.
+- 1 x gamepad controller for manual operation and recovery.
+- 1 x ROV battery and 1 x compatible charger; buy at least two batteries for
+  field operations.
+- 1 x Bar30 or appropriate pressure/depth sensor if not included in the selected
+  kit.
+- 1 x leak sensor connected to the Navigator.
+- 2 x or 4 x Lumen lights, depending on inspection-lighting needs.
+- 1 x spare T200 thruster if downtime matters.
+- 1 x spare propeller set, penetrator blanks, O-rings, silicone grease, and
+  enclosure service kit.
+- 1 x optional Ping360, imaging sonar, DVL, USBL, or acoustic modem depending on
+  navigation and inspection requirements.
+- 1 x field kit: vacuum pump/test fittings, dry bag, hand tools, corrosion
+  control supplies, multimeter, towels, spare fasteners, cable ties, and labels.
+
+Software stack
+
+- BlueOS on the onboard Raspberry Pi.
+- ArduSub on the Navigator.
+- MAVROS inside `cyberphysics/submarine`.
+- CyberPhysics `bluerov2_bridge.py` for ROS 2 telemetry topics.
+- Cockpit or QGroundControl for vehicle setup, manual operation, video, and
+  missions.
+
+ROS 2 topic contract
+
+- `/sub0/sensor_measurements/gps`
+- `/sub0/sensor_measurements/odom`
+- `/sub0/sensor_measurements/imu`
+- `/sub0/sensor_measurements/pressure`
+- `/sub0/sensor_measurements/battery`
+- `/sub0/cmd_vel` only after velocity setpoints are explicitly enabled and
+  tested in a controlled test tank.
+
+Useful purchase and software references
+
+- BlueROV2:
+  https://bluerobotics.com/store/rov/bluerov2/
+- Navigator Flight Controller:
+  https://bluerobotics.com/store/comm-control-power/control/navigator/
+- BlueOS documentation:
+  https://blueos.cloud/docs/latest/usage/overview/
+- ArduSub:
+  https://www.ardusub.com/
+- QGroundControl:
+  https://docs.qgroundcontrol.com/

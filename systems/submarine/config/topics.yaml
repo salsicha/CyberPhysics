@@ -1,0 +1,14 @@
+topics:
+  command_velocity: /sub0/cmd_vel
+  gps: /sub0/sensor_measurements/gps
+  odom: /sub0/sensor_measurements/odom
+  imu: /sub0/sensor_measurements/imu
+  pressure: /sub0/sensor_measurements/pressure
+  battery: /sub0/sensor_measurements/battery
+  mavros_state: /mavros/state
+  mavros_velocity_setpoint: /mavros/setpoint_velocity/cmd_vel
+frames:
+  map: map
+  base: sub0/base_link
+  pressure: sub0/pressure_link
+  imu: sub0/imu_link
