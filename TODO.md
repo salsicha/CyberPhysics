@@ -1,14 +1,14 @@
 TODO:
 
 Complete simulation validation plan for the hardware configurations in
-`hardware/`: `racecarneo`, `so101`, and `aerodrone`.
+`hardware/`: `racecarneo`, `so101`, `aerodrone`, and `turret`.
 
 ## Cross-platform simulation foundation
 
 1. Define a simulation readiness matrix for every hardware sensor and actuator.
    Include simulated topic name, message type, frame_id, update rate, latency,
    noise model, drop-out model, calibration source, and the matching physical
-   hardware item from `hardware/*.txt`.
+   hardware item from the relevant `hardware/` platform entry.
 2. Add a reusable simulation validation harness that can launch each supported
    composition headlessly, wait for required ROS topics, assert TF connectivity,
    record a short rosbag, and fail on stale topics, NaNs, impossible covariance,
@@ -206,10 +206,83 @@ satellite maps.
    - Terrain clearance, waypoint success, battery reserve, geofence violations,
      and emergency landing success.
 
+## Turret realistic object-tracking simulation
+
+Goal: validate a PanTiltROS-based pan/tilt turret that segments a realistic
+scene, selects a configured target object, and tracks that object with closed
+loop pan/tilt control while distractors and occluders move through the camera
+view.
+
+1. Define the turret hardware and ROS contract.
+   - Use `applications/pantiltros` as the starting control stack and preserve
+     its `pan_joint` and `tilt_joint` names, ST3215 servo assumptions, joystick
+     emergency-stop behavior, and measured joint-state/diagnostics feedback.
+   - Track the hardware definition in `hardware/turret/README.md`, including
+     camera, servo bus, power, emergency stop, and ROS topic expectations.
+   - Standardize simulated topics for `/turret/camera/image_raw`,
+     `/turret/camera/camera_info`, segmentation outputs, target lock state,
+     angular error, joint commands, joint states, diagnostics, and emergency
+     stop.
+2. Build a realistic moving-object scene.
+   - Include an indoor lab or warehouse aisle with textured walls, shelves,
+     benches, windows, shadows, reflective surfaces, partial occluders, and
+     background clutter.
+   - Add multiple moving object classes such as person, cart, box, drone,
+     vehicle, and distractor objects with seeded trajectories, velocities,
+     stops, crossings, and occlusions.
+   - Provide ground-truth object IDs, class labels, segmentation masks,
+     3D poses, target visibility state, and the camera-to-target angular error
+     used only for scoring.
+3. Integrate YOLO segmentation.
+   - Use the current Ultralytics YOLO instance-segmentation model at
+     implementation time. As of June 2026, public Ultralytics YOLO26 material
+     describes instance segmentation support; use the latest available YOLO26
+     `-seg` checkpoint in the installed Ultralytics release for GPU/nightly
+     validation, and the smallest available YOLO26 segmentation checkpoint for
+     CPU smoke tests. Re-verify the exact checkpoint name before
+     implementation.
+   - Publish instance masks, class IDs, confidences, bounding boxes, mask
+     centroids, and per-frame inference latency.
+   - Validate segmentation against simulator masks for target IoU, false
+     positives, missed detections, confidence calibration, and mask latency
+     under motion blur, low light, glare, and partial occlusion.
+4. Add target selection and tracking behavior.
+   - Load a scenario target contract that identifies the object to track by
+     class plus stable simulator object ID, initial mask, or configured visual
+     prompt.
+   - Maintain target identity through brief occlusions and class-level
+     distractors using mask overlap, appearance embedding or color histogram,
+     predicted image motion, and joint-angle history.
+   - Convert target pixel centroid error into pan/tilt angular commands using
+     camera intrinsics, joint limits, velocity limits, deadband, and PID or
+     model-predictive smoothing.
+   - Drive the turret through PanTiltROS-compatible `JointState` commands; do
+     not use simulator ground truth for tracking control.
+5. Simulate actuator and camera failure modes.
+   - Model ST3215 position quantization, speed/acceleration limits, backlash,
+     overshoot, latency, dropped commands, bus disconnects, current/temperature
+     saturation, and emergency-stop torque disable.
+   - Model camera exposure changes, rolling-shutter artifacts, lens distortion,
+     frame drops, timestamp skew, compression artifacts, and vibration from
+     fast pan/tilt motion.
+   - Verify safe behavior when the target is lost, the segmentation model is
+     stale, the commanded joint would exceed limits, or emergency stop is
+     asserted.
+6. Add Turret acceptance metrics.
+   - Target lock percentage, reacquisition time after occlusion, and ID-switch
+     count.
+   - Mean and 95th-percentile pixel error and angular error while visible.
+   - Segmentation mask IoU, false-positive rate, false-negative rate, and
+     inference latency.
+   - Joint command saturation, overshoot, settling time, diagnostic fault
+     count, emergency-stop response time, and zero use of simulator ground truth
+     by the tracker.
+
 ## Deliverables
 
-1. Scenario assets and launch files for all three platforms.
-2. Sensor model configuration files matching every item in `hardware/*.txt`.
+1. Scenario assets and launch files for all four platforms.
+2. Sensor model configuration files matching every item in the `hardware/`
+   platform entries.
 3. Mission/waypoint/task definitions and scoring scripts.
 4. Headless smoke tests and GPU/nightly robustness tests.
 5. Documentation for running each simulation, inspecting results, and mapping
