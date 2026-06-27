@@ -1,0 +1,284 @@
+{
+  "name": "aerodrone_navigation_robustness_tests",
+  "scenario": "../scenarios/mount_tamalpais_wilderness.json",
+  "mission_file": "../missions/wilderness_missions.json",
+  "description": "Failure and degraded-condition tests for simultaneous GPS, DemNav, WildNav, and fused-navigation evaluation.",
+  "telemetry_contract": {
+    "sample_fields": [
+      "test_id",
+      "t_s",
+      "position_enu_m",
+      "ground_truth_enu_m",
+      "horizontal_error_m",
+      "vertical_error_m",
+      "correction_source",
+      "correction_confidence",
+      "demnav_valid",
+      "demnav_confidence",
+      "wildnav_valid",
+      "wildnav_confidence",
+      "wildnav_match_count",
+      "geofence_violation",
+      "rangefinder_valid",
+      "stale_cache_used",
+      "command_safe"
+    ]
+  },
+  "global_thresholds": {
+    "max_geofence_violations": 0,
+    "max_horizontal_error_m": 25.0,
+    "max_vertical_error_m": 12.0,
+    "min_safe_command_fraction": 1.0,
+    "max_false_positive_corrections": 0
+  },
+  "tests": [
+    {
+      "id": "gps_degraded_ridge_crossing",
+      "mission_id": "ridge_crossing_gps_degraded",
+      "faults": [
+        {
+          "type": "gps_noise",
+          "std_m": 12.0,
+          "from_waypoint": "ridge_entry",
+          "to_waypoint": "ridge_exit"
+        },
+        {
+          "type": "wind",
+          "gust_mps": 5.0,
+          "direction_deg": 260.0
+        }
+      ],
+      "expected_behavior": {
+        "demnav_should_bound_drift": true,
+        "wildnav_should_bound_drift": true,
+        "allowed_fallback_sources": [
+          "demnav",
+          "wildnav",
+          "fused",
+          "dead_reckoning"
+        ],
+        "min_demnav_valid_fraction": 0.4,
+        "min_wildnav_valid_fraction": 0.25
+      },
+      "thresholds": {
+        "max_horizontal_error_m": 18.0,
+        "max_vertical_error_m": 10.0
+      }
+    },
+    {
+      "id": "gps_denied_valley_segment",
+      "mission_id": "valley_following_satellite_dem",
+      "faults": [
+        {
+          "type": "gps_dropout",
+          "duration_s": 45.0,
+          "region": "trail_bend_to_water_overlook"
+        },
+        {
+          "type": "gps_status",
+          "status": "no_fix"
+        }
+      ],
+      "expected_behavior": {
+        "gps_should_not_be_required": true,
+        "allowed_fallback_sources": [
+          "wildnav",
+          "demnav",
+          "fused",
+          "dead_reckoning"
+        ],
+        "min_wildnav_valid_fraction": 0.35
+      },
+      "thresholds": {
+        "max_horizontal_error_m": 22.0,
+        "max_vertical_error_m": 12.0
+      }
+    },
+    {
+      "id": "low_texture_wildnav_rejection",
+      "mission_id": "ridge_crossing_gps_degraded",
+      "faults": [
+        {
+          "type": "satellite_texture",
+          "region": "ridge_grassland",
+          "texture": "low_contrast_grass"
+        },
+        {
+          "type": "image_blur",
+          "exposure_s": 0.03,
+          "angular_rate_dps": 80.0
+        }
+      ],
+      "expected_behavior": {
+        "wildnav_should_reject": true,
+        "allowed_fallback_sources": [
+          "demnav",
+          "dead_reckoning",
+          "fused"
+        ],
+        "max_wildnav_false_positive_corrections": 0
+      },
+      "thresholds": {
+        "max_horizontal_error_m": 25.0,
+        "max_vertical_error_m": 12.0
+      }
+    },
+    {
+      "id": "flat_terrain_demnav_rejection",
+      "mission_id": "waypoint_loiter_visual_match",
+      "faults": [
+        {
+          "type": "terrain_patch",
+          "region": "loiter_clearance",
+          "profile": "flat_low_relief"
+        },
+        {
+          "type": "relative_depth_scale_bias",
+          "scale": 1.35
+        }
+      ],
+      "expected_behavior": {
+        "demnav_should_reject": true,
+        "allowed_fallback_sources": [
+          "wildnav",
+          "dead_reckoning",
+          "fused"
+        ],
+        "max_demnav_false_positive_corrections": 0
+      },
+      "thresholds": {
+        "max_horizontal_error_m": 20.0,
+        "max_vertical_error_m": 12.0
+      }
+    },
+    {
+      "id": "canopy_shadow_motion_blur",
+      "mission_id": "valley_following_satellite_dem",
+      "faults": [
+        {
+          "type": "lighting",
+          "variant": "canopy_shadow",
+          "sun_elevation_deg": 35.0
+        },
+        {
+          "type": "image_blur",
+          "exposure_s": 0.025,
+          "angular_rate_dps": 65.0
+        },
+        {
+          "type": "depth_invalid_pixels",
+          "fraction": 0.35
+        }
+      ],
+      "expected_behavior": {
+        "confidence_should_drop_cleanly": true,
+        "allowed_fallback_sources": [
+          "gps_standard",
+          "wildnav",
+          "demnav",
+          "dead_reckoning",
+          "fused"
+        ],
+        "max_false_positive_corrections": 0
+      },
+      "thresholds": {
+        "max_horizontal_error_m": 25.0,
+        "max_vertical_error_m": 12.0
+      }
+    },
+    {
+      "id": "rangefinder_dropout_emergency_landing",
+      "mission_id": "emergency_landing",
+      "faults": [
+        {
+          "type": "rangefinder_dropout",
+          "duration_s": 12.0,
+          "region": "flare"
+        },
+        {
+          "type": "gps_noise",
+          "std_m": 12.0,
+          "region": "landing_decision"
+        }
+      ],
+      "expected_behavior": {
+        "landing_should_remain_safe": true,
+        "allowed_fallback_sources": [
+          "gps_standard",
+          "fused",
+          "dead_reckoning"
+        ],
+        "require_safe_commands": true
+      },
+      "thresholds": {
+        "max_horizontal_error_m": 10.0,
+        "max_vertical_error_m": 6.0,
+        "require_landed": true
+      }
+    },
+    {
+      "id": "stale_dem_cache_rejected",
+      "mission_id": "ridge_crossing_gps_degraded",
+      "faults": [
+        {
+          "type": "dem_cache",
+          "state": "stale_wrong_origin",
+          "offset_m": [
+            180.0,
+            -130.0
+          ]
+        },
+        {
+          "type": "demnav_confidence_gate",
+          "min_correlation": 0.35
+        }
+      ],
+      "expected_behavior": {
+        "demnav_should_reject": true,
+        "allowed_fallback_sources": [
+          "wildnav",
+          "gps_standard",
+          "dead_reckoning",
+          "fused"
+        ],
+        "max_stale_cache_corrections": 0
+      },
+      "thresholds": {
+        "max_horizontal_error_m": 25.0,
+        "max_vertical_error_m": 12.0
+      }
+    },
+    {
+      "id": "stale_satellite_cache_rejected",
+      "mission_id": "waypoint_loiter_visual_match",
+      "faults": [
+        {
+          "type": "satellite_cache",
+          "state": "stale_wrong_zoom_or_origin",
+          "offset_m": [
+            -220.0,
+            80.0
+          ]
+        },
+        {
+          "type": "wildnav_match_gate",
+          "min_inlier_ratio": 0.25
+        }
+      ],
+      "expected_behavior": {
+        "wildnav_should_reject": true,
+        "allowed_fallback_sources": [
+          "demnav",
+          "gps_standard",
+          "dead_reckoning",
+          "fused"
+        ],
+        "max_stale_cache_corrections": 0
+      },
+      "thresholds": {
+        "max_horizontal_error_m": 25.0,
+        "max_vertical_error_m": 12.0
+      }
+    }
+  ]
+}

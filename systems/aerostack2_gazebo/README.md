@@ -16,6 +16,10 @@ Files:
   valley following, loiter, return-home, and emergency-landing mission suite.
 - `scripts/score_wilderness_mission.py`: validates the mission contract and
   scores extracted telemetry JSON against the mission criteria.
+- `validation/navigation_robustness_tests.json`: GPS, map, camera, weather,
+  rangefinder, cache, and fallback failure cases.
+- `scripts/score_navigation_robustness.py`: validates robustness contracts and
+  scores extracted telemetry JSON against the failure-case criteria.
 
 Start the base Aerostack2 simulation headlessly:
 
@@ -79,6 +83,20 @@ Score a mission after extracting telemetry samples from a bag or simulator log:
 python3 systems/aerostack2_gazebo/scripts/score_wilderness_mission.py \
   --mission-id ridge_crossing_gps_degraded \
   --telemetry generated/aerodrone/ridge_crossing_telemetry.json
+```
+
+Validate the robustness test contract:
+
+```bash
+python3 systems/aerostack2_gazebo/scripts/score_navigation_robustness.py
+```
+
+Score a robustness run after extracting telemetry samples:
+
+```bash
+python3 systems/aerostack2_gazebo/scripts/score_navigation_robustness.py \
+  --test-id gps_degraded_ridge_crossing \
+  --telemetry generated/aerodrone/robustness_telemetry.json
 ```
 
 
