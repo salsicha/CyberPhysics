@@ -14,6 +14,7 @@ install(
     scripts/genesis_so101.py
     scripts/isaacsim_so101.py
     scripts/so101_cbf_control.py
+    scripts/score_picking_task.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

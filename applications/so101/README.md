@@ -133,6 +133,36 @@ Sim 5.1 crashed in `librtx.scenedb.plugin.so` before the SO-101 script could run
 The ROS demo above exercises the SO-101 camera, GR00T policy server, and bridge
 path without that renderer dependency.
 
+## Picking Task Validation
+
+Score scenario telemetry against the selected SO-101 picking task:
+
+```bash
+python3 applications/so101/scripts/score_picking_task.py \
+  --scenario systems/so101/scenarios/picking_table.json \
+  --telemetry /tmp/so101_pick_run.json \
+  --task-id pick_red_block_left_bin
+```
+
+Telemetry JSON should include `duration_s`, optional `collisions`, optional
+`failed_grasps`, and a `samples` array with `time`, `end_effector_xyz`,
+`object_xyz`, and `gripper_width_m`. The scorer fails if the policy uses
+simulator ground truth, if the arm never approaches and closes on the target, if
+the object is not lifted and placed within task tolerance, if collisions exceed
+the scenario limit, or if recovery after a failed grasp does not complete within
+the configured window.
+
+Generate deterministic domain-randomized scenario variants for nightly
+validation:
+
+```bash
+python3 applications/so101/scripts/score_picking_task.py \
+  --scenario systems/so101/scenarios/picking_table.json \
+  --write-randomized-scenarios /tmp/so101_randomized \
+  --num-randomizations 25 \
+  --seed 101
+```
+
 ## Manual motion test
 
 With any backend running, publish one six-joint target:
