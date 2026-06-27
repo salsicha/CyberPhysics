@@ -12,6 +12,10 @@ Files:
 - `config/nav_topics.env`: expected simulated topic names and Mount Tamalpais test origin for DemNav/WildNav.
 - `config/sensor_models.yaml`: hardware-to-simulation GPS, OAK-1, rangefinder, battery, geofence, RC failsafe, and emergency-land topic contract.
 - `scenarios/mount_tamalpais_wilderness.json`: georeferenced wilderness scenario contract for simultaneous GPS, DemNav, WildNav, and fused-navigation evaluation.
+- `missions/wilderness_missions.json`: takeoff, climb, ridge crossing,
+  valley following, loiter, return-home, and emergency-landing mission suite.
+- `scripts/score_wilderness_mission.py`: validates the mission contract and
+  scores extracted telemetry JSON against the mission criteria.
 
 Start the base Aerostack2 simulation headlessly:
 
@@ -62,6 +66,20 @@ docker compose --profile navsim --profile validation -f compositions/aerostack2_
 If the AS2 Gazebo assets publish camera topics under different names on your
 installed package version, override the topic variables from `nav_topics.env`
 or edit the compose environment.
+
+Validate the tracked mission contract without telemetry:
+
+```bash
+python3 systems/aerostack2_gazebo/scripts/score_wilderness_mission.py
+```
+
+Score a mission after extracting telemetry samples from a bag or simulator log:
+
+```bash
+python3 systems/aerostack2_gazebo/scripts/score_wilderness_mission.py \
+  --mission-id ridge_crossing_gps_degraded \
+  --telemetry generated/aerodrone/ridge_crossing_telemetry.json
+```
 
 
 ## DemNav/WildNav Simulation Notes

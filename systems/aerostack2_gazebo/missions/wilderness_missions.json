@@ -1,0 +1,556 @@
+{
+  "name": "aerodrone_mount_tamalpais_wilderness_missions",
+  "scenario": "../scenarios/mount_tamalpais_wilderness.json",
+  "frame_id": "map",
+  "local_frame": "drone_sim_0/map",
+  "origin": {
+    "lat": 37.9234,
+    "lon": -122.5967,
+    "alt_m": 280.0,
+    "projection": "local_tangent_enu"
+  },
+  "navigation_sources": {
+    "gps_standard": "/navigation/gps_standard",
+    "demnav": [
+      "/demnav/fix",
+      "/demnav/odometry",
+      "/demnav/confidence",
+      "/demnav/valid"
+    ],
+    "wildnav": [
+      "/wildnav/fix",
+      "/wildnav/odometry",
+      "/wildnav/confidence",
+      "/wildnav/valid"
+    ],
+    "fused": [
+      "/navigation/odometry",
+      "/navigation/fix",
+      "/navigation/correction_source",
+      "/navigation/correction_confidence"
+    ]
+  },
+  "geofence": {
+    "keep_in_polygon_enu_m": [
+      [
+        -1000,
+        -700
+      ],
+      [
+        1100,
+        -700
+      ],
+      [
+        1100,
+        700
+      ],
+      [
+        -1000,
+        700
+      ]
+    ],
+    "no_fly_polygons_enu_m": [
+      [
+        [
+          -100,
+          -80
+        ],
+        [
+          260,
+          -80
+        ],
+        [
+          260,
+          140
+        ],
+        [
+          -100,
+          140
+        ]
+      ],
+      [
+        [
+          760,
+          260
+        ],
+        [
+          1050,
+          260
+        ],
+        [
+          1050,
+          620
+        ],
+        [
+          760,
+          620
+        ]
+      ]
+    ],
+    "min_agl_m": 25.0,
+    "max_agl_m": 120.0
+  },
+  "global_acceptance": {
+    "max_geofence_violations": 0,
+    "min_battery_reserve_v": 14.2,
+    "max_horizontal_waypoint_error_m": 8.0,
+    "max_vertical_error_m": 6.0,
+    "min_correction_confidence": 0.2
+  },
+  "missions": [
+    {
+      "id": "takeoff_climb_clearance",
+      "description": "Take off from the west clearing, climb above tree height, verify rangefinder and fused navigation stability, then settle into the mission cruise altitude.",
+      "variant": "clear_midday",
+      "start_enu_m": [
+        -720.0,
+        -260.0,
+        0.0
+      ],
+      "phases": [
+        {
+          "name": "takeoff",
+          "required_sources": [
+            "gps_standard",
+            "rangefinder",
+            "fused"
+          ],
+          "waypoints": [
+            {
+              "id": "arm_start",
+              "position_enu_m": [
+                -720.0,
+                -260.0,
+                0.0
+              ],
+              "target_agl_m": 0.0,
+              "acceptance_radius_m": 2.0,
+              "hold_s": 2.0
+            },
+            {
+              "id": "clear_landing_pad",
+              "position_enu_m": [
+                -720.0,
+                -260.0,
+                35.0
+              ],
+              "target_agl_m": 35.0,
+              "acceptance_radius_m": 4.0,
+              "speed_limit_mps": 1.5
+            }
+          ]
+        },
+        {
+          "name": "climb",
+          "required_sources": [
+            "gps_standard",
+            "demnav",
+            "wildnav",
+            "fused"
+          ],
+          "waypoints": [
+            {
+              "id": "above_canopy",
+              "position_enu_m": [
+                -640.0,
+                -220.0,
+                55.0
+              ],
+              "target_agl_m": 55.0,
+              "acceptance_radius_m": 6.0,
+              "speed_limit_mps": 3.0
+            },
+            {
+              "id": "cruise_entry",
+              "position_enu_m": [
+                -520.0,
+                -160.0,
+                65.0
+              ],
+              "target_agl_m": 65.0,
+              "acceptance_radius_m": 6.0,
+              "speed_limit_mps": 4.0
+            }
+          ]
+        }
+      ],
+      "score": {
+        "min_waypoint_completion": 1.0,
+        "min_terrain_clearance_m": 0.0,
+        "max_agl_m": 90.0
+      }
+    },
+    {
+      "id": "ridge_crossing_gps_degraded",
+      "description": "Cross the ridge grassland while GPS accuracy is degraded so DEM terrain correlation and satellite matching must bound drift.",
+      "variant": "gps_degraded",
+      "start_enu_m": [
+        -520.0,
+        -160.0,
+        65.0
+      ],
+      "gps_degraded_segments": [
+        {
+          "from_waypoint": "ridge_entry",
+          "to_waypoint": "ridge_exit",
+          "std_m": 12.0
+        }
+      ],
+      "phases": [
+        {
+          "name": "ridge_crossing",
+          "required_sources": [
+            "gps_standard",
+            "demnav",
+            "wildnav",
+            "fused"
+          ],
+          "waypoints": [
+            {
+              "id": "ridge_entry",
+              "position_enu_m": [
+                -260.0,
+                -120.0,
+                70.0
+              ],
+              "target_agl_m": 70.0,
+              "acceptance_radius_m": 8.0,
+              "speed_limit_mps": 5.0
+            },
+            {
+              "id": "ridge_mid",
+              "position_enu_m": [
+                80.0,
+                -170.0,
+                75.0
+              ],
+              "target_agl_m": 75.0,
+              "acceptance_radius_m": 8.0,
+              "speed_limit_mps": 5.0
+            },
+            {
+              "id": "ridge_turn",
+              "position_enu_m": [
+                340.0,
+                -150.0,
+                72.0
+              ],
+              "target_agl_m": 72.0,
+              "acceptance_radius_m": 8.0,
+              "speed_limit_mps": 4.0
+            },
+            {
+              "id": "ridge_exit",
+              "position_enu_m": [
+                620.0,
+                80.0,
+                68.0
+              ],
+              "target_agl_m": 68.0,
+              "acceptance_radius_m": 8.0,
+              "speed_limit_mps": 4.0
+            }
+          ]
+        }
+      ],
+      "score": {
+        "min_waypoint_completion": 0.95,
+        "min_demnav_confidence": 0.35,
+        "min_wildnav_confidence": 0.2,
+        "max_horizontal_error_m": 12.0
+      }
+    },
+    {
+      "id": "valley_following_satellite_dem",
+      "description": "Follow the trail/valley corridor around the no-fly outcrop using satellite visual corrections and DEM-derived altitude constraints.",
+      "variant": "canopy_shadow",
+      "start_enu_m": [
+        620.0,
+        80.0,
+        68.0
+      ],
+      "phases": [
+        {
+          "name": "valley_following",
+          "required_sources": [
+            "gps_standard",
+            "wildnav",
+            "demnav",
+            "fused"
+          ],
+          "avoid_regions": [
+            "central_no_fly",
+            "east_no_fly"
+          ],
+          "waypoints": [
+            {
+              "id": "valley_entry",
+              "position_enu_m": [
+                420.0,
+                110.0,
+                62.0
+              ],
+              "target_agl_m": 62.0,
+              "acceptance_radius_m": 8.0,
+              "speed_limit_mps": 4.0
+            },
+            {
+              "id": "trail_bend",
+              "position_enu_m": [
+                180.0,
+                180.0,
+                58.0
+              ],
+              "target_agl_m": 58.0,
+              "acceptance_radius_m": 8.0,
+              "speed_limit_mps": 4.0
+            },
+            {
+              "id": "water_overlook",
+              "position_enu_m": [
+                -120.0,
+                300.0,
+                62.0
+              ],
+              "target_agl_m": 62.0,
+              "acceptance_radius_m": 8.0,
+              "speed_limit_mps": 3.0
+            },
+            {
+              "id": "west_trail",
+              "position_enu_m": [
+                -420.0,
+                220.0,
+                60.0
+              ],
+              "target_agl_m": 60.0,
+              "acceptance_radius_m": 8.0,
+              "speed_limit_mps": 3.0
+            }
+          ]
+        }
+      ],
+      "score": {
+        "min_waypoint_completion": 0.95,
+        "min_terrain_clearance_m": 30.0,
+        "max_no_fly_intrusions": 0
+      }
+    },
+    {
+      "id": "waypoint_loiter_visual_match",
+      "description": "Loiter over a visually distinctive clearing so WildNav has repeated satellite-match opportunities while DemNav checks relative-depth scale.",
+      "variant": "dusk_low_sun",
+      "start_enu_m": [
+        -420.0,
+        220.0,
+        60.0
+      ],
+      "phases": [
+        {
+          "name": "loiter",
+          "required_sources": [
+            "wildnav",
+            "demnav",
+            "fused"
+          ],
+          "waypoints": [
+            {
+              "id": "loiter_north",
+              "position_enu_m": [
+                -360.0,
+                260.0,
+                58.0
+              ],
+              "target_agl_m": 58.0,
+              "acceptance_radius_m": 7.0,
+              "hold_s": 8.0
+            },
+            {
+              "id": "loiter_east",
+              "position_enu_m": [
+                -320.0,
+                210.0,
+                58.0
+              ],
+              "target_agl_m": 58.0,
+              "acceptance_radius_m": 7.0,
+              "hold_s": 8.0
+            },
+            {
+              "id": "loiter_south",
+              "position_enu_m": [
+                -380.0,
+                170.0,
+                58.0
+              ],
+              "target_agl_m": 58.0,
+              "acceptance_radius_m": 7.0,
+              "hold_s": 8.0
+            },
+            {
+              "id": "loiter_west",
+              "position_enu_m": [
+                -430.0,
+                220.0,
+                58.0
+              ],
+              "target_agl_m": 58.0,
+              "acceptance_radius_m": 7.0,
+              "hold_s": 8.0
+            }
+          ]
+        }
+      ],
+      "score": {
+        "min_waypoint_completion": 1.0,
+        "min_wildnav_match_count": 10,
+        "max_loiter_radius_m": 18.0
+      }
+    },
+    {
+      "id": "return_to_home",
+      "description": "Return from the west trail to the launch clearing using fused navigation and standard GPS fallback if either map-based source is invalid.",
+      "variant": "clear_midday",
+      "start_enu_m": [
+        -430.0,
+        220.0,
+        58.0
+      ],
+      "phases": [
+        {
+          "name": "return",
+          "required_sources": [
+            "gps_standard",
+            "fused"
+          ],
+          "waypoints": [
+            {
+              "id": "return_mid",
+              "position_enu_m": [
+                -520.0,
+                40.0,
+                62.0
+              ],
+              "target_agl_m": 62.0,
+              "acceptance_radius_m": 8.0,
+              "speed_limit_mps": 4.0
+            },
+            {
+              "id": "return_descent_gate",
+              "position_enu_m": [
+                -650.0,
+                -160.0,
+                45.0
+              ],
+              "target_agl_m": 45.0,
+              "acceptance_radius_m": 7.0,
+              "speed_limit_mps": 3.0
+            },
+            {
+              "id": "home_hover",
+              "position_enu_m": [
+                -720.0,
+                -260.0,
+                30.0
+              ],
+              "target_agl_m": 30.0,
+              "acceptance_radius_m": 5.0,
+              "hold_s": 5.0
+            }
+          ]
+        }
+      ],
+      "score": {
+        "min_waypoint_completion": 1.0,
+        "max_return_home_error_m": 5.0,
+        "min_battery_reserve_v": 14.2
+      }
+    },
+    {
+      "id": "emergency_landing",
+      "description": "Trigger emergency landing from a degraded-navigation segment and verify the drone lands in a mapped clearing without geofence or no-fly violation.",
+      "variant": "gps_degraded",
+      "start_enu_m": [
+        -650.0,
+        -160.0,
+        45.0
+      ],
+      "trigger": {
+        "type": "emergency_land",
+        "at_waypoint": "landing_decision",
+        "reason": "rangefinder_dropout_plus_gps_degraded"
+      },
+      "landing_zones": [
+        {
+          "id": "primary_home_clearing",
+          "center_enu_m": [
+            -720.0,
+            -260.0
+          ],
+          "radius_m": 18.0,
+          "max_slope_deg": 8.0
+        },
+        {
+          "id": "alternate_west_trail",
+          "center_enu_m": [
+            -580.0,
+            -210.0
+          ],
+          "radius_m": 14.0,
+          "max_slope_deg": 10.0
+        }
+      ],
+      "phases": [
+        {
+          "name": "land",
+          "required_sources": [
+            "gps_standard",
+            "rangefinder",
+            "fused"
+          ],
+          "waypoints": [
+            {
+              "id": "landing_decision",
+              "position_enu_m": [
+                -690.0,
+                -230.0,
+                35.0
+              ],
+              "target_agl_m": 35.0,
+              "acceptance_radius_m": 6.0,
+              "speed_limit_mps": 2.0
+            },
+            {
+              "id": "flare",
+              "position_enu_m": [
+                -720.0,
+                -260.0,
+                8.0
+              ],
+              "target_agl_m": 8.0,
+              "acceptance_radius_m": 4.0,
+              "speed_limit_mps": 1.0
+            },
+            {
+              "id": "touchdown",
+              "position_enu_m": [
+                -720.0,
+                -260.0,
+                0.0
+              ],
+              "target_agl_m": 0.0,
+              "acceptance_radius_m": 3.0,
+              "speed_limit_mps": 0.5
+            }
+          ]
+        }
+      ],
+      "score": {
+        "min_waypoint_completion": 1.0,
+        "max_touchdown_error_m": 3.0,
+        "require_landed": true,
+        "min_terrain_clearance_m": 0.0
+      }
+    }
+  ]
+}
