@@ -1,0 +1,39 @@
+racecarneo_sensor_models:
+  ros__parameters:
+    hardware_equivalence:
+      rgb_camera: "RealSense D455/D435i color stream or global-shutter USB RGB camera"
+      depth_camera: "RealSense metric depth fallback plus Depth Anything metric estimate"
+      lidar: "Slamtec RPLIDAR C1/S2/A2 or Hokuyo UST class 2D lidar"
+      imu: "BNO085/BNO086, WT901C, D435i IMU, or equivalent ROS IMU"
+      vesc_odometry: "VESC telemetry or magnetic/optical wheel encoder odometry"
+      steering_servo: "20 kg-cm class steering servo through microcontroller/PWM bridge"
+      safety_io: "RC manual override and physical motor-power emergency stop"
+    topics:
+      color_image: /camera/color/image_raw
+      color_camera_info: /camera/color/camera_info
+      depth_image: /camera/depth/image_rect_raw
+      depth_anything_metric_depth: /depth_anything/depth/image
+      depth_anything_pointcloud: /depth_anything/points
+      lidar_scan: /scan
+      imu: /imu/data_raw
+      odometry: /odom
+      ackermann_command: /ackermann_cmd
+      ackermann_feedback: /ackermann_feedback
+      manual_override: /racecarneo/manual_override
+      estop: /racecarneo/estop
+      battery_voltage: /racecarneo/battery_voltage
+    noise_and_dynamics:
+      camera_dropout_probability: 0.0
+      camera_motion_blur_pixels: 0
+      depth_noise_std_m: 0.015
+      depth_dropout_probability: 0.01
+      lidar_noise_std_m: 0.015
+      lidar_dropout_probability: 0.005
+      imu_accel_noise_std: 0.08
+      imu_gyro_noise_std: 0.015
+      wheel_slip_std: 0.025
+      encoder_quantization_m: 0.002
+      throttle_time_constant_s: 0.12
+      steering_time_constant_s: 0.09
+      battery_nominal_voltage: 11.1
+      battery_sag_per_speed: 0.8

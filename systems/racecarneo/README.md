@@ -11,6 +11,7 @@ This folder contains configuration for the MIT RACECAR Neo hardware/simulation s
 - `config/nvblox.yaml`: nvblox TSDF/ESDF mapper overrides for the RACECAR camera setup.
 - `config/slam_toolbox.yaml`: online SLAM Toolbox settings for `map -> odom`.
 - `config/topics.yaml`: canonical topics and frames for this system.
+- `config/sensor_models.yaml`: hardware-to-simulation sensor, actuator, safety, and noise-model contract.
 - `calibration/camera.yaml`: simulator camera calibration placeholder.
 - `urdf/racecarneo.urdf.xacro`: lightweight frame model for ROS visualization.
 - `scenarios/campus_closed_course.json`: tracked source-of-truth contract for the realistic outdoor/indoor closed-course environment, semantic labels, collision geometry, dynamic actors, spawn poses, and scenario variants.

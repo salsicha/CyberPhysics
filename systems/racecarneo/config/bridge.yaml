@@ -16,3 +16,23 @@ racecarneo_bridge:
     map_frame: map
     wheelbase: 0.33
     max_steering_angle: 0.42
+    sensor_random_seed: 101
+    camera_dropout_probability: 0.0
+    camera_motion_blur_pixels: 0
+    depth_noise_std_m: 0.015
+    depth_dropout_probability: 0.01
+    lidar_noise_std_m: 0.015
+    lidar_dropout_probability: 0.005
+    imu_accel_noise_std: 0.08
+    imu_gyro_noise_std: 0.015
+    imu_accel_bias: [0.02, -0.015, 0.0]
+    imu_gyro_bias: [0.001, -0.001, 0.002]
+    wheel_slip_std: 0.025
+    encoder_quantization_m: 0.002
+    throttle_time_constant_s: 0.12
+    steering_time_constant_s: 0.09
+    battery_nominal_voltage: 11.1
+    battery_sag_per_speed: 0.8
+    manual_override: false
+    estop_engaged: false
+    publish_actuator_feedback: true

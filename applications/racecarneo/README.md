@@ -33,6 +33,10 @@ Published topics:
 - `/scan` (`sensor_msgs/LaserScan`)
 - `/imu/data_raw` (`sensor_msgs/Imu`)
 - `/odom` (`nav_msgs/Odometry`)
+- `/ackermann_feedback` (`ackermann_msgs/AckermannDriveStamped`)
+- `/racecarneo/manual_override` (`std_msgs/Bool`)
+- `/racecarneo/estop` (`std_msgs/Bool`)
+- `/racecarneo/battery_voltage` (`std_msgs/Float32`)
 - TF for `odom -> base_link` and simulated sensor frames
 
 Subscribed topics:
@@ -87,6 +91,7 @@ Robot-specific config lives in `systems/racecarneo/`:
 - `config/nav2.yaml`: Nav2 parameters and nvblox costmap layers
 - `config/slam_toolbox.yaml`: online SLAM parameters
 - `config/topics.yaml`: topic and frame conventions
+- `config/sensor_models.yaml`: hardware-equivalent sensor, actuator, safety, and noise model settings
 - `urdf/racecarneo.urdf.xacro`: lightweight visualization model
 
 No maps or simulator assets are committed to the repo.

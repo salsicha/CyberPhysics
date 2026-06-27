@@ -1,5 +1,6 @@
 topics:
   command: /ackermann_cmd
+  ackermann_feedback: /ackermann_feedback
   color_image: /camera/color/image_raw
   depth_image: /camera/depth/image_rect_raw
   metric_depth_image: /depth_anything/depth/image
@@ -7,6 +8,9 @@ topics:
   camera_info: /camera/color/camera_info
   lidar: /scan
   imu: /imu/data_raw
+  manual_override: /racecarneo/manual_override
+  estop: /racecarneo/estop
+  battery_voltage: /racecarneo/battery_voltage
   nvblox_static_slice: /nvblox_node/static_map_slice
   nvblox_combined_slice: /nvblox_node/combined_map_slice
 frames:

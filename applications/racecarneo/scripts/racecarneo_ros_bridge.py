@@ -15,7 +15,7 @@ from geometry_msgs.msg import TransformStamped
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
 from sensor_msgs.msg import CameraInfo, Image, Imu, LaserScan
-from std_msgs.msg import Header
+from std_msgs.msg import Bool, Float32, Header
 from tf2_ros import TransformBroadcaster
 
 
@@ -38,6 +38,26 @@ class RacecarNeoBridge(Node):
         self.declare_parameter('map_frame', 'map')
         self.declare_parameter('wheelbase', 0.33)
         self.declare_parameter('max_steering_angle', 0.42)
+        self.declare_parameter('sensor_random_seed', 101)
+        self.declare_parameter('camera_dropout_probability', 0.0)
+        self.declare_parameter('camera_motion_blur_pixels', 0)
+        self.declare_parameter('depth_noise_std_m', 0.015)
+        self.declare_parameter('depth_dropout_probability', 0.01)
+        self.declare_parameter('lidar_noise_std_m', 0.015)
+        self.declare_parameter('lidar_dropout_probability', 0.005)
+        self.declare_parameter('imu_accel_noise_std', 0.08)
+        self.declare_parameter('imu_gyro_noise_std', 0.015)
+        self.declare_parameter('imu_accel_bias', [0.02, -0.015, 0.0])
+        self.declare_parameter('imu_gyro_bias', [0.001, -0.001, 0.002])
+        self.declare_parameter('wheel_slip_std', 0.025)
+        self.declare_parameter('encoder_quantization_m', 0.002)
+        self.declare_parameter('throttle_time_constant_s', 0.12)
+        self.declare_parameter('steering_time_constant_s', 0.09)
+        self.declare_parameter('battery_nominal_voltage', 11.1)
+        self.declare_parameter('battery_sag_per_speed', 0.8)
+        self.declare_parameter('manual_override', False)
+        self.declare_parameter('estop_engaged', False)
+        self.declare_parameter('publish_actuator_feedback', True)
 
         self.frame_prefix = self.get_parameter('frame_prefix').value
         self.max_speed = float(self.get_parameter('max_speed').value)
@@ -55,15 +75,40 @@ class RacecarNeoBridge(Node):
         self.map_frame = self.get_parameter('map_frame').value
         self.wheelbase = float(self.get_parameter('wheelbase').value)
         self.max_steering_angle = float(self.get_parameter('max_steering_angle').value)
+        seed = int(self.get_parameter('sensor_random_seed').value)
+        self.rng = np.random.default_rng(seed)
+        self.camera_dropout_probability = float(self.get_parameter('camera_dropout_probability').value)
+        self.camera_motion_blur_pixels = int(self.get_parameter('camera_motion_blur_pixels').value)
+        self.depth_noise_std_m = float(self.get_parameter('depth_noise_std_m').value)
+        self.depth_dropout_probability = float(self.get_parameter('depth_dropout_probability').value)
+        self.lidar_noise_std_m = float(self.get_parameter('lidar_noise_std_m').value)
+        self.lidar_dropout_probability = float(self.get_parameter('lidar_dropout_probability').value)
+        self.imu_accel_noise_std = float(self.get_parameter('imu_accel_noise_std').value)
+        self.imu_gyro_noise_std = float(self.get_parameter('imu_gyro_noise_std').value)
+        self.imu_accel_bias = np.asarray(self.get_parameter('imu_accel_bias').value, dtype=np.float32)
+        self.imu_gyro_bias = np.asarray(self.get_parameter('imu_gyro_bias').value, dtype=np.float32)
+        self.wheel_slip_std = float(self.get_parameter('wheel_slip_std').value)
+        self.encoder_quantization_m = float(self.get_parameter('encoder_quantization_m').value)
+        self.throttle_time_constant_s = max(1e-3, float(self.get_parameter('throttle_time_constant_s').value))
+        self.steering_time_constant_s = max(1e-3, float(self.get_parameter('steering_time_constant_s').value))
+        self.battery_nominal_voltage = float(self.get_parameter('battery_nominal_voltage').value)
+        self.battery_sag_per_speed = float(self.get_parameter('battery_sag_per_speed').value)
+        self.manual_override = bool(self.get_parameter('manual_override').value)
+        self.estop_engaged = bool(self.get_parameter('estop_engaged').value)
+        self.publish_actuator_feedback = bool(self.get_parameter('publish_actuator_feedback').value)
 
         self._x = 0.0
         self._y = 0.0
         self._yaw = 0.0
         self._last_update_time = None
+        self._last_speed_mps = 0.0
+        self._last_yaw_rate = 0.0
 
         self._cmd_lock = threading.Lock()
         self._speed = 0.0
         self._steering = 0.0
+        self._actual_speed_cmd = 0.0
+        self._actual_steering_cmd = 0.0
         self._rc = None
         self._stop = False
         self._sim_thread: Optional[threading.Thread] = None
@@ -75,6 +120,10 @@ class RacecarNeoBridge(Node):
         self.lidar_pub = self.create_publisher(LaserScan, 'scan', 5)
         self.imu_pub = self.create_publisher(Imu, 'imu/data_raw', 5)
         self.odom_pub = self.create_publisher(Odometry, 'odom', 10)
+        self.ackermann_feedback_pub = self.create_publisher(AckermannDriveStamped, 'ackermann_feedback', 10)
+        self.manual_override_pub = self.create_publisher(Bool, 'racecarneo/manual_override', 5)
+        self.estop_pub = self.create_publisher(Bool, 'racecarneo/estop', 5)
+        self.battery_pub = self.create_publisher(Float32, 'racecarneo/battery_voltage', 5)
         self.tf_broadcaster = TransformBroadcaster(self)
         self.create_subscription(AckermannDriveStamped, 'ackermann_cmd', self._cmd_callback, 10)
 
@@ -111,7 +160,6 @@ class RacecarNeoBridge(Node):
             self.get_logger().exception(f'RACECAR Neo simulator bridge stopped: {exc}')
             rclpy.shutdown()
 
-
     def _pulse_user_program_start(self) -> None:
         # MIT RacecarSim exposes header 8 as racecar_go. Some simulator builds use
         # this to enter user-program mode; builds that require UI input ignore it.
@@ -143,14 +191,11 @@ class RacecarNeoBridge(Node):
             finally:
                 return
 
-        with self._cmd_lock:
-            speed = self._speed
-            steering = self._steering
-        self._rc.drive.set_speed_angle(speed, steering)
-
         now = self.get_clock().now()
         stamp = now.to_msg()
-        self._update_odometry(now, speed, steering)
+        speed_cmd, steering_cmd = self._update_vehicle_state(now)
+        self._rc.drive.set_speed_angle(speed_cmd, steering_cmd)
+
         if self.publish_camera:
             self._publish_color(stamp)
             self._publish_camera_info(stamp)
@@ -161,9 +206,10 @@ class RacecarNeoBridge(Node):
         if self.publish_imu:
             self._publish_imu(stamp)
         if self.publish_odom:
-            self._publish_odom(stamp, speed, steering)
+            self._publish_odom(stamp)
         if self.publish_tf:
             self._publish_tf(stamp)
+        self._publish_feedback(stamp, speed_cmd, steering_cmd)
 
     def _header(self, stamp, frame: str) -> Header:
         header = Header()
@@ -171,39 +217,52 @@ class RacecarNeoBridge(Node):
         header.frame_id = self._frame(frame)
         return header
 
-
     def _frame(self, frame: str) -> str:
         if frame in (self.map_frame, self.odom_frame, self.base_frame):
             return frame
         return f'{self.frame_prefix}/{frame}'
 
-    def _update_odometry(self, now, speed_cmd: float, steering_cmd: float) -> None:
+    def _update_vehicle_state(self, now):
         if self._last_update_time is None:
             self._last_update_time = now
-            return
+            return self._actual_speed_cmd, self._actual_steering_cmd
         dt = max(0.0, (now - self._last_update_time).nanoseconds * 1e-9)
         self._last_update_time = now
         if dt <= 0.0:
-            return
-        speed = float(speed_cmd) * self.max_speed
-        steering_angle = float(steering_cmd) * self.max_steering_angle
-        yaw_rate = 0.0
-        if abs(self.wheelbase) > 1e-6:
-            yaw_rate = speed * math.tan(steering_angle) / self.wheelbase
+            return self._actual_speed_cmd, self._actual_steering_cmd
+
+        with self._cmd_lock:
+            target_speed = self._speed
+            target_steering = self._steering
+        if self.manual_override or self.estop_engaged:
+            target_speed = 0.0
+            if self.estop_engaged:
+                target_steering = 0.0
+
+        throttle_alpha = min(1.0, dt / self.throttle_time_constant_s)
+        steering_alpha = min(1.0, dt / self.steering_time_constant_s)
+        self._actual_speed_cmd += (target_speed - self._actual_speed_cmd) * throttle_alpha
+        self._actual_steering_cmd += (target_steering - self._actual_steering_cmd) * steering_alpha
+
+        speed = float(self._actual_speed_cmd) * self.max_speed
+        speed *= 1.0 + float(self.rng.normal(0.0, self.wheel_slip_std))
+        steering_angle = float(self._actual_steering_cmd) * self.max_steering_angle
+        yaw_rate = speed * math.tan(steering_angle) / self.wheelbase if abs(self.wheelbase) > 1e-6 else 0.0
         self._yaw = math.atan2(math.sin(self._yaw + yaw_rate * dt), math.cos(self._yaw + yaw_rate * dt))
         self._x += speed * math.cos(self._yaw) * dt
         self._y += speed * math.sin(self._yaw) * dt
+        if self.encoder_quantization_m > 0.0:
+            self._x = round(self._x / self.encoder_quantization_m) * self.encoder_quantization_m
+            self._y = round(self._y / self.encoder_quantization_m) * self.encoder_quantization_m
+        self._last_speed_mps = speed
+        self._last_yaw_rate = yaw_rate
+        return self._actual_speed_cmd, self._actual_steering_cmd
 
     def _yaw_quaternion(self):
         half = 0.5 * self._yaw
         return (0.0, 0.0, math.sin(half), math.cos(half))
 
-    def _publish_odom(self, stamp, speed_cmd: float, steering_cmd: float) -> None:
-        speed = float(speed_cmd) * self.max_speed
-        steering_angle = float(steering_cmd) * self.max_steering_angle
-        yaw_rate = 0.0
-        if abs(self.wheelbase) > 1e-6:
-            yaw_rate = speed * math.tan(steering_angle) / self.wheelbase
+    def _publish_odom(self, stamp) -> None:
         qx, qy, qz, qw = self._yaw_quaternion()
         msg = Odometry()
         msg.header.stamp = stamp
@@ -216,8 +275,8 @@ class RacecarNeoBridge(Node):
         msg.pose.pose.orientation.y = qy
         msg.pose.pose.orientation.z = qz
         msg.pose.pose.orientation.w = qw
-        msg.twist.twist.linear.x = speed
-        msg.twist.twist.angular.z = yaw_rate
+        msg.twist.twist.linear.x = self._last_speed_mps
+        msg.twist.twist.angular.z = self._last_yaw_rate
         msg.pose.covariance[0] = 0.05
         msg.pose.covariance[7] = 0.05
         msg.pose.covariance[35] = 0.2
@@ -267,10 +326,21 @@ class RacecarNeoBridge(Node):
 
         self.tf_broadcaster.sendTransform(transforms)
 
+    def _drop(self, probability: float) -> bool:
+        return probability > 0.0 and float(self.rng.random()) < probability
+
     def _publish_color(self, stamp) -> None:
+        if self._drop(self.camera_dropout_probability):
+            return
         image = self._rc.camera.get_color_image_no_copy()
         if image is None:
             return
+        image = np.ascontiguousarray(image)
+        if self.camera_motion_blur_pixels > 1:
+            blurred = image.astype(np.float32)
+            for offset in range(1, self.camera_motion_blur_pixels):
+                blurred += np.roll(image, shift=offset, axis=1).astype(np.float32)
+            image = np.clip(blurred / float(self.camera_motion_blur_pixels), 0, 255).astype(np.uint8)
         msg = Image()
         msg.header = self._header(stamp, 'camera_color_optical_frame')
         msg.height = int(image.shape[0])
@@ -278,14 +348,22 @@ class RacecarNeoBridge(Node):
         msg.encoding = 'bgr8'
         msg.is_bigendian = 0
         msg.step = int(image.shape[1] * image.shape[2])
-        msg.data = np.ascontiguousarray(image).tobytes()
+        msg.data = image.tobytes()
         self.color_pub.publish(msg)
 
     def _publish_depth(self, stamp) -> None:
+        if self._drop(self.camera_dropout_probability):
+            return
         depth_cm = self._rc.camera.get_depth_image()
         if depth_cm is None:
             return
-        depth_m = np.ascontiguousarray(depth_cm.astype(np.float32) / 100.0)
+        depth_m = depth_cm.astype(np.float32) / 100.0
+        if self.depth_noise_std_m > 0.0:
+            depth_m += self.rng.normal(0.0, self.depth_noise_std_m, size=depth_m.shape).astype(np.float32)
+        if self.depth_dropout_probability > 0.0:
+            mask = self.rng.random(depth_m.shape) < self.depth_dropout_probability
+            depth_m[mask] = np.nan
+        depth_m = np.ascontiguousarray(depth_m)
         msg = Image()
         msg.header = self._header(stamp, 'camera_depth_optical_frame')
         msg.height = int(depth_m.shape[0])
@@ -319,6 +397,10 @@ class RacecarNeoBridge(Node):
         if raw_cm is None:
             return
         raw_m = np.asarray(raw_cm, dtype=np.float32) / 100.0
+        if self.lidar_noise_std_m > 0.0:
+            raw_m += self.rng.normal(0.0, self.lidar_noise_std_m, size=raw_m.shape).astype(np.float32)
+        if self.lidar_dropout_probability > 0.0:
+            raw_m[self.rng.random(raw_m.shape) < self.lidar_dropout_probability] = np.inf
         count = raw_m.shape[0]
         msg = LaserScan()
         msg.header = self._header(stamp, 'lidar_link')
@@ -342,16 +424,38 @@ class RacecarNeoBridge(Node):
     def _publish_imu(self, stamp) -> None:
         msg = Imu()
         msg.header = self._header(stamp, 'imu_link')
-        accel = self._rc.physics.get_linear_acceleration()
-        gyro = self._rc.physics.get_angular_velocity()
+        accel = np.asarray(self._rc.physics.get_linear_acceleration(), dtype=np.float32)
+        gyro = np.asarray(self._rc.physics.get_angular_velocity(), dtype=np.float32)
+        accel = accel + self.imu_accel_bias + self.rng.normal(0.0, self.imu_accel_noise_std, size=3)
+        gyro = gyro + self.imu_gyro_bias + self.rng.normal(0.0, self.imu_gyro_noise_std, size=3)
         msg.linear_acceleration.x = float(accel[0])
         msg.linear_acceleration.y = float(accel[1])
         msg.linear_acceleration.z = float(accel[2])
         msg.angular_velocity.x = float(gyro[0])
         msg.angular_velocity.y = float(gyro[1])
         msg.angular_velocity.z = float(gyro[2])
+        msg.linear_acceleration_covariance = [self.imu_accel_noise_std ** 2, 0.0, 0.0, 0.0, self.imu_accel_noise_std ** 2, 0.0, 0.0, 0.0, self.imu_accel_noise_std ** 2]
+        msg.angular_velocity_covariance = [self.imu_gyro_noise_std ** 2, 0.0, 0.0, 0.0, self.imu_gyro_noise_std ** 2, 0.0, 0.0, 0.0, self.imu_gyro_noise_std ** 2]
         msg.orientation_covariance[0] = -1.0
         self.imu_pub.publish(msg)
+
+    def _publish_feedback(self, stamp, speed_cmd, steering_cmd) -> None:
+        if self.publish_actuator_feedback:
+            msg = AckermannDriveStamped()
+            msg.header.stamp = stamp
+            msg.header.frame_id = self.base_frame
+            msg.drive.speed = float(speed_cmd)
+            msg.drive.steering_angle = float(steering_cmd)
+            self.ackermann_feedback_pub.publish(msg)
+        manual = Bool()
+        manual.data = bool(self.manual_override)
+        self.manual_override_pub.publish(manual)
+        estop = Bool()
+        estop.data = bool(self.estop_engaged)
+        self.estop_pub.publish(estop)
+        battery = Float32()
+        battery.data = float(self.battery_nominal_voltage - self.battery_sag_per_speed * abs(self._last_speed_mps) / max(self.max_speed, 1e-6))
+        self.battery_pub.publish(battery)
 
 
 def main() -> None:

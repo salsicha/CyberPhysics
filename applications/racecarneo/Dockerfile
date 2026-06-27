@@ -51,6 +51,7 @@ RUN apt update && apt install -q -y --no-install-recommends \
     ros-${ROS_DISTRO}-robot-state-publisher \
     ros-${ROS_DISTRO}-sensor-msgs \
     ros-${ROS_DISTRO}-slam-toolbox \
+    ros-${ROS_DISTRO}-std-msgs \
     ros-${ROS_DISTRO}-tf2-ros \
     xvfb \
     && rm -rf /var/lib/apt/lists/*
