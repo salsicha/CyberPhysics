@@ -11,18 +11,44 @@ aerodrone_sensor_models:
       raw_gps: /drone_sim_0/sensor_measurements/gps
       standard_gps: /navigation/gps_standard
       raw_odom: /drone_sim_0/sensor_measurements/odom
+      flight_controller_imu: /aerodrone/imu/data_raw
+      compass_magnetic_field: /aerodrone/compass/magnetic_field
+      barometer_pressure: /aerodrone/barometer
       oak1_image_highres: /oak1/image_highres
       oak1_image_highres_info: /oak1/image_highres/camera_info
       oak1_relative_depth: /oak1/relative_depth
       oak1_depth_info: /oak1/camera_info
       rangefinder: /aerodrone/rangefinder
       battery_voltage: /aerodrone/battery_voltage
+      battery_state: /aerodrone/battery
       rc_failsafe: /aerodrone/rc_failsafe
       geofence_violation: /aerodrone/geofence_violation
       emergency_land: /aerodrone/emergency_land
+    message_types:
+      standard_gps: sensor_msgs/msg/NavSatFix
+      flight_controller_imu: sensor_msgs/msg/Imu
+      compass_magnetic_field: sensor_msgs/msg/MagneticField
+      barometer_pressure: sensor_msgs/msg/FluidPressure
+      oak1_image_highres: sensor_msgs/msg/Image
+      oak1_image_highres_info: sensor_msgs/msg/CameraInfo
+      oak1_relative_depth: sensor_msgs/msg/Image
+      oak1_depth_info: sensor_msgs/msg/CameraInfo
+      rangefinder: sensor_msgs/msg/Range
+      battery_voltage: std_msgs/msg/Float32
+      battery_state: sensor_msgs/msg/BatteryState
+      rc_failsafe: std_msgs/msg/Bool
+      geofence_violation: std_msgs/msg/Bool
+      emergency_land: std_msgs/msg/Bool
     noise_and_limits:
       gps_noise_std_m: 1.5
       gps_degraded_noise_std_m: 12.0
+      imu_accel_noise_std: 0.08
+      imu_gyro_noise_std: 0.015
+      magnetic_field_strength_ut: 47.0
+      magnetic_inclination_deg: 61.0
+      magnetic_declination_deg: 13.4
+      magnetic_noise_std_ut: 0.8
+      barometer_noise_std_pa: 1.5
       range_min_m: 0.3
       range_max_m: 40.0
       battery_nominal_v: 16.0

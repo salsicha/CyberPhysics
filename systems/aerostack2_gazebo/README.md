@@ -30,12 +30,16 @@ listed in `config/nav_topics.env`; the default sensor topics are:
 - `/drone_sim_0/sensor_measurements/downward_rgbd/depth`
 - `/drone_sim_0/sensor_measurements/downward_rgbd/depth/camera_info`
 - `/navigation/gps_standard`
+- `/aerodrone/imu/data_raw`
+- `/aerodrone/compass/magnetic_field`
+- `/aerodrone/barometer`
 - `/oak1/image_highres`
 - `/oak1/image_highres/camera_info`
 - `/oak1/relative_depth`
 - `/oak1/camera_info`
 - `/aerodrone/rangefinder`
 - `/aerodrone/battery_voltage`
+- `/aerodrone/battery`
 - `/aerodrone/rc_failsafe`
 - `/aerodrone/geofence_violation`
 - `/aerodrone/emergency_land`
