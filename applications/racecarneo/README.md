@@ -113,6 +113,21 @@ runtime planner inputs include simulator ground truth, if localization or map
 consumption is missing, if recovery does not complete, or if stale/degraded depth
 permits unsafe throttle.
 
+## Acceptance Report
+
+Aggregate scored mission runs against Racecar Neo acceptance thresholds:
+
+```bash
+python3 applications/racecarneo/scripts/racecarneo_acceptance_report.py \
+  --metrics /tmp/racecarneo_metrics/*.json \
+  --thresholds systems/racecarneo/validation/acceptance_thresholds.json
+```
+
+The report enforces at least 95 percent waypoint completion, zero nominal
+collisions, bounded recovery contact speed, lateral tracking error, stop-line
+error, localization drift, costmap freshness, command saturation, and actuator
+lag thresholds.
+
 ## Configuration
 
 Robot-specific config lives in `systems/racecarneo/`:

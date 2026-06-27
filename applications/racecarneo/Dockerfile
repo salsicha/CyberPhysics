@@ -80,9 +80,10 @@ COPY scripts/cmd_vel_to_ackermann.py /workspace/cmd_vel_to_ackermann.py
 COPY scripts/run_nav2_mission.py /workspace/run_nav2_mission.py
 COPY scripts/validate_stack_integration.py /workspace/validate_stack_integration.py
 COPY scripts/score_sensor_behavior.py /workspace/score_sensor_behavior.py
+COPY scripts/racecarneo_acceptance_report.py /workspace/racecarneo_acceptance_report.py
 COPY scripts/run_headless_sim.sh /workspace/run_headless_sim.sh
 COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh /workspace/racecarneo_ros_bridge.py /workspace/cmd_vel_to_ackermann.py /workspace/run_nav2_mission.py /workspace/validate_stack_integration.py /workspace/score_sensor_behavior.py /workspace/run_headless_sim.sh
+RUN chmod +x /entrypoint.sh /workspace/racecarneo_ros_bridge.py /workspace/cmd_vel_to_ackermann.py /workspace/run_nav2_mission.py /workspace/validate_stack_integration.py /workspace/score_sensor_behavior.py /workspace/racecarneo_acceptance_report.py /workspace/run_headless_sim.sh
 
 FROM scratch
 

@@ -17,6 +17,7 @@ This folder contains configuration for the MIT RACECAR Neo hardware/simulation s
 - `scenarios/campus_closed_course.json`: tracked source-of-truth contract for the realistic outdoor/indoor closed-course environment, semantic labels, collision geometry, dynamic actors, spawn poses, and scenario variants.
 - `missions/nav2_waypoints.json`: Nav2 waypoint missions for loop, slalom, lane-change, obstacle-avoidance, recovery, and multi-lap validation.
 - `validation/sensor_behavior_tests.json`: sensor-driven behavior test manifest for nominal, degraded-camera, lidar-dropout, IMU-bias, and odometry-slip runs.
+- `validation/acceptance_thresholds.json`: default Racecar Neo mission acceptance thresholds.
 
 ## Runtime Pipeline
 

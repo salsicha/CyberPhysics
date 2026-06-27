@@ -1,0 +1,11 @@
+{
+  "min_waypoint_completion_rate": 0.95,
+  "max_nominal_collision_count": 0,
+  "max_recovery_collision_speed_mps": 0.08,
+  "max_lateral_tracking_error_m": 0.45,
+  "max_stop_line_error_m": 0.35,
+  "max_localization_drift_m": 0.45,
+  "max_costmap_age_s": 1.0,
+  "max_command_saturation_fraction": 0.05,
+  "max_actuator_lag_s": 0.25
+}
