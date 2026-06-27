@@ -1,0 +1,31 @@
+aerodrone_sensor_models:
+  ros__parameters:
+    hardware_equivalence:
+      flight_controller: "Blue Robotics Navigator/ArduPilot IMU, compass, barometer, PWM motor outputs, RC failsafe"
+      gps: "u-blox M9N/M10N or Here-class GPS/compass"
+      oak1_rgb: "Downward Luxonis OAK-1 high-resolution RGB still capture"
+      oak1_relative_depth: "OAK-1 MegaDepth relative depth output"
+      rangefinder: "Benewake TFmini-S/TF-Luna or LightWare downward rangefinder"
+      battery_safety: "Main LiPo battery monitor, geofence, RC failsafe, emergency land"
+    topics:
+      raw_gps: /drone_sim_0/sensor_measurements/gps
+      standard_gps: /navigation/gps_standard
+      raw_odom: /drone_sim_0/sensor_measurements/odom
+      oak1_image_highres: /oak1/image_highres
+      oak1_image_highres_info: /oak1/image_highres/camera_info
+      oak1_relative_depth: /oak1/relative_depth
+      oak1_depth_info: /oak1/camera_info
+      rangefinder: /aerodrone/rangefinder
+      battery_voltage: /aerodrone/battery_voltage
+      rc_failsafe: /aerodrone/rc_failsafe
+      geofence_violation: /aerodrone/geofence_violation
+      emergency_land: /aerodrone/emergency_land
+    noise_and_limits:
+      gps_noise_std_m: 1.5
+      gps_degraded_noise_std_m: 12.0
+      range_min_m: 0.3
+      range_max_m: 40.0
+      battery_nominal_v: 16.0
+      battery_sag_v_per_mps: 0.08
+      min_agl_m: 25.0
+      max_agl_m: 120.0

@@ -10,6 +10,7 @@ Files:
 - `config/config_gazebo.yaml`: shared ROS parameters for Aerostack2 nodes.
 - `config/pid_speed_controller.yaml`: PID speed-controller parameters.
 - `config/nav_topics.env`: expected simulated topic names and Mount Tamalpais test origin for DemNav/WildNav.
+- `config/sensor_models.yaml`: hardware-to-simulation GPS, OAK-1, rangefinder, battery, geofence, RC failsafe, and emergency-land topic contract.
 - `scenarios/mount_tamalpais_wilderness.json`: georeferenced wilderness scenario contract for simultaneous GPS, DemNav, WildNav, and fused-navigation evaluation.
 
 Start the base Aerostack2 simulation headlessly:
@@ -28,6 +29,16 @@ listed in `config/nav_topics.env`; the default sensor topics are:
 - `/drone_sim_0/sensor_measurements/downward_rgb/camera_info`
 - `/drone_sim_0/sensor_measurements/downward_rgbd/depth`
 - `/drone_sim_0/sensor_measurements/downward_rgbd/depth/camera_info`
+- `/navigation/gps_standard`
+- `/oak1/image_highres`
+- `/oak1/image_highres/camera_info`
+- `/oak1/relative_depth`
+- `/oak1/camera_info`
+- `/aerodrone/rangefinder`
+- `/aerodrone/battery_voltage`
+- `/aerodrone/rc_failsafe`
+- `/aerodrone/geofence_violation`
+- `/aerodrone/emergency_land`
 
 Start it with DemNav and WildNav consumers enabled:
 

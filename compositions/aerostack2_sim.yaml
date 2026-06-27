@@ -134,6 +134,21 @@ services:
   #   command: >
   #     ros2 launch as2_behavior_tree behavior_trees.launch.py drone_id:=drone_sim_0 tree:=./trees/square.xml
 
+  aerodrone_sensor_sim:
+    profiles: ["navsim"]
+    network_mode: "host"
+    image: cyberphysics/aerostack2
+    depends_on:
+      - simulator
+      - odom_bridge
+    env_file:
+      - ../systems/aerostack2_gazebo/config/nav_topics.env
+    volumes:
+      - /dev/shm:/dev/shm
+      - ../systems/aerostack2_gazebo/scripts:/workspace/scripts:ro
+    command: >
+      python3 /workspace/scripts/aerodrone_sensor_sim.py
+
   demnav:
     profiles: ["navsim"]
     network_mode: "host"
@@ -143,6 +158,7 @@ services:
       - simulator
       - stateestimator
       - odom_bridge
+      - aerodrone_sensor_sim
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
       - INITIAL_LAT=${INITIAL_LAT:-37.7694}
@@ -175,6 +191,7 @@ services:
       - simulator
       - stateestimator
       - odom_bridge
+      - aerodrone_sensor_sim
       - demnav
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
