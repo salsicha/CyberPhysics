@@ -20,6 +20,10 @@ Files:
   rangefinder, cache, and fallback failure cases.
 - `scripts/score_navigation_robustness.py`: validates robustness contracts and
   scores extracted telemetry JSON against the failure-case criteria.
+- `validation/acceptance_thresholds.json`: final acceptance thresholds for
+  localization, DemNav, WildNav, missions, safety, and robustness.
+- `scripts/aerodrone_acceptance_report.py`: validates the acceptance threshold
+  contract and evaluates metrics JSON into JSON or Markdown reports.
 
 Start the base Aerostack2 simulation headlessly:
 
@@ -97,6 +101,21 @@ Score a robustness run after extracting telemetry samples:
 python3 systems/aerostack2_gazebo/scripts/score_navigation_robustness.py \
   --test-id gps_degraded_ridge_crossing \
   --telemetry generated/aerodrone/robustness_telemetry.json
+```
+
+Validate the final acceptance threshold contract:
+
+```bash
+python3 systems/aerostack2_gazebo/scripts/aerodrone_acceptance_report.py
+```
+
+Evaluate aggregated metrics and write reports:
+
+```bash
+python3 systems/aerostack2_gazebo/scripts/aerodrone_acceptance_report.py \
+  --metrics generated/aerodrone/acceptance_metrics.json \
+  --output-json generated/aerodrone/acceptance_report.json \
+  --output-markdown generated/aerodrone/acceptance_report.md
 ```
 
 

@@ -1,0 +1,162 @@
+{
+  "name": "aerodrone_acceptance_thresholds",
+  "scenario": "../scenarios/mount_tamalpais_wilderness.json",
+  "mission_file": "../missions/wilderness_missions.json",
+  "robustness_suite": "navigation_robustness_tests.json",
+  "description": "Acceptance thresholds for complete Aerodrone wilderness navigation simulation.",
+  "metric_contract": {
+    "localization": {
+      "horizontal_error_rmse_m": {
+        "op": "max",
+        "value": 8.0
+      },
+      "horizontal_error_p95_m": {
+        "op": "max",
+        "value": 15.0
+      },
+      "vertical_error_rmse_m": {
+        "op": "max",
+        "value": 5.0
+      },
+      "vertical_error_p95_m": {
+        "op": "max",
+        "value": 10.0
+      }
+    },
+    "demnav": {
+      "depth_scale_error_rmse": {
+        "op": "max",
+        "value": 0.12
+      },
+      "depth_scale_error_p95": {
+        "op": "max",
+        "value": 0.22
+      },
+      "terrain_correlation_confidence_mean": {
+        "op": "min",
+        "value": 0.35
+      },
+      "terrain_correlation_confidence_p05": {
+        "op": "min",
+        "value": 0.2
+      },
+      "rejection_correctness": {
+        "op": "min",
+        "value": 0.95
+      },
+      "false_positive_rate": {
+        "op": "max",
+        "value": 0.02
+      }
+    },
+    "wildnav": {
+      "match_count_median": {
+        "op": "min",
+        "value": 16.0
+      },
+      "inlier_ratio_p05": {
+        "op": "min",
+        "value": 0.25
+      },
+      "correction_error_p95_m": {
+        "op": "max",
+        "value": 18.0
+      },
+      "false_positive_rate": {
+        "op": "max",
+        "value": 0.02
+      },
+      "rejection_correctness": {
+        "op": "min",
+        "value": 0.95
+      }
+    },
+    "mission": {
+      "waypoint_success_rate": {
+        "op": "min",
+        "value": 0.95
+      },
+      "route_completion_rate": {
+        "op": "min",
+        "value": 0.95
+      },
+      "min_terrain_clearance_m": {
+        "op": "min",
+        "value": 25.0
+      },
+      "max_terrain_clearance_m": {
+        "op": "max",
+        "value": 120.0
+      },
+      "battery_reserve_v": {
+        "op": "min",
+        "value": 14.2
+      },
+      "geofence_violations": {
+        "op": "max",
+        "value": 0
+      },
+      "no_fly_intrusions": {
+        "op": "max",
+        "value": 0
+      }
+    },
+    "safety": {
+      "emergency_landing_success_rate": {
+        "op": "min",
+        "value": 1.0
+      },
+      "emergency_touchdown_error_m": {
+        "op": "max",
+        "value": 3.0
+      },
+      "safe_command_fraction": {
+        "op": "min",
+        "value": 1.0
+      },
+      "rangefinder_dropout_safe_landings": {
+        "op": "min",
+        "value": 1.0
+      }
+    },
+    "robustness": {
+      "gps_degraded_pass_rate": {
+        "op": "min",
+        "value": 1.0
+      },
+      "gps_denied_pass_rate": {
+        "op": "min",
+        "value": 1.0
+      },
+      "low_texture_rejection_correctness": {
+        "op": "min",
+        "value": 0.95
+      },
+      "flat_terrain_rejection_correctness": {
+        "op": "min",
+        "value": 0.95
+      },
+      "stale_cache_rejection_correctness": {
+        "op": "min",
+        "value": 0.95
+      }
+    }
+  },
+  "report_inputs": {
+    "metrics_json": {
+      "description": "Nested object keyed by the same sections and metric names as metric_contract.",
+      "example": {
+        "localization": {
+          "horizontal_error_p95_m": 12.0
+        },
+        "mission": {
+          "waypoint_success_rate": 0.98
+        }
+      }
+    },
+    "generated_outputs": [
+      "generated/aerodrone/acceptance_report.json",
+      "generated/aerodrone/acceptance_report.md"
+    ]
+  }
+}
