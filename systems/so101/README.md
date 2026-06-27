@@ -8,6 +8,8 @@ SO-101 Gazebo, Genesis, and Isaac Sim adapters.
 - `config/controllers.yaml`: ROS 2 control configuration for Gazebo.
 - `config/groot_demo.yaml`: SO-101 + GR00T bridge parameters for Isaac Sim.
 - `worlds/empty.sdf`: minimal Gazebo world for the arm.
+- `worlds/picking_table.sdf`: tabletop picking scene with bins, target objects, clutter, an occluder, calibration board, lighting, and collision geometry.
+- `scenarios/picking_table.json`: simulator-neutral task and scene metadata for Isaac Sim, Genesis, Gazebo, and GR00T scoring.
 
 Regenerate the plain URDF after editing the Xacro:
 

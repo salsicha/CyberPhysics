@@ -42,7 +42,7 @@ launch/script paths point at `/workspace/systems/so101`.
 docker compose -f compositions/so101_gazebo.yaml up
 ```
 
-Gazebo uses `gz_ros2_control` and a joint-group position controller. The relay
+Gazebo uses `gz_ros2_control` and a joint-group position controller. The default world is `/workspace/systems/so101/worlds/picking_table.sdf`, a tabletop pick-and-place scene mirrored by `/workspace/systems/so101/scenarios/picking_table.json`. The relay
 maps the common command topic to the Gazebo controller topic.
 
 ## Genesis

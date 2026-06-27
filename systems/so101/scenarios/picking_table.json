@@ -1,0 +1,144 @@
+{
+  "name": "so101_picking_table",
+  "description": "Realistic tabletop pick-and-place scene for SO-101 GR00T validation.",
+  "frame_id": "world",
+  "robot_spawn": {
+    "xyz": [0.0, 0.0, 0.431],
+    "rpy": [0.0, 0.0, 0.0]
+  },
+  "camera": {
+    "name": "groot_camera",
+    "frame_id": "groot_camera_rgb_optical_frame",
+    "mount": "fixed_over_table",
+    "image_topic": "/so101/camera/image_raw",
+    "camera_info_topic": "/so101/camera/camera_info",
+    "depth_topic": "/so101/camera/depth/image_rect_raw",
+    "xyz": [0.17, -0.52, 0.92],
+    "rpy": [1.10, 0.0, 0.0],
+    "resolution": [640, 480],
+    "horizontal_fov_deg": 69.0
+  },
+  "static_assets": [
+    {
+      "name": "workbench",
+      "type": "table",
+      "xyz": [0.42, 0.0, 0.375],
+      "size": [1.35, 0.9, 0.05],
+      "material": "laminated_wood"
+    },
+    {
+      "name": "arm_base_mount",
+      "type": "mount_plate",
+      "xyz": [0.0, 0.0, 0.43],
+      "size": [0.22, 0.22, 0.06],
+      "material": "black_anodized_aluminum"
+    },
+    {
+      "name": "left_bin",
+      "type": "target_bin",
+      "xyz": [0.56, 0.27, 0.45],
+      "size": [0.24, 0.18, 0.035],
+      "material": "blue_plastic"
+    },
+    {
+      "name": "right_bin",
+      "type": "target_bin",
+      "xyz": [0.56, -0.27, 0.45],
+      "size": [0.24, 0.18, 0.035],
+      "material": "red_plastic"
+    },
+    {
+      "name": "occluder_box",
+      "type": "occluder",
+      "xyz": [0.46, -0.02, 0.515],
+      "rpy": [0.0, 0.0, 0.12],
+      "size": [0.05, 0.16, 0.07],
+      "material": "matte_gray_cardboard"
+    },
+    {
+      "name": "calibration_board",
+      "type": "aprilgrid",
+      "xyz": [0.18, 0.43, 0.69],
+      "rpy": [1.5708, 0.0, 0.0],
+      "size": [0.28, 0.20, 0.006],
+      "tag_family": "tag36h11",
+      "tag_rows": 4,
+      "tag_cols": 6,
+      "tag_size_m": 0.028,
+      "tag_spacing_m": 0.008
+    }
+  ],
+  "objects": [
+    {
+      "id": "red_block_target",
+      "role": "target",
+      "shape": "box",
+      "color": "red",
+      "xyz": [0.34, -0.12, 0.4825],
+      "rpy": [0.0, 0.0, 0.18],
+      "size": [0.045, 0.045, 0.045],
+      "mass_kg": 0.045,
+      "friction": 0.8
+    },
+    {
+      "id": "blue_cylinder_distractor",
+      "role": "distractor",
+      "shape": "cylinder",
+      "color": "blue",
+      "xyz": [0.43, 0.08, 0.49],
+      "rpy": [0.0, 0.0, 0.0],
+      "radius_m": 0.027,
+      "height_m": 0.06,
+      "mass_kg": 0.035,
+      "friction": 0.65
+    },
+    {
+      "id": "green_block_distractor",
+      "role": "distractor",
+      "shape": "box",
+      "color": "green",
+      "xyz": [0.25, 0.18, 0.48],
+      "rpy": [0.0, 0.0, -0.35],
+      "size": [0.04, 0.055, 0.04],
+      "mass_kg": 0.04,
+      "friction": 0.75
+    }
+  ],
+  "tasks": [
+    {
+      "id": "pick_red_block_left_bin",
+      "language": "pick the red block and place it in the left bin",
+      "target_object": "red_block_target",
+      "destination": "left_bin",
+      "success": {
+        "object_inside_destination": true,
+        "object_lift_height_m": 0.08,
+        "place_position_tolerance_m": 0.055,
+        "max_collision_count": 0,
+        "max_duration_s": 45.0
+      }
+    },
+    {
+      "id": "pick_green_block_right_bin",
+      "language": "pick the green block and place it in the right bin",
+      "target_object": "green_block_distractor",
+      "destination": "right_bin",
+      "success": {
+        "object_inside_destination": true,
+        "object_lift_height_m": 0.08,
+        "place_position_tolerance_m": 0.055,
+        "max_collision_count": 0,
+        "max_duration_s": 45.0
+      }
+    }
+  ],
+  "domain_randomization": {
+    "object_xy_jitter_m": 0.035,
+    "object_yaw_jitter_rad": 0.35,
+    "camera_xyz_jitter_m": 0.015,
+    "camera_rpy_jitter_rad": 0.035,
+    "light_intensity_scale": [0.55, 1.25],
+    "table_friction": [0.55, 0.95],
+    "object_mass_scale": [0.75, 1.35]
+  }
+}

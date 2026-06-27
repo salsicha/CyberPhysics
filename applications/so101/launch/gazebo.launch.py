@@ -79,7 +79,7 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             "world_file",
-            default_value="/workspace/systems/so101/worlds/empty.sdf",
+            default_value="/workspace/systems/so101/worlds/picking_table.sdf",
         ),
         gazebo,
         state_publisher,
