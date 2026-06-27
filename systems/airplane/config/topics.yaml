@@ -1,0 +1,19 @@
+airplane:
+  ros__parameters:
+    namespace: plane0
+    mavros_namespace: /mavros
+    gps_topic: /plane0/sensor_measurements/gps
+    odom_topic: /plane0/sensor_measurements/odom
+    imu_topic: /plane0/sensor_measurements/imu
+    battery_topic: /plane0/sensor_measurements/battery
+    downward_image_topic: /airplane/downward/image_raw
+    downward_camera_info_topic: /airplane/downward/camera_info
+    downward_highres_image_topic: /airplane/downward/image_highres
+    downward_highres_camera_info_topic: /airplane/downward/image_highres/camera_info
+    downward_depth_topic: /airplane/downward/relative_depth
+    demnav_odom_topic: /demnav/odometry
+    wildnav_odom_topic: /wildnav/odometry
+    navigation_odom_topic: /airplane/navigation/odometry
+    map_frame: airplane/map
+    base_frame: airplane/base_link
+    downward_camera_frame: airplane/downward_optical_frame

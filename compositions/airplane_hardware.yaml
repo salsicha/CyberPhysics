@@ -1,0 +1,144 @@
+# Physical ArduPlane/BlueOS fixed-wing stack.
+
+services:
+  airplane_mavros:
+    image: cyberphysics/aerostack2:${CYBERPHYSICS_TAG:-arm64}
+    container_name: airplane_mavros
+    network_mode: host
+    ipc: host
+    restart: unless-stopped
+    env_file:
+      - ../systems/airplane/config/blueos.env
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    command: >
+      ros2 launch mavros apm.launch
+        fcu_url:=${BLUEOS_FCU_URL:-udp://0.0.0.0:14550@}
+
+  airplane_bridge:
+    image: cyberphysics/aerostack2:${CYBERPHYSICS_TAG:-arm64}
+    container_name: airplane_bridge
+    network_mode: host
+    ipc: host
+    restart: unless-stopped
+    depends_on:
+      - airplane_mavros
+    env_file:
+      - ../systems/airplane/config/blueos.env
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    volumes:
+      - ../systems/airplane:/workspace/systems/airplane:ro
+      - /dev/shm:/dev/shm
+    command: >
+      python3 /workspace/systems/airplane/scripts/airplane_mavros_bridge.py
+        --ros-args
+        --params-file /workspace/systems/airplane/config/mavros_bridge.yaml
+
+  airplane_downward_camera:
+    image: cyberphysics/oak1:${CYBERPHYSICS_TAG:-arm64}
+    container_name: airplane_downward_camera
+    network_mode: host
+    ipc: host
+    privileged: true
+    restart: unless-stopped
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    volumes:
+      - /dev/bus/usb:/dev/bus/usb
+      - /dev/shm:/dev/shm
+    command: >
+      python3 /scripts/megadepth_ros.py --ros-args
+        -p device_ip:=${OAK1_DEVICE_IP:-auto}
+        -p blob_path:=/models/megadepth_192x256_openvino_2021.4_6shave.blob
+        -p image_topic:=/airplane/downward/image_raw
+        -p depth_topic:=/airplane/downward/relative_depth
+        -p camera_info_topic:=/airplane/downward/camera_info
+        -p highres_image_topic:=/airplane/downward/image_highres
+        -p highres_camera_info_topic:=/airplane/downward/image_highres/camera_info
+        -p highres_width:=${WILDNAV_IMAGE_WIDTH:-1280}
+        -p highres_height:=${WILDNAV_IMAGE_HEIGHT:-720}
+        -p highres_capture_hz:=${WILDNAV_IMAGE_RATE:-0.5}
+        -p frame_id:=airplane/downward_optical_frame
+
+  airplane_demnav:
+    image: cyberphysics/demnav:${CYBERPHYSICS_TAG:-arm64}
+    container_name: airplane_demnav
+    network_mode: host
+    ipc: host
+    restart: unless-stopped
+    depends_on:
+      - airplane_bridge
+      - airplane_downward_camera
+    env_file:
+      - ../systems/airplane/config/blueos.env
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    volumes:
+      - /dev/shm:/dev/shm
+      - /data/airplane_demnav_cache:/data/demnav_cache
+    command: >
+      ros2 launch demnav_pkg demnav.launch.py
+        gps_topic:=/${AIRPLANE_NAMESPACE:-plane0}/sensor_measurements/gps
+        odom_topic:=/${AIRPLANE_NAMESPACE:-plane0}/sensor_measurements/odom
+        depth_topic:=/airplane/downward/relative_depth
+        camera_info_topic:=/airplane/downward/camera_info
+        initial_lat:=${INITIAL_LAT:-37.9234}
+        initial_lon:=${INITIAL_LON:--122.5967}
+        origin_alt:=${ORIGIN_ALT:-280.0}
+        area_km:=${AREA_KM:-12.0}
+        search_radius_m:=${SEARCH_RADIUS_M:-1200.0}
+        fov_deg:=${FOV_DEG:-69.0}
+        min_correlation:=${MIN_CORRELATION:-0.35}
+
+  airplane_wildnav:
+    image: cyberphysics/wildnav:${CYBERPHYSICS_TAG:-arm64}
+    container_name: airplane_wildnav
+    network_mode: host
+    ipc: host
+    restart: unless-stopped
+    depends_on:
+      - airplane_bridge
+      - airplane_downward_camera
+      - airplane_demnav
+    env_file:
+      - ../systems/airplane/config/blueos.env
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - WILDNAV_TILE_URL
+    volumes:
+      - /dev/shm:/dev/shm
+      - /data/airplane_wildnav_cache:/data/wildnav_cache
+    command: >
+      ros2 launch wildnav_pkg wildnav.launch.py
+        image_topic:=/airplane/downward/image_highres
+        camera_info_topic:=/airplane/downward/image_highres/camera_info
+        prediction_odom_topic:=/airplane/navigation/odometry
+        raw_odom_topic:=/${AIRPLANE_NAMESPACE:-plane0}/sensor_measurements/odom
+        gps_topic:=/${AIRPLANE_NAMESPACE:-plane0}/sensor_measurements/gps
+        demnav_odom_topic:=/demnav/odometry
+        navigation_output_topic:=/airplane/navigation/odometry
+        initial_lat:=${INITIAL_LAT:-37.9234}
+        initial_lon:=${INITIAL_LON:--122.5967}
+        origin_alt:=${ORIGIN_ALT:-280.0}
+        zoom:=${WILDNAV_ZOOM:-17}
+        search_radius_m:=${WILDNAV_SEARCH_RADIUS_M:-1200.0}
+        max_tiles:=${WILDNAV_MAX_TILES:-81}
+        max_tile_downloads_per_cycle:=${WILDNAV_MAX_DOWNLOADS:-8}
+        match_rate_hz:=${WILDNAV_RATE_HZ:-0.2}
+        feature_backend:=${WILDNAV_FEATURE_BACKEND:-SIFT}
+        min_matches:=${WILDNAV_MIN_MATCHES:-18}
+        min_inliers:=${WILDNAV_MIN_INLIERS:-12}
+        min_inlier_ratio:=${WILDNAV_MIN_INLIER_RATIO:-0.25}
+        max_position_jump_m:=${WILDNAV_MAX_JUMP_M:-350.0}
+        minimum_demnav_confidence:=${DEMNAV_FUSION_CONFIDENCE:-0.35}
+        minimum_wildnav_confidence:=${WILDNAV_FUSION_CONFIDENCE:-0.20}
+
+  airplane_rosbridge:
+    image: cyberphysics/aerostack2:${CYBERPHYSICS_TAG:-arm64}
+    container_name: airplane_rosbridge
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    command: ros2 launch rosbridge_server rosbridge_websocket_launch.xml

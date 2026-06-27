@@ -1,0 +1,22 @@
+satellite_camera_sim:
+  ros__parameters:
+    rate_hz: 1.0
+    width: 640
+    height: 480
+    depth_width: 160
+    depth_height: 120
+    image_topic: /airplane/downward/image_highres
+    camera_info_topic: /airplane/downward/image_highres/camera_info
+    preview_image_topic: /airplane/downward/image_raw
+    preview_camera_info_topic: /airplane/downward/camera_info
+    depth_topic: /airplane/downward/relative_depth
+    depth_camera_info_topic: /airplane/downward/camera_info
+    gps_topic: /plane0/sensor_measurements/gps
+    odom_topic: /plane0/sensor_measurements/odom
+    frame_id: airplane/downward_optical_frame
+    origin_lat: 37.9234
+    origin_lon: -122.5967
+    altitude_agl_m: 180.0
+    groundspeed_mps: 24.0
+    horizontal_fov_deg: 69.0
+    fallback_route_radius_m: 650.0

@@ -1,0 +1,17 @@
+# Minimal ArduPlane SITL defaults for the CyberPhysics airplane simulation.
+# Vehicle-specific airframe tuning belongs outside this generic config.
+ARMING_CHECK 1
+AHRS_EKF_TYPE 3
+EK3_ENABLE 1
+ARSPD_USE 1
+ARSPD_TYPE 1
+TECS_SPDWEIGHT 1.0
+TRIM_ARSPD_CM 1900
+MIN_GNDSPD_CM 1200
+RTL_ALTITUDE 12000
+WP_RADIUS 60
+LIM_ROLL_CD 4500
+LIM_PITCH_MAX 2000
+LIM_PITCH_MIN -2500
+FS_SHORT_ACTN 0
+FS_LONG_ACTN 1

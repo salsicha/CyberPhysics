@@ -1,0 +1,6 @@
+airplane_mavros_bridge:
+  ros__parameters:
+    namespace: plane0
+    mavros_namespace: /mavros
+    mirror_navigation_seed: true
+    navigation_seed_topic: /airplane/navigation/odometry

@@ -24,6 +24,7 @@ Applications should stay generic and accept paths into `systems/` through launch
 - `aerostack2_genesis/`: Aerostack2 headless drone navigation simulation configuration for Genesis.
 - `boat/`: BlueBoat/BlueOS/ArduRover topic conventions and bridge parameters.
 - `submarine/`: BlueROV2/BlueOS/ArduSub topic conventions and bridge parameters.
+- `airplane/`: ArduPlane/BlueOS fixed-wing topic conventions, satellite navigation, and JSBSim SITL setup.
 - `lunar_rover/`: Space ROS lunar rover topic conventions and south-pole traverse simulation.
 - `turret/`: PanTiltROS-compatible turret tracking scenario, simulator, and acceptance validation.
 - `realsense/`: RealSense-specific example configuration.

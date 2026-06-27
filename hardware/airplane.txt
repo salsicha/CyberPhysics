@@ -1,0 +1,113 @@
+# Airplane Hardware Shopping List
+
+Goal: build a fixed-wing mapping airplane around Raspberry Pi 5, BlueOS,
+Navigator, ArduPlane, GPS, and a downward camera that can localize with
+satellite maps and DEM matching like the Aerodrone stack.
+
+Important compatibility note
+
+- The requested target is Raspberry Pi 5 plus BlueOS and Navigator if possible.
+  BlueOS supports Raspberry Pi 5-class deployments, but the Blue Robotics
+  Navigator product line has historically targeted the Raspberry Pi 4 form
+  factor. Before purchasing, confirm Pi 5 mechanical/header/software fit with
+  Blue Robotics. If that fit is blocked, use a Raspberry Pi 4 for the Navigator
+  flight-controller stack and keep the Raspberry Pi 5 as a companion computer.
+- This is an ArduPlane fixed-wing aircraft. Do not reuse multicopter tuning,
+  failsafe, arming, or mission assumptions from the aerodrone.
+
+Quick-buy baseline
+
+- 1 x fixed-wing mapping airframe with stable low-speed handling, payload bay,
+  and clean downward camera view. Good first choices: Hee Wing Ranger T1,
+  Skywalker X8, Volantex Ranger EX, or another ArduPilot-proven foam mapping
+  platform with a pusher prop and enough payload margin.
+- 1 x matched brushless motor, ESC, and propeller set for the selected airframe.
+- 1 x spare propeller set and motor mount hardware.
+- 4 x to 6 x airframe servos for ailerons, elevator, rudder, flaps, or elevons,
+  depending on the airframe.
+- 1 x servo power rail or BEC sized for all control-surface servos at stall.
+- 1 x Raspberry Pi 5, preferably 8 GB or 16 GB.
+- 1 x Raspberry Pi 5 active cooler and high-endurance 128 GB or larger microSD
+  card, or a supported NVMe HAT if vibration mounting is solved.
+- 1 x Blue Robotics Navigator Flight Controller kit, plus recommended power
+  sense and 5 V supply hardware.
+- 1 x BlueOS image and ArduPlane firmware configured through BlueOS.
+- 1 x digital airspeed sensor and pitot tube. Treat this as mandatory for
+  repeatable fixed-wing autonomous flight and wind handling.
+- 1 x GPS + compass module supported by ArduPilot, such as u-blox M9N/M10N or
+  Here3+/Here4-class hardware.
+- 1 x RC transmitter and receiver for manual launch, recovery, and failsafe.
+- 1 x telemetry link for field setup and monitoring, such as Wi-Fi/Ethernet on
+  the bench plus 915 MHz/868 MHz telemetry radio for the field.
+- 1 x downward-facing Luxonis OAK-1 USB or OAK-1 PoE camera mounted nadir.
+  Use it for high-resolution WildNav RGB and MegaDepth relative depth for
+  DemNav. Pick PoE if cable retention and remote mounting matter more than
+  weight and power complexity.
+- 1 x vibration-isolated nadir camera mount with a clear view through the belly
+  or below the fuselage.
+- 1 x USB 3.0 screw-locking cable, or PoE injector/switch for OAK-1 PoE.
+- 1 x optional nadir global-shutter camera if fast low-altitude passes cause
+  rolling-shutter blur in the OAK-1 RGB stream.
+- 1 x lithium battery pack sized for the aircraft motor and avionics load, plus
+  a separate avionics BEC if the main ESC BEC is not robust enough.
+- 1 x LiPo/Li-ion balance charger, fire-safe charging bag, and battery checker.
+- 1 x launch and recovery kit: bungee or hand-launch helper if needed, landing
+  markers, prop safety tools, spare control horns, hinges, pushrods, clevises,
+  tape, glue, and field repair foam.
+- 1 x operator laptop with QGroundControl, Docker, ROS 2 tools, and access to
+  the CyberPhysics compose stacks.
+
+Software stack
+
+- BlueOS on the onboard Raspberry Pi.
+- ArduPlane on the Navigator.
+- MAVROS in the `cyberphysics/aerostack2` image.
+- CyberPhysics `airplane_mavros_bridge.py` to mirror MAVROS telemetry into the
+  `/plane0/sensor_measurements/*` contract.
+- OAK-1 MegaDepth for `/airplane/downward/image_raw`,
+  `/airplane/downward/image_highres`, and `/airplane/downward/relative_depth`.
+- DemNav consuming GPS, odometry, camera info, and relative depth.
+- WildNav consuming downward RGB and satellite tiles, then publishing fused
+  `/airplane/navigation/odometry`.
+- QGroundControl for ArduPlane setup, calibration, mission upload, manual
+  control, and safety monitoring.
+
+ROS 2 topic contract
+
+- `/plane0/sensor_measurements/gps`
+- `/plane0/sensor_measurements/odom`
+- `/plane0/sensor_measurements/imu`
+- `/plane0/sensor_measurements/battery`
+- `/airplane/downward/image_raw`
+- `/airplane/downward/camera_info`
+- `/airplane/downward/image_highres`
+- `/airplane/downward/image_highres/camera_info`
+- `/airplane/downward/relative_depth`
+- `/demnav/odometry`
+- `/wildnav/odometry`
+- `/airplane/navigation/odometry`
+
+Simulation baseline
+
+- Use ArduPilot Plane SITL with JSBSim for high-fidelity fixed-wing flight
+  dynamics and autopilot behavior.
+- Use `systems/airplane/scripts/satellite_camera_sim.py` to provide a
+  georeferenced nadir RGB/depth stream for DemNav/WildNav when a full
+  photorealistic terrain simulator is not available.
+- The compose stack uses the ArduPilot dev-base Docker image and keeps the
+  cloned simulator source under `cache/ardupilot`, outside tracked files.
+
+Useful references
+
+- ArduPilot Plane:
+  https://ardupilot.org/plane/
+- ArduPilot SITL:
+  https://ardupilot.org/dev/docs/sitl-simulator-software-in-the-loop.html
+- JSBSim:
+  https://jsbsim.sourceforge.net/
+- BlueOS:
+  https://blueos.cloud/
+- Blue Robotics Navigator:
+  https://bluerobotics.com/store/comm-control-power/control/navigator/
+- Luxonis OAK-1:
+  https://shop.luxonis.com/products/oak-1
