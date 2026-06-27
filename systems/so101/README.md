@@ -10,6 +10,7 @@ SO-101 Gazebo, Genesis, and Isaac Sim adapters.
 - `worlds/empty.sdf`: minimal Gazebo world for the arm.
 - `worlds/picking_table.sdf`: tabletop picking scene with bins, target objects, clutter, an occluder, calibration board, lighting, and collision geometry.
 - `scenarios/picking_table.json`: simulator-neutral task and scene metadata for Isaac Sim, Genesis, Gazebo, and GR00T scoring.
+- `validation/groot_demo_sync_manifest.example.json`: example topic synchronization manifest for GR00T regression bags.
 
 Regenerate the plain URDF after editing the Xacro:
 

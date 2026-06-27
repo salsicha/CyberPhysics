@@ -133,6 +133,30 @@ Sim 5.1 crashed in `librtx.scenedb.plugin.so` before the SO-101 script could run
 The ROS demo above exercises the SO-101 camera, GR00T policy server, and bridge
 path without that renderer dependency.
 
+## Calibration And Dataset Checks
+
+Validate the scenario camera, URDF camera/gripper alignment, and collision
+geometry before collecting policy data:
+
+```bash
+PYTHONPATH=applications/so101/scripts \
+python3 applications/so101/scripts/validate_calibration_and_dataset.py \
+  --scenario systems/so101/scenarios/picking_table.json \
+  --urdf systems/so101/urdf/so101.urdf
+```
+
+Record a short GR00T regression bag from a running SO-101 demo:
+
+```bash
+ros2 run so101_description record_groot_demo_bag.sh /tmp/so101_groot_demo_bag
+```
+
+After extracting topic timestamp arrays from the bag, validate synchronization
+with the same checker using a manifest shaped like
+`systems/so101/validation/groot_demo_sync_manifest.example.json`. The checker
+fails if image, depth, camera_info, joint state, and command streams exceed the
+configured skew budget.
+
 ## Picking Task Validation
 
 Score scenario telemetry against the selected SO-101 picking task:

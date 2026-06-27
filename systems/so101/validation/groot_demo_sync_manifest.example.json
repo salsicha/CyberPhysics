@@ -1,0 +1,12 @@
+{
+  "description": "Example synchronization manifest produced from a short SO-101 GR00T demo bag.",
+  "max_skew_s": 0.05,
+  "topics": {
+    "/joint_states": [1.00, 1.03, 1.06, 1.09],
+    "/so101/joint_commands": [1.00, 1.05, 1.10],
+    "/so101/camera/image_raw": [1.00, 1.03, 1.06, 1.09],
+    "/so101/camera/camera_info": [1.00, 1.03, 1.06, 1.09],
+    "/so101/camera/depth/image_rect_raw": [1.00, 1.03, 1.06, 1.09],
+    "/so101/camera/depth/camera_info": [1.00, 1.03, 1.06, 1.09]
+  }
+}
