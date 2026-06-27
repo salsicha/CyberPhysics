@@ -65,6 +65,20 @@ The composition runs this pipeline:
 
 NiceGUI is available at `http://localhost:8080`.
 
+## Stack Validation
+
+Run the full stack and validate sensor topic freshness, nvblox map-slice
+presence, and TF connectivity from `map` through `odom`, `base_link`, camera,
+lidar, and IMU frames:
+
+```bash
+docker compose --profile validation -f compositions/racecarneo.yaml up racecarneo_stack_validator
+```
+
+This validator exercises the RealSense-equivalent camera/depth topics, Depth
+Anything metric depth, nvblox output topics, SLAM/Nav2 frames, and the simulated
+Ackermann feedback path used by hardware.
+
 ## Waypoint Missions
 
 Run the full stack and send a tracked mission through Nav2's

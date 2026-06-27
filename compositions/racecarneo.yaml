@@ -132,6 +132,24 @@ services:
         autostart:=true
 
 
+  racecarneo_stack_validator:
+    profiles: ["validation"]
+    network_mode: host
+    pull_policy: if_not_present
+    image: cyberphysics/racecarneo:${CYBERPHYSICS_TAG:-latest}
+    container_name: racecarneo_stack_validator
+    depends_on:
+      - racecarneo_nav2
+      - racecarneo_nvblox
+      - racecarneo_depthanything
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+    command: >
+      python3 /workspace/validate_stack_integration.py
+        --timeout-s ${RACECAR_STACK_VALIDATION_TIMEOUT:-90}
+        --freshness-s ${RACECAR_STACK_VALIDATION_FRESHNESS:-5}
+
   racecarneo_mission_runner:
     profiles: ["missions"]
     network_mode: host
