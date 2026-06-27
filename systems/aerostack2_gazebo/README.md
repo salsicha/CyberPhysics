@@ -9,7 +9,8 @@ Files:
 - `config/world_gazebo.yaml`: AS2 Gazebo world, drone, and payload selection.
 - `config/config_gazebo.yaml`: shared ROS parameters for Aerostack2 nodes.
 - `config/pid_speed_controller.yaml`: PID speed-controller parameters.
-- `config/nav_topics.env`: expected simulated topic names for DemNav/WildNav.
+- `config/nav_topics.env`: expected simulated topic names and Mount Tamalpais test origin for DemNav/WildNav.
+- `scenarios/mount_tamalpais_wilderness.json`: georeferenced wilderness scenario contract for simultaneous GPS, DemNav, WildNav, and fused-navigation evaluation.
 
 Start the base Aerostack2 simulation headlessly:
 
@@ -68,12 +69,20 @@ Practical simulator choices:
 - Bag replay: still the fastest regression path for DemNav/WildNav once real or
   simulator image/depth/GPS/odom topics have been recorded.
 
-## Golden Gate Park navsim default
+## Mount Tamalpais Wilderness Navsim Default
 
-The `navsim` Compose profile uses a small San Francisco test origin near Golden Gate Park:
+The `navsim` Compose profile uses a georeferenced wilderness test origin near
+Mount Tamalpais so standard GPS, DemNav, WildNav, and fused navigation can be
+evaluated against the same area:
 
-- `INITIAL_LAT=37.7694`
-- `INITIAL_LON=-122.4862`
-- `ORIGIN_ALT=0.0`
+- `INITIAL_LAT=37.9234`
+- `INITIAL_LON=-122.5967`
+- `ORIGIN_ALT=280.0`
 
-`cyberphysics/demnav:latest` seeds `/data/demnav_cache` during Docker build, and `cyberphysics/wildnav:latest` seeds `/data/wildnav_cache` during Docker build. Do not add generated DEMs, satellite tiles, or feature descriptors to this repository; change the Docker build args when a different test area is needed.
+The tracked scenario contract is
+`systems/aerostack2_gazebo/scenarios/mount_tamalpais_wilderness.json`.
+`cyberphysics/demnav:latest` seeds `/data/demnav_cache` during Docker build, and
+`cyberphysics/wildnav:latest` seeds `/data/wildnav_cache` during Docker build.
+Do not add generated DEMs, satellite tiles, feature descriptors, terrain meshes,
+bags, or logs to this repository; change Docker build args or runtime volumes
+when evaluating a different test area.

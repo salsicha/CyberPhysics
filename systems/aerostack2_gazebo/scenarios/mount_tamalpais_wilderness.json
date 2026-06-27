@@ -1,0 +1,147 @@
+{
+  "name": "aerodrone_mount_tamalpais_wilderness",
+  "description": "Georeferenced wilderness navigation scenario for simultaneous GPS, DemNav, and WildNav evaluation.",
+  "frame_id": "map",
+  "local_frame": "drone_sim_0/map",
+  "georeference": {
+    "datum": "WGS84",
+    "projection": "local_tangent_enu",
+    "origin_lat": 37.9234,
+    "origin_lon": -122.5967,
+    "origin_alt_m": 280.0,
+    "utm_zone": "10S",
+    "area_km": 8.0
+  },
+  "asset_policy": {
+    "tracked_contract": "This JSON is the source of truth for georeferencing, terrain semantics, cache seeding, geofence, and mission scoring.",
+    "generated_runtime_assets": [
+      "/data/demnav_cache",
+      "/data/wildnav_cache",
+      "Gazebo terrain meshes",
+      "orthophoto textures",
+      "rosbags",
+      "navigation logs"
+    ],
+    "license_note": "Confirm satellite imagery provider terms before caching or distributing tiles. Cache files are not committed."
+  },
+  "map_sources": {
+    "dem": {
+      "cache_dir": "/data/demnav_cache",
+      "source_class": "SRTM_or_better",
+      "recommended_resolution_m": 10.0,
+      "min_footprint_cells": 12,
+      "seed_env": {
+        "NAV_ASSET_LAT": 37.9234,
+        "NAV_ASSET_LON": -122.5967,
+        "DEMNAV_AREA_KM": 8.0,
+        "DEMNAV_DEM_RESOLUTION_M": 10.0
+      }
+    },
+    "satellite": {
+      "cache_dir": "/data/wildnav_cache",
+      "default_zoom": 18,
+      "search_radius_m": 300.0,
+      "max_tiles": 64,
+      "feature_backend": "sift",
+      "seed_env": {
+        "NAV_ASSET_LAT": 37.9234,
+        "NAV_ASSET_LON": -122.5967,
+        "WILDNAV_ZOOM": 18,
+        "WILDNAV_SEARCH_RADIUS_M": 300.0,
+        "WILDNAV_MAX_TILES": 64
+      }
+    }
+  },
+  "terrain_layers": [
+    {
+      "label": "forest_canopy",
+      "class_id": 1,
+      "polygons_enu_m": [
+        [[-850, -450], [-150, -520], [180, -260], [80, 260], [-760, 330]],
+        [[420, -620], [980, -500], [1040, 120], [560, 220], [360, -180]]
+      ]
+    },
+    {
+      "label": "ridge_grassland",
+      "class_id": 2,
+      "polygons_enu_m": [
+        [[-220, -150], [560, -180], [760, 80], [360, 360], [-180, 260]]
+      ]
+    },
+    {
+      "label": "trail",
+      "class_id": 3,
+      "polylines_enu_m": [
+        [[-720, -260], [-420, -120], [-160, -40], [120, 40], [420, 110], [720, 180]],
+        [[-280, 300], [-80, 160], [180, 40], [420, -180], [720, -420]]
+      ],
+      "nominal_width_m": 3.0
+    },
+    {
+      "label": "rock_outcrop",
+      "class_id": 4,
+      "polygons_enu_m": [
+        [[130, -80], [240, -110], [290, -20], [210, 60], [120, 20]],
+        [[-420, 80], [-310, 60], [-280, 170], [-390, 220], [-470, 150]]
+      ]
+    },
+    {
+      "label": "water",
+      "class_id": 5,
+      "polylines_enu_m": [
+        [[-960, 420], [-620, 360], [-340, 420], [-80, 520], [260, 560]]
+      ],
+      "nominal_width_m": 8.0
+    }
+  ],
+  "geofence": {
+    "keep_in_polygon_enu_m": [[-1000, -700], [1100, -700], [1100, 700], [-1000, 700]],
+    "no_fly_polygons_enu_m": [
+      [[-100, -80], [260, -80], [260, 140], [-100, 140]],
+      [[760, 260], [1050, 260], [1050, 620], [760, 620]]
+    ],
+    "min_agl_m": 25.0,
+    "max_agl_m": 120.0
+  },
+  "sensor_environment": {
+    "gps": {
+      "nominal_std_m": 1.5,
+      "degraded_std_m": 12.0,
+      "multipath_regions_enu_m": [
+        {"id": "ridge_reflection", "polygon": [[-120, -80], [360, -60], [420, 180], [-80, 220]]}
+      ]
+    },
+    "oak1_downward_rgb": {
+      "topic": "/drone_sim_0/sensor_measurements/downward_rgb/image_raw",
+      "camera_info_topic": "/drone_sim_0/sensor_measurements/downward_rgb/camera_info",
+      "mount": "nadir",
+      "resolution": [1280, 720],
+      "failure_modes": ["motion_blur", "low_texture_grass", "canopy_shadow", "sun_glare"]
+    },
+    "oak1_relative_depth": {
+      "topic": "/drone_sim_0/sensor_measurements/downward_rgbd/depth",
+      "camera_info_topic": "/drone_sim_0/sensor_measurements/downward_rgbd/depth/camera_info",
+      "mount": "nadir",
+      "relative_scale": true,
+      "failure_modes": ["flat_terrain", "canopy", "invalid_pixels", "small_dem_footprint"]
+    },
+    "rangefinder": {
+      "topic": "/drone_sim_0/sensor_measurements/rangefinder",
+      "min_range_m": 0.3,
+      "max_range_m": 40.0,
+      "dropout_regions": ["water", "dense_canopy"]
+    }
+  },
+  "weather_and_lighting_variants": [
+    {"id": "clear_midday", "wind_mps": 2.0, "sun_elevation_deg": 58.0, "visibility_m": 10000.0},
+    {"id": "dusk_low_sun", "wind_mps": 4.5, "sun_elevation_deg": 11.0, "visibility_m": 6000.0},
+    {"id": "canopy_shadow", "wind_mps": 3.0, "sun_elevation_deg": 35.0, "visibility_m": 8000.0},
+    {"id": "gps_degraded", "wind_mps": 5.0, "sun_elevation_deg": 42.0, "visibility_m": 7000.0, "gps_std_m": 12.0}
+  ],
+  "evaluation_modes": {
+    "gps_only": {"enabled_sources": ["gps", "odom"], "expected_role": "fallback_and_baseline"},
+    "demnav": {"enabled_sources": ["gps", "odom", "oak1_relative_depth", "dem"], "expected_role": "terrain_depth_correction"},
+    "wildnav": {"enabled_sources": ["gps", "odom", "oak1_downward_rgb", "satellite"], "expected_role": "visual_map_correction"},
+    "fused": {"enabled_sources": ["gps", "odom", "demnav", "wildnav", "rangefinder"], "expected_role": "independent_navigation_output"}
+  }
+}
