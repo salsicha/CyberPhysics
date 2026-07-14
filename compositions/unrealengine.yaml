@@ -7,7 +7,7 @@ services:
     image: cyberphysics/unrealengine
     container_name: ue_server
     volumes:
-      - ../applications/unrealengine/server/server:/server
+      - ../applications/unrealengine/server:/server
       - "/tmp/.X11-unix:/tmp/.X11-unix"
     environment:
       - "DISPLAY=${DISPLAY}"
@@ -28,7 +28,7 @@ services:
     image: cyberphysics/unrealengine
     container_name: ue_client
     volumes:
-      - ../applications/unrealengine/client/scripts:/scripts
+      - ../applications/unrealengine/client:/scripts
       - "/tmp/.X11-unix:/tmp/.X11-unix"
       - /data:/data
     environment:

@@ -200,7 +200,8 @@ class MegaDepthNode(Node):
         relative_depth = np.asarray(
             depth_packet.getFirstLayerFp16(),
             dtype=np.float32).reshape(self.height, self.width)
-        relative_depth[~np.isfinite(relative_depth)] = 0.0
+        # Keep invalid pixels NaN so downstream isfinite masks (demnav) work.
+        relative_depth[~np.isfinite(relative_depth)] = np.nan
 
         stamp = self.get_clock().now().to_msg()
         image_msg = self.bridge.cv2_to_imgmsg(frame, encoding='bgr8')

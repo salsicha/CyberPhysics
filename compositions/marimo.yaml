@@ -7,7 +7,7 @@ services:
       - ../applications/marimo/notebooks:/notebooks
     environment:
       - MARIMO_WORKDIR=/notebooks
-      - MARIMO_HOST=0.0.0.0
+      - MARIMO_HOST=127.0.0.1
       - MARIMO_PORT=2718
     command: >
-      marimo edit --headless --host 0.0.0.0 --port 2718 --no-token /notebooks
+      marimo edit --headless --host 127.0.0.1 --port 2718 --no-token /notebooks

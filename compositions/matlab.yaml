@@ -7,13 +7,13 @@ services:
     network_mode: "host"
     image: cyberphysics/matlab
     container_name: matlab
+    shm_size: '512m'
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix
     environment:
       - XAUTHORITY
       - DISPLAY
       - MLM_LICENSE_FILE=/network.lic
-      - shm-size=512M
     command: >
         stdbuf -o L
         matlab

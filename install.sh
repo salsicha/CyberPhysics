@@ -28,6 +28,7 @@ else
     echo "Installing docker"
     curl -fsSL https://get.docker.com -o get-docker.sh
     DRY_RUN=0 sudo sh ./get-docker.sh
+    rm -f get-docker.sh
 fi
 
 # Enable docker command without sudo
@@ -41,14 +42,9 @@ sudo snap install foxglove-studio
 echo "To run Foxglove, open terminal: foxglove-studio"
 
 # Create data directory for recordings
-sudo mkdir /data
+sudo mkdir -p /data
 
 # Enable Nvidia GPU passthrough
-distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
-curl -s -L -k https://nvidia.github.io/nvidia-docker/gpgkey | sudo apt-key add -
-
-# curl -s -L -k https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list | sudo tee /etc/apt/sources.list.d/nvidia-docker.list
-
 curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg \
   && curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
     sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
@@ -56,17 +52,19 @@ curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dear
 
 sudo apt-get update && sudo apt-get install -y make nvidia-container-toolkit
 sudo nvidia-ctk runtime configure --runtime=docker
-sudo systemctl restart docker
 sudo systemctl daemon-reload
+sudo systemctl restart docker
 
 # For Jetson emulation
 echo "Installing qemu (for Jetson platform target)"
-sudo apt install -y qemu binfmt-support qemu-user-static
+sudo apt install -y qemu-user-static binfmt-support
 
 # Convenient shortcuts
-if [ $(cat /home/$USER/.bashrc | grep -c 'xhost +local:root') -lt 1 ]; then
-    echo 'xhost +local:root' >> /home/$USER/.bashrc
-    echo 'xhost +local:docker' >> /home/$USER/.bashrc
+if ! grep -q 'xhost +local:root' "$HOME/.bashrc"; then
+    echo '[ -n "$DISPLAY" ] && xhost +local:root' >> "$HOME/.bashrc"
+fi
+if ! grep -q 'xhost +local:docker' "$HOME/.bashrc"; then
+    echo '[ -n "$DISPLAY" ] && xhost +local:docker' >> "$HOME/.bashrc"
 fi
 if [ $(cat /etc/hosts | grep -c host.docker.internal) -lt 1 ]; then
     echo '127.0.0.1    host.docker.internal' | sudo tee -a /etc/hosts

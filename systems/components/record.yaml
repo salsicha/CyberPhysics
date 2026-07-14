@@ -6,8 +6,6 @@ services:
     network_mode: host
     ipc: host
     privileged: true
-    depends_on:
-      - web
     volumes:
       - /data:/data
       - ${PWD}/env/:/env
@@ -16,7 +14,7 @@ services:
       - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket # *
       - /sys/fs/cgroup:/sys/fs/cgroup # *
     environment:
-      - TOPICS_EXCLUDED="-x '(.*)/image_raw_meta$'"
+      - TOPICS_EXCLUDED="-x '(.*)/image_raw_meta$$'"
       - TZ=America/Los_Angeles
       - ROS_LOCALHOST_ONLY=$ROS_LOCALHOST_ONLY
       - ROS_DOMAIN_ID=$ROS_DOMAIN_ID

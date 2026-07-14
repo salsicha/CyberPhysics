@@ -7,34 +7,38 @@ if [ $# -lt 1 ]; then
 fi
 
 # The argument to this script must match the system name in the "systems" folder
-env_file="./systems/$1/"
-if [ ! -d "$env_file" ]; then
-    echo "System $env_file does not exist"
+system_dir="./systems/$1"
+if [ ! -d "$system_dir" ]; then
+    echo "System $system_dir does not exist"
     exit 1
 fi
 
-set -a
-source ./systems/$1/env/env.list
-set +a
+# Load the system's environment if it has one
+env_file="$system_dir/env.list"
+if [ -f "$env_file" ]; then
+    set -a
+    source "$env_file"
+    set +a
+fi
 
 # Run the startup script if it exists
 # Also pass any arguments the user supplied
-startup_script="./systems/$1/scripts/startup.sh"
+startup_script="$system_dir/scripts/startup.sh"
 if [ -f "$startup_script" ]; then
     echo "Running $startup_script"
-    source $startup_script $@
+    source "$startup_script" "$@"
 fi
 
-# This can move to ./systems/$1/scripts/startup.sh
-if [ "$OFFSCREEN" == "true" ]; then
-    ./apps/airsim_server/server/Development/Linux/GeoSpecificEnv.sh -RenderOffScreen &
+if [ -z "$COMPONENT_LIST" ]; then
+    echo "COMPONENT_LIST is not set (define it in $env_file or $startup_script)"
+    exit 1
 fi
 
-cd deployment/components/
+cd systems/components/
 
-OUT=""
+compose_files=()
 for A in $COMPONENT_LIST; do
-    OUT=$OUT" -f "$A".yml";
-done;
+    compose_files+=(-f "$A.yaml")
+done
 
-docker compose $OUT up --remove-orphans
+docker compose "${compose_files[@]}" up --remove-orphans

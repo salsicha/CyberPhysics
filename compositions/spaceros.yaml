@@ -9,10 +9,10 @@ services:
     environment:
       - "DISPLAY=${DISPLAY}"
       - XAUTHORITY=/tmp/.XAuthority
-      - "/tmp/.X11-unix:/tmp/.X11-unix"
     volumes:
+      - "/tmp/.X11-unix:/tmp/.X11-unix"
       - /dev/shm:/dev/shm
-      - $XAUTHORITY:/tmp/.XAuthority
+      - ${XAUTHORITY:-/tmp/.Xauthority}:/tmp/.XAuthority:ro
     command: >
       stdbuf -o L
       /demos/curiosity_rover/run.sh

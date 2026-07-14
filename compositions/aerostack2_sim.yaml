@@ -46,9 +46,6 @@ services:
   stateestimator:
     network_mode: "host"
     image: cyberphysics/aerostack2
-    privileged: true
-    devices:
-      - /dev:/dev
     volumes:
       - /dev/shm:/dev/shm
       - ../systems/aerostack2_gazebo/config:/workspace/config:ro
@@ -57,9 +54,6 @@ services:
   motioncontroller:
     network_mode: "host"
     image: cyberphysics/aerostack2
-    privileged: true
-    devices:
-      - /dev:/dev
     volumes:
       - /dev/shm:/dev/shm
       - ../systems/aerostack2_gazebo/config:/workspace/config:ro
@@ -70,9 +64,6 @@ services:
     profiles: ["behaviors"]
     network_mode: "host"
     image: cyberphysics/aerostack2
-    privileged: true
-    devices:
-      - /dev:/dev
     volumes:
       - /dev/shm:/dev/shm
       - ../systems/aerostack2_gazebo/config:/workspace/config:ro
@@ -83,9 +74,6 @@ services:
     profiles: ["behaviors"]
     network_mode: "host"
     image: cyberphysics/aerostack2
-    privileged: true
-    devices:
-      - /dev:/dev
     volumes:
       - /dev/shm:/dev/shm
       - ../systems/aerostack2_gazebo/config:/workspace/config:ro
@@ -96,9 +84,6 @@ services:
     profiles: ["behaviors"]
     network_mode: "host"
     image: cyberphysics/aerostack2
-    privileged: true
-    devices:
-      - /dev:/dev
     volumes:
       - /dev/shm:/dev/shm
       - ../systems/aerostack2_gazebo/config:/workspace/config:ro
@@ -108,9 +93,6 @@ services:
     profiles: ["teleop"]
     network_mode: "host"
     image: cyberphysics/aerostack2
-    privileged: true
-    devices:
-      - /dev:/dev
     volumes:
       - /dev/shm:/dev/shm
       - "/tmp/.X11-unix:/tmp/.X11-unix"

@@ -14,7 +14,9 @@ topics:
   nvblox_static_slice: /nvblox_node/static_map_slice
   nvblox_combined_slice: /nvblox_node/combined_map_slice
 frames:
-  base: racecarneo/base_link
+  base: base_link
+  odom: odom
+  map: map
   camera_color: racecarneo/camera_color_optical_frame
   camera_depth: racecarneo/camera_depth_optical_frame
   lidar: racecarneo/lidar_link

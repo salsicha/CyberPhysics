@@ -95,8 +95,9 @@ class RosDroneController(Node):
             t.transform.rotation.z = float(quat[3])
             
             self.tf_broadcaster.sendTransform(t)
-        except Exception:
-            pass # Handle initialization transients
+        except Exception as e:
+            # Handle initialization transients
+            self.get_logger().warn(f"Failed to publish drone state: {e}")
 
 def run_sim(scene, drone, ros_node):
     while rclpy.ok():

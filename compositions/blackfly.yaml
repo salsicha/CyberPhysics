@@ -33,7 +33,7 @@ services:
     volumes:
       - /dev/shm:/dev/shm
       - /data:/data
-      - ../systems/example/env/:/env
+      - ../systems/blackfly/env/:/env
       - /bin/systemctl:/bin/systemctl # these folders (*) allow the docker container to shutdown host
       - /run/systemd/system:/run/systemd/system # *
       - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket # *

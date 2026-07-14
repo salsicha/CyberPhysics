@@ -15,6 +15,7 @@ services:
     privileged: true
     image: cyberphysics/realsense:${CYBERPHYSICS_TAG:-latest}
     container_name: racecarneo_camera
+    restart: unless-stopped
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
       - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
@@ -37,6 +38,7 @@ services:
     pull_policy: if_not_present
     image: cyberphysics/racecarneo:${CYBERPHYSICS_TAG:-latest}
     container_name: racecarneo_cmd_vel_to_ackermann
+    restart: unless-stopped
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
       - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
@@ -52,6 +54,7 @@ services:
     pull_policy: if_not_present
     image: cyberphysics/depthanything:${CYBERPHYSICS_TAG:-latest}
     container_name: racecarneo_depthanything
+    restart: unless-stopped
     depends_on:
       - racecarneo_camera
     environment:
@@ -76,6 +79,7 @@ services:
     pull_policy: if_not_present
     image: cyberphysics/nvblox:${CYBERPHYSICS_TAG:-latest}
     container_name: racecarneo_nvblox
+    restart: unless-stopped
     depends_on:
       - racecarneo_camera
       - racecarneo_depthanything
@@ -96,6 +100,7 @@ services:
     pull_policy: if_not_present
     image: cyberphysics/racecarneo:${CYBERPHYSICS_TAG:-latest}
     container_name: racecarneo_slam
+    restart: unless-stopped
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
       - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
@@ -111,6 +116,7 @@ services:
     pull_policy: if_not_present
     image: cyberphysics/racecarneo:${CYBERPHYSICS_TAG:-latest}
     container_name: racecarneo_nav2
+    restart: unless-stopped
     depends_on:
       - racecarneo_slam
       - racecarneo_cmd_vel_to_ackermann
@@ -131,6 +137,7 @@ services:
     pull_policy: if_not_present
     image: cyberphysics/nicegui:${CYBERPHYSICS_TAG:-latest}
     container_name: racecarneo_nicegui
+    restart: unless-stopped
     depends_on:
       - racecarneo_nav2
     environment:
@@ -143,6 +150,7 @@ services:
     network_mode: host
     image: cyberphysics/ros2:${CYBERPHYSICS_TAG:-latest}
     container_name: racecarneo_foxglove_bridge
+    restart: unless-stopped
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
     volumes:

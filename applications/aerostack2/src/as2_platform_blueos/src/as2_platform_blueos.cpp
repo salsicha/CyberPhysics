@@ -238,6 +238,7 @@ bool BlueOSPlatform::ownLand()
 void BlueOSPlatform::ownKillSwitch()
 {
   if (!waitForService(command_client_)) {
+    RCLCPP_ERROR(this->get_logger(), "Kill switch failed: could not send force disarm command");
     return;
   }
   auto request = std::make_shared<mavros_msgs::srv::CommandLong::Request>();
@@ -245,7 +246,17 @@ void BlueOSPlatform::ownKillSwitch()
   request->param1 = 0.0F;
   request->param2 = MAV_FORCE_DISARM_MAGIC;
   auto future = command_client_->async_send_request(request);
-  rclcpp::spin_until_future_complete(service_node_, future, service_timeout_);
+  if (rclcpp::spin_until_future_complete(service_node_, future, service_timeout_) !=
+    rclcpp::FutureReturnCode::SUCCESS)
+  {
+    RCLCPP_ERROR(this->get_logger(), "Timed out sending force disarm command");
+    return;
+  }
+  const auto response = future.get();
+  if (!response->success) {
+    RCLCPP_ERROR(
+      this->get_logger(), "Force disarm command rejected (result %d)", response->result);
+  }
 }
 
 void BlueOSPlatform::ownStopPlatform()

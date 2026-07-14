@@ -93,6 +93,6 @@ class DronePIDController:
 
         prop_rpms = self.__mixer(thrust_des, roll_del, pitch_del, yaw_del, x_vel_del, y_vel_del)
         prop_rpms = prop_rpms.cpu()
-        prop_rpms - prop_rpms.numpy()
+        prop_rpms = prop_rpms.numpy()
 
         return prop_rpms

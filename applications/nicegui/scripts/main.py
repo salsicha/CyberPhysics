@@ -45,6 +45,8 @@ class RacecarNeoGuiNode(Node):
         super().__init__('racecarneo_nicegui')
         self.state = state
         self.bridge = CvBridge()
+        self.frame_lock = threading.Lock()
+        self.latest_frame = None
         self.nav_client = ActionClient(self, NavigateToPose, 'navigate_to_pose')
         self.create_subscription(Odometry, '/odom', self.handle_odom, 10)
         self.create_subscription(Image, '/camera/color/image_raw', self.handle_camera, 5)
@@ -59,6 +61,16 @@ class RacecarNeoGuiNode(Node):
 
     def handle_camera(self, msg: Image) -> None:
         self.state.camera_time = time.monotonic()
+        # Store the raw message; conversion and encoding happen at UI rate.
+        with self.frame_lock:
+            self.latest_frame = msg
+
+    def encode_latest_frame(self) -> None:
+        with self.frame_lock:
+            msg = self.latest_frame
+            self.latest_frame = None
+        if msg is None:
+            return
         try:
             frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
             frame = cv2.resize(frame, (480, 270), interpolation=cv2.INTER_AREA)
@@ -149,6 +161,9 @@ def index() -> None:
 
     def refresh_ui() -> None:
         now = time.monotonic()
+        node = node_holder['node']
+        if node is not None:
+            node.encode_latest_frame()
         nav_status.text = state.nav_status
         pose_label.text = f'Pose: x={state.x:.2f}, y={state.y:.2f}, yaw={state.yaw:.2f}'
         odom_ok = now - state.odom_time < 1.0

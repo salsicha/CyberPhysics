@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import json
+import threading
 import time
 from collections import deque
 from pathlib import Path
@@ -108,6 +109,8 @@ class SO101GrootBridge(Node):
         self.latest_positions = np.zeros(len(JOINT_NAMES), dtype=np.float32)
         self.joint_history = deque(maxlen=self.joint_history_size)
         self.have_joint_state = False
+        self._policy_busy = False
+        self._policy_lock = threading.Lock()
 
         self.command_pub = self.create_publisher(
             Float64MultiArray, self.get_parameter("command_topic").value, 10
@@ -159,22 +162,23 @@ class SO101GrootBridge(Node):
             self.get_logger().warn(f"Unsupported image encoding {msg.encoding}; expected rgb8/bgr8/rgba8/bgra8")
             return
         channels = 4 if msg.encoding in ("rgba8", "bgra8") else 3
-        arr = np.frombuffer(msg.data, dtype=np.uint8).reshape(msg.height, msg.step // channels, channels)
-        arr = arr[:, :msg.width, :3]
+        arr = np.frombuffer(msg.data, dtype=np.uint8).reshape(msg.height, msg.step)
+        arr = arr[:, :msg.width * channels].reshape(msg.height, msg.width, channels)
+        arr = arr[:, :, :3]
         if msg.encoding in ("bgr8", "bgra8"):
             arr = arr[:, :, ::-1]
         self.latest_image = self._resize_nearest(arr, self.image_height, self.image_width)
 
     def _depth_cb(self, msg: Image):
+        raw = np.frombuffer(msg.data, dtype=np.uint8).reshape(msg.height, msg.step)
         if msg.encoding == "32FC1":
-            depth = np.frombuffer(msg.data, dtype=np.float32).reshape(msg.height, msg.step // 4)
+            depth = np.ascontiguousarray(raw[:, :msg.width * 4]).view(np.float32)
         elif msg.encoding == "16UC1":
-            depth = np.frombuffer(msg.data, dtype=np.uint16).reshape(msg.height, msg.step // 2).astype(np.float32)
+            depth = np.ascontiguousarray(raw[:, :msg.width * 2]).view(np.uint16).astype(np.float32)
             depth *= 0.001
         else:
             self.get_logger().warn(f"Unsupported depth encoding {msg.encoding}; expected 32FC1/16UC1")
             return
-        depth = depth[:, :msg.width]
         self.latest_depth = self._resize_nearest(depth, self.image_height, self.image_width).astype(np.float32)
 
     def _camera_info_cb(self, msg: CameraInfo):
@@ -238,7 +242,7 @@ class SO101GrootBridge(Node):
             "objects": self.scenario.get("objects", []),
         }
 
-    def _extract_action(self, response) -> np.ndarray:
+    def _extract_action(self, response, positions) -> np.ndarray:
         if isinstance(response, (list, tuple)) and response:
             action = response[0]
         else:
@@ -248,21 +252,36 @@ class SO101GrootBridge(Node):
         else:
             raw = next(iter(action.values()))
         target = np.asarray(raw, dtype=np.float32).reshape(-1, len(JOINT_NAMES))[0]
-        delta = np.clip(target - self.latest_positions, -self.max_joint_step, self.max_joint_step)
-        return np.clip(self.latest_positions + delta, LOWER_LIMITS, UPPER_LIMITS)
+        delta = np.clip(target - positions, -self.max_joint_step, self.max_joint_step)
+        return np.clip(positions + delta, LOWER_LIMITS, UPPER_LIMITS)
 
     def _tick(self):
         if not self.have_joint_state:
             return
+        with self._policy_lock:
+            if self._policy_busy:
+                return
+            self._policy_busy = True
+        observation = self._observation()
+        threading.Thread(
+            target=self._policy_worker, args=(observation,), daemon=True
+        ).start()
+
+    def _policy_worker(self, observation):
         try:
-            response = self.client.get_action(self._observation())
-            target = self._extract_action(response)
+            response = self.client.get_action(observation)
+            # Clamp against where the joints are now, not a pre-request
+            # snapshot, so a slow policy round-trip cannot command a step
+            # larger than max_joint_step from the arm's actual position.
+            target = self._extract_action(response, self.latest_positions.copy())
+            msg = Float64MultiArray()
+            msg.data = target.astype(float).tolist()
+            self.command_pub.publish(msg)
         except Exception as exc:
             self.get_logger().warn(f"GR00T policy request failed: {exc}")
-            return
-        msg = Float64MultiArray()
-        msg.data = target.astype(float).tolist()
-        self.command_pub.publish(msg)
+        finally:
+            with self._policy_lock:
+                self._policy_busy = False
 
 
 def main():

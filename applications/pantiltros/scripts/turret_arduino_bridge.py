@@ -40,14 +40,29 @@ class TurretArduinoBridge(Node):
             "dry_run", env_bool("TURRET_ARDUINO_DRY_RUN", False)
         )
         self.declare_parameter("diagnostic_rate_hz", 1.0)
+        # Defaults match the turret contract in
+        # systems/turret/scenarios/warehouse_tracking.json: tilt is restricted
+        # to keep the payload clear of the base.
+        self.declare_parameter("pan_min_rad", -1.5708)
+        self.declare_parameter("pan_max_rad", 1.5708)
+        self.declare_parameter("tilt_min_rad", -0.65)
+        self.declare_parameter("tilt_max_rad", 0.75)
 
         self.serial_port = str(self.get_parameter("serial_port").value)
         self.baud_rate = int(self.get_parameter("baud_rate").value)
         self.dry_run = bool(self.get_parameter("dry_run").value)
+        self.pan_min_rad = float(self.get_parameter("pan_min_rad").value)
+        self.pan_max_rad = float(self.get_parameter("pan_max_rad").value)
+        self.tilt_min_rad = float(self.get_parameter("tilt_min_rad").value)
+        self.tilt_max_rad = float(self.get_parameter("tilt_max_rad").value)
         self.serial_handle = None
         self.last_command = JointState()
         self.last_error = ""
         self.last_write_time = time.time()
+        self.connect_settle_s = 2.0
+        self.reconnect_interval_s = 2.0
+        self.serial_ready_time = 0.0
+        self.last_connect_attempt = float("-inf")
 
         self.joint_state_pub = self.create_publisher(
             JointState, str(self.get_parameter("joint_state_topic").value), 10
@@ -79,6 +94,10 @@ class TurretArduinoBridge(Node):
             return
         if self.serial_handle and self.serial_handle.is_open:
             return
+        now = time.monotonic()
+        if now - self.last_connect_attempt < self.reconnect_interval_s:
+            return
+        self.last_connect_attempt = now
         try:
             self.serial_handle = serial.Serial(
                 self.serial_port,
@@ -86,7 +105,8 @@ class TurretArduinoBridge(Node):
                 timeout=0.05,
                 write_timeout=0.1,
             )
-            time.sleep(2.0)
+            # Non-blocking settle: skip writes until the Arduino has rebooted.
+            self.serial_ready_time = now + self.connect_settle_s
             self.last_error = ""
         except Exception as exc:  # pragma: no cover - hardware dependent.
             self.serial_handle = None
@@ -100,10 +120,16 @@ class TurretArduinoBridge(Node):
             return
 
         self.last_command = msg
+        pan = min(max(pan, self.pan_min_rad), self.pan_max_rad)
+        tilt = min(max(tilt, self.tilt_min_rad), self.tilt_max_rad)
         line = f"SET pan_joint {pan:.6f} tilt_joint {tilt:.6f}\n"
         if not self.dry_run:
             self._connect_serial()
-            if self.serial_handle and self.serial_handle.is_open:
+            if (
+                self.serial_handle
+                and self.serial_handle.is_open
+                and time.monotonic() >= self.serial_ready_time
+            ):
                 try:
                     self.serial_handle.write(line.encode("ascii"))
                     self.serial_handle.flush()
@@ -112,7 +138,7 @@ class TurretArduinoBridge(Node):
                     self.last_error = str(exc)
                     self._close_serial()
         self.last_write_time = time.time()
-        self._publish_joint_state(msg)
+        self._publish_joint_state(pan, tilt)
 
     def _joint_position(self, msg: JointState, name: str) -> Optional[float]:
         if name in msg.name:
@@ -121,14 +147,11 @@ class TurretArduinoBridge(Node):
                 return float(msg.position[index])
         return None
 
-    def _publish_joint_state(self, command: JointState) -> None:
+    def _publish_joint_state(self, pan: float, tilt: float) -> None:
         state = JointState()
         state.header.stamp = self.get_clock().now().to_msg()
         state.name = ["pan_joint", "tilt_joint"]
-        state.position = [
-            self._joint_position(command, "pan_joint") or 0.0,
-            self._joint_position(command, "tilt_joint") or 0.0,
-        ]
+        state.position = [pan, tilt]
         state.velocity = [0.0, 0.0]
         state.effort = [0.0, 0.0]
         self.joint_state_pub.publish(state)

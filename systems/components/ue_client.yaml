@@ -4,11 +4,10 @@ services:
     network_mode: "host"
     image: cyberphysics/unrealengine
     volumes:
+      - ../../applications/unrealengine/client:/scripts
       - "/tmp/.X11-unix:/tmp/.X11-unix"
     environment:
       - "DISPLAY=${DISPLAY}"
-    depends_on:
-      - roscore
     command: >
       stdbuf -o L
-      bash -c "cd /scripts/ && python3 script.py"
+      bash -c "cd /scripts/ && python3 example.py"

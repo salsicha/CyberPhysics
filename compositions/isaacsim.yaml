@@ -9,12 +9,12 @@ services:
     environment:
       - "DISPLAY=${DISPLAY}"
       - XAUTHORITY=/tmp/.XAuthority
-      - "/tmp/.X11-unix:/tmp/.X11-unix"
       - "PRIVACY_CONSENT=Y"
       - "ACCEPT_EULA=Y"
     volumes:
+      - "/tmp/.X11-unix:/tmp/.X11-unix"
       - /dev/shm:/dev/shm
-      - $XAUTHORITY:/tmp/.XAuthority
+      - ${XAUTHORITY:-/tmp/.Xauthority}:/tmp/.XAuthority:ro
       - ~/docker/isaac-sim/cache/kit:/isaac-sim/kit/cache:rw
       - ~/docker/isaac-sim/cache/ov:/root/.cache/ov:rw
       - ~/docker/isaac-sim/cache/pip:/root/.cache/pip:rw

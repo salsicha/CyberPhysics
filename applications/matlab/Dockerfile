@@ -26,7 +26,7 @@ RUN dpkg -i libc-bin_2.31-0ubuntu9.9.ubuntu.focal.custom_amd64.deb
 RUN dpkg -i libc-dev-bin_2.31-0ubuntu9.9.ubuntu.focal.custom_amd64.deb
 RUN dpkg -i libc6-dev_2.31-0ubuntu9.9.ubuntu.focal.custom_amd64.deb
 
-RUN wget -q https://www.mathworks.com/mpm/glnxa64/mpm && \ 
+RUN wget -q https://www.mathworks.com/mpm/glnxa64/mpm && \
     chmod +x mpm && \
     ./mpm install \
         --release=R2022b \
@@ -54,6 +54,6 @@ RUN chmod +x /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
 
 USER matlab
-RUN mkdir /home/matlab/
+RUN mkdir -p /home/matlab/
 WORKDIR /home/matlab/
 CMD ["matlab"]

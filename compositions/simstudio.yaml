@@ -3,10 +3,6 @@ services:
     image: cyberphysics/simstudio
     ports:
       - "3000:3000"
-    volumes:
-      - ./sim:/app
-      - /app/node_modules
-      - /app/.next
     environment:
       - NODE_ENV=development
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/simstudio
@@ -29,7 +25,7 @@ services:
     image: postgres:16
     restart: always
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres

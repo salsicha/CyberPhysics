@@ -1,2 +1,13 @@
 
 services:
+  qgroundcontrol:
+    network_mode: "host"
+    image: cyberphysics/qgroundcontrol
+    container_name: qgroundcontrol
+    volumes:
+      - "/tmp/.X11-unix:/tmp/.X11-unix"
+    environment:
+      - "DISPLAY=${DISPLAY}"
+    command: >
+      stdbuf -o L
+      bash -c "./staging/QGroundControl"

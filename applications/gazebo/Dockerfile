@@ -36,4 +36,4 @@ WORKDIR /workspace
 
 ENTRYPOINT ["/entrypoint.sh"]
 
-CMD ["gazebo"]
+CMD ["gz", "sim"]

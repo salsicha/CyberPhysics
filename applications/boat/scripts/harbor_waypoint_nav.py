@@ -8,6 +8,7 @@ import rclpy
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
+from rclpy.qos import qos_profile_sensor_data
 
 
 def clamp(value: float, lower: float, upper: float) -> float:
@@ -43,6 +44,7 @@ class HarborWaypointNav(Node):
             raise ValueError("waypoints_xy must contain x/y pairs")
         self.waypoints = list(zip(flat[0::2], flat[1::2]))
         self.index = 0
+        self.complete = False
         self.loop = bool(self.get_parameter("loop").value)
         self.acceptance_radius = float(
             self.get_parameter("acceptance_radius_m").value)
@@ -57,12 +59,16 @@ class HarborWaypointNav(Node):
             Odometry,
             str(self.get_parameter("odom_topic").value),
             self._odom,
-            10,
+            qos_profile_sensor_data,
         )
         self.get_logger().info(
             f"Harbor survey scenario loaded with {len(self.waypoints)} waypoints")
 
     def _odom(self, msg: Odometry) -> None:
+        if self.complete:
+            self.cmd_pub.publish(Twist())
+            return
+
         x = float(msg.pose.pose.position.x)
         y = float(msg.pose.pose.position.y)
         yaw = yaw_from_quaternion(msg.pose.pose.orientation)
@@ -78,6 +84,8 @@ class HarborWaypointNav(Node):
                 self.index = 0
                 self.get_logger().info("Restarting harbor survey loop")
             else:
+                self.complete = True
+                self.get_logger().info("Harbor survey complete")
                 self.cmd_pub.publish(Twist())
                 return
 

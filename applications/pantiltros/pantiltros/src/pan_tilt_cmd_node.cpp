@@ -43,14 +43,14 @@ private:
     sensor_msgs::msg::Joy::SharedPtr joy_msg_;
 
     vector<string> joint_names_;
-    unordered_map<string, vector<long int>> joint_axis_map_, joint_step_map;
+    unordered_map<string, vector<long int>> joint_axis_map_, joint_step_map_;
     unordered_map<string, bool> joint_inv_map_;
 
     void JoyCallback(const sensor_msgs::msg::Joy::SharedPtr msg) { joy_msg_ = msg; }
 
     void TimerCallback() {
         if (!joy_msg_) {
-            RCLCPP_WARN(this->get_logger(), "No joystick message received yet.");
+            RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000, "No joystick message received yet.");
             return;
         }
 
@@ -58,6 +58,19 @@ private:
         joint_cmd_msg->header.stamp = this->now();
 
         for(const auto& j : joint_names_) {
+            bool axes_in_range = true;
+            for(const auto& a : joint_axis_map_[j]) {
+                if (a < 0 || static_cast<size_t>(a) >= joy_msg_->axes.size()) { axes_in_range = false; }
+            }
+            if (!axes_in_range) {
+                // keep the joint in the message at mid position so the ctrl node
+                // still accepts the command for the joints that do have axes
+                RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000, "Joystick axis index out of range for joint %s", j.c_str());
+                joint_cmd_msg->name.push_back(j);
+                joint_cmd_msg->position.push_back(M_PI - joint_step_map_[j][0]*2*M_PI/4096.0);
+                continue;
+            }
+
             double axis_val = 0.0;
             switch(joint_axis_map_[j].size()) {
                 case 1:

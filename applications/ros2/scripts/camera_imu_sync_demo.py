@@ -41,6 +41,9 @@ def find_rotation_between_images(prev_gray, cur_gray, K, D, is_fisheye):
 
     p0 = cv2.goodFeaturesToTrack(prev_gray, maxCorners=1000, qualityLevel=0.01, minDistance=7, blockSize=7)
 
+    if p0 is None:
+        return None
+
     p1, st, err = cv2.calcOpticalFlowPyrLK(
         prev_gray,
         cur_gray,
@@ -69,12 +72,18 @@ def find_rotation_between_images(prev_gray, cur_gray, K, D, is_fisheye):
 
     # find essential matrix
     E, mask = cv2.findFundamentalMat(good_prev_norm, good_cur_norm, cv2.FM_RANSAC, 0.01)
+
+    if E is None or mask is None:
+        return None
+
     idx, _ = np.where(mask == 1)
 
     good_cur = good_cur[idx, :]
     good_prev = good_prev[idx, :]
+    good_cur_norm = good_cur_norm[idx, :]
+    good_prev_norm = good_prev_norm[idx, :]
 
-    num_inliers, R, _, _ = cv2.recoverPose(E, good_prev, good_cur, np.eye(3, 3))
+    num_inliers, R, _, _ = cv2.recoverPose(E, good_prev_norm, good_cur_norm, np.eye(3, 3))
 
     if num_inliers < 10:
         return None
@@ -114,12 +123,13 @@ def find_quadratic_peak(y0, y1, y2):
         y2: scalar
 
     Returns:
-        x: peak location, scalar between [-1, 1]
+        x: peak location, scalar between [-1, 1], or None if the
+           input does not look quadratic
     """
 
     # make sure input is quadratic looking
-    assert abs(y1) > abs(y0)
-    assert abs(y1) > abs(y2)
+    if abs(y1) <= abs(y0) or abs(y1) <= abs(y2):
+        return None
 
     # solve for ax^2 + bx + c = y
     M = np.array([
@@ -154,6 +164,9 @@ def find_shift(A, B):
 
     assert len(A) == len(B)
 
+    if A.std() == 0 or B.std() == 0:
+        return None
+
     # normalize data
     a = A - A.mean()
     a /= A.std()
@@ -170,7 +183,7 @@ def find_shift(A, B):
     shift = 0
 
     if x0 >= 0 and x2 < len(xcorr):
-        shift = -len(A) + x1
+        shift = x1 - (len(A) - 1)
 
         # refine the time shift estimate
         y0 = xcorr[x0]
@@ -178,7 +191,8 @@ def find_shift(A, B):
         y2 = xcorr[x2]
 
         delta = find_quadratic_peak(y0, y1, y2)
-        shift += delta
+        if delta is not None:
+            shift += delta
 
     return shift
 
@@ -299,7 +313,7 @@ def run_demo(bagfile):
                 cur_img_t = None
 
             # wait for at least 2 images before processing
-            if all(item is not None for item in [prev_img_t, cur_img_t, prev_gray, cur_mark2time_imu]):
+            if all(item is not None for item in [prev_img_t, cur_img_t, prev_gray, cur_mark2time_imu, avg_mark2time_timestep]):
                 ret = find_rotation_between_images(prev_gray, cur_gray, K, D, is_fisheye)
 
                 if ret is not None:
@@ -331,9 +345,10 @@ def run_demo(bagfile):
             prev_gray = cur_gray
             prev_img_t = cur_img_t
 
-            if len(img_omega) >= 2:
+            if len(img_omega) >= 2 and avg_mark2time_timestep is not None:
                 shift = find_shift(np.array(img_omega), np.array(imu_omega))
-                time_shift = shift * avg_mark2time_timestep
+                if shift is not None:
+                    time_shift = shift * avg_mark2time_timestep
 
             display_results(img_t, img_omega, imu_t, imu_omega, time_shift, count + 1, bag.get_message_count(), dbg_img)
 

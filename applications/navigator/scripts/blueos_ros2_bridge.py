@@ -45,7 +45,8 @@ class BlueOSROS2Bridge(Node):
             self.master = mavutil.mavlink_connection(connection_string)
             # Wait for a heartbeat to confirm connection
             self.get_logger().info('Waiting for heartbeat...')
-            self.master.wait_heartbeat(timeout=10)
+            if self.master.wait_heartbeat(timeout=10) is None:
+                raise TimeoutError('timed out waiting for heartbeat')
             self.get_logger().info(f'Heartbeat received from System {self.master.target_system}, Component {self.master.target_component}')
         except Exception as e:
             self.get_logger().fatal(f'Failed to connect to MAVLink: {e}')
@@ -111,8 +112,9 @@ class BlueOSROS2Bridge(Node):
         pose.header.frame_id = self.frame_id
         
         # Convert Euler (Roll, Pitch, Yaw) to Quaternion
-        # MAVLink: Roll/Pitch/Yaw in radians
-        q = self.quaternion_from_euler(msg.roll, msg.pitch, msg.yaw)
+        # MAVLink ATTITUDE is NED (yaw clockwise from north); ROS expects ENU:
+        # roll_enu = roll, pitch_enu = -pitch, yaw_enu = pi/2 - yaw
+        q = self.quaternion_from_euler(msg.roll, -msg.pitch, math.pi / 2.0 - msg.yaw)
         pose.pose.orientation.x = q[0]
         pose.pose.orientation.y = q[1]
         pose.pose.orientation.z = q[2]
@@ -126,10 +128,10 @@ class BlueOSROS2Bridge(Node):
         imu.header.frame_id = self.frame_id
         imu.orientation = pose.pose.orientation
         
-        # Angular velocities (rad/s)
+        # Angular velocities (rad/s), FRD body frame -> FLU
         imu.angular_velocity.x = msg.rollspeed
-        imu.angular_velocity.y = msg.pitchspeed
-        imu.angular_velocity.z = msg.yawspeed
+        imu.angular_velocity.y = -msg.pitchspeed
+        imu.angular_velocity.z = -msg.yawspeed
         
         # Note: Linear acceleration is not in ATTITUDE message. 
         # It is in RAW_IMU or SCALED_IMU, but those might not be streamed by default.
@@ -143,9 +145,10 @@ class BlueOSROS2Bridge(Node):
         # voltage_battery: mV, current_battery: cA, battery_remaining: %
         bat = BatteryState()
         bat.header.stamp = self.get_clock().now().to_msg()
-        bat.voltage = msg.voltage_battery / 1000.0
-        bat.current = msg.current_battery / 100.0
-        bat.percentage = float(msg.battery_remaining) / 100.0
+        # Filter invalid sentinels; unknown fields are NaN per sensor_msgs convention
+        bat.voltage = msg.voltage_battery / 1000.0 if msg.voltage_battery != 65535 else float('nan')
+        bat.current = msg.current_battery / 100.0 if msg.current_battery != -1 else float('nan')
+        bat.percentage = float(msg.battery_remaining) / 100.0 if msg.battery_remaining != -1 else float('nan')
         self.battery_pub.publish(bat)
 
     def handle_battery_status(self, msg):
@@ -234,6 +237,13 @@ class BlueOSROS2Bridge(Node):
              response.success = False
              response.message = "Request was false"
         return response
+
+    def destroy_node(self):
+        try:
+            self.master.close()
+        except Exception as e:
+            self.get_logger().warn(f'Error closing MAVLink connection: {e}')
+        return super().destroy_node()
 
     @staticmethod
     def quaternion_from_euler(roll, pitch, yaw):

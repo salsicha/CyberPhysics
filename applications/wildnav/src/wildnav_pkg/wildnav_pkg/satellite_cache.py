@@ -80,7 +80,8 @@ class SatelliteTileCache:
         stem = f'{self.zoom}_{x}_{y}'
         image_path = os.path.join(self.cache_dir, stem + '.jpg')
         feature_path = os.path.join(
-            self.cache_dir, stem + '_' + self.feature_backend.lower() + '.npz')
+            self.cache_dir,
+            f'{stem}_{self.feature_backend.lower()}_nf{self.max_features}.npz')
 
         image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
         if image is None:

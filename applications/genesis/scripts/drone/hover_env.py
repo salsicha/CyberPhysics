@@ -28,7 +28,7 @@ class HoverEnv:
         self.command_cfg = command_cfg
 
         self.obs_scales = obs_cfg["obs_scales"]
-        self.reward_scales = reward_cfg["reward_scales"]
+        self.reward_scales = dict(reward_cfg["reward_scales"])
 
         # create scene
         self.scene = gs.Scene(
@@ -129,7 +129,7 @@ class HoverEnv:
 
     def step(self, actions):
         self.actions = torch.clip(actions, -self.env_cfg["clip_actions"], self.env_cfg["clip_actions"])
-        exec_actions = self.actions
+        exec_actions = self.last_actions if self.simulate_action_latency else self.actions
 
         # 14468 is hover rpm
         self.drone.set_propellels_rpm((1 + exec_actions * 0.8) * 14468.429183500699)

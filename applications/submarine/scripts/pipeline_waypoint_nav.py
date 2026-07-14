@@ -8,6 +8,7 @@ import rclpy
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
+from rclpy.qos import qos_profile_sensor_data
 
 
 def clamp(value: float, lower: float, upper: float) -> float:
@@ -52,6 +53,7 @@ class PipelineWaypointNav(Node):
             raise ValueError("waypoints_x_y_depth must contain x/y/depth triples")
         self.waypoints = list(zip(flat[0::3], flat[1::3], flat[2::3]))
         self.index = 0
+        self.complete = False
         self.loop = bool(self.get_parameter("loop").value)
         self.acceptance_radius = float(
             self.get_parameter("acceptance_radius_m").value)
@@ -71,12 +73,16 @@ class PipelineWaypointNav(Node):
             Odometry,
             str(self.get_parameter("odom_topic").value),
             self._odom,
-            10,
+            qos_profile_sensor_data,
         )
         self.get_logger().info(
             f"Pipeline inspection scenario loaded with {len(self.waypoints)} waypoints")
 
     def _odom(self, msg: Odometry) -> None:
+        if self.complete:
+            self.cmd_pub.publish(Twist())
+            return
+
         x = float(msg.pose.pose.position.x)
         y = float(msg.pose.pose.position.y)
         depth = -float(msg.pose.pose.position.z)
@@ -95,6 +101,8 @@ class PipelineWaypointNav(Node):
                 self.index = 0
                 self.get_logger().info("Restarting pipeline inspection loop")
             else:
+                self.complete = True
+                self.get_logger().info("Pipeline inspection complete")
                 self.cmd_pub.publish(Twist())
                 return
 

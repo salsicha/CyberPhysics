@@ -78,6 +78,9 @@ def validate_urdf_alignment(urdf_path):
     missing_joints = [name for name in REQUIRED_URDF_JOINTS if name not in joints]
     if missing_joints:
         raise AssertionError(f"Missing URDF joints: {missing_joints}")
+    missing_links = [name for name in REQUIRED_COLLISION_LINKS if name not in links]
+    if missing_links:
+        raise AssertionError(f"Missing URDF links: {missing_links}")
     missing_collision = [name for name in REQUIRED_COLLISION_LINKS if links[name].find("collision") is None]
     if missing_collision:
         raise AssertionError(f"Missing collision geometry on links: {missing_collision}")

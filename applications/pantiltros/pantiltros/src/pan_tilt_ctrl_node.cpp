@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cmath>
 #include <SCServo_Linux/SCServo.h>
 
@@ -16,6 +17,8 @@ public:
         speed_        = declare_parameter<int>("speed", 4500); // steps per second
         acceleration_ = declare_parameter<int>("acceleration", 255); // 0 - 255
         stop_button_  = declare_parameter<int>("stop_button", 4); // defaults to SixAxis/SteamDeck:L1
+        min_pos_      = declare_parameter<vector<long int>>("min_pos", {1600, 1600}); // per-joint servo step limits
+        max_pos_      = declare_parameter<vector<long int>>("max_pos", {2816, 2816});
         joint_ids_    = declare_parameter<vector<long int>>("joint_ids", {1, 2});
 
         auto usb_port  = declare_parameter<string>("usb_port", "/dev/ttyACM0");
@@ -23,6 +26,11 @@ public:
 
         if (joint_ids_.size() != 2) {
             RCLCPP_ERROR(this->get_logger(), "Invalid parameter - only 2 joint IDs are supported");
+            return;
+        }
+
+        if (min_pos_.size() != joint_ids_.size() || max_pos_.size() != joint_ids_.size()) {
+            RCLCPP_ERROR(this->get_logger(), "Invalid parameter - min_pos/max_pos must have one entry per joint");
             return;
         }
 
@@ -58,7 +66,7 @@ public:
 private:
     SMS_STS st3215_;
 
-    vector<long int> joint_ids_;
+    vector<long int> joint_ids_, min_pos_, max_pos_;
     int speed_, acceleration_, stop_button_;
     bool stop_;
 
@@ -74,7 +82,13 @@ private:
     unordered_map<string, long int> joint_id_map_;
 
     void JoyCallback(const sensor_msgs::msg::Joy::SharedPtr msg) {
-        if (msg->buttons[stop_button_] && !joy_msg_->buttons[stop_button_]) { stop_ = !(stop_); }
+        if (stop_button_ < 0 || static_cast<size_t>(stop_button_) >= msg->buttons.size()) {
+            RCLCPP_WARN(this->get_logger(), "Stop button index %d out of range", stop_button_);
+            joy_msg_ = msg;
+            return;
+        }
+        bool prev_pressed = joy_msg_ && static_cast<size_t>(stop_button_) < joy_msg_->buttons.size() && joy_msg_->buttons[stop_button_];
+        if (msg->buttons[stop_button_] && !prev_pressed) { stop_ = !(stop_); }
         joy_msg_ = msg;
     }
 
@@ -85,15 +99,23 @@ private:
             RCLCPP_WARN(this->get_logger(), "No joint command received");
             return;
         }
-        else if (joint_cmd_msg_->name.size() != joint_ids_.size()) {
+        else if (joint_cmd_msg_->name.size() != joint_ids_.size() || joint_cmd_msg_->position.size() < joint_cmd_msg_->name.size()) {
             RCLCPP_WARN(this->get_logger(), "Invalid joint command received");
             return;
         }
         else {
+            // create joint state message, diagnostics message
+            auto joint_state_msg = std::make_shared<sensor_msgs::msg::JointState>();
+            joint_state_msg->header.stamp = now();
+
+            auto diagnostic_msg = std::make_shared<diagnostic_msgs::msg::DiagnosticArray>();
+            diagnostic_msg->header.stamp = now();
+
             for(size_t i = 0; i < joint_cmd_msg_->name.size(); ++i) {
                 auto j = joint_cmd_msg_->name[i];
                 auto u8_id = static_cast<uint8_t>(joint_ids_[i]);
-                auto joint_pos_cmd = static_cast<int>(round((M_PI - joint_cmd_msg_->position[i]) * 4096.0 / (2 * M_PI)))
+                auto joint_pos_cmd = static_cast<int>(round((M_PI - joint_cmd_msg_->position[i]) * 4096.0 / (2 * M_PI)));
+                joint_pos_cmd = clamp(joint_pos_cmd, static_cast<int>(min_pos_[i]), static_cast<int>(max_pos_[i]));
 
                 // write to servos
                 if (!stop_) {
@@ -116,17 +138,13 @@ private:
                     current = st3215_.ReadCurrent(u8_id)*6.5/1000; // 1 : 6.5/1000 A
                 }
 
-                // create and populate joint state message
-                auto joint_state_msg = std::make_shared<sensor_msgs::msg::JointState>();
-                joint_state_msg->header.stamp = now();
+                // populate joint state message
                 joint_state_msg->name.push_back(joint_cmd_msg_->name[i]);
                 joint_state_msg->position.push_back(position);
                 joint_state_msg->velocity.push_back(speed);
                 joint_state_msg->effort.push_back(current);
 
-                // create and populate diagnostics message
-                auto diagnostic_msg = std::make_shared<diagnostic_msgs::msg::DiagnosticArray>();
-                diagnostic_msg->header.stamp = now();
+                // populate diagnostics message
                 diagnostic_msg->status.emplace_back();
                 diagnostic_msg->status[i].name = j;
                 diagnostic_msg->status[i].hardware_id = to_string(u8_id);

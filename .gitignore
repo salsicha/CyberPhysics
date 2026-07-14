@@ -2,11 +2,16 @@
 .env
 my_store.db
 .ipynb_checkpoints
-.pyc
-__pycache__
+*.pyc
+__pycache__/
 .DS_Store
 
 generated/
 cache/
+
+build/
+install/
+log/
+CMakeFiles/
 
 graphify-out/

@@ -46,7 +46,7 @@ class DroneController:
 
         # Deceleration (Left Shift) - All rotors spin slower
         if keyboard.Key.shift in self.pressed_keys:
-            self.thrust -= self.thrust_delta
+            self.thrust = max(0, self.thrust - self.thrust_delta)
             self.rpms = [self.thrust] * 4
             print("Decelerating")
 

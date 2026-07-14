@@ -1,5 +1,5 @@
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchParameter
+from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
@@ -10,17 +10,17 @@ def generate_launch_description():
     output_topic = LaunchConfiguration('output_topic')
 
     return LaunchDescription([
-        DeclareLaunchParameter(
+        DeclareLaunchArgument(
             'use_sim_time',
             default_value='false',
             description='Use simulation (Gazebo) clock if true'),
             
-        DeclareLaunchParameter(
+        DeclareLaunchArgument(
             'input_topic',
             default_value='/camera/depth/color/points',
             description='Input point cloud topic to filter'),
 
-        DeclareLaunchParameter(
+        DeclareLaunchArgument(
             'output_topic',
             default_value='/camera/depth/color/points_filtered',
             description='Output filtered point cloud topic'),

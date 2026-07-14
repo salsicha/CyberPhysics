@@ -13,6 +13,7 @@ services:
     privileged: true
     image: cyberphysics/realsense:${CYBERPHYSICS_TAG:-latest}
     container_name: so101_depth_camera
+    restart: unless-stopped
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
       - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
@@ -36,6 +37,7 @@ services:
     container_name: so101_hardware_groot_policy
     network_mode: host
     ipc: host
+    restart: unless-stopped
     environment:
       - HF_HOME=/workspace/cache/huggingface
       - TORCH_HOME=/workspace/cache/torch
@@ -57,6 +59,7 @@ services:
     image: cyberphysics/so101:${CYBERPHYSICS_TAG:-latest}
     container_name: so101_hardware_groot_bridge
     network_mode: host
+    restart: unless-stopped
     depends_on:
       - so101_depth_camera
       - groot_policy
@@ -70,11 +73,14 @@ services:
         --ros-args
         --params-file /workspace/systems/so101/config/groot_demo.yaml
         -p camera_topic:=${SO101_CAMERA_TOPIC:-/so101/depth_camera/color/image_raw}
+        -p depth_topic:=${SO101_DEPTH_TOPIC:-/so101/depth_camera/depth/image_rect_raw}
+        -p camera_info_topic:=${SO101_CAMERA_INFO_TOPIC:-/so101/depth_camera/color/camera_info}
 
   so101_foxglove_bridge:
     network_mode: host
     image: cyberphysics/ros2:${CYBERPHYSICS_TAG:-latest}
     container_name: so101_foxglove_bridge
+    restart: unless-stopped
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
     volumes:

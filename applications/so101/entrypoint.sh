@@ -9,10 +9,10 @@ for vendor_prefix in "/opt/ros/${ROS_DISTRO:-jazzy}"/opt/*; do
         PATH="$vendor_prefix/bin:$PATH"
     fi
     if [ -d "$vendor_prefix/lib" ]; then
-        LD_LIBRARY_PATH="$vendor_prefix/lib:${LD_LIBRARY_PATH:-}"
+        LD_LIBRARY_PATH="$vendor_prefix/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
     fi
     if [ -d "$vendor_prefix/lib64" ]; then
-        LD_LIBRARY_PATH="$vendor_prefix/lib64:${LD_LIBRARY_PATH:-}"
+        LD_LIBRARY_PATH="$vendor_prefix/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
     fi
     if [ -d "$vendor_prefix/share/gz" ]; then
         GZ_CONFIG_PATH="$vendor_prefix/share/gz:${GZ_CONFIG_PATH:-}"

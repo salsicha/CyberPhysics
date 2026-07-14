@@ -17,7 +17,7 @@ if [ ! -z "$TARGET" ]; then
     # User specified target
     target="${NAMESPACE}/${TARGET}:${tag}"
 else
-    if [ ${PLATFORM} == "arm64" ]; then
+    if [ "${PLATFORM:-amd64}" = "arm64" ]; then
         tag=arm64
     fi
 
@@ -40,7 +40,7 @@ while [ $# -gt 0 ]; do
     --git)
       GIT_COMMIT=$(git rev-parse HEAD)
       GIT_BRANCH=$(git branch --show-current)
-      GIT_TAG=$(git describe --tag)
+      GIT_TAG=$(git describe --tags --always)
       build_cmd="${build_cmd} --build-arg GIT_COMMIT=$GIT_COMMIT --build-arg GIT_BRANCH=$GIT_BRANCH --build-arg GIT_TAG=$GIT_TAG"
       ;;
   esac

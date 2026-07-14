@@ -11,13 +11,10 @@ services:
     container_name: lunar_rover_spaceros
     network_mode: host
     ipc: host
-    privileged: true
     restart: unless-stopped
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
       - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
-    devices:
-      - /dev:/dev
     volumes:
       - ../systems/lunar_rover/config:/workspace/config:ro
       - /dev/shm:/dev/shm

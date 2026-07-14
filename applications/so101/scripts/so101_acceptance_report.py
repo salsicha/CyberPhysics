@@ -43,7 +43,10 @@ def load_runs(paths):
 def run_success(run):
     if "success" in run:
         return bool(run["success"])
-    return all(run.get("checks", {}).values())
+    checks = run.get("checks")
+    if not checks:
+        return False
+    return all(checks.values())
 
 
 def run_group(run):

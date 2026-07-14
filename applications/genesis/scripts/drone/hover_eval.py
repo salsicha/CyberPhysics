@@ -19,7 +19,8 @@ def main():
     gs.init()
 
     log_dir = f"logs/{args.exp_name}"
-    env_cfg, obs_cfg, reward_cfg, command_cfg, train_cfg = pickle.load(open(f"logs/{args.exp_name}/cfgs.pkl", "rb"))
+    with open(f"logs/{args.exp_name}/cfgs.pkl", "rb") as f:
+        env_cfg, obs_cfg, reward_cfg, command_cfg, train_cfg = pickle.load(f)
     reward_cfg["reward_scales"] = {}
 
     # visualize the target
@@ -45,7 +46,7 @@ def main():
 
     obs, _ = env.reset()
 
-    max_sim_step = int(env_cfg["episode_length_s"] * env_cfg["max_visualize_FPS"])
+    max_sim_step = int(env_cfg["episode_length_s"] / env.dt)
     with torch.no_grad():
         if args.record:
             env.cam.start_recording()

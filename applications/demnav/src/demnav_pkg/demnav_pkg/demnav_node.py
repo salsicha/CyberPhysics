@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import math
+import threading
 import numpy as np
 import cv2
 import rclpy
@@ -91,10 +92,9 @@ class DemNavNode(Node):
         self.camera_info  = None
         self.yaw_rad      = 0.0
         self.heightmap    = None
+        self._heightmap_thread = None
 
         if initial_lat != 0.0 or initial_lon != 0.0:
-            self.get_logger().info(
-                f'Pre-loading height map at ({initial_lat:.5f}, {initial_lon:.5f}) ...')
             self._load_heightmap(initial_lat, initial_lon)
         else:
             self.get_logger().warn(
@@ -130,27 +130,38 @@ class DemNavNode(Node):
             f'DemNav ready | gps={gps_topic} depth={depth_topic} out={output_topic}')
 
     def _load_heightmap(self, lat: float, lon: float):
+        if (self._heightmap_thread is not None and
+                self._heightmap_thread.is_alive()):
+            return
+        self.get_logger().info(
+            f'Loading height map at ({lat:.5f}, {lon:.5f}) in the background ...')
+        self._heightmap_thread = threading.Thread(
+            target=self._build_heightmap, args=(lat, lon), daemon=True)
+        self._heightmap_thread.start()
+
+    def _build_heightmap(self, lat: float, lon: float):
         try:
-            self.heightmap = HeightMapCache(
+            heightmap = HeightMapCache(
                 lat, lon,
                 self.get_parameter('area_km').value,
                 self.get_parameter('dem_resolution_m').value,
                 self.get_parameter('cache_dir').value,
                 self.synthetic_terrain)
-            self.get_logger().info('Height map ready.')
         except Exception as e:
             self.get_logger().error(f'Failed to load height map: {e}')
+            return
+        self.heightmap = heightmap
+        self.get_logger().info('Height map ready.')
 
     def _on_fix(self, msg: NavSatFix):
+        if msg.status.status < NavSatStatus.STATUS_FIX:
+            return
         self.latest_fix = msg
         if self.origin_lat == 0.0 and self.origin_lon == 0.0:
             self.origin_lat = msg.latitude
             self.origin_lon = msg.longitude
             self.origin_alt = msg.altitude
         if self.heightmap is None:
-            self.get_logger().info(
-                f'First GPS fix — loading height map at '
-                f'({msg.latitude:.5f}, {msg.longitude:.5f})')
             self._load_heightmap(msg.latitude, msg.longitude)
 
     def _on_odom(self, msg: Odometry):
@@ -162,9 +173,6 @@ class DemNavNode(Node):
 
     def _on_depth(self, msg: Image):
         if self.latest_fix is None or self.heightmap is None:
-            self._publish_valid(False)
-            return
-        if self.latest_fix.status.status < NavSatStatus.STATUS_FIX:
             self._publish_valid(False)
             return
         try:
@@ -200,6 +208,11 @@ class DemNavNode(Node):
             M, (img_w, img_h),
             borderMode=cv2.BORDER_CONSTANT,
             borderValue=fill_value)
+        valid_aligned = cv2.warpAffine(
+            finite.astype(np.float32),
+            M, (img_w, img_h),
+            borderMode=cv2.BORDER_CONSTANT,
+            borderValue=0.0)
 
         # Normalise (zero mean, unit variance)
         d = depth_aligned
@@ -209,8 +222,18 @@ class DemNavNode(Node):
             return
         d = (d - d.mean()) / std
 
+        # Get DEM search patch
+        search_m = self.search_radius_m * 2.0
+        dem_patch, dem_res, (center_row, center_col) = self.heightmap.get_patch(
+            lat, lon, search_m, search_m)
+        if dem_patch.size == 0:
+            self._publish_valid(False)
+            return
+
         # Ground sampling distance → resample depth to DEM pixel scale
-        ground_width_m = 2.0 * alt * math.tan(math.radians(self.fov_deg / 2.0))
+        ground_elevation = float(dem_patch[center_row, center_col])
+        agl = max(alt - ground_elevation, 1.0)
+        ground_width_m = 2.0 * agl * math.tan(math.radians(self.fov_deg / 2.0))
         gsd = ground_width_m / img_w
         scale = gsd / self.heightmap.resolution_m
         new_w = max(3, int(img_w * scale))
@@ -224,10 +247,9 @@ class DemNavNode(Node):
         depth_tmpl = cv2.resize(d, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
         relative_tmpl = cv2.resize(
             depth_aligned, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
-
-        # Get DEM search patch
-        search_m = self.search_radius_m * 2.0
-        dem_patch, dem_res = self.heightmap.get_patch(lat, lon, search_m, search_m)
+        valid_tmpl = cv2.resize(
+            valid_aligned, (new_w, new_h),
+            interpolation=cv2.INTER_LINEAR) > 0.99
 
         if (dem_patch.shape[0] < depth_tmpl.shape[0] + 2 or
                 dem_patch.shape[1] < depth_tmpl.shape[1] + 2):
@@ -261,8 +283,8 @@ class DemNavNode(Node):
         # Centre of the best-match window relative to DEM patch centre
         match_col = max_loc[0] + depth_tmpl.shape[1] // 2
         match_row = max_loc[1] + depth_tmpl.shape[0] // 2
-        offset_col = match_col - dem_patch.shape[1] // 2
-        offset_row = match_row - dem_patch.shape[0] // 2
+        offset_col = match_col - center_col
+        offset_row = match_row - center_row
 
         offset_east_m  =  offset_col * dem_res
         offset_north_m = -offset_row * dem_res  # rows increase southward
@@ -278,7 +300,7 @@ class DemNavNode(Node):
             max_loc[0]:max_loc[0] + depth_tmpl.shape[1]]
         target_range = alt - matched_dem
         fit_mask = (
-            np.isfinite(relative_tmpl) &
+            valid_tmpl &
             np.isfinite(target_range) &
             (target_range > self.min_metric_depth) &
             (target_range < self.max_metric_depth))

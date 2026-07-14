@@ -3,7 +3,10 @@
 import argparse
 import os
 import json
+import re
+import shlex
 import shutil
+import signal
 import subprocess
 from datetime import datetime
 
@@ -53,8 +56,13 @@ class RosbagRecord(Node):
         self.timer = self.create_timer(1, self.publish_disk_space)
 
     def publish_disk_space(self):
-        path = "/data"
-        stat = shutil.disk_usage(path)
+        path = self.root_folder or "/data"
+        try:
+            stat = shutil.disk_usage(path)
+        except OSError as err:
+            self.get_logger().warning(f"Could not read disk usage for {path}: {err}",
+                                      throttle_duration_sec=60)
+            return
         disk_usage_data = str(round((stat.used/stat.total)*100, 1))
         disk_avail_data = str(round(stat.free/1000000000, 1)) + "G"
         msg = disk_usage_data + "," + disk_avail_data
@@ -84,10 +92,12 @@ class RosbagRecord(Node):
         # Linux shutdown command
         os.system("shutdown -h now")
 
+        return response
+
     def backend_status_response(self, request, response):
         record_check = "false"
 
-        list_cmd = subprocess.Popen("source /entrypoint.sh && ros2 node list", shell=True, stdout=subprocess.PIPE, universal_newlines=True)
+        list_cmd = subprocess.Popen("source /entrypoint.sh && ros2 node list", shell=True, executable='/bin/bash', stdout=subprocess.PIPE, universal_newlines=True)
         list_output = list_cmd.stdout.read()
         retcode = list_cmd.wait()
 
@@ -103,6 +113,12 @@ class RosbagRecord(Node):
         return response
 
     def start_recording(self, request, response):
+        if any(p is not None and p.poll() is None
+               for p in (getattr(self, 'p1', None), getattr(self, 'p2', None))):
+            response.success = False
+            response.message = "Recording already in progress, stop it first."
+            return response
+
         # House keeping. Clean up any zombies from the shared memory.
         os.system("fastdds shm clean")
 
@@ -115,65 +131,85 @@ class RosbagRecord(Node):
                                           RECORDING.format(num=self.recording_count))
 
         try:
-            os.makedirs(self.save_location)
-        except FileExistsError as err:
+            os.makedirs(self.save_location, exist_ok=True)
+        except OSError as err:
             response.success = False
             response.message = str(err)
 
             return response
 
-        command = f"chmod -R ugo+rwx {self.root_folder}"
-        subprocess.Popen(command, stdin=subprocess.PIPE, shell=True, executable='/bin/bash')
+        subprocess.Popen(["chmod", "-R", "ugo+rwx", self.root_folder])
         self.get_logger().info("Save_location: " + self.save_location)
 
         if self.recording_count == 0:
             self.save_config_files()
         self.recording_count += 1
 
-        topics_excluded = os.path.expandvars("$TOPICS_EXCLUDED")
-        if len(topics_excluded) > 2:
-            # Remove any extra start and end quote
-            if topics_excluded[0] == '"' and topics_excluded[-1] == '"':
-                topics_excluded = topics_excluded[1:-1]
+        # Compose files set TOPICS_EXCLUDED="-x '...'" so the value arrives
+        # wrapped in literal double quotes; strip that one pair, then let
+        # shlex tokenize and re-quote each token shell-safely.
+        topics_excluded = os.environ.get("TOPICS_EXCLUDED", "")
+        if len(topics_excluded) >= 2 and topics_excluded[0] == '"' and topics_excluded[-1] == '"':
+            topics_excluded = topics_excluded[1:-1]
+        topics_excluded = ' '.join(shlex.quote(token) for token in shlex.split(topics_excluded))
 
         whole_bagfile = os.path.join(self.save_location, BAGFILE_NAME.format(type=WHOLE, datetime=date_time))
         command1 = f"source /entrypoint.sh && ros2 bag record --include-hidden-topics -a " \
-                   f"-o {whole_bagfile} -b {MAX_BAG_SIZE} -d {MAX_BAG_DURATION} {topics_excluded}"
+                   f"-o {shlex.quote(whole_bagfile)} -b {MAX_BAG_SIZE} -d {MAX_BAG_DURATION} {topics_excluded}"
         self.get_logger().info(f"command1: {command1}")
 
         skim_bagfile = os.path.join(self.save_location, BAGFILE_NAME.format(type=SKIM, datetime=date_time))
         command2 = f"source /entrypoint.sh && ros2 bag record " \
-                   f"-a -o {skim_bagfile} -b {MAX_BAG_SIZE} -d {MAX_BAG_DURATION} -x '(.*)(image|camera)'"
+                   f"-a -o {shlex.quote(skim_bagfile)} -b {MAX_BAG_SIZE} -d {MAX_BAG_DURATION} -x '(.*)(image|camera)'"
         self.get_logger().info(f"command2: {command2}")
 
-        self.p1 = subprocess.Popen(command1, stdin=subprocess.PIPE, shell=True, executable='/bin/bash') # rosbag containing all topics
-        self.p2 = subprocess.Popen(command2, stdin=subprocess.PIPE, shell=True, executable='/bin/bash') # rosbag containing only Nav topics
+        self.p1 = subprocess.Popen(command1, stdin=subprocess.PIPE, shell=True, executable='/bin/bash', start_new_session=True) # rosbag containing all topics
+        self.p2 = subprocess.Popen(command2, stdin=subprocess.PIPE, shell=True, executable='/bin/bash', start_new_session=True) # rosbag containing only Nav topics
 
         response.success = True
         response.message = whole_bagfile
 
         return response
 
+    def stop_process_group(self, p):
+        if p is None or p.poll() is not None:
+            return
+        try:
+            pgid = os.getpgid(p.pid)
+        except ProcessLookupError:
+            return
+        # SIGINT the whole group so ros2 bag record finalizes the bag cleanly.
+        for sig, timeout in ((signal.SIGINT, 15), (signal.SIGTERM, 5)):
+            try:
+                os.killpg(pgid, sig)
+            except ProcessLookupError:
+                return
+            try:
+                p.wait(timeout=timeout)
+                return
+            except subprocess.TimeoutExpired:
+                continue
+        try:
+            os.killpg(pgid, signal.SIGKILL)
+        except ProcessLookupError:
+            return
+        p.wait()
+
     def stop_recording(self, request, response):
         self.get_logger().info("Stopping recording...")
-        try:
-            if hasattr(self, 'p1') and self.p1 and self.p1.poll() is None:
-                self.p1.terminate()
-                self.p2.terminate()
+        p1 = getattr(self, 'p1', None)
+        p2 = getattr(self, 'p2', None)
+        if any(p is not None and p.poll() is None for p in (p1, p2)):
+            self.stop_process_group(p1)
+            self.stop_process_group(p2)
 
-                self.p1.wait()
-                self.p2.wait()
+            self.save_pilot_notes_to_file()
 
-                self.save_pilot_notes_to_file()
-
-                response.message = "Recording stopped!"
-                response.success = True
-            else:
-                response.message = "No active recording to stop."
-                response.success = False
-        except AttributeError as e:
+            response.message = "Recording stopped!"
+            response.success = True
+        else:
+            response.message = "No active recording to stop."
             response.success = False
-            response.message = f"Error: {e}"
 
         # flush files to disk
         os.system("sync")
@@ -197,7 +233,13 @@ class RosbagRecord(Node):
         self.pilot_notes = data.data
 
     def flight_number_callback(self, data):
-        self.flight_number = data.data
+        flight_number = re.sub(r'[^A-Za-z0-9_-]', '', data.data)
+        if not flight_number:
+            self.get_logger().warning(f"Rejected invalid flight number: {data.data!r}")
+            return
+        if flight_number != data.data:
+            self.get_logger().warning(f"Sanitized flight number {data.data!r} to {flight_number!r}")
+        self.flight_number = flight_number
         self.get_logger().info(f"flight_number_callback: {data}")
 
     def save_config_files(self):
@@ -206,9 +248,9 @@ class RosbagRecord(Node):
 
     def save_run_logs(self):
         log_dict = {
-            'git_commit': os.environ['GIT_COMMIT'],
-            'git_branch': os.environ['GIT_BRANCH'],
-            'git_tag': os.environ['GIT_TAG'],
+            'git_commit': os.environ.get('GIT_COMMIT', 'unknown'),
+            'git_branch': os.environ.get('GIT_BRANCH', 'unknown'),
+            'git_tag': os.environ.get('GIT_TAG', 'unknown'),
             'flight_id': self.flight_number,
             'system_id': self.proj_name
         }

@@ -19,7 +19,7 @@ SHELL ["/bin/bash","-c"]
 RUN apt update && apt install -q -y --no-install-recommends \
     curl gnupg2 lsb-release python3-pip python3-venv && \
     rm -rf /var/lib/apt/lists/*
-RUN curl --insecure -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key  -o /usr/share/keyrings/ros-archive-keyring.gpg
+RUN curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key  -o /usr/share/keyrings/ros-archive-keyring.gpg
 RUN echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/ros2.list > /dev/null
 
 # Install ROS2 packages
@@ -36,7 +36,7 @@ RUN apt update && apt install -q -y --no-install-recommends \
 
 RUN python3 -m venv /venv
 # EM is preventing msgs from building...
-RUN pip3 uninstall em
+RUN pip3 uninstall -y em
 RUN pip3 install rosdep colcon-common-extensions pytest-rerunfailures numpy lark empy==3.3.4 pymongo psutil pillow tornado
 
 WORKDIR /workspace

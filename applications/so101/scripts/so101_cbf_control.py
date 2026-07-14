@@ -19,7 +19,7 @@ class SO101CBFController(Node):
         self.declare_parameter("goal", [0.0] * len(JOINT_NAMES))
 
         self.kp = float(self.get_parameter("kp").value)
-        self.rate = float(self.get_parameter("control_rate").value)
+        self.rate = max(1e-3, float(self.get_parameter("control_rate").value))
         self.margin = float(self.get_parameter("safety_margin").value)
         self.q_des = np.asarray(self.get_parameter("goal").value, dtype=float)
         if self.q_des.shape != (len(JOINT_NAMES),):

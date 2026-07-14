@@ -10,8 +10,8 @@ import rclpy
 import torch
 from cv_bridge import CvBridge
 from rclpy.node import Node
-from sensor_msgs.msg import CameraInfo, Image, PointCloud2
-from sensor_msgs_py import point_cloud2
+from rclpy.qos import qos_profile_sensor_data
+from sensor_msgs.msg import CameraInfo, Image, PointCloud2, PointField
 from std_msgs.msg import Header
 
 # Put metric_depth first so DepthAnythingV2 resolves to the metric model implementation.
@@ -90,8 +90,11 @@ class DepthAnythingNode(Node):
         self.bridge = CvBridge()
         self.depth_pub = self.create_publisher(Image, depth_topic, 10)
         self.pointcloud_pub = self.create_publisher(PointCloud2, pointcloud_topic, 10)
-        self.create_subscription(Image, image_topic, self.image_callback, 10)
-        self.create_subscription(CameraInfo, camera_info_topic, self.camera_info_callback, 10)
+        self.create_subscription(
+            Image, image_topic, self.image_callback, qos_profile_sensor_data)
+        self.create_subscription(
+            CameraInfo, camera_info_topic, self.camera_info_callback,
+            qos_profile_sensor_data)
 
         self.get_logger().info(
             f'Subscribed to {image_topic} and {camera_info_topic}; publishing depth to {depth_topic}'
@@ -113,8 +116,10 @@ class DepthAnythingNode(Node):
             depth = self.model.infer_image(cv_image)
 
         depth = np.asarray(depth, dtype=np.float32)
-        depth[~np.isfinite(depth)] = 0.0
-        depth[(depth < self.min_depth) | (depth > self.max_depth)] = 0.0
+        depth[
+            (~np.isfinite(depth)) |
+            (depth < self.min_depth) |
+            (depth > self.max_depth)] = np.nan
 
         depth_msg = self.bridge.cv2_to_imgmsg(depth, encoding='32FC1')
         depth_msg.header = msg.header
@@ -128,16 +133,32 @@ class DepthAnythingNode(Node):
         cx, cy = float(info.k[2]), float(info.k[5])
         if fx == 0.0 or fy == 0.0:
             self.get_logger().warn('CameraInfo has zero focal length; skipping point cloud projection')
-            return point_cloud2.create_cloud_xyz32(header, [])
+            points = np.empty((0, 3), dtype=np.float32)
+        else:
+            ys, xs = np.mgrid[0:depth.shape[0]:self.pointcloud_stride, 0:depth.shape[1]:self.pointcloud_stride]
+            zs = depth[ys, xs]
+            # image_callback already NaN-masked out-of-range depths.
+            valid = np.isfinite(zs)
+            xs = xs[valid].astype(np.float32)
+            ys = ys[valid].astype(np.float32)
+            zs = zs[valid].astype(np.float32)
+            points = np.column_stack(((xs - cx) * zs / fx, (ys - cy) * zs / fy, zs))
 
-        ys, xs = np.mgrid[0:depth.shape[0]:self.pointcloud_stride, 0:depth.shape[1]:self.pointcloud_stride]
-        zs = depth[ys, xs]
-        valid = np.isfinite(zs) & (zs > self.min_depth) & (zs <= self.max_depth)
-        xs = xs[valid].astype(np.float32)
-        ys = ys[valid].astype(np.float32)
-        zs = zs[valid].astype(np.float32)
-        points = np.column_stack(((xs - cx) * zs / fx, (ys - cy) * zs / fy, zs))
-        return point_cloud2.create_cloud_xyz32(header, points.tolist())
+        cloud = PointCloud2()
+        cloud.header = header
+        cloud.height = 1
+        cloud.width = points.shape[0]
+        cloud.fields = [
+            PointField(name='x', offset=0, datatype=PointField.FLOAT32, count=1),
+            PointField(name='y', offset=4, datatype=PointField.FLOAT32, count=1),
+            PointField(name='z', offset=8, datatype=PointField.FLOAT32, count=1),
+        ]
+        cloud.is_bigendian = False
+        cloud.point_step = 12
+        cloud.row_step = cloud.point_step * cloud.width
+        cloud.is_dense = True  # invalid points are filtered out above
+        cloud.data = points.astype(np.float32, copy=False).tobytes()
+        return cloud
 
 
 def main(args=None):

@@ -120,7 +120,9 @@ def create_rendered_camera(camera_config):
     camera.initialize()
     if hasattr(camera, "set_horizontal_aperture"):
         # Keep the camera close to the RealSense D435i/D405 tabletop FOV.
-        camera.set_horizontal_aperture(float(camera_config.get("horizontal_fov_deg", 69.0)))
+        fov_deg = float(camera_config.get("horizontal_fov_deg", 69.0))
+        aperture = 2.0 * camera.get_focal_length() * np.tan(np.radians(fov_deg) / 2.0)
+        camera.set_horizontal_aperture(float(aperture))
     if hasattr(camera, "add_distance_to_image_plane_to_frame"):
         camera.add_distance_to_image_plane_to_frame()
     elif hasattr(camera, "add_distance_to_camera_to_frame"):

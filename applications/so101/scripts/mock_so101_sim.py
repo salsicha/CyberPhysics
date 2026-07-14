@@ -78,9 +78,8 @@ class MockSO101Sim(Node):
             self.static_tf = StaticTransformBroadcaster(self)
             self.static_tf.sendTransform(self._static_transforms())
 
-        self.timer = self.create_timer(
-            1.0 / float(self.get_parameter("rate_hz").value), self._tick
-        )
+        rate_hz = max(1e-3, float(self.get_parameter("rate_hz").value))
+        self.timer = self.create_timer(1.0 / rate_hz, self._tick)
 
     def _command(self, msg):
         if len(msg.data) != len(JOINT_NAMES):

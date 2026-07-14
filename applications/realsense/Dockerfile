@@ -27,4 +27,4 @@ ENV LANGUAGE=en_US.UTF-8 \
 COPY --from=build / /
 
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["ros2 launch realsense2_camera rs_launch.py"]
+CMD ["ros2", "launch", "realsense2_camera", "rs_launch.py"]

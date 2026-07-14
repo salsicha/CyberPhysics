@@ -43,39 +43,43 @@ build_depthanything: cleanup build_ros2
 	APP=depthanything ./_build_it.sh
 build_gazebo: cleanup build_ros2
 	APP=gazebo ./_build_it.sh
-build_genesis: cleanup
+build_genesis: cleanup build_aerostack2
 	APP=genesis ./_build_it.sh
 build_groot: cleanup
 	APP=groot ./_build_it.sh
-build_isaacsim: cleanup
-	APP=isaacsim ./_build_it.sh
 build_demnav: cleanup build_aerostack2
 	APP=demnav ./_build_it.sh
-build_matlab: cleanup
+build_matlab: cleanup build_ros2
 	APP=matlab ./_build_it.sh
 build_marimo: cleanup
 	APP=marimo ./_build_it.sh
 build_navigation2: cleanup build_ros2
 	APP=navigation2 ./_build_it.sh
+build_navigator: cleanup
+	APP=navigator ./_build_it.sh
 build_nicegui: cleanup build_ros2
 	APP=nicegui ./_build_it.sh
 build_nvblox: cleanup build_ros2
 	APP=nvblox ./_build_it.sh
 build_oak1: cleanup build_aerostack2
 	APP=oak1 ./_build_it.sh
+build_pantiltros: cleanup
+	APP=pantiltros ./_build_it.sh
 build_pysimcoder: cleanup
 	APP=pysimcoder ./_build_it.sh
-build_qgroundcontrol: cleanup
+build_qgroundcontrol: cleanup build_ros2
 	APP=qgroundcontrol ./_build_it.sh
 build_rai: cleanup
 	APP=rai ./_build_it.sh
-build_realsense: cleanup
+build_rangefinder: cleanup build_ros2
+	APP=rangefinder ./_build_it.sh
+build_realsense: cleanup build_ros2
 	APP=realsense ./_build_it.sh
 build_racecarneo: cleanup build_ros2
 	APP=racecarneo ./_build_it.sh
 build_record: cleanup build_ros2
 	APP=record ./_build_it.sh
-build_roboticstoolbox: cleanup
+build_roboticstoolbox: cleanup build_ros2
 	APP=roboticstoolbox ./_build_it.sh
 build_ros2: cleanup
 	APP=ros2 ./_build_it.sh
@@ -89,18 +93,16 @@ build_submarine: cleanup build_aerostack2
 	APP=submarine ./_build_it.sh
 build_tello: cleanup build_ros2
 	APP=tello ./_build_it.sh
-build_unrealengine: cleanup
+build_unrealengine: cleanup build_ros2
 	APP=unrealengine ./_build_it.sh
-build_vinsmono: cleanup
+build_vinsmono: cleanup build_ros2
 	APP=vinsmono ./_build_it.sh
-build_whereami: cleanup
-	APP=whereami ./_build_it.sh
 build_wildnav: cleanup build_aerostack2
 	APP=wildnav ./_build_it.sh
 
 # Run rviz in ROS2 container with native display mounting
 run_ros2:
-	xhost +
+	xhost +local:docker
 	docker run -it --rm \
 	--gpus=all \
 	--privileged \

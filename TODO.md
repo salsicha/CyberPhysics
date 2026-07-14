@@ -223,7 +223,7 @@ view.
    - Use `applications/pantiltros` as the starting control stack and preserve
      its `pan_joint` and `tilt_joint` names, ST3215 servo assumptions, joystick
      emergency-stop behavior, and measured joint-state/diagnostics feedback.
-   - Track the hardware definition in `hardware/turret/README.md`, including
+   - Track the hardware definition in `hardware/turret.md`, including
      camera, servo bus, power, emergency stop, and ROS topic expectations.
    - Standardize simulated topics for `/turret/camera/image_raw`,
      `/turret/camera/camera_info`, segmentation outputs, target lock state,

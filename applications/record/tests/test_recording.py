@@ -10,17 +10,12 @@ import pytest
 import rclpy
 import time
 import rosbags
-import yaml
-import argparse
 import os
-import io
-import psutil
 
 from glob import glob
 from pathlib import Path
-from sensor_msgs.msg import Image, CameraInfo
-from std_msgs.msg import Int32, String
-from std_srvs.srv import Trigger, SetBool
+from std_msgs.msg import String
+from std_srvs.srv import Trigger
 from rclpy.node import Node
 from rcl_interfaces.srv import GetParameters
 from rosbags.highlevel import AnyReader
@@ -65,7 +60,9 @@ def check_topic_and_rate(bag_path, topic_rate_tol):
 
         for x in reader.connections:
             if x.topic in topic_rate_tol:
+                assert x.topic in start and x.topic in end, f"topic {x.topic} had <2 messages"
                 duration = (end[x.topic] - start[x.topic])*1e-9
+                assert duration > 0, f"topic {x.topic} messages span zero duration"
                 actual_rate = x.msgcount / duration
                 expected_rate, tol = topic_rate_tol[x.topic]
 

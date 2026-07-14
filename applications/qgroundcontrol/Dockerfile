@@ -1,6 +1,6 @@
 ## QGroundControl
 
-FROM cyberphysics/ros2:latest
+FROM cyberphysics/ros2:latest AS build
 
 ARG QT_VERSION=5.15.2
 
@@ -16,7 +16,7 @@ ENV QT_DESKTOP $QT_PATH/${QT_VERSION}/gcc_64
 ENV PATH /usr/lib/ccache:$QT_DESKTOP/bin:$PATH
 
 # COPY qgroundcontrol /qgroundcontrol
-RUN curl -L -k -o /master.zip https://github.com/mavlink/qgroundcontrol/archive/refs/heads/master.zip && \
+RUN curl -L -o /master.zip https://github.com/mavlink/qgroundcontrol/archive/refs/heads/master.zip && \
     unzip /master.zip && rm /master.zip && mv /qgroundcontrol-master/ /qgroundcontrol
 RUN chmod +rwx /qgroundcontrol
 
@@ -65,7 +65,7 @@ RUN apt-get update && apt-get -y --quiet --no-install-recommends install \
 		ros-humble-mavros-msgs \
 	&& apt-get -y autoremove \
 	&& apt-get clean autoclean \
-	&& rm -rf /var/lib/apt/lists/{apt,dpkg,cache,log} /tmp/* /var/tmp/*
+	&& rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 RUN wget https://raw.githubusercontent.com/mavlink/mavros/master/mavros/scripts/install_geographiclib_datasets.sh
 RUN chmod +x /install_geographiclib_datasets.sh
@@ -113,6 +113,8 @@ ENV LANG=en_US.UTF-8 \
     PATH="/venv/bin:$PATH"
 
 COPY --from=build / /
+
+WORKDIR /qgroundcontrol/build
 
 ENTRYPOINT [ "/entrypoint.sh" ]
 

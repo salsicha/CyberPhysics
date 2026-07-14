@@ -61,7 +61,7 @@ RUN mkdir -p /root/.platformio/penv/bin/
 RUN cp /venv/bin/activate /root/.platformio/penv/bin/activate
 
 ## Install all projects
-RUN . /venv/bin/activate && bash -c 'for i in ./*; do cd "$i" && pio lib install && pio run && cd -; done'
+RUN . /venv/bin/activate && bash -c 'for i in ./*/; do (cd "$i" && pio lib install && pio run) || exit 1; done'
 ## Debug:
 # RUN . /venv/bin/activate && cd example && bash -c 'pio lib install && pio run'
 

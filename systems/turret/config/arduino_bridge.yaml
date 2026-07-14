@@ -6,3 +6,8 @@ turret_arduino_bridge:
     # Serial settings come from systems/turret/config/arduino.env so field
     # teams can override the device path without editing this ROS params file.
     diagnostic_rate_hz: 1.0
+    # Joint limits from systems/turret/scenarios/warehouse_tracking.json.
+    pan_min_rad: -1.5708
+    pan_max_rad: 1.5708
+    tilt_min_rad: -0.65
+    tilt_max_rad: 0.75

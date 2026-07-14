@@ -54,10 +54,13 @@ def rpm_callback(msg):
     global RPM_3
     global RPM_4
 
-    RPM_1 = msg.data.rpm1
-    RPM_2 = msg.data.rpm2
-    RPM_3 = msg.data.rpm3
-    RPM_4 = msg.data.rpm4
+    if len(msg.data) < 4:
+        return
+
+    RPM_1 = msg.data[0]
+    RPM_2 = msg.data[1]
+    RPM_3 = msg.data[2]
+    RPM_4 = msg.data[3]
 
     # TODO: set RPMs of simulated motors
     # [M1, M2, M3, M4] = controller.update(target)
@@ -145,8 +148,8 @@ def fly_to_point(target, controller: DronePIDController, scene: gs.Scene, cam: C
         z = drone_pos[2]
         cam.set_pose(lookat=(x, y, z))
         x = target[0] - x
-        y = target[0] - y
-        z = target[0] - z
+        y = target[1] - y
+        z = target[2] - z
         distance = math.sqrt(x**2 + y**2 + z**2)
         step += 1
 

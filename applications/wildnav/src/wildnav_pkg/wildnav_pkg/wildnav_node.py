@@ -83,6 +83,7 @@ class WildNavNode(Node):
         self.camera_info = None
         self.latest_odom = None
         self.latest_image = None
+        self.latest_image_header = None
         self.latest_image_odom = None
         self.latest_image_received = 0.0
         self.busy = threading.Lock()
@@ -157,27 +158,40 @@ class WildNavNode(Node):
     def _match_latest(self):
         if not self.busy.acquire(blocking=False):
             return
+        started = False
         try:
-            self._run_match()
+            if (self.latest_image is None or self.latest_image_odom is None or
+                    (self.origin_lat == 0.0 and self.origin_lon == 0.0)):
+                self._publish_invalid(0, 0.0)
+                return
+            if time.monotonic() - self.latest_image_received > float(
+                    self.get_parameter('max_image_age_s').value):
+                self._publish_invalid(0, 0.0)
+                return
+            worker = threading.Thread(
+                target=self._match_worker,
+                args=(self.latest_image.copy(), self.latest_image_header,
+                      self.latest_image_odom, self.camera_info),
+                daemon=True)
+            worker.start()
+            started = True
+        finally:
+            if not started:
+                self.busy.release()
+
+    def _match_worker(self, image, header, image_odom, camera_info):
+        try:
+            self._run_match(image, header, image_odom, camera_info)
+        except Exception as exc:
+            self.get_logger().warning(f'WildNav match failed: {exc}')
+            self._publish_invalid(0, 0.0)
         finally:
             self.busy.release()
 
-    def _run_match(self):
-        if (self.latest_image is None or self.latest_image_odom is None or
-                (self.origin_lat == 0.0 and self.origin_lon == 0.0)):
-            self._publish_invalid(0, 0.0)
-            return
-        if time.monotonic() - self.latest_image_received > float(
-                self.get_parameter('max_image_age_s').value):
-            self._publish_invalid(0, 0.0)
-            return
-
-        image = self.latest_image.copy()
-        image_odom = self.latest_image_odom
-        header = self.latest_image_header
-        if self.camera_info is not None and self.camera_info.k[0] > 0.0:
-            matrix = np.asarray(self.camera_info.k, dtype=np.float64).reshape(3, 3)
-            distortion = np.asarray(self.camera_info.d, dtype=np.float64)
+    def _run_match(self, image, header, image_odom, camera_info):
+        if camera_info is not None and camera_info.k[0] > 0.0:
+            matrix = np.asarray(camera_info.k, dtype=np.float64).reshape(3, 3)
+            distortion = np.asarray(camera_info.d, dtype=np.float64)
             image = cv2.undistort(image, matrix, distortion)
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         max_dimension = max(gray.shape)
@@ -294,7 +308,7 @@ class WildNavNode(Node):
         confidence = float(np.clip(best['confidence'], 0.0, 1.0))
 
         fix = NavSatFix()
-        fix.header = header
+        fix.header = copy.deepcopy(header)
         fix.header.frame_id = 'map'
         fix.status.status = NavSatStatus.STATUS_GBAS_FIX
         fix.status.service = NavSatStatus.SERVICE_GPS
@@ -313,7 +327,7 @@ class WildNavNode(Node):
         matched_east = (matched_lon - self.origin_lon) * metres_per_deg_lon
         matched_north = (matched_lat - self.origin_lat) * METERS_PER_DEG_LAT
         odom = Odometry()
-        odom.header = header
+        odom.header = copy.deepcopy(header)
         odom.header.frame_id = 'odom'
         odom.child_frame_id = image_odom.child_frame_id or 'base_link'
         odom.pose = copy.deepcopy(image_odom.pose)

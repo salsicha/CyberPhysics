@@ -176,28 +176,34 @@ bool CreateEntities() {
     return false;
   }
   if (rcl_init_options_set_domain_id(&init_options, kDomainId) != RCL_RET_OK) {
+    (void)! rcl_init_options_fini(&init_options);
     return false;
   }
 
   // Initialize support with domain ID options
   if (rclc_support_init_with_options(&support, 0, NULL, &init_options, &allocator) != RCL_RET_OK) {
+    (void)! rcl_init_options_fini(&init_options);
     return false;
   }
 
   // Clean up initialization options
   if (rcl_init_options_fini(&init_options) != RCL_RET_OK) {
+    rclc_support_fini(&support);
     return false;
   }
 
   // Initialize node and rest of entities
   if (rclc_node_init_default(&node, kNodeName, "", &support) != RCL_RET_OK) {
+    rclc_support_fini(&support);
     return false;
   }
 
   // Create publisher
-  if (rclc_publisher_init_default(&publisher, &node, 
+  if (rclc_publisher_init_default(&publisher, &node,
       ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, String),
       kPublisherTopic) != RCL_RET_OK) {
+    (void)! rcl_node_fini(&node);
+    rclc_support_fini(&support);
     return false;
   }
 
@@ -205,17 +211,29 @@ bool CreateEntities() {
   if (rclc_subscription_init_default(&subscriber, &node,
       ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, String),
       kSubscriberTopic) != RCL_RET_OK) {
+    (void)! rcl_publisher_fini(&publisher, &node);
+    (void)! rcl_node_fini(&node);
+    rclc_support_fini(&support);
     return false;
   }
 
   // Initialize executor
   if (rclc_executor_init(&executor, &support.context, 1, &allocator) != RCL_RET_OK) {
+    (void)! rcl_subscription_fini(&subscriber, &node);
+    (void)! rcl_publisher_fini(&publisher, &node);
+    (void)! rcl_node_fini(&node);
+    rclc_support_fini(&support);
     return false;
   }
 
   // Add subscriber to executor
   if (rclc_executor_add_subscription(&executor, &subscriber, &received_msg,
       &SubscriptionCallback, ON_NEW_DATA) != RCL_RET_OK) {
+    (void)! rcl_subscription_fini(&subscriber, &node);
+    (void)! rcl_publisher_fini(&publisher, &node);
+    rclc_executor_fini(&executor);
+    (void)! rcl_node_fini(&node);
+    rclc_support_fini(&support);
     return false;
   }
 
@@ -226,10 +244,9 @@ void DestroyEntities() {
     rmw_context_t* rmw_context = rcl_context_get_rmw_context(&support.context);
     (void)rmw_uros_set_context_entity_destroy_session_timeout(rmw_context, 0);
 
-    rcl_ret_t rc = RCL_RET_OK;
-    rc = rcl_subscription_fini(&subscriber, &node);
-    rc = rcl_publisher_fini(&publisher, &node);
+    (void)! rcl_subscription_fini(&subscriber, &node);
+    (void)! rcl_publisher_fini(&publisher, &node);
     rclc_executor_fini(&executor);
-    rc = rcl_node_fini(&node);
+    (void)! rcl_node_fini(&node);
     rclc_support_fini(&support);
 }

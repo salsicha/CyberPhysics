@@ -2,6 +2,8 @@ pan_tilt_ctrl_node:
   ros__parameters:
     joint_ids: [12, 13]
     stop_button: 4 # L1
+    min_pos: [1024, 1600] # per-joint servo step limits, matches cmd_config.yaml
+    max_pos: [3072, 3072]
     speed: 4500 # steps / second
     acceleration: 255 # 0 - 255
     usb_port: /dev/ttyACM0

@@ -8,8 +8,6 @@ services:
     environment:
       - ROS_LOCALHOST_ONLY=$ROS_LOCALHOST_ONLY
       - ROS_DOMAIN_ID=$ROS_DOMAIN_ID
-    depends_on:
-      - web
     command: >
       ros2 launch spinnaker_camera_driver blackfly_s_gige.launch.py
         camera_name:="blackfly_1"

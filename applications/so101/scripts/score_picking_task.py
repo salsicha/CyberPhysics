@@ -116,7 +116,7 @@ def score(scenario, telemetry, task_id=""):
     target = object_by_id(scenario, task["target_object"])
     destination = asset_by_name(scenario, task["destination"])
     success_rules = task.get("success", {})
-    thresholds = {**DEFAULT_THRESHOLDS, **telemetry.get("thresholds", {})}
+    thresholds = dict(DEFAULT_THRESHOLDS)
     samples = telemetry.get("samples", [])
 
     target_initial = np.asarray(target["xyz"][:3], dtype=np.float64)

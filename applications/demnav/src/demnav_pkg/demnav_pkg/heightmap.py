@@ -62,7 +62,10 @@ class HeightMapCache:
         return grid
 
     def get_patch(self, lat: float, lon: float,
-                  width_m: float, height_m: float) -> tuple[np.ndarray, float]:
+                  width_m: float, height_m: float
+                  ) -> tuple[np.ndarray, float, tuple[int, int]]:
+        """Return (patch, resolution, (center_row, center_col)) where the
+        center indices locate (lat, lon) within the returned patch."""
         row, col = self._latlon_to_pixel(lat, lon)
         hw = int(width_m / (2.0 * self.resolution_m))
         hh = int(height_m / (2.0 * self.resolution_m))
@@ -70,7 +73,8 @@ class HeightMapCache:
         r1 = min(self.grid.shape[0], row + hh)
         c0 = max(0, col - hw)
         c1 = min(self.grid.shape[1], col + hw)
-        return self.grid[r0:r1, c0:c1].copy(), self.resolution_m
+        return (self.grid[r0:r1, c0:c1].copy(), self.resolution_m,
+                (row - r0, col - c0))
 
     def latlon_to_local(self, lat: float, lon: float) -> tuple[float, float]:
         """Return east/north metres from the height-map centre."""

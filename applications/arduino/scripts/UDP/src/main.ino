@@ -52,6 +52,7 @@ void loop() {
 
     // read the packet into packetBufffer
     int n = Udp.read(packetBuffer, UDP_TX_PACKET_MAX_SIZE);
+    n = constrain(n, 0, UDP_TX_PACKET_MAX_SIZE);
     packetBuffer[n] = 0;
     Serial.println("Contents:");
     Serial.println(packetBuffer);

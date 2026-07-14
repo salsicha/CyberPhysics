@@ -20,7 +20,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /
 
 # Download /tello-ros2-main/
-RUN curl -L -k -o /main.zip https://github.com/salsicha/tello-ros2/archive/refs/heads/main.zip
+RUN curl -L -o /main.zip https://github.com/salsicha/tello-ros2/archive/refs/heads/main.zip
 RUN unzip /main.zip && rm /main.zip
 
 WORKDIR /tello-ros2-main/
@@ -37,4 +37,4 @@ COPY --from=build / /
 WORKDIR /tello-ros2-main/
 
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["./script/run.sh"]
+CMD ["./scripts/run.sh"]

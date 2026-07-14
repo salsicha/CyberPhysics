@@ -32,7 +32,7 @@ services:
         fi;
         cd /workspace/ardupilot;
         export PATH="$$PATH:/root/jsbsim/build/src";
-        if [ "${AIRPLANE_SITL_MODEL:-jsbsim}" = "jsbsim" ] && ! command -v JSBSim >/dev/null 2>&1; then
+        if [ "${AIRPLANE_SITL_MODEL:-plane}" = "jsbsim" ] && ! command -v JSBSim >/dev/null 2>&1; then
           if [ ! -d /root/jsbsim/.git ]; then
             git clone https://github.com/JSBSim-Team/jsbsim.git /root/jsbsim;
           fi;
@@ -40,7 +40,7 @@ services:
           cmake --build /root/jsbsim/build -j2;
           export PATH="$$PATH:/root/jsbsim/build/src";
         fi;
-        python3 Tools/autotest/sim_vehicle.py -v ArduPlane -f ${AIRPLANE_SITL_MODEL:-jsbsim} --no-mavproxy --custom-location=${INITIAL_LAT:-37.9234},${INITIAL_LON:--122.5967},${ORIGIN_ALT:-280.0},0 --add-param-file=/workspace/systems/airplane/config/ardupilot_plane.params
+        python3 Tools/autotest/sim_vehicle.py -v ArduPlane -f ${AIRPLANE_SITL_MODEL:-plane} --no-mavproxy --custom-location=${INITIAL_LAT:-37.9234},${INITIAL_LON:--122.5967},${ORIGIN_ALT:-280.0},0 --add-param-file=/workspace/systems/airplane/config/ardupilot_plane.params
 
   airplane_mavros:
     image: cyberphysics/aerostack2:${CYBERPHYSICS_TAG:-latest}
@@ -56,7 +56,7 @@ services:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
     command: >
       ros2 launch mavros apm.launch
-        fcu_url:=${SITL_FCU_URL:-udp://0.0.0.0:14550@}
+        fcu_url:=${SITL_FCU_URL:-tcp://127.0.0.1:5760}
 
   airplane_bridge:
     image: cyberphysics/aerostack2:${CYBERPHYSICS_TAG:-latest}
@@ -132,7 +132,7 @@ services:
         fov_deg:=${FOV_DEG:-69.0}
         dem_resolution_m:=${DEMNAV_RESOLUTION_M:-10.0}
         min_correlation:=${MIN_CORRELATION:-0.35}
-        synthetic_terrain:=${DEMNAV_SYNTHETIC_TERRAIN:-false}
+        synthetic_terrain:=${DEMNAV_SYNTHETIC_TERRAIN:-true}
 
   airplane_wildnav:
     image: cyberphysics/wildnav:${CYBERPHYSICS_TAG:-latest}
@@ -164,17 +164,17 @@ services:
         initial_lon:=${INITIAL_LON:--122.5967}
         origin_alt:=${ORIGIN_ALT:-280.0}
         zoom:=${WILDNAV_ZOOM:-17}
-        search_radius_m:=${WILDNAV_SEARCH_RADIUS_M:-1200.0}
-        max_tiles:=${WILDNAV_MAX_TILES:-81}
+        search_radius_m:=${WILDNAV_SEARCH_RADIUS_M:-250.0}
+        max_tiles:=${WILDNAV_MAX_TILES:-25}
         max_tile_downloads_per_cycle:=${WILDNAV_MAX_DOWNLOADS:-8}
         match_rate_hz:=${WILDNAV_RATE_HZ:-0.2}
         feature_backend:=${WILDNAV_FEATURE_BACKEND:-SIFT}
         min_matches:=${WILDNAV_MIN_MATCHES:-18}
         min_inliers:=${WILDNAV_MIN_INLIERS:-12}
         min_inlier_ratio:=${WILDNAV_MIN_INLIER_RATIO:-0.25}
-        max_position_jump_m:=${WILDNAV_MAX_JUMP_M:-350.0}
+        max_position_jump_m:=${WILDNAV_MAX_JUMP_M:-200.0}
         minimum_demnav_confidence:=${DEMNAV_FUSION_CONFIDENCE:-0.35}
-        minimum_wildnav_confidence:=${WILDNAV_FUSION_CONFIDENCE:-0.20}
+        minimum_wildnav_confidence:=${WILDNAV_FUSION_CONFIDENCE:-0.10}
 
   airplane_rosbridge:
     image: cyberphysics/aerostack2:${CYBERPHYSICS_TAG:-latest}

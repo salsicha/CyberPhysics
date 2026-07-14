@@ -39,6 +39,7 @@ class BlueROV2Sim(Node):
         self.declare_parameter("max_yaw_rate_rps", 0.45)
         self.declare_parameter("velocity_time_constant_s", 1.2)
         self.declare_parameter("battery_runtime_s", 2700.0)
+        self.declare_parameter("cmd_timeout_s", 5.0)
         self.declare_parameter(
             "mavros_velocity_topic", "/mavros/setpoint_velocity/cmd_vel")
 
@@ -60,6 +61,7 @@ class BlueROV2Sim(Node):
             0.05, float(self.get_parameter("velocity_time_constant_s").value))
         self.battery_runtime = max(
             1.0, float(self.get_parameter("battery_runtime_s").value))
+        self.cmd_timeout = float(self.get_parameter("cmd_timeout_s").value)
 
         self.forward_speed = 0.0
         self.vertical_speed = 0.0
@@ -69,6 +71,7 @@ class BlueROV2Sim(Node):
         self.cmd_yaw_rate = 0.0
         self.elapsed = 0.0
         self.last_time = self.get_clock().now()
+        self.last_cmd_time = self.get_clock().now()
 
         self.odom_pub = self.create_publisher(
             Odometry, "/mavros/local_position/odom", 10)
@@ -97,12 +100,17 @@ class BlueROV2Sim(Node):
             float(msg.twist.linear.z), -self.max_vertical, self.max_vertical)
         self.cmd_yaw_rate = clamp(
             float(msg.twist.angular.z), -self.max_yaw_rate, self.max_yaw_rate)
+        self.last_cmd_time = self.get_clock().now()
 
     def _tick(self) -> None:
         now = self.get_clock().now()
         dt = max(1e-3, (now - self.last_time).nanoseconds * 1e-9)
         self.last_time = now
         self.elapsed += dt
+        if (now - self.last_cmd_time).nanoseconds * 1e-9 > self.cmd_timeout:
+            self.cmd_forward = 0.0
+            self.cmd_vertical = 0.0
+            self.cmd_yaw_rate = 0.0
         alpha = min(1.0, dt / self.velocity_tau)
         self.forward_speed += (self.cmd_forward - self.forward_speed) * alpha
         self.vertical_speed += (self.cmd_vertical - self.vertical_speed) * alpha

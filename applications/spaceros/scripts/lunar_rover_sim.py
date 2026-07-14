@@ -49,6 +49,7 @@ class LunarRoverSim(Node):
         self.declare_parameter("idle_power_w", 42.0)
         self.declare_parameter("drive_power_w", 115.0)
         self.declare_parameter("solar_charge_w", 38.0)
+        self.declare_parameter("cmd_timeout_s", 5.0)
 
         self.x = float(self.get_parameter("initial_x_m").value)
         self.y = float(self.get_parameter("initial_y_m").value)
@@ -73,6 +74,7 @@ class LunarRoverSim(Node):
         self.idle_power_w = float(self.get_parameter("idle_power_w").value)
         self.drive_power_w = float(self.get_parameter("drive_power_w").value)
         self.solar_charge_w = float(self.get_parameter("solar_charge_w").value)
+        self.cmd_timeout_s = float(self.get_parameter("cmd_timeout_s").value)
 
         self.speed = 0.0
         self.yaw_rate = 0.0
@@ -81,7 +83,9 @@ class LunarRoverSim(Node):
         self.elapsed = 0.0
         self.slip_ratio = 0.04
         self.wheel_angle = 0.0
+        self.wheel_speed = 0.0
         self.last_time = self.get_clock().now()
+        self.last_cmd_time = self.get_clock().now()
 
         self.odom_pub = self.create_publisher(
             Odometry, str(self.get_parameter("odom_topic").value), 10
@@ -123,12 +127,17 @@ class LunarRoverSim(Node):
         self.cmd_yaw_rate = clamp(
             float(msg.angular.z), -self.max_yaw_rate, self.max_yaw_rate
         )
+        self.last_cmd_time = self.get_clock().now()
 
     def _tick(self) -> None:
         now = self.get_clock().now()
         dt = max(1e-3, (now - self.last_time).nanoseconds * 1e-9)
         self.last_time = now
         self.elapsed += dt
+
+        if (now - self.last_cmd_time).nanoseconds * 1e-9 > self.cmd_timeout_s:
+            self.cmd_speed = 0.0
+            self.cmd_yaw_rate = 0.0
 
         slope_deg, slip_base, illumination_lux, temperature_c = self._terrain_metrics()
         command_load = abs(self.cmd_speed) / max(0.01, self.max_speed)
@@ -150,10 +159,12 @@ class LunarRoverSim(Node):
         )
         self.x += self.speed * math.cos(self.yaw) * dt
         self.y += self.speed * math.sin(self.yaw) * dt
-        self.wheel_angle += (self.speed / self.wheel_radius) * dt
+        # Wheels spin faster than ground speed under slip.
+        self.wheel_speed = self.speed / max(0.05, 1.0 - min(self.slip_ratio, 0.95))
+        self.wheel_angle += (self.wheel_speed / self.wheel_radius) * dt
 
         charge_factor = clamp(illumination_lux / 110000.0, 0.0, 1.0)
-        drain_w = self.idle_power_w + self.drive_power_w * abs(self.speed) / self.max_speed
+        drain_w = self.idle_power_w + self.drive_power_w * abs(self.speed) / max(0.01, self.max_speed)
         charge_w = self.solar_charge_w * charge_factor
         self.energy_wh = clamp(
             self.energy_wh + (charge_w - drain_w) * dt / 3600.0,
@@ -217,7 +228,8 @@ class LunarRoverSim(Node):
         msg.header.frame_id = "lunar_rover/battery"
         msg.voltage = 28.0 * clamp(self.energy_wh / self.battery_capacity_wh, 0.72, 1.0)
         msg.current = -(
-            self.idle_power_w + self.drive_power_w * abs(self.speed) / self.max_speed
+            self.idle_power_w
+            + self.drive_power_w * abs(self.speed) / max(0.01, self.max_speed)
         ) / max(1.0, msg.voltage)
         msg.percentage = clamp(self.energy_wh / self.battery_capacity_wh, 0.0, 1.0)
         self.battery_pub.publish(msg)
@@ -234,7 +246,7 @@ class LunarRoverSim(Node):
             "rear_right_wheel",
         ]
         msg.position = [self.wheel_angle] * len(msg.name)
-        msg.velocity = [self.speed / self.wheel_radius] * len(msg.name)
+        msg.velocity = [self.wheel_speed / self.wheel_radius] * len(msg.name)
         self.joint_pub.publish(msg)
 
     def _publish_environment(
