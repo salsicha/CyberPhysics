@@ -1,7 +1,7 @@
 services:
   lerobot:
     network_mode: "host"
-    image: cyberphysics/lerobot
+    image: cyberphysics/lerobot:latest
     volumes:
       - "/tmp/.X11-unix:/tmp/.X11-unix"
     environment:
@@ -9,8 +9,7 @@ services:
       - XAUTHORITY
       - NVIDIA_DRIVER_CAPABILITIES=all
       - EGL_PLATFORM=surfaceless
-    command: >
-      bash -c "conda activate lerobot && python3 evaluate_pretrained_policy.py"
+    command: ["python3", "evaluate_pretrained_policy.py"]
     deploy:
       resources:
         reservations:

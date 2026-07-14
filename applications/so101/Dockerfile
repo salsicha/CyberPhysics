@@ -41,3 +41,20 @@ RUN chmod +x /entrypoint.sh
 
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["ros2", "launch", "so101_description", "gazebo.launch.py"]
+
+# Policy evaluation image (cyberphysics/lerobot), selected with
+# --target lerobot (BUILD_STAGE=lerobot via _build_it.sh). Not part of
+# the default build, so cyberphysics/so101 stays lean.
+FROM build AS lerobot
+
+RUN pip3 install --break-system-packages --no-cache-dir \
+    "lerobot[smolvla,pi0,diffusion]" \
+    gym-pusht \
+    "pymunk<7" \
+    "imageio[ffmpeg]"
+
+WORKDIR /workspace/src/so101_description/scripts
+CMD ["python3", "evaluate_pretrained_policy.py"]
+
+# Default target: the plain so101 simulation image.
+FROM build

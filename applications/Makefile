@@ -53,6 +53,8 @@ build_matlab: cleanup build_ros2
 	APP=matlab ./_build_it.sh
 build_marimo: cleanup
 	APP=marimo ./_build_it.sh
+build_lerobot: cleanup
+	APP=so101 TARGET=lerobot BUILD_STAGE=lerobot ./_build_it.sh
 build_navigation2: cleanup build_ros2
 	APP=navigation2 ./_build_it.sh
 build_navigator: cleanup

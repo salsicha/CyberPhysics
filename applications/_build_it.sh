@@ -34,6 +34,11 @@ fi
 
 build_cmd="${build_cmd} --platform linux/${PLATFORM:-amd64} --build-arg TAG=${tag}"
 
+# Optional multi-stage build target (docker build --target)
+if [ ! -z "$BUILD_STAGE" ]; then
+    build_cmd="${build_cmd} --target ${BUILD_STAGE}"
+fi
+
 
 while [ $# -gt 0 ]; do
   case $1 in

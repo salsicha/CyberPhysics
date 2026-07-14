@@ -35,6 +35,14 @@ class RosDroneController(Node):
         self.thrust_gain = 500.0 # RPM per unit of linear.z
 
     def cmd_vel_callback(self, msg):
+        # NOTE: Genesis' Drone entity applies each propeller's thrust as a
+        # body +z force plus a z reaction torque (rpm^2 * KM * spin); the
+        # propeller position offset is not turned into a body moment. So
+        # only collective thrust (linear.z -> climb) and the yaw reaction
+        # torque are actuated. The differential linear.x/linear.y terms
+        # below do not pitch/roll or translate the drone in this model, and
+        # swapping the pitch and yaw mixes does not change that (both sum to
+        # zero net yaw). Verified empirically against genesis-world 1.2.2.
         # Start with base hover thrust
         rpms = np.array([self.base_thrust] * 4)
         

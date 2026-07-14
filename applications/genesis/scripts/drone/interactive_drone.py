@@ -32,6 +32,13 @@ class DroneController:
             pass
 
     def update_thrust(self):
+        # NOTE: Genesis' Drone entity actuates only collective thrust (climb)
+        # and the per-propeller yaw reaction torque; propeller position
+        # offsets are not converted into body pitch/roll moments. The
+        # directional arrow keys below therefore do not translate the drone
+        # in this model (only space/shift collective and yaw reaction have an
+        # effect), and swapping the pitch/yaw mixes does not change that.
+        # Verified empirically against genesis-world 1.2.2.
         # Store previous RPMs for debugging
         prev_rpms = self.rpms.copy()
 
