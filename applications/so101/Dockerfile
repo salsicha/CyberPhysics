@@ -47,14 +47,25 @@ CMD ["ros2", "launch", "so101_description", "gazebo.launch.py"]
 # the default build, so cyberphysics/so101 stays lean.
 FROM build AS lerobot
 
-RUN pip3 install --break-system-packages --no-cache-dir \
+# Install the policy stack in an isolated venv so pip does not collide with
+# the Debian/apt-managed system packages (uninstalling e.g. python3-packaging
+# fails with "RECORD file not found"). The evaluation scripts are pure
+# lerobot/gym and do not need the ROS packages. pymunk<7 keeps gym-pusht's
+# collision handler API working.
+RUN apt-get update && apt-get install -q -y --no-install-recommends \
+    python3-venv \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN python3 -m venv /opt/lerobot_venv && \
+    /opt/lerobot_venv/bin/pip install --no-cache-dir --upgrade pip && \
+    /opt/lerobot_venv/bin/pip install --no-cache-dir \
     "lerobot[smolvla,pi0,diffusion]" \
     gym-pusht \
     "pymunk<7" \
     "imageio[ffmpeg]"
 
 WORKDIR /workspace/src/so101_description/scripts
-CMD ["python3", "evaluate_pretrained_policy.py"]
+CMD ["/opt/lerobot_venv/bin/python3", "evaluate_pretrained_policy.py"]
 
 # Default target: the plain so101 simulation image.
 FROM build

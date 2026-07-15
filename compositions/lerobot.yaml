@@ -9,7 +9,7 @@ services:
       - XAUTHORITY
       - NVIDIA_DRIVER_CAPABILITIES=all
       - EGL_PLATFORM=surfaceless
-    command: ["python3", "evaluate_pretrained_policy.py"]
+    command: ["/opt/lerobot_venv/bin/python3", "evaluate_pretrained_policy.py"]
     deploy:
       resources:
         reservations:
