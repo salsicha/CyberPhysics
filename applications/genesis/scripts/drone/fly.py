@@ -212,7 +212,7 @@ def run_sim(scene, drone, enable_vis):
 
     for i in range(len(traj)):
         # 14468 is hover rpm
-        drone.set_propellels_rpm((1 + 0.05 * traj[i]) * 14468.429183500699)
+        drone.set_propellers_rpm((1 + 0.05 * traj[i]) * 14468.429183500699)
         scene.step()
 
     if enable_vis:

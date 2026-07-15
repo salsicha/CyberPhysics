@@ -132,7 +132,7 @@ class HoverEnv:
         exec_actions = self.last_actions if self.simulate_action_latency else self.actions
 
         # 14468 is hover rpm
-        self.drone.set_propellels_rpm((1 + exec_actions * 0.8) * 14468.429183500699)
+        self.drone.set_propellers_rpm((1 + exec_actions * 0.8) * 14468.429183500699)
         self.scene.step()
 
         # update buffers

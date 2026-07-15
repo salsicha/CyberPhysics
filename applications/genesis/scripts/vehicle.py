@@ -68,7 +68,7 @@ def rpm_callback(msg):
     # M2 = clamp(M2)
     # M3 = clamp(M3)
     # M4 = clamp(M4)
-    # drone.set_propellels_rpm([M1, M2, M3, M4])
+    # drone.set_propellers_rpm([M1, M2, M3, M4])
 
 
 # TODO: 
@@ -81,7 +81,7 @@ imu_pub = node.create_publisher(Imu, 'imu_data', 10)
 
 
 # def hover(drone: DroneEntity):
-#     drone.set_propellels_rpm([base_rpm, base_rpm, base_rpm, base_rpm])
+#     drone.set_propellers_rpm([base_rpm, base_rpm, base_rpm, base_rpm])
 
 
 def clamp(rpm):
@@ -136,7 +136,7 @@ def fly_to_point(target, controller: DronePIDController, scene: gs.Scene, cam: C
         M2 = clamp(M2)
         M3 = clamp(M3)
         M4 = clamp(M4)
-        drone.set_propellels_rpm([M1, M2, M3, M4])
+        drone.set_propellers_rpm([M1, M2, M3, M4])
         # print("drone: ", drone.get_dofs_force())
         scene.step()
         cam.render()

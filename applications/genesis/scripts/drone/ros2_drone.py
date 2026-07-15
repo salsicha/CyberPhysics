@@ -113,7 +113,7 @@ def run_sim(scene, drone, ros_node):
         rclpy.spin_once(ros_node, timeout_sec=0)
         
         # Update drone RPMs based on ROS commands
-        drone.set_propellels_rpm(ros_node.rpms)
+        drone.set_propellers_rpm(ros_node.rpms)
         
         # Step Physics
         scene.step()
