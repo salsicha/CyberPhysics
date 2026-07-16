@@ -146,7 +146,9 @@ class DemNavNode(Node):
                 self.get_parameter('area_km').value,
                 self.get_parameter('dem_resolution_m').value,
                 self.get_parameter('cache_dir').value,
-                self.synthetic_terrain)
+                self.synthetic_terrain,
+                origin_lat=self.origin_lat,
+                origin_lon=self.origin_lon)
         except Exception as e:
             self.get_logger().error(f'Failed to load height map: {e}')
             return

@@ -21,10 +21,6 @@ class AirplaneMavrosBridge(Node):
         super().__init__("airplane_mavros_bridge")
         self.declare_parameter("namespace", "plane0")
         self.declare_parameter("mavros_namespace", "/mavros")
-        self.declare_parameter("mirror_navigation_seed", True)
-        self.declare_parameter(
-            "navigation_seed_topic", "/airplane/navigation/odometry"
-        )
 
         namespace = normalize_namespace(str(self.get_parameter("namespace").value))
         mavros_namespace = normalize_namespace(
@@ -48,21 +44,10 @@ class AirplaneMavrosBridge(Node):
             f"{output_prefix}/battery",
         )
 
-        odom_pub = self.create_publisher(
-            Odometry, f"{output_prefix}/odom", qos_profile_sensor_data
-        )
-        self.navigation_seed_pub = None
-        if bool(self.get_parameter("mirror_navigation_seed").value):
-            self.navigation_seed_pub = self.create_publisher(
-                Odometry,
-                str(self.get_parameter("navigation_seed_topic").value),
-                qos_profile_sensor_data,
-            )
-        self.create_subscription(
+        self._mirror(
             Odometry,
             f"{mavros_namespace}/local_position/odom",
-            partial(self._publish_odom, odom_pub),
-            qos_profile_sensor_data,
+            f"{output_prefix}/odom",
         )
 
         self.get_logger().info(
@@ -83,11 +68,6 @@ class AirplaneMavrosBridge(Node):
     @staticmethod
     def _publish(publisher, msg) -> None:
         publisher.publish(msg)
-
-    def _publish_odom(self, odom_pub, msg: Odometry) -> None:
-        odom_pub.publish(msg)
-        if self.navigation_seed_pub is not None:
-            self.navigation_seed_pub.publish(msg)
 
 
 def main() -> None:

@@ -34,6 +34,7 @@ services:
       python3 /workspace/systems/airplane/scripts/airplane_mavros_bridge.py
         --ros-args
         --params-file /workspace/systems/airplane/config/mavros_bridge.yaml
+        -p namespace:=${AIRPLANE_NAMESPACE:-plane0}
 
   airplane_downward_camera:
     image: cyberphysics/oak1:${CYBERPHYSICS_TAG:-arm64}

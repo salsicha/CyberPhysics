@@ -77,6 +77,7 @@ services:
       python3 /workspace/systems/airplane/scripts/airplane_mavros_bridge.py
         --ros-args
         --params-file /workspace/systems/airplane/config/mavros_bridge.yaml
+        -p namespace:=${AIRPLANE_NAMESPACE:-plane0}
 
   airplane_satellite_camera:
     image: cyberphysics/aerostack2:${CYBERPHYSICS_TAG:-latest}
@@ -97,6 +98,8 @@ services:
       python3 /workspace/systems/airplane/scripts/satellite_camera_sim.py
         --ros-args
         --params-file /workspace/systems/airplane/config/satellite_camera_sim.yaml
+        -p gps_topic:=/${AIRPLANE_NAMESPACE:-plane0}/sensor_measurements/gps
+        -p odom_topic:=/${AIRPLANE_NAMESPACE:-plane0}/sensor_measurements/odom
         -p origin_lat:=${INITIAL_LAT:-37.9234}
         -p origin_lon:=${INITIAL_LON:--122.5967}
         -p altitude_agl_m:=${AIRPLANE_SIM_ALTITUDE_AGL_M:-180.0}

@@ -10,11 +10,19 @@ class HeightMapCache:
 
     def __init__(self, lat: float, lon: float, area_km: float,
                  resolution_m: float = 30.0, cache_dir: str = '/data/demnav_cache',
-                 synthetic: bool = False):
+                 synthetic: bool = False,
+                 origin_lat: float | None = None,
+                 origin_lon: float | None = None):
         self.resolution_m = resolution_m
         self.center_lat = lat
         self.center_lon = lon
         self.synthetic = synthetic
+        # The synthetic world is anchored at a fixed origin so the terrain
+        # does not translate with wherever the map happens to be loaded —
+        # it must line up with the imagery the camera sim renders about the
+        # same origin.
+        self.origin_lat = lat if origin_lat is None else float(origin_lat)
+        self.origin_lon = lon if origin_lon is None else float(origin_lon)
         os.makedirs(cache_dir, exist_ok=True)
 
         half_m = area_km * 500.0
@@ -25,13 +33,24 @@ class HeightMapCache:
         self.max_lon = lon + half_m / m_per_deg_lon
 
         n = max(2, int(area_km * 1000.0 / resolution_m))
-        cache_file = os.path.join(
+        if synthetic:
+            cache_file = os.path.join(
+                cache_dir,
+                f'dem_synthetic_{self.origin_lat:.4f}_{self.origin_lon:.4f}_'
+                f'{lat:.4f}_{lon:.4f}_{area_km:.1f}_{resolution_m:.0f}.npy')
+        else:
+            cache_file = os.path.join(
+                cache_dir,
+                f'dem_srtm_{lat:.4f}_{lon:.4f}_{area_km:.1f}_{resolution_m:.0f}.npy')
+        # SRTM caches seeded before the source prefix was added.
+        legacy_file = os.path.join(
             cache_dir,
-            f'dem_{"synthetic" if synthetic else "srtm"}_'
-            f'{lat:.4f}_{lon:.4f}_{area_km:.1f}_{resolution_m:.0f}.npy')
+            f'dem_{lat:.4f}_{lon:.4f}_{area_km:.1f}_{resolution_m:.0f}.npy')
 
         if os.path.exists(cache_file):
             self.grid = np.load(cache_file)
+        elif not synthetic and os.path.exists(legacy_file):
+            self.grid = np.load(legacy_file)
         elif synthetic:
             self.grid = self._generate_synthetic(n, n)
             np.save(cache_file, self.grid)
@@ -44,9 +63,9 @@ class HeightMapCache:
         lons = np.linspace(self.min_lon, self.max_lon, n_cols)
         lon_grid, lat_grid = np.meshgrid(lons, lats)
         metres_per_deg_lon = (
-            METERS_PER_DEG_LAT * math.cos(math.radians(self.center_lat)))
-        east = (lon_grid - self.center_lon) * metres_per_deg_lon
-        north = (lat_grid - self.center_lat) * METERS_PER_DEG_LAT
+            METERS_PER_DEG_LAT * math.cos(math.radians(self.origin_lat)))
+        east = (lon_grid - self.origin_lon) * metres_per_deg_lon
+        north = (lat_grid - self.origin_lat) * METERS_PER_DEG_LAT
         return _synthetic_terrain_height(east, north).astype(np.float32)
 
     def _download(self, n_rows: int, n_cols: int) -> np.ndarray:
@@ -93,6 +112,9 @@ class HeightMapCache:
 
 
 def _synthetic_terrain_height(east, north):
+    # Kept in sync with _terrain_height in
+    # systems/airplane/scripts/satellite_camera_sim.py — the airplane camera
+    # sim renders depth from the same field so DEM correlation can lock on.
     ridge = 48.0 * np.exp(-((north - 0.18 * east - 120.0) / 420.0) ** 2)
     hill_shape = ((east + 240.0) / 380.0) ** 2
     hill_shape += ((north - 80.0) / 300.0) ** 2

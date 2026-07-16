@@ -76,8 +76,22 @@ class SatelliteTileCache:
         candidates.sort()
         return [(x, y) for _, x, y in candidates[:max_tiles]]
 
+    def set_origin(self, lat, lon):
+        self.origin_lat = float(lat)
+        self.origin_lon = float(lon)
+
+    def _tile_stem(self, x, y):
+        # Synthetic tile pixels depend on the origin, and synthetic and real
+        # tiles must never collide in a shared cache dir, so both facts are
+        # part of the cache key (mirrors the DEM cache naming in demnav's
+        # heightmap.py).
+        if self.synthetic:
+            return (f'synthetic_{self.origin_lat:.4f}_{self.origin_lon:.4f}_'
+                    f'{self.zoom}_{x}_{y}')
+        return f'{self.zoom}_{x}_{y}'
+
     def get_features(self, x, y, allow_download=True):
-        stem = f'{self.zoom}_{x}_{y}'
+        stem = self._tile_stem(x, y)
         image_path = os.path.join(self.cache_dir, stem + '.jpg')
         feature_path = os.path.join(
             self.cache_dir,
@@ -117,7 +131,7 @@ class SatelliteTileCache:
         return cv2.BFMatcher(self.norm, crossCheck=False)
 
     def is_cached(self, x, y):
-        stem = f'{self.zoom}_{x}_{y}'
+        stem = self._tile_stem(x, y)
         return os.path.exists(os.path.join(self.cache_dir, stem + '.jpg'))
 
     def _download(self, x, y, image_path):
@@ -163,6 +177,9 @@ class SatelliteTileCache:
 
 
 def _synthetic_satellite_rgb(east, north):
+    # Kept in sync with _satellite_rgb in
+    # systems/airplane/scripts/satellite_camera_sim.py — the airplane camera
+    # sim renders frames that must match these tiles pixel-for-pixel.
     coast = north < -420.0 + 45.0 * np.sin(east / 210.0)
     road_a = np.abs((north + 0.22 * east + 35.0) % 180.0 - 90.0) < 4.5
     road_b = np.abs((east - 0.35 * north - 20.0) % 240.0 - 120.0) < 3.5

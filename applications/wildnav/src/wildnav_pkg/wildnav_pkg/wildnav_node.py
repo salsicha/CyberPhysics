@@ -151,6 +151,7 @@ class WildNavNode(Node):
             self.origin_lat = msg.latitude
             self.origin_lon = msg.longitude
             self.origin_alt = msg.altitude
+            self.cache.set_origin(self.origin_lat, self.origin_lon)
             self.get_logger().info(
                 f'WildNav origin set from GPS: '
                 f'{self.origin_lat:.7f}, {self.origin_lon:.7f}')

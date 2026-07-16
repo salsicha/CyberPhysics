@@ -7,6 +7,14 @@ def main():
     parser = argparse.ArgumentParser(description='Seed WildNav satellite tile cache.')
     parser.add_argument('--lat', type=float, required=True)
     parser.add_argument('--lon', type=float, required=True)
+    parser.add_argument(
+        '--origin-lat', type=float, default=None,
+        help='Synthetic-world origin latitude; must match the initial_lat '
+             'the wildnav node runs with (defaults to --lat).')
+    parser.add_argument(
+        '--origin-lon', type=float, default=None,
+        help='Synthetic-world origin longitude; must match the initial_lon '
+             'the wildnav node runs with (defaults to --lon).')
     parser.add_argument('--cache-dir', default='/data/wildnav_cache')
     parser.add_argument('--tile-url-template', default=(
         'https://server.arcgisonline.com/ArcGIS/rest/services/'
@@ -27,6 +35,8 @@ def main():
         feature_backend=args.feature_backend,
         max_features=args.max_features,
         request_timeout=args.request_timeout,
+        origin_lat=args.origin_lat if args.origin_lat is not None else args.lat,
+        origin_lon=args.origin_lon if args.origin_lon is not None else args.lon,
     )
     tiles = cache.candidate_tiles(
         args.lat, args.lon, args.search_radius_m, args.max_tiles
