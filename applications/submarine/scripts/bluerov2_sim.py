@@ -9,6 +9,7 @@ from geometry_msgs.msg import Quaternion, TwistStamped
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
 from sensor_msgs.msg import BatteryState, FluidPressure, Imu, NavSatFix, NavSatStatus
+from synthetic_world import local_to_latlon
 
 
 def clamp(value: float, lower: float, upper: float) -> float:
@@ -152,11 +153,8 @@ class BlueROV2Sim(Node):
         msg.header.frame_id = "sub0/gps_link"
         msg.status.status = NavSatStatus.STATUS_FIX
         msg.status.service = NavSatStatus.SERVICE_GPS
-        metres_per_deg_lat = 111_111.0
-        metres_per_deg_lon = metres_per_deg_lat * math.cos(
-            math.radians(self.origin_lat))
-        msg.latitude = self.origin_lat + self.y / metres_per_deg_lat
-        msg.longitude = self.origin_lon + self.x / metres_per_deg_lon
+        msg.latitude, msg.longitude = local_to_latlon(
+            self.x, self.y, self.origin_lat, self.origin_lon)
         msg.altitude = -self.depth
         self.gps_pub.publish(msg)
 
