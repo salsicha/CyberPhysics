@@ -2,7 +2,7 @@ import math
 import os
 import numpy as np
 
-METERS_PER_DEG_LAT = 111320.0
+from synthetic_world import METERS_PER_DEG_LAT, terrain_height
 
 
 class HeightMapCache:
@@ -66,7 +66,7 @@ class HeightMapCache:
             METERS_PER_DEG_LAT * math.cos(math.radians(self.origin_lat)))
         east = (lon_grid - self.origin_lon) * metres_per_deg_lon
         north = (lat_grid - self.origin_lat) * METERS_PER_DEG_LAT
-        return _synthetic_terrain_height(east, north).astype(np.float32)
+        return terrain_height(east, north).astype(np.float32)
 
     def _download(self, n_rows: int, n_cols: int) -> np.ndarray:
         import srtm
@@ -109,21 +109,3 @@ class HeightMapCache:
         row = max(0, min(self.grid.shape[0] - 1, row))
         col = max(0, min(self.grid.shape[1] - 1, col))
         return row, col
-
-
-def _synthetic_terrain_height(east, north):
-    # Kept in sync with _terrain_height in
-    # systems/airplane/scripts/satellite_camera_sim.py — the airplane camera
-    # sim renders depth from the same field so DEM correlation can lock on.
-    ridge = 48.0 * np.exp(-((north - 0.18 * east - 120.0) / 420.0) ** 2)
-    hill_shape = ((east + 240.0) / 380.0) ** 2
-    hill_shape += ((north - 80.0) / 300.0) ** 2
-    hill = 36.0 * np.exp(-hill_shape)
-    marker_rise = 65.0 * np.exp(-((east - 45.0) / 115.0) ** 2 -
-                                 ((north + 55.0) / 85.0) ** 2)
-    marker_cut = -42.0 * np.exp(-((east + 120.0) / 75.0) ** 2 -
-                                ((north - 95.0) / 105.0) ** 2)
-    coast_line = -420.0 + 45.0 * np.sin(east / 210.0)
-    coast_drop = np.where(north < coast_line, -22.0, 0.0)
-    texture = 4.0 * np.sin(east / 95.0) * np.cos(north / 120.0)
-    return ridge + hill + marker_rise + marker_cut + coast_drop + texture

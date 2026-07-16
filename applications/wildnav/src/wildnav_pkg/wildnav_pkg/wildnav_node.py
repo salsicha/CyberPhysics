@@ -14,19 +14,10 @@ from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import CameraInfo, Image, NavSatFix, NavSatStatus
 from std_msgs.msg import Bool, Float32, Int32
 
+from synthetic_world import METERS_PER_DEG_LAT, local_to_latlon
+
 from .satellite_cache import SatelliteTileCache
 from .satellite_cache import ground_resolution_m, tile_pixel_to_latlon
-
-
-METERS_PER_DEG_LAT = 111320.0
-
-
-def local_to_latlon(east, north, origin_lat, origin_lon):
-    lat = origin_lat + north / METERS_PER_DEG_LAT
-    metres_per_deg_lon = (
-        METERS_PER_DEG_LAT * math.cos(math.radians(origin_lat)))
-    lon = origin_lon + east / metres_per_deg_lon
-    return lat, lon
 
 
 def horizontal_distance_m(lat_a, lon_a, lat_b, lon_b):

@@ -10,6 +10,7 @@ from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import NavSatFix, NavSatStatus
 from std_msgs.msg import Bool, Float32, String
+from synthetic_world import local_to_latlon
 
 
 def stamp_ns(stamp):
@@ -220,14 +221,12 @@ class NavigationFusionNode(Node):
         lat, lon, alt, ref_east, ref_north, ref_up, _ = self.global_reference
         east = fused.pose.pose.position.x - ref_east
         north = fused.pose.pose.position.y - ref_north
-        metres_per_deg_lon = 111320.0 * math.cos(math.radians(lat))
         fix = NavSatFix()
         fix.header = fused.header
         fix.header.frame_id = 'map'
         fix.status.status = NavSatStatus.STATUS_GBAS_FIX
         fix.status.service = NavSatStatus.SERVICE_GPS
-        fix.latitude = lat + north / 111320.0
-        fix.longitude = lon + east / metres_per_deg_lon
+        fix.latitude, fix.longitude = local_to_latlon(east, north, lat, lon)
         fix.altitude = alt + fused.pose.pose.position.z - ref_up
         fix.position_covariance = [
             fused.pose.covariance[0], 0.0, 0.0,

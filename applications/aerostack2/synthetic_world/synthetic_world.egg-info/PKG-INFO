@@ -1,0 +1,6 @@
+Metadata-Version: 2.4
+Name: synthetic-world
+Version: 0.1.0
+Summary: Shared synthetic terrain/imagery world model and local-tangent georeferencing for CyberPhysics SITL navigation validation
+Requires-Python: >=3.8
+Requires-Dist: numpy

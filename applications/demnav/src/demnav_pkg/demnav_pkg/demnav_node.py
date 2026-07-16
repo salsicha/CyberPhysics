@@ -19,9 +19,9 @@ from nav_msgs.msg import Odometry
 from std_msgs.msg import Bool, Float32
 from cv_bridge import CvBridge
 
-from .heightmap import HeightMapCache
+from synthetic_world import METERS_PER_DEG_LAT
 
-METERS_PER_DEG_LAT = 111320.0
+from .heightmap import HeightMapCache
 
 
 def _yaw_from_quaternion(q) -> float:
