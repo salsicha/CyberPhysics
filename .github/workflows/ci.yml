@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  python-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Install test dependencies
+        run: pip install numpy opencv-python-headless pytest
+      - name: Install synthetic_world
+        run: pip install ./applications/aerostack2/synthetic_world
+      - name: Run unit tests
+        run: python -m pytest tests/ -v
+      - name: Byte-compile navigation sources
+        run: >
+          python -m compileall -q
+          applications/aerostack2/synthetic_world
+          applications/demnav/src
+          applications/wildnav/src
+          systems/airplane
+          tools
+          tests
+
+  compose-config:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate every composition renders
+        run: |
+          set -e
+          for f in compositions/*.yaml; do
+            echo "== $f"
+            docker compose -f "$f" config --quiet
+          done
+
+  ardupilot-params:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check .params names against the pinned ArduPilot ref
+        run: python3 tools/check_ardupilot_params.py

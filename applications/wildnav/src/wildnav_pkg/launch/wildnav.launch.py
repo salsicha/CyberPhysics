@@ -28,6 +28,7 @@ def generate_launch_description():
         ('min_inlier_ratio', '0.25'),
         ('max_reprojection_error_px', '8.0'),
         ('max_position_jump_m', '250.0'),
+        ('max_attitude_deg', '20.0'),
         ('demnav_odom_topic', '/demnav/odometry'),
         ('navigation_output_topic', '/navigation/odometry'),
         ('minimum_demnav_confidence', '0.35'),
@@ -78,6 +79,7 @@ def generate_launch_description():
             'max_reprojection_error_px':
                 values['max_reprojection_error_px'],
             'max_position_jump_m': values['max_position_jump_m'],
+            'max_attitude_deg': values['max_attitude_deg'],
         }],
     )
     fusion = Node(

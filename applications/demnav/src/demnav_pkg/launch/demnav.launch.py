@@ -32,6 +32,7 @@ def generate_launch_description():
         ('min_dem_footprint_pixels', '5',              'Minimum DEM cells across a match'),
         ('min_metric_depth_m', '0.2',                  'Minimum valid metric depth'),
         ('max_metric_depth_m', '500.0',                'Maximum valid metric depth'),
+        ('max_attitude_deg', '20.0',                   'Skip matching when |roll| or |pitch| exceeds this (0 disables)'),
     ]
 
     declare_args = [

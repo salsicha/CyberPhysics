@@ -170,7 +170,11 @@ class SatelliteCameraSim(Node):
         """East/north metres seen by each pixel of the body-fixed nadir
         camera (image up = vehicle forward). DemNav de-rotates frames by
         -yaw before DEM correlation, so the rendered frame must be yawed
-        the same way the aerodrone sensor sim yaws its crops."""
+        the same way the aerodrone sensor sim yaws its crops.
+
+        Only yaw is modelled: the camera is assumed roll/pitch-stabilised
+        at nadir. The matchers gate on max_attitude_deg, so banked-turn
+        frames are skipped rather than rendered off-nadir."""
         ground_width = 2.0 * view_height * math.tan(self.fov * 0.5)
         gsd = ground_width / max(1, width)
         dx = np.arange(width, dtype=np.float64) - width * 0.5

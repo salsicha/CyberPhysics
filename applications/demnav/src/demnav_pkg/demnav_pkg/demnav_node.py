@@ -29,6 +29,13 @@ def _yaw_from_quaternion(q) -> float:
                       1.0 - 2.0 * (q.y * q.y + q.z * q.z))
 
 
+def _roll_pitch_from_quaternion(q) -> tuple[float, float]:
+    roll = math.atan2(2.0 * (q.w * q.x + q.y * q.z),
+                      1.0 - 2.0 * (q.x * q.x + q.y * q.y))
+    sin_pitch = max(-1.0, min(1.0, 2.0 * (q.w * q.y - q.z * q.x)))
+    return roll, math.asin(sin_pitch)
+
+
 class DemNavNode(Node):
     def __init__(self):
         super().__init__('demnav_node')
@@ -59,6 +66,7 @@ class DemNavNode(Node):
         self.declare_parameter('min_dem_footprint_pixels', 5)
         self.declare_parameter('min_metric_depth_m', 0.2)
         self.declare_parameter('max_metric_depth_m', 500.0)
+        self.declare_parameter('max_attitude_deg', 20.0)
 
         gps_topic      = self.get_parameter('gps_topic').value
         depth_topic    = self.get_parameter('depth_topic').value
@@ -80,6 +88,8 @@ class DemNavNode(Node):
             3, int(self.get_parameter('min_dem_footprint_pixels').value))
         self.min_metric_depth = self.get_parameter('min_metric_depth_m').value
         self.max_metric_depth = self.get_parameter('max_metric_depth_m').value
+        self.max_attitude_rad = math.radians(
+            float(self.get_parameter('max_attitude_deg').value))
         synthetic_terrain = self.get_parameter('synthetic_terrain').value
         self.synthetic_terrain = (
             synthetic_terrain
@@ -91,6 +101,8 @@ class DemNavNode(Node):
         self.latest_odom  = None
         self.camera_info  = None
         self.yaw_rad      = 0.0
+        self.roll_rad     = 0.0
+        self.pitch_rad    = 0.0
         self.heightmap    = None
         self._heightmap_thread = None
 
@@ -169,6 +181,8 @@ class DemNavNode(Node):
     def _on_odom(self, msg: Odometry):
         self.latest_odom = msg
         self.yaw_rad = _yaw_from_quaternion(msg.pose.pose.orientation)
+        self.roll_rad, self.pitch_rad = _roll_pitch_from_quaternion(
+            msg.pose.pose.orientation)
 
     def _on_camera_info(self, msg: CameraInfo):
         self.camera_info = msg
@@ -191,6 +205,16 @@ class DemNavNode(Node):
         alt = self.latest_fix.altitude
 
         if alt <= 0.0:
+            self._publish_valid(False)
+            return
+
+        # A banked or pitched-up camera no longer looks at the nadir patch
+        # the DEM correlation assumes; skip those frames (0 disables).
+        if self.max_attitude_rad > 0.0 and (
+                abs(self.roll_rad) > self.max_attitude_rad or
+                abs(self.pitch_rad) > self.max_attitude_rad):
+            self.get_logger().debug(
+                'Attitude beyond max_attitude_deg — skipping off-nadir frame')
             self._publish_valid(False)
             return
 

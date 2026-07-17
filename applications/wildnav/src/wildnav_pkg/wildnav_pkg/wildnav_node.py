@@ -20,6 +20,13 @@ from .satellite_cache import SatelliteTileCache
 from .satellite_cache import ground_resolution_m, tile_pixel_to_latlon
 
 
+def _roll_pitch_from_quaternion(q):
+    roll = math.atan2(2.0 * (q.w * q.x + q.y * q.z),
+                      1.0 - 2.0 * (q.x * q.x + q.y * q.y))
+    sin_pitch = max(-1.0, min(1.0, 2.0 * (q.w * q.y - q.z * q.x)))
+    return roll, math.asin(sin_pitch)
+
+
 def horizontal_distance_m(lat_a, lon_a, lat_b, lon_b):
     mean_lat = math.radians((lat_a + lat_b) * 0.5)
     east = (lon_b - lon_a) * METERS_PER_DEG_LAT * math.cos(mean_lat)
@@ -63,6 +70,7 @@ class WildNavNode(Node):
             'max_position_jump_m': 250.0,
             'max_image_age_s': 10.0,
             'request_timeout_s': 5.0,
+            'max_attitude_deg': 20.0,
         }
         for name, value in defaults.items():
             self.declare_parameter(name, value)
@@ -181,6 +189,19 @@ class WildNavNode(Node):
             self.busy.release()
 
     def _run_match(self, image, header, image_odom, camera_info):
+        # A banked or pitched camera no longer looks at the nadir footprint
+        # the tile match assumes; skip those frames (0 disables).
+        max_attitude = math.radians(
+            float(self.get_parameter('max_attitude_deg').value))
+        if max_attitude > 0.0:
+            roll, pitch = _roll_pitch_from_quaternion(
+                image_odom.pose.pose.orientation)
+            if abs(roll) > max_attitude or abs(pitch) > max_attitude:
+                self.get_logger().debug(
+                    'Attitude beyond max_attitude_deg — '
+                    'skipping off-nadir frame')
+                self._publish_invalid(0, 0.0)
+                return
         if camera_info is not None and camera_info.k[0] > 0.0:
             matrix = np.asarray(camera_info.k, dtype=np.float64).reshape(3, 3)
             distortion = np.asarray(camera_info.d, dtype=np.float64)

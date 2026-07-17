@@ -2,45 +2,21 @@
 
 services:
   airplane_sitl:
-    image: ardupilot/ardupilot-dev-base:${ARDUPILOT_TAG:-v0.2.0}
+    image: cyberphysics/ardupilot_sitl:${CYBERPHYSICS_TAG:-latest}
     container_name: airplane_sitl
     network_mode: host
     restart: unless-stopped
     env_file:
       - ../systems/airplane/config/sitl.env
     volumes:
-      - ../cache/ardupilot:/workspace/ardupilot
-      - ../cache/jsbsim:/root/jsbsim
       - ../systems/airplane:/workspace/systems/airplane:ro
-    working_dir: /workspace
-    command:
-      - bash
-      - -lc
-      - >
-        set -e;
-        ARDUPILOT_REF="$${ARDUPILOT_REF:-Plane-4.6.3}";
-        if [ ! -d /workspace/ardupilot/.git ]; then
-          git clone --recurse-submodules --depth=1 --branch "$$ARDUPILOT_REF" https://github.com/ArduPilot/ardupilot.git /workspace/ardupilot;
-        else
-          if ! git -C /workspace/ardupilot rev-parse --verify "refs/tags/$$ARDUPILOT_REF^{commit}" >/dev/null 2>&1; then
-            git -C /workspace/ardupilot fetch --depth=1 origin "refs/tags/$$ARDUPILOT_REF:refs/tags/$$ARDUPILOT_REF";
-          fi;
-          if [ "$$(git -C /workspace/ardupilot rev-parse HEAD)" != "$$(git -C /workspace/ardupilot rev-parse "refs/tags/$$ARDUPILOT_REF^{commit}")" ]; then
-            git -C /workspace/ardupilot checkout --detach "refs/tags/$$ARDUPILOT_REF";
-            git -C /workspace/ardupilot submodule update --init --recursive --depth=1;
-          fi;
-        fi;
-        cd /workspace/ardupilot;
-        export PATH="$$PATH:/root/jsbsim/build/src";
-        if [ "${AIRPLANE_SITL_MODEL:-plane}" = "jsbsim" ] && ! command -v JSBSim >/dev/null 2>&1; then
-          if [ ! -d /root/jsbsim/.git ]; then
-            git clone https://github.com/JSBSim-Team/jsbsim.git /root/jsbsim;
-          fi;
-          cmake -S /root/jsbsim -B /root/jsbsim/build -DCMAKE_BUILD_TYPE=Release;
-          cmake --build /root/jsbsim/build -j2;
-          export PATH="$$PATH:/root/jsbsim/build/src";
-        fi;
-        python3 Tools/autotest/sim_vehicle.py -v ArduPlane -f ${AIRPLANE_SITL_MODEL:-plane} --no-mavproxy --custom-location=${INITIAL_LAT:-37.9234},${INITIAL_LON:--122.5967},${ORIGIN_ALT:-280.0},0 --add-param-file=/workspace/systems/airplane/config/ardupilot_plane.params
+    working_dir: /ardupilot
+    command: >
+      python3 Tools/autotest/sim_vehicle.py -v ArduPlane
+        -f ${AIRPLANE_SITL_MODEL:-plane}
+        --no-rebuild --no-mavproxy
+        --custom-location=${INITIAL_LAT:-37.9234},${INITIAL_LON:--122.5967},${ORIGIN_ALT:-280.0},0
+        --add-param-file=/workspace/systems/airplane/config/ardupilot_plane.params
 
   airplane_mavros:
     image: cyberphysics/aerostack2:${CYBERPHYSICS_TAG:-latest}
@@ -57,6 +33,12 @@ services:
     command: >
       ros2 launch mavros apm.launch
         fcu_url:=${SITL_FCU_URL:-tcp://127.0.0.1:5760}
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 10 /entrypoint.sh ros2 topic echo --once /mavros/state | grep -q 'connected: true'"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 120s
 
   airplane_bridge:
     image: cyberphysics/aerostack2:${CYBERPHYSICS_TAG:-latest}
@@ -178,6 +160,34 @@ services:
         max_position_jump_m:=${WILDNAV_MAX_JUMP_M:-200.0}
         minimum_demnav_confidence:=${DEMNAV_FUSION_CONFIDENCE:-0.35}
         minimum_wildnav_confidence:=${WILDNAV_FUSION_CONFIDENCE:-0.10}
+
+  airplane_evaluator:
+    image: cyberphysics/wildnav:${CYBERPHYSICS_TAG:-latest}
+    container_name: airplane_sim_evaluator
+    network_mode: host
+    ipc: host
+    restart: unless-stopped
+    depends_on:
+      - airplane_wildnav
+    env_file:
+      - ../systems/airplane/config/sitl.env
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    volumes:
+      - /dev/shm:/dev/shm
+    command: >
+      ros2 run wildnav_pkg nav_evaluator
+        --ros-args
+        -p truth_gps_topic:=/${AIRPLANE_NAMESPACE:-plane0}/sensor_measurements/gps
+        -p wildnav_fix_topic:=/wildnav/fix
+        -p demnav_fix_topic:=/demnav/fix
+        -p fused_odom_topic:=/airplane/navigation/odometry
+        -p initial_lat:=${INITIAL_LAT:-37.9234}
+        -p initial_lon:=${INITIAL_LON:--122.5967}
+        -p report_period_s:=${NAV_EVAL_REPORT_PERIOD_S:-30.0}
+        -p assert_after_s:=${NAV_EVAL_ASSERT_AFTER_S:-0.0}
+        -p max_rmse_m:=${NAV_EVAL_MAX_RMSE_M:-25.0}
+        -p min_fixes:=${NAV_EVAL_MIN_FIXES:-3}
 
   airplane_rosbridge:
     image: cyberphysics/aerostack2:${CYBERPHYSICS_TAG:-latest}

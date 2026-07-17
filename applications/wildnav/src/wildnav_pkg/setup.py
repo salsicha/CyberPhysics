@@ -27,6 +27,7 @@ setup(
             'wildnav_node = wildnav_pkg.wildnav_node:main',
             'navigation_fusion_node = wildnav_pkg.navigation_fusion:main',
             'wildnav_seed_cache = wildnav_pkg.seed_cache:main',
+            'nav_evaluator = wildnav_pkg.nav_evaluator:main',
         ],
     },
 )
