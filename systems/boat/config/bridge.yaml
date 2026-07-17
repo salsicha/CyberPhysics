@@ -1,4 +1,4 @@
-blueboat_bridge:
+/**:
   ros__parameters:
     namespace: boat0
     mavros_namespace: /mavros

@@ -1,0 +1,7 @@
+pyproject.toml
+mavros_mirror/__init__.py
+mavros_mirror.egg-info/PKG-INFO
+mavros_mirror.egg-info/SOURCES.txt
+mavros_mirror.egg-info/dependency_links.txt
+mavros_mirror.egg-info/entry_points.txt
+mavros_mirror.egg-info/top_level.txt

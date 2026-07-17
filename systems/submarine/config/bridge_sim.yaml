@@ -1,7 +1,8 @@
-bluerov2_bridge:
+/**:
   ros__parameters:
     namespace: sub0
     mavros_namespace: /mavros
+    mirror_pressure: true
     pressure_topic: /mavros/imu/static_pressure
     enable_velocity_setpoints: true
     cmd_vel_topic: /sub0/cmd_vel

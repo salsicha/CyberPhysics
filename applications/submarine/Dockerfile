@@ -22,4 +22,4 @@ FROM scratch
 COPY --from=build / /
 
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["python3", "/scripts/bluerov2_bridge.py"]
+CMD ["mavros_mirror"]

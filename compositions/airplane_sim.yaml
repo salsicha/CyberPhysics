@@ -56,7 +56,7 @@ services:
       - ../systems/airplane:/workspace/systems/airplane:ro
       - /dev/shm:/dev/shm
     command: >
-      python3 /workspace/systems/airplane/scripts/airplane_mavros_bridge.py
+      mavros_mirror
         --ros-args
         --params-file /workspace/systems/airplane/config/mavros_bridge.yaml
         -p namespace:=${AIRPLANE_NAMESPACE:-plane0}

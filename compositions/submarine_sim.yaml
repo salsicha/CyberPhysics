@@ -31,7 +31,7 @@ services:
       - ../systems/submarine/config:/workspace/config:ro
       - /dev/shm:/dev/shm
     command: >
-      python3 /scripts/bluerov2_bridge.py
+      mavros_mirror
         --ros-args
         --params-file /workspace/config/bridge_sim.yaml
 

@@ -1,0 +1,123 @@
+# Shared BlueOS navigation core: MAVROS, OAK-1 MegaDepth camera, DemNav,
+# WildNav, and rosbridge.
+#
+# Defaults render the drone deployment (blueos_aerostack.yaml includes this
+# file unmodified). Other vehicles include it with an env_file that
+# overrides the *_CONTAINER names, camera topic root/frame, namespace,
+# navigation topic, cache paths, and scenario values — see
+# airplane_hardware.yaml with systems/airplane/config/blueos.env.
+
+services:
+  mavros:
+    image: cyberphysics/aerostack2:${CYBERPHYSICS_TAG:-arm64}
+    container_name: ${MAVROS_CONTAINER:-mavros}
+    network_mode: host
+    ipc: host
+    restart: unless-stopped
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    command: >
+      ros2 launch mavros apm.launch
+        fcu_url:=${BLUEOS_FCU_URL:-udp://0.0.0.0:14550@}
+
+  oak1:
+    image: cyberphysics/oak1:${CYBERPHYSICS_TAG:-arm64}
+    container_name: ${OAK1_CONTAINER:-oak1}
+    network_mode: host
+    ipc: host
+    privileged: true
+    restart: unless-stopped
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    volumes:
+      - /dev/bus/usb:/dev/bus/usb
+      - /dev/shm:/dev/shm
+    command: >
+      python3 /scripts/megadepth_ros.py --ros-args
+        -p device_ip:=${OAK1_DEVICE_IP:-auto}
+        -p blob_path:=/models/megadepth_192x256_openvino_2021.4_6shave.blob
+        -p image_topic:=${CAMERA_TOPIC_ROOT:-/oak1}/image_raw
+        -p depth_topic:=${CAMERA_TOPIC_ROOT:-/oak1}/relative_depth
+        -p camera_info_topic:=${CAMERA_TOPIC_ROOT:-/oak1}/camera_info
+        -p highres_image_topic:=${CAMERA_TOPIC_ROOT:-/oak1}/image_highres
+        -p highres_camera_info_topic:=${CAMERA_TOPIC_ROOT:-/oak1}/image_highres/camera_info
+        -p highres_width:=${WILDNAV_IMAGE_WIDTH:-1280}
+        -p highres_height:=${WILDNAV_IMAGE_HEIGHT:-720}
+        -p highres_capture_hz:=${WILDNAV_IMAGE_RATE:-0.5}
+        -p frame_id:=${CAMERA_FRAME_ID:-oak1_optical_frame}
+
+  demnav:
+    image: cyberphysics/demnav:${CYBERPHYSICS_TAG:-arm64}
+    container_name: ${DEMNAV_CONTAINER:-demnav}
+    network_mode: host
+    ipc: host
+    restart: unless-stopped
+    depends_on:
+      - oak1
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    volumes:
+      - /dev/shm:/dev/shm
+      - ${DEMNAV_CACHE_HOST:-/data/demnav_cache}:/data/demnav_cache
+    command: >
+      ros2 launch demnav_pkg demnav.launch.py
+        gps_topic:=/${VEHICLE_NAMESPACE:-${DRONE_NAMESPACE:-drone0}}/sensor_measurements/gps
+        odom_topic:=/${VEHICLE_NAMESPACE:-${DRONE_NAMESPACE:-drone0}}/sensor_measurements/odom
+        depth_topic:=${CAMERA_TOPIC_ROOT:-/oak1}/relative_depth
+        camera_info_topic:=${CAMERA_TOPIC_ROOT:-/oak1}/camera_info
+        initial_lat:=${INITIAL_LAT:-0.0}
+        initial_lon:=${INITIAL_LON:-0.0}
+        origin_alt:=${ORIGIN_ALT:-0.0}
+        area_km:=${AREA_KM:-10.0}
+        search_radius_m:=${SEARCH_RADIUS_M:-200.0}
+        fov_deg:=${FOV_DEG:-69.0}
+        min_correlation:=${MIN_CORRELATION:-0.35}
+
+  wildnav:
+    image: cyberphysics/wildnav:${CYBERPHYSICS_TAG:-arm64}
+    container_name: ${WILDNAV_CONTAINER:-wildnav}
+    network_mode: host
+    ipc: host
+    restart: unless-stopped
+    depends_on:
+      - demnav
+      - oak1
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - WILDNAV_TILE_URL
+    volumes:
+      - /dev/shm:/dev/shm
+      - ${WILDNAV_CACHE_HOST:-/data/wildnav_cache}:/data/wildnav_cache
+    command: >
+      ros2 launch wildnav_pkg wildnav.launch.py
+        image_topic:=${CAMERA_TOPIC_ROOT:-/oak1}/image_highres
+        camera_info_topic:=${CAMERA_TOPIC_ROOT:-/oak1}/image_highres/camera_info
+        prediction_odom_topic:=${NAVIGATION_ODOM_TOPIC:-/navigation/odometry}
+        raw_odom_topic:=/${VEHICLE_NAMESPACE:-${DRONE_NAMESPACE:-drone0}}/sensor_measurements/odom
+        gps_topic:=/${VEHICLE_NAMESPACE:-${DRONE_NAMESPACE:-drone0}}/sensor_measurements/gps
+        demnav_odom_topic:=/demnav/odometry
+        navigation_output_topic:=${NAVIGATION_ODOM_TOPIC:-/navigation/odometry}
+        initial_lat:=${INITIAL_LAT:-0.0}
+        initial_lon:=${INITIAL_LON:-0.0}
+        origin_alt:=${ORIGIN_ALT:-0.0}
+        zoom:=${WILDNAV_ZOOM:-18}
+        search_radius_m:=${WILDNAV_SEARCH_RADIUS_M:-250.0}
+        max_tiles:=${WILDNAV_MAX_TILES:-49}
+        max_tile_downloads_per_cycle:=${WILDNAV_MAX_DOWNLOADS:-8}
+        match_rate_hz:=${WILDNAV_RATE_HZ:-0.2}
+        feature_backend:=${WILDNAV_FEATURE_BACKEND:-SIFT}
+        min_matches:=${WILDNAV_MIN_MATCHES:-16}
+        min_inliers:=${WILDNAV_MIN_INLIERS:-10}
+        min_inlier_ratio:=${WILDNAV_MIN_INLIER_RATIO:-0.25}
+        max_position_jump_m:=${WILDNAV_MAX_JUMP_M:-250.0}
+        minimum_demnav_confidence:=${DEMNAV_FUSION_CONFIDENCE:-0.35}
+        minimum_wildnav_confidence:=${WILDNAV_FUSION_CONFIDENCE:-0.20}
+
+  rosbridge:
+    image: cyberphysics/aerostack2:${CYBERPHYSICS_TAG:-arm64}
+    container_name: ${ROSBRIDGE_CONTAINER:-rosbridge}
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    command: ros2 launch rosbridge_server rosbridge_websocket_launch.xml

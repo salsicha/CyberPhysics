@@ -36,10 +36,13 @@ COPY requirements.txt /requirements.txt
 RUN python3 -m venv --system-site-packages /venv
 RUN . /venv/bin/activate && pip3 install -r /requirements.txt
 
-# Shared synthetic-world model, importable in this image and every image
-# derived from it (demnav, wildnav).
+# Shared libraries, importable in this image and every image derived from
+# it (demnav, wildnav, boat, submarine): the synthetic-world model and the
+# generic MAVROS mirror bridge.
 COPY synthetic_world /workspace/synthetic_world
-RUN . /venv/bin/activate && pip3 install /workspace/synthetic_world
+COPY mavros_mirror /workspace/mavros_mirror
+RUN . /venv/bin/activate && \
+    pip3 install /workspace/synthetic_world /workspace/mavros_mirror
 
 COPY src /workspace/src
 RUN . /opt/ros/${ROS_DISTRO}/setup.bash && \

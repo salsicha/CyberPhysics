@@ -1,4 +1,4 @@
-airplane_mavros_bridge:
+/**:
   ros__parameters:
     namespace: plane0
     mavros_namespace: /mavros

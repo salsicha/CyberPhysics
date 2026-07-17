@@ -14,7 +14,7 @@ jobs:
         with:
           python-version: '3.10'
       - name: Install test dependencies
-        run: pip install numpy opencv-python-headless pytest
+        run: pip install numpy opencv-python-headless pytest pyyaml
       - name: Install synthetic_world
         run: pip install ./applications/aerostack2/synthetic_world
       - name: Run unit tests
@@ -23,11 +23,14 @@ jobs:
         run: >
           python -m compileall -q
           applications/aerostack2/synthetic_world
+          applications/aerostack2/mavros_mirror
           applications/demnav/src
           applications/wildnav/src
           systems/airplane
           tools
           tests
+      - name: Check compose fallbacks match env files
+        run: python tools/check_compose_env_defaults.py
 
   compose-config:
     runs-on: ubuntu-latest

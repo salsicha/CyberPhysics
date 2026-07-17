@@ -1,0 +1,2 @@
+[console_scripts]
+mavros_mirror = mavros_mirror:main

@@ -27,7 +27,7 @@ services:
       - ../systems/boat/config:/workspace/config:ro
       - /dev/shm:/dev/shm
     command: >
-      python3 /scripts/blueboat_bridge.py
+      mavros_mirror
         --ros-args
         --params-file /workspace/config/bridge.yaml
         -p namespace:=${BOAT_NAMESPACE:-boat0}
