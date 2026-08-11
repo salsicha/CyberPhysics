@@ -40,7 +40,7 @@ def generate_launch_description():
     spawn = Node(
         package="ros_gz_sim",
         executable="create",
-        arguments=["-name", "so101", "-topic", "robot_description", "-z", "0.001"],
+        arguments=["-name", "so101", "-topic", "robot_description", "-z", "0.431"],
         output="screen",
     )
     joint_state_broadcaster = Node(

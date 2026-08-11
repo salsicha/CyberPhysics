@@ -1,19 +1,32 @@
+# SO-101 task-solving demo. Select exactly one backend profile:
+#   --profile sim  (Isaac Sim, default policy mode is deterministic demo)
+#   --profile hil  (physical driver + RealSense, commands blocked until armed)
+# Add --profile observe to expose ROS topics to Foxglove over rosbridge.
+
 services:
   isaacsim:
+    profiles: [sim]
     image: nvcr.io/nvidia/isaac-sim:5.1.0
     container_name: so101_groot_isaacsim
     network_mode: host
     ipc: host
     environment:
+      - DISPLAY=${DISPLAY:-:0}
       - ACCEPT_EULA=Y
       - PRIVACY_CONSENT=Y
       - ROS_DISTRO=jazzy
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
       - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+      - NVIDIA_DRIVER_CAPABILITIES=${NVIDIA_DRIVER_CAPABILITIES:-graphics,utility,compute}
+      - SO101_HEADLESS=${SO101_HEADLESS:-true}
+      - SO101_TASK_ID=${SO101_TASK_ID:-pick_red_block_left_bin}
+      - SO101_TASK_TELEMETRY=/workspace/data/so101_task_telemetry.json
     volumes:
       - /dev/shm:/dev/shm
+      - /tmp/.X11-unix:/tmp/.X11-unix
       - ../systems:/workspace/systems:ro
       - ../applications/so101:/workspace/so101:ro
+      - ../data/groot:/workspace/data
       - ${CYBERPHYSICS_ISAAC_CACHE:-/tmp/cyberphysics/isaac-sim/so101}/kit:/isaac-sim/kit/cache:rw
       - ${CYBERPHYSICS_ISAAC_CACHE:-/tmp/cyberphysics/isaac-sim/so101}/ov:/root/.cache/ov:rw
       - ${CYBERPHYSICS_ISAAC_CACHE:-/tmp/cyberphysics/isaac-sim/so101}/pip:/root/.cache/pip:rw
@@ -21,10 +34,11 @@ services:
       - ${CYBERPHYSICS_ISAAC_CACHE:-/tmp/cyberphysics/isaac-sim/so101}/computecache:/root/.nv/ComputeCache:rw
     command: >
       ./python.sh /workspace/so101/scripts/isaacsim_so101.py
-        --headless
         --experience /isaac-sim/apps/isaacsim.exp.base.python.kit
         --urdf /workspace/systems/so101/urdf/so101.urdf
         --scenario /workspace/systems/so101/scenarios/picking_table.json
+        --task-id ${SO101_TASK_ID:-pick_red_block_left_bin}
+        --task-telemetry /workspace/data/so101_task_telemetry.json
         --camera-source ${SO101_ISAAC_CAMERA_SOURCE:-rendered}
     deploy:
       resources:
@@ -35,6 +49,7 @@ services:
               capabilities: [gpu]
 
   groot_policy:
+    profiles: [sim, hil]
     image: cyberphysics/groot:${CYBERPHYSICS_TAG:-latest}
     container_name: so101_groot_policy
     network_mode: host
@@ -45,19 +60,20 @@ services:
       - NVIDIA_DRIVER_CAPABILITIES=${NVIDIA_DRIVER_CAPABILITIES:-graphics,utility,compute}
       - HF_HOME=/workspace/cache/huggingface
       - TORCH_HOME=/workspace/cache/torch
-      - SO101_GROOT_MODE=${SO101_GROOT_MODE:-mock}
+      - SO101_GROOT_MODE=${SO101_GROOT_MODE:-demo}
       - GR00T_MODEL_PATH=${GR00T_MODEL_PATH:-}
-      - GR00T_EMBODIMENT_TAG=${GR00T_EMBODIMENT_TAG:-new_embodiment}
+      - GR00T_EMBODIMENT_TAG=${GR00T_EMBODIMENT_TAG:-so101}
       - GR00T_DEVICE=${GR00T_DEVICE:-cuda}
     volumes:
       - ../data/groot:/workspace/data
       - ../cache/groot:/workspace/cache
     command: >
       python /workspace/so101_policy_server.py
-        --mode ${SO101_GROOT_MODE:-mock}
+        --mode ${SO101_GROOT_MODE:-demo}
         --port ${SO101_GROOT_PORT:-5555}
 
   so101_groot_bridge:
+    profiles: [sim]
     image: cyberphysics/so101:${CYBERPHYSICS_TAG:-latest}
     container_name: so101_groot_bridge
     network_mode: host
@@ -73,3 +89,82 @@ services:
       python3 /workspace/src/so101_description/scripts/groot_so101_bridge.py
         --ros-args
         --params-file /workspace/systems/so101/config/groot_demo.yaml
+        -p task_id:=${SO101_TASK_ID:-pick_red_block_left_bin}
+
+  so101_depth_camera:
+    profiles: [hil]
+    image: cyberphysics/realsense:${CYBERPHYSICS_TAG:-latest}
+    container_name: so101_groot_hil_camera
+    network_mode: host
+    privileged: true
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+    volumes:
+      - /dev/bus/usb:/dev/bus/usb
+      - /dev/shm:/dev/shm
+    command: >
+      stdbuf -o L
+      ros2 launch realsense2_camera rs_launch.py
+        camera_name:=depth_camera
+        camera_namespace:=so101
+        enable_color:=true
+        enable_depth:=true
+        align_depth.enable:=true
+
+  so101_groot_hil_bridge:
+    profiles: [hil]
+    image: cyberphysics/so101:${CYBERPHYSICS_TAG:-latest}
+    container_name: so101_groot_hil_bridge
+    network_mode: host
+    depends_on:
+      - so101_depth_camera
+      - groot_policy
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+    volumes:
+      - ../systems:/workspace/systems:ro
+    command: >
+      python3 /workspace/src/so101_description/scripts/groot_so101_bridge.py
+        --ros-args
+        --params-file /workspace/systems/so101/config/groot_demo.yaml
+        -p task_id:=${SO101_TASK_ID:-pick_red_block_left_bin}
+        -p joint_state_topic:=${SO101_HARDWARE_STATE_TOPIC:-/so101/hardware/joint_states}
+        -p command_topic:=/so101/hil/policy_commands
+        -p camera_topic:=${SO101_CAMERA_TOPIC:-/so101/depth_camera/color/image_raw}
+        -p depth_topic:=${SO101_DEPTH_TOPIC:-/so101/depth_camera/aligned_depth_to_color/image_raw}
+        -p camera_info_topic:=${SO101_CAMERA_INFO_TOPIC:-/so101/depth_camera/color/camera_info}
+
+  so101_hil_guard:
+    profiles: [hil]
+    image: cyberphysics/so101:${CYBERPHYSICS_TAG:-latest}
+    container_name: so101_groot_hil_guard
+    network_mode: host
+    depends_on:
+      - so101_groot_hil_bridge
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+    command: >
+      python3 /workspace/src/so101_description/scripts/so101_hil_guard.py
+        --ros-args
+        -p armed:=${SO101_HIL_ARMED:-false}
+        -p input_command_topic:=/so101/hil/policy_commands
+        -p hardware_state_topic:=${SO101_HARDWARE_STATE_TOPIC:-/so101/hardware/joint_states}
+        -p hardware_command_topic:=${SO101_HARDWARE_COMMAND_TOPIC:-/so101/hardware/joint_commands}
+        -p state_timeout_s:=${SO101_HIL_STATE_TIMEOUT_S:-0.5}
+        -p max_joint_step:=${SO101_HIL_MAX_JOINT_STEP:-0.04}
+
+  foxglove_bridge:
+    profiles: [observe]
+    image: cyberphysics/ros2:${CYBERPHYSICS_TAG:-latest}
+    container_name: so101_groot_foxglove_bridge
+    network_mode: host
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    volumes:
+      - /dev/shm:/dev/shm
+    command: >
+      stdbuf -o L
+      ros2 launch rosbridge_server rosbridge_websocket_launch.xml

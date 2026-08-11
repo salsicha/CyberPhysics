@@ -11,6 +11,7 @@ install(
 install(
   PROGRAMS
     scripts/gazebo_command_relay.py
+    scripts/so101_hil_guard.py
     scripts/genesis_so101.py
     scripts/isaacsim_so101.py
     scripts/so101_cbf_control.py
@@ -22,7 +23,7 @@ install(
 )
 
 install(
-  FILES scripts/so101_common.py
+  FILES scripts/so101_common.py scripts/so101_task_scene.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

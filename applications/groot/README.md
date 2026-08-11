@@ -25,6 +25,12 @@ docker compose -f compositions/groot.yaml up groot
 
 The default command imports `gr00t` and `torch`, then reports whether CUDA is visible. Full inference and fine-tuning require an NVIDIA GPU, NVIDIA Container Toolkit, and enough VRAM for the selected checkpoint.
 
+The SO-101 task server supports three policy modes:
+
+- `demo`: deterministic IK pick-and-place baseline used by the Compose task demo.
+- `mock`: sinusoidal joint motion for transport smoke tests.
+- `real`: a fine-tuned `Gr00tPolicy` checkpoint.
+
 ## Interactive Shell
 
 ```bash

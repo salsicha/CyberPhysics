@@ -239,6 +239,8 @@ class SO101GrootBridge(Node):
             "name": self.scenario.get("name"),
             "frame_id": self.scenario.get("frame_id"),
             "selected_task": self.scenario.get("selected_task"),
+            "robot_spawn": self.scenario.get("robot_spawn", {}),
+            "static_assets": self.scenario.get("static_assets", []),
             "objects": self.scenario.get("objects", []),
         }
 

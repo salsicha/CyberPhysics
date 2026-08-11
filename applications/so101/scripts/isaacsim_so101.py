@@ -22,6 +22,7 @@ from so101_common import (
     LOWER_LIMITS,
     RGB_CAMERA_INFO_TOPIC,
     RGB_TOPIC,
+    TASK_STATUS_TOPIC,
     UPPER_LIMITS,
     camera_info_values,
     quantize,
@@ -29,11 +30,24 @@ from so101_common import (
     synthetic_rgbd,
 )
 
+def env_bool(name, default):
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip().lower() in ("1", "true", "yes", "on")
+
+
 parser = argparse.ArgumentParser()
 parser.add_argument("--urdf", default="/workspace/systems/so101/urdf/so101.urdf")
 parser.add_argument("--usd", default="/tmp/so101.usd")
-parser.add_argument("--headless", action="store_true")
+parser.add_argument(
+    "--headless",
+    action=argparse.BooleanOptionalAction,
+    default=env_bool("SO101_HEADLESS", False),
+)
 parser.add_argument("--scenario", default="/workspace/systems/so101/scenarios/picking_table.json")
+parser.add_argument("--task-id", default=os.environ.get("SO101_TASK_ID", "pick_red_block_left_bin"))
+parser.add_argument("--task-telemetry", default=os.environ.get("SO101_TASK_TELEMETRY", ""))
 parser.add_argument("--camera-source", choices=("rendered", "synthetic"), default="rendered")
 parser.add_argument(
     "--experience",
@@ -57,6 +71,7 @@ simulation_app.update()
 from isaacsim.asset.importer.urdf._urdf import UrdfJointTargetType
 from isaacsim.core.api import World
 from isaacsim.core.prims import Articulation
+from so101_task_scene import SO101TaskScene, load_scenario
 
 try:
     from isaacsim.sensors.camera import Camera
@@ -72,7 +87,7 @@ try:
     import rclpy
     from rclpy.node import Node
     from sensor_msgs.msg import CameraInfo, Image, Imu, JointState
-    from std_msgs.msg import Float64MultiArray
+    from std_msgs.msg import Float64MultiArray, String
 except ImportError as exc:
     simulation_app.close()
     raise RuntimeError(
@@ -134,6 +149,7 @@ class IsaacBridge(Node):
     def __init__(self, rendered_camera=None, camera_source="rendered"):
         super().__init__("so101_isaacsim_bridge")
         self.target = np.zeros(len(JOINT_NAMES), dtype=np.float32)
+        self.command_received = False
         self.rendered_camera = rendered_camera
         self.camera_source = camera_source
         self.warned_camera_fallback = False
@@ -143,6 +159,9 @@ class IsaacBridge(Node):
         self.depth_pub = self.create_publisher(Image, DEPTH_TOPIC, 5)
         self.depth_info_pub = self.create_publisher(CameraInfo, DEPTH_CAMERA_INFO_TOPIC, 5)
         self.imu_pub = self.create_publisher(Imu, CAMERA_IMU_TOPIC, 20)
+        self.task_status_pub = self.create_publisher(String, TASK_STATUS_TOPIC, 10)
+        self.last_task_status = None
+        self.last_task_publish_ns = 0
         self.camera_width = CAMERA_WIDTH
         self.camera_height = CAMERA_HEIGHT
         self.subscription = self.create_subscription(
@@ -156,6 +175,18 @@ class IsaacBridge(Node):
         self.target = np.clip(
             np.asarray(msg.data), LOWER_LIMITS, UPPER_LIMITS
         ).astype(np.float32)
+        self.command_received = True
+
+    def publish_task_status(self, summary):
+        now_ns = self.get_clock().now().nanoseconds
+        status = summary.get("status")
+        if status == self.last_task_status and now_ns - self.last_task_publish_ns < 1_000_000_000:
+            return
+        self.last_task_status = status
+        self.last_task_publish_ns = now_ns
+        msg = String()
+        msg.data = json.dumps(summary, sort_keys=True)
+        self.task_status_pub.publish(msg)
 
     def publish_state(self, positions, velocities):
         msg = JointState()
@@ -276,6 +307,13 @@ def main():
 
     world = World(stage_units_in_meters=1.0)
     world.scene.add_default_ground_plane()
+    scenario = load_scenario(args.scenario)
+    task_scene = SO101TaskScene(
+        omni.usd.get_context().get_stage(),
+        scenario,
+        task_id=args.task_id,
+        telemetry_path=args.task_telemetry,
+    )
     camera_config = load_scenario_camera(args.scenario)
     rendered_camera = None
     if args.camera_source == "rendered":
@@ -284,6 +322,11 @@ def main():
     robot = world.scene.add(Articulation(prim_path=prim_path, name="so101"))
     world.reset()
     robot.initialize()
+    robot_spawn = scenario.get("robot_spawn", {})
+    robot.set_world_pose(
+        position=np.asarray(robot_spawn.get("xyz", [0.0, 0.0, 0.0]), dtype=np.float64),
+        orientation=isaac_orientation_from_rpy(robot_spawn.get("rpy", [0.0, 0.0, 0.0])),
+    )
     if args.usd:
         omni.usd.get_context().save_as_stage(args.usd)
 
@@ -300,13 +343,15 @@ def main():
             rclpy.spin_once(bridge, timeout_sec=0.0)
             robot.set_joint_position_targets(bridge.target, joint_indices=indices)
             world.step(render=(not args.headless) or args.camera_source == "rendered")
-            bridge.publish_state(
-                robot.get_joint_positions(joint_indices=indices),
-                robot.get_joint_velocities(joint_indices=indices),
-            )
+            positions = robot.get_joint_positions(joint_indices=indices)
+            velocities = robot.get_joint_velocities(joint_indices=indices)
+            task_scene.update(positions, bridge.command_received)
+            bridge.publish_state(positions, velocities)
+            bridge.publish_task_status(task_scene.summary())
     except KeyboardInterrupt:
         pass
     finally:
+        task_scene.close()
         bridge.destroy_node()
         rclpy.shutdown()
         simulation_app.close()

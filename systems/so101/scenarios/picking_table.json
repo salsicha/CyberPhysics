@@ -36,15 +36,15 @@
     {
       "name": "left_bin",
       "type": "target_bin",
-      "xyz": [0.56, 0.27, 0.45],
-      "size": [0.24, 0.18, 0.035],
+      "xyz": [0.30, 0.25, 0.45],
+      "size": [0.18, 0.12, 0.035],
       "material": "blue_plastic"
     },
     {
       "name": "right_bin",
       "type": "target_bin",
-      "xyz": [0.56, -0.27, 0.45],
-      "size": [0.24, 0.18, 0.035],
+      "xyz": [0.30, -0.25, 0.45],
+      "size": [0.18, 0.12, 0.035],
       "material": "red_plastic"
     },
     {
@@ -74,7 +74,7 @@
       "role": "target",
       "shape": "box",
       "color": "red",
-      "xyz": [0.34, -0.12, 0.4825],
+      "xyz": [0.30, -0.10, 0.4825],
       "rpy": [0.0, 0.0, 0.18],
       "size": [0.045, 0.045, 0.045],
       "mass_kg": 0.045,
@@ -85,7 +85,7 @@
       "role": "distractor",
       "shape": "cylinder",
       "color": "blue",
-      "xyz": [0.43, 0.08, 0.49],
+      "xyz": [0.38, 0.02, 0.49],
       "rpy": [0.0, 0.0, 0.0],
       "radius_m": 0.027,
       "height_m": 0.06,
@@ -97,7 +97,7 @@
       "role": "distractor",
       "shape": "box",
       "color": "green",
-      "xyz": [0.25, 0.18, 0.48],
+      "xyz": [0.27, 0.10, 0.48],
       "rpy": [0.0, 0.0, -0.35],
       "size": [0.04, 0.055, 0.04],
       "mass_kg": 0.04,

@@ -8,6 +8,8 @@ import numpy as np
 from gr00t.policy.policy import BasePolicy
 from gr00t.policy.server_client import PolicyServer
 
+from so101_task_policy import ScriptedPickPlaceController
+
 JOINT_LIMITS = np.array([
     [-1.9199, 1.9199],
     [-1.7453, 1.7453],
@@ -64,6 +66,37 @@ class MockSO101Policy(BasePolicy):
         return {"joint_positions": action.reshape(1, 1, 6)}, {"mode": "mock", "step": self.step}
 
 
+class DemoSO101Policy(BasePolicy):
+    """GR00T-compatible deterministic baseline for the tabletop task demo."""
+
+    def __init__(self):
+        super().__init__(strict=False)
+        self.controller = ScriptedPickPlaceController()
+
+    def check_observation(self, observation: dict[str, Any]) -> None:
+        pass
+
+    def check_action(self, action: dict[str, Any]) -> None:
+        pass
+
+    def reset(self, options: dict[str, Any] | None = None) -> dict[str, Any]:
+        self.controller.reset()
+        return {"reset": True}
+
+    def get_modality_config(self) -> dict[str, Any]:
+        return {
+            "video": {"modality_keys": ["front"], "delta_indices": [0]},
+            "state": {"modality_keys": ["joint_positions"], "delta_indices": [0]},
+            "action": {"modality_keys": ["joint_positions"], "delta_indices": [0]},
+        }
+
+    def _get_action(self, observation: dict[str, Any], options: dict[str, Any] | None = None):
+        action = self.controller.get_action(observation)
+        return {
+            "joint_positions": action.reshape(1, 1, 6)
+        }, {"mode": "demo", "waypoint": self.controller.status}
+
+
 def build_real_policy(args):
     from gr00t.data.embodiment_tags import EmbodimentTag
     from gr00t.policy.gr00t_policy import Gr00tPolicy
@@ -80,7 +113,11 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--port", type=int, default=5555)
-    parser.add_argument("--mode", choices=["mock", "real"], default=os.environ.get("SO101_GROOT_MODE", "mock"))
+    parser.add_argument(
+        "--mode",
+        choices=["demo", "mock", "real"],
+        default=os.environ.get("SO101_GROOT_MODE", "demo"),
+    )
     parser.add_argument("--model-path", default=os.environ.get("GR00T_MODEL_PATH"))
     parser.add_argument("--embodiment-tag", default=os.environ.get("GR00T_EMBODIMENT_TAG", "new_embodiment"))
     parser.add_argument("--device", default=os.environ.get("GR00T_DEVICE", "cuda"))
@@ -92,6 +129,8 @@ def main():
         if not args.model_path:
             raise SystemExit("--model-path or GR00T_MODEL_PATH is required for --mode real")
         policy = build_real_policy(args)
+    elif args.mode == "demo":
+        policy = DemoSO101Policy()
     else:
         policy = MockSO101Policy(amplitude=args.mock_amplitude)
 

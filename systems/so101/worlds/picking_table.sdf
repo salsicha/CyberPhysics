@@ -77,24 +77,24 @@
 
     <model name="left_bin">
       <static>true</static>
-      <pose>0.56 0.27 0.45 0 0 0</pose>
+      <pose>0.30 0.25 0.45 0 0 0</pose>
       <link name="link">
-        <collision name="base"><geometry><box><size>0.24 0.18 0.035</size></box></geometry></collision>
-        <visual name="base_visual"><geometry><box><size>0.24 0.18 0.035</size></box></geometry><material><ambient>0.04 0.19 0.35 1</ambient><diffuse>0.06 0.32 0.58 1</diffuse></material></visual>
+        <collision name="base"><geometry><box><size>0.18 0.12 0.035</size></box></geometry></collision>
+        <visual name="base_visual"><geometry><box><size>0.18 0.12 0.035</size></box></geometry><material><ambient>0.04 0.19 0.35 1</ambient><diffuse>0.06 0.32 0.58 1</diffuse></material></visual>
       </link>
     </model>
 
     <model name="right_bin">
       <static>true</static>
-      <pose>0.56 -0.27 0.45 0 0 0</pose>
+      <pose>0.30 -0.25 0.45 0 0 0</pose>
       <link name="link">
-        <collision name="base"><geometry><box><size>0.24 0.18 0.035</size></box></geometry></collision>
-        <visual name="base_visual"><geometry><box><size>0.24 0.18 0.035</size></box></geometry><material><ambient>0.36 0.12 0.08 1</ambient><diffuse>0.66 0.22 0.14 1</diffuse></material></visual>
+        <collision name="base"><geometry><box><size>0.18 0.12 0.035</size></box></geometry></collision>
+        <visual name="base_visual"><geometry><box><size>0.18 0.12 0.035</size></box></geometry><material><ambient>0.36 0.12 0.08 1</ambient><diffuse>0.66 0.22 0.14 1</diffuse></material></visual>
       </link>
     </model>
 
     <model name="red_block_target">
-      <pose>0.34 -0.12 0.4825 0 0 0.18</pose>
+      <pose>0.30 -0.10 0.4825 0 0 0.18</pose>
       <link name="link">
         <inertial><mass>0.045</mass><inertia><ixx>0.00002</ixx><iyy>0.00002</iyy><izz>0.00002</izz></inertia></inertial>
         <collision name="collision"><geometry><box><size>0.045 0.045 0.045</size></box></geometry></collision>
@@ -103,7 +103,7 @@
     </model>
 
     <model name="blue_cylinder_distractor">
-      <pose>0.43 0.08 0.49 0 0 0</pose>
+      <pose>0.38 0.02 0.49 0 0 0</pose>
       <link name="link">
         <inertial><mass>0.035</mass><inertia><ixx>0.000015</ixx><iyy>0.000015</iyy><izz>0.00001</izz></inertia></inertial>
         <collision name="collision"><geometry><cylinder><radius>0.027</radius><length>0.06</length></cylinder></geometry></collision>
@@ -112,7 +112,7 @@
     </model>
 
     <model name="green_block_distractor">
-      <pose>0.25 0.18 0.48 0 0 -0.35</pose>
+      <pose>0.27 0.10 0.48 0 0 -0.35</pose>
       <link name="link">
         <inertial><mass>0.04</mass><inertia><ixx>0.000018</ixx><iyy>0.000018</iyy><izz>0.000018</izz></inertia></inertial>
         <collision name="collision"><geometry><box><size>0.04 0.055 0.04</size></box></geometry></collision>

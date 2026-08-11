@@ -40,6 +40,7 @@ DEPTH_FRAME_ID = "groot_camera_depth_optical_frame"
 BASE_FRAME_ID = "base_link"
 TABLE_FRAME_ID = "table_frame"
 GRIPPER_FRAME_ID = "gripper_base_link"
+TASK_STATUS_TOPIC = "/so101/task_status"
 
 CAMERA_WIDTH = 640
 CAMERA_HEIGHT = 480
@@ -58,10 +59,43 @@ CAMERA_TO_DEPTH_RPY = (0.0, 0.0, 0.0)
 WORLD_TO_TABLE_TRANSLATION = (0.42, 0.0, 0.425)
 WORLD_TO_TABLE_RPY = (0.0, 0.0, 0.0)
 
+# Kinematic dimensions to the centre of the jaws.
+SHOULDER_PIVOT_Z = 0.0225 + 0.065 + 0.045
+ARM_LINK_LENGTHS = np.array([0.14, 0.13, 0.055 + 0.052 + 0.035], dtype=np.float64)
+
 
 def quantize(values, resolution):
     values = np.asarray(values, dtype=np.float32)
     return np.round(values / resolution) * resolution
+
+
+def forward_kinematics(joints, robot_spawn_xyz=(0.0, 0.0, 0.0)):
+    """Return the world-space centre of the SO-101 gripper jaws."""
+    joints = np.asarray(joints, dtype=np.float64).reshape(len(JOINT_NAMES))
+    spawn = np.asarray(robot_spawn_xyz, dtype=np.float64)
+    cumulative_pitch = np.cumsum(joints[1:4])
+    radial = float(np.sum(ARM_LINK_LENGTHS * np.sin(cumulative_pitch)))
+    vertical = float(np.sum(ARM_LINK_LENGTHS * np.cos(cumulative_pitch)))
+    return np.array([
+        spawn[0] + radial * math.cos(float(joints[0])),
+        spawn[1] + radial * math.sin(float(joints[0])),
+        spawn[2] + SHOULDER_PIVOT_Z + vertical,
+    ], dtype=np.float64)
+
+
+def safe_hardware_target(requested, current, max_joint_step):
+    """Clamp one HIL command against limits and the measured hardware state."""
+    requested = np.asarray(requested, dtype=np.float64).reshape(len(JOINT_NAMES))
+    current = np.asarray(current, dtype=np.float64).reshape(len(JOINT_NAMES))
+    if not np.all(np.isfinite(requested)) or not np.all(np.isfinite(current)):
+        raise ValueError("SO-101 HIL state and command must be finite")
+    step = np.asarray(max_joint_step, dtype=np.float64)
+    if step.ndim == 0:
+        step = np.full(len(JOINT_NAMES), float(step))
+    if step.size != len(JOINT_NAMES) or not np.all(np.isfinite(step)) or np.any(step <= 0.0):
+        raise ValueError("SO-101 HIL max joint step must be finite and positive")
+    bounded = np.clip(requested, LOWER_LIMITS, UPPER_LIMITS)
+    return np.clip(current + np.clip(bounded - current, -step, step), LOWER_LIMITS, UPPER_LIMITS)
 
 
 def camera_info_values(width=CAMERA_WIDTH, height=CAMERA_HEIGHT):

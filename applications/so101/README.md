@@ -93,45 +93,87 @@ commands from the GR00T policy server through the bridge. The compose file sets
 `FASTDDS_BUILTIN_TRANSPORTS=UDPv4` so ROS samples flow reliably between Docker
 host-network containers.
 
-## SO-101 + GR00T in Isaac Sim
+## SO-101 + GR00T Task-Solving Demo
 
-The Isaac GR00T demo runs Isaac Sim headless, publishes SO-101 joint state plus
-a simulated RGB camera stream, starts a GR00T-compatible policy server, and
-bridges policy actions back to `/so101/joint_commands`:
+Build the reusable SO-101 and GR00T images, then select the simulation profile:
 
 ```bash
 make -C applications build_so101 build_groot
-docker compose -f compositions/so101_groot_isaac.yaml up
+docker compose -f compositions/so101_groot_isaac.yaml --profile sim up
 ```
 
-By default the policy service uses `SO101_GROOT_MODE=mock`. This gives a
-repeatable end-to-end demo without storing or downloading a finetuned SO-101
-checkpoint. To use a real GR00T policy, provide a checkpoint that has been
-finetuned for the SO-101 embodiment:
+The default `SO101_GROOT_MODE=demo` policy is a deterministic, GR00T-compatible
+benchmark baseline. It uses the fixed task specification and measured joint state
+to execute IK-generated pick, lift, transfer, place, and retreat waypoints. It does
+not read live simulator object poses. Use this mode to verify the complete system;
+use `real` mode for visual-policy evaluation.
+
+Isaac now materializes the table, bins, target, distractors, and camera from
+`systems/so101/scenarios/picking_table.json`. For deterministic demo behavior it
+uses kinematic grasp attachment at the jaws, publishes JSON task progress on
+`/so101/task_status`, and writes these host files:
+
+- `data/groot/so101_task_telemetry.json`
+- `data/groot/so101_task_telemetry_metrics.json`
+
+The simulator is headless by default. On a Linux X11 host, show the Isaac window with:
+
+```bash
+xhost +si:localuser:root
+SO101_HEADLESS=false docker compose \
+  -f compositions/so101_groot_isaac.yaml --profile sim up
+xhost -si:localuser:root
+```
+
+The final `xhost` command revokes the temporary local-root display permission after
+the stack stops. To inspect camera, joints, commands, and task status in Foxglove:
+
+```bash
+docker compose -f compositions/so101_groot_isaac.yaml \
+  --profile sim --profile observe up
+foxglove-studio
+```
+
+Connect Foxglove to Rosbridge at `ws://localhost:9090`.
+
+Set `SO101_TASK_ID=pick_green_block_right_bin` to run the second scenario task.
+
+To use a fine-tuned SO-101 GR00T checkpoint stored under `data/groot/models/`:
 
 ```bash
 SO101_GROOT_MODE=real \
-GR00T_MODEL_PATH=/models/so101-gr00t-checkpoint \
+GR00T_MODEL_PATH=/workspace/data/models/so101-checkpoint \
 GR00T_EMBODIMENT_TAG=so101 \
-docker compose -f compositions/so101_groot_isaac.yaml up
+docker compose -f compositions/so101_groot_isaac.yaml --profile sim up
 ```
 
-The Isaac adapter loads `/workspace/systems/so101/scenarios/picking_table.json`,
-creates a rendered camera from its camera pose, and publishes RGB, depth, camera
-info, IMU, and joint state topics. Set `SO101_ISAAC_CAMERA_SOURCE=synthetic` to
-force deterministic generated images when the Isaac camera sensor cannot start.
+### Optional Hardware In The Loop
 
-The bridge reads `/so101/camera/image_raw`, optional depth, camera calibration,
-and `/joint_states`, loads the selected task language from the scenario file,
-sends joint history and observation metadata to the policy server, clips returned
-joint targets to the SO-101 URDF limits, and publishes
-`std_msgs/msg/Float64MultiArray` commands. Camera, scenario, and bridge
-parameters live in `systems/so101/config/groot_demo.yaml`.
+The `hil` profile replaces Isaac and its simulation bridge with a RealSense camera,
+hardware-topic bridge, and a safety gate. A physical motor driver must run separately,
+publish `/so101/hardware/joint_states`, and subscribe to
+`/so101/hardware/joint_commands`. Start HIL disarmed first:
 
-On this host, bounded startup testing reached Isaac Sim initialization but Isaac
-Sim 5.1 crashed in `librtx.scenedb.plugin.so` before the SO-101 script could run.
-The ROS demo above exercises the SO-101 camera, GR00T policy server, and bridge
-path without that renderer dependency.
+```bash
+docker compose -f compositions/so101_groot_isaac.yaml --profile hil up
+```
+
+The gate rejects every command while disarmed and also rejects commands when hardware
+state is missing or older than 0.5 seconds. After checking the physical workspace,
+driver, joint directions, limits, and emergency stop, explicitly arm a new run:
+
+```bash
+SO101_HIL_ARMED=true \
+docker compose -f compositions/so101_groot_isaac.yaml --profile hil up
+```
+
+Override `SO101_HARDWARE_STATE_TOPIC`, `SO101_HARDWARE_COMMAND_TOPIC`, or the camera
+topic variables when the physical driver uses different names. The HIL gate additionally
+clips each requested joint step using `SO101_HIL_MAX_JOINT_STEP` (default `0.04`).
+
+Isaac Sim 5.1 previously reached initialization but crashed in
+`librtx.scenedb.plugin.so` on one tested host. The lightweight ROS demo remains useful
+for transport/interface tests when that renderer-specific failure occurs.
 
 ## Calibration And Dataset Checks
 
