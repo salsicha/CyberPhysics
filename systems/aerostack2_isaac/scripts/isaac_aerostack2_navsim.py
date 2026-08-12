@@ -47,8 +47,6 @@ from isaacsim.core.api.materials import OmniPBR
 from isaacsim.core.api.objects import VisualCuboid
 from isaacsim.core.utils.extensions import enable_extension
 from isaacsim.core.utils.rotations import euler_angles_to_quat
-from isaacsim.core.utils.stage import add_reference_to_stage
-from isaacsim.core.utils.viewports import get_active_viewport
 from pxr import Gf, UsdGeom
 
 enable_extension("isaacsim.ros2.bridge")

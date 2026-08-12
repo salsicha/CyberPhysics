@@ -6,8 +6,10 @@ services:
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
       - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+    volumes:
+      - ../applications/so101/scripts:/workspace/so101_scripts:ro
     command: >
-      python3 /workspace/src/so101_description/scripts/mock_so101_sim.py
+      python3 /workspace/so101_scripts/mock_so101_sim.py
 
   groot_policy:
     image: cyberphysics/groot:${CYBERPHYSICS_TAG:-latest}
@@ -21,13 +23,19 @@ services:
       - GR00T_MODEL_PATH=${GR00T_MODEL_PATH:-}
       - GR00T_EMBODIMENT_TAG=${GR00T_EMBODIMENT_TAG:-new_embodiment}
       - GR00T_DEVICE=${GR00T_DEVICE:-cuda}
+      - SO101_SCENARIO_FILE=/workspace/systems/so101/scenarios/picking_table.json
+      - SO101_TASK_ID=${SO101_TASK_ID:-pick_red_block_left_bin}
     volumes:
       - ../data/groot:/workspace/data
       - ../cache/groot:/workspace/cache
+      - ../applications/groot/scripts:/workspace/groot_scripts:ro
+      - ../systems:/workspace/systems:ro
     command: >
-      python /workspace/so101_policy_server.py
+      python /workspace/groot_scripts/so101_policy_server.py
         --mode ${SO101_GROOT_MODE:-mock}
         --port ${SO101_GROOT_PORT:-5555}
+        --scenario-file /workspace/systems/so101/scenarios/picking_table.json
+        --task-id ${SO101_TASK_ID:-pick_red_block_left_bin}
 
   so101_groot_bridge:
     image: cyberphysics/so101:${CYBERPHYSICS_TAG:-latest}
@@ -41,7 +49,8 @@ services:
       - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
     volumes:
       - ../systems:/workspace/systems:ro
+      - ../applications/so101/scripts:/workspace/so101_scripts:ro
     command: >
-      python3 /workspace/src/so101_description/scripts/groot_so101_bridge.py
+      python3 /workspace/so101_scripts/groot_so101_bridge.py
         --ros-args
         --params-file /workspace/systems/so101/config/groot_demo.yaml

@@ -64,7 +64,7 @@ control at each simulation step.
 
 ## Isaac Sim
 
-The composition uses the repository's Isaac Sim 5.1.0 image selection:
+The composition is pinned to Isaac Sim 6.0.1:
 
 ```bash
 docker compose -f compositions/so101_isaacsim.yaml up
@@ -74,8 +74,23 @@ The standalone script uses Isaac Sim's base Python experience for headless runs,
 enables the URDF importer and Isaac ROS 2 bridge, imports
 `systems/so101/urdf/so101.urdf` as a fixed-base USD articulation, drives
 articulation position targets, and publishes joint states plus a simulated RGB
-camera. NVIDIA marks Isaac Sim 5.1 as unsupported, so validate the importer API
-before changing the pinned image version.
+camera. The Compose service configures the ROS 2 Jazzy bridge from
+`isaacsim.ros2.core`, bypasses the container's streaming entrypoint, and keeps
+6.0.1 caches separate from older releases.
+
+Isaac Sim 6.0.1 runs as UID/GID 1234 in the container. The Compose files run a
+network-disabled `isaacsim_cache_init` dependency first so newly created cache
+mounts are automatically writable by that user. If you deliberately launch the
+Isaac service with `--no-deps`, initialize the cache explicitly first:
+
+```bash
+docker compose -f compositions/so101_isaacsim.yaml run --rm isaacsim_cache_init
+```
+
+The GR00T composition instead defaults
+`CYBERPHYSICS_ISAAC_CACHE` to
+`/tmp/cyberphysics/isaac-sim/6.0.1/so101`; its `sim` profile initializes that
+directory automatically, or the variable can point at another cache location.
 
 ## SO-101 + GR00T ROS Demo
 
@@ -113,20 +128,37 @@ Isaac now materializes the table, bins, target, distractors, and camera from
 uses kinematic grasp attachment at the jaws, publishes JSON task progress on
 `/so101/task_status`, and writes these host files:
 
-- `data/groot/so101_task_telemetry.json`
-- `data/groot/so101_task_telemetry_metrics.json`
+- `data/groot/telemetry/so101_task_telemetry.json`
+- `data/groot/telemetry/so101_task_telemetry_metrics.json`
 
-The simulator is headless by default. On a Linux X11 host, show the Isaac window with:
+On a Linux X11 host, the simulator opens the Isaac window by default:
 
 ```bash
-xhost +si:localuser:root
-SO101_HEADLESS=false docker compose \
-  -f compositions/so101_groot_isaac.yaml --profile sim up
-xhost -si:localuser:root
+docker compose \
+  -f compositions/so101_groot_isaac.yaml --profile sim up --force-recreate
 ```
 
-The final `xhost` command revokes the temporary local-root display permission after
-the stack stops. To inspect camera, joints, commands, and task status in Foxglove:
+Set `SO101_HEADLESS=true` for a remote or display-less run. Once the first
+physics/render/publish step completes, the service becomes healthy and prints a
+heartbeat every 30 seconds. Set `SO101_LOG_HEARTBEAT_SECONDS=0` to disable it.
+
+The network-disabled `isaacsim_xauth_init` service copies the current Xauthority
+cookie into a private Docker volume readable by Isaac Sim's UID 1234. This avoids
+granting broad display access with `xhost`. Windowed runs automatically select
+`isaacsim.exp.full.kit`; headless runs use `isaacsim.exp.base.python.kit`. Override
+either choice with `SO101_ISAAC_EXPERIENCE` if needed. The GUI opens at `(0,0)`
+with a 1440x900 window. Multi-monitor hosts can set `SO101_ISAAC_WINDOW_X`,
+`SO101_ISAAC_WINDOW_Y`, `SO101_ISAAC_WINDOW_WIDTH`, and
+`SO101_ISAAC_WINDOW_HEIGHT`. The launcher detects GNOME's truncated desktop-wide
+work area, expands it only while Kit creates the startup window, and then restores
+the original value. Set `SO101_ISAAC_X11_WORKAREA_FIX=false` to disable this guard.
+After initialization, the arm's force position drive is assigned stiffness `400`
+and damping `40` directly through the articulation controller, preventing gravity
+sag at extended grasp poses. Advanced tuning is available through
+`SO101_ISAAC_JOINT_DRIVE_TYPE`, `SO101_ISAAC_JOINT_STIFFNESS`, and
+`SO101_ISAAC_JOINT_DAMPING`.
+To inspect camera, joints, commands, and task status
+in Foxglove:
 
 ```bash
 docker compose -f compositions/so101_groot_isaac.yaml \
@@ -171,9 +203,10 @@ Override `SO101_HARDWARE_STATE_TOPIC`, `SO101_HARDWARE_COMMAND_TOPIC`, or the ca
 topic variables when the physical driver uses different names. The HIL gate additionally
 clips each requested joint step using `SO101_HIL_MAX_JOINT_STEP` (default `0.04`).
 
-Isaac Sim 5.1 previously reached initialization but crashed in
-`librtx.scenedb.plugin.so` on one tested host. The lightweight ROS demo remains useful
-for transport/interface tests when that renderer-specific failure occurs.
+The 6.0.1 pin replaces the unsupported 5.1 runtime that crashed in
+`librtx.scenedb.plugin.so` with R595 drivers. The lightweight ROS demo remains
+useful for transport/interface tests on hosts that do not satisfy Isaac Sim's
+GPU, VRAM, or driver requirements.
 
 ## Calibration And Dataset Checks
 

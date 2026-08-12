@@ -1,8 +1,40 @@
 services:
+  isaacsim_cache_init:
+    profiles: ["navsim"]
+    image: nvcr.io/nvidia/isaac-sim:6.0.1
+    user: "0:0"
+    network_mode: none
+    volumes:
+      - ~/docker/isaac-sim/6.0.1/cache/kit:/isaac-sim/kit/cache:rw
+      - ~/docker/isaac-sim/6.0.1/cache/user:/isaac-sim/.cache:rw
+      - ~/docker/isaac-sim/6.0.1/cache/ov:/isaac-sim/.cache/ov:rw
+      - ~/docker/isaac-sim/6.0.1/cache/pip:/isaac-sim/.cache/pip:rw
+      - ~/docker/isaac-sim/6.0.1/cache/glcache:/isaac-sim/.cache/nvidia/GLCache:rw
+      - ~/docker/isaac-sim/6.0.1/cache/computecache:/isaac-sim/.nv/ComputeCache:rw
+      - ~/docker/isaac-sim/6.0.1/logs:/isaac-sim/.nvidia-omniverse/logs:rw
+      - ~/docker/isaac-sim/6.0.1/config:/isaac-sim/.nvidia-omniverse/config:rw
+      - ~/docker/isaac-sim/6.0.1/data:/isaac-sim/.local/share/ov/data:rw
+    entrypoint: ["/bin/chown"]
+    command:
+      - "1234:1234"
+      - /isaac-sim/kit/cache
+      - /isaac-sim/.cache
+      - /isaac-sim/.cache/ov
+      - /isaac-sim/.cache/pip
+      - /isaac-sim/.cache/nvidia/GLCache
+      - /isaac-sim/.nv/ComputeCache
+      - /isaac-sim/.nvidia-omniverse/logs
+      - /isaac-sim/.nvidia-omniverse/config
+      - /isaac-sim/.local/share/ov/data
+    restart: "no"
+
   isaacsim:
     profiles: ["navsim"]
-    image: nvcr.io/nvidia/isaac-sim:5.1.0
+    image: nvcr.io/nvidia/isaac-sim:6.0.1
     container_name: aerostack2_isaacsim
+    depends_on:
+      isaacsim_cache_init:
+        condition: service_completed_successfully
     network_mode: host
     ipc: host
     runtime: nvidia
@@ -13,8 +45,7 @@ services:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
       - ROS_DISTRO=${ISAAC_ROS_DISTRO:-humble}
       - RMW_IMPLEMENTATION=${RMW_IMPLEMENTATION:-rmw_fastrtps_cpp}
-      - LD_LIBRARY_PATH=/isaac-sim/exts/isaacsim.ros2.bridge/${ISAAC_ROS_DISTRO:-humble}/lib
-      - PYTHONPATH=/isaac-sim/exts/isaacsim.ros2.bridge/${ISAAC_ROS_DISTRO:-humble}
+      - LD_LIBRARY_PATH=/isaac-sim/exts/isaacsim.ros2.core/${ISAAC_ROS_DISTRO:-humble}/lib
       - NVIDIA_DRIVER_CAPABILITIES=all
       - OMNI_KIT_ALLOW_ROOT=1
     env_file:
@@ -22,14 +53,15 @@ services:
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix
       - ../systems/aerostack2_isaac:/workspace/systems/aerostack2_isaac:ro
-      - ~/docker/isaac-sim/cache/kit:/isaac-sim/kit/cache:rw
-      - ~/docker/isaac-sim/cache/ov:/root/.cache/ov:rw
-      - ~/docker/isaac-sim/cache/pip:/root/.cache/pip:rw
-      - ~/docker/isaac-sim/cache/glcache:/root/.cache/nvidia/GLCache:rw
-      - ~/docker/isaac-sim/cache/computecache:/root/.nv/ComputeCache:rw
-      - ~/docker/isaac-sim/logs:/root/.nvidia-omniverse/logs:rw
-      - ~/docker/isaac-sim/config:/root/.nvidia-omniverse/config:rw
-      - ~/docker/isaac-sim/data:/root/.local/share/ov/data:rw
+      - ~/docker/isaac-sim/6.0.1/cache/kit:/isaac-sim/kit/cache:rw
+      - ~/docker/isaac-sim/6.0.1/cache/user:/isaac-sim/.cache:rw
+      - ~/docker/isaac-sim/6.0.1/cache/ov:/isaac-sim/.cache/ov:rw
+      - ~/docker/isaac-sim/6.0.1/cache/pip:/isaac-sim/.cache/pip:rw
+      - ~/docker/isaac-sim/6.0.1/cache/glcache:/isaac-sim/.cache/nvidia/GLCache:rw
+      - ~/docker/isaac-sim/6.0.1/cache/computecache:/isaac-sim/.nv/ComputeCache:rw
+      - ~/docker/isaac-sim/6.0.1/logs:/isaac-sim/.nvidia-omniverse/logs:rw
+      - ~/docker/isaac-sim/6.0.1/config:/isaac-sim/.nvidia-omniverse/config:rw
+      - ~/docker/isaac-sim/6.0.1/data:/isaac-sim/.local/share/ov/data:rw
     entrypoint: []
     command: >
       ./python.sh /workspace/systems/aerostack2_isaac/scripts/isaac_aerostack2_navsim.py

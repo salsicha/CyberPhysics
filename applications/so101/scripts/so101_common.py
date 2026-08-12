@@ -118,14 +118,21 @@ def camera_info_values(width=CAMERA_WIDTH, height=CAMERA_HEIGHT):
 
 def synthetic_rgbd(positions, width=CAMERA_WIDTH, height=CAMERA_HEIGHT):
     """Generate deterministic RGB-D frames with tabletop, objects, and invalid depth."""
-    positions = np.asarray(positions, dtype=np.float32)
+    positions = np.nan_to_num(
+        np.asarray(positions, dtype=np.float32),
+        nan=0.0,
+        posinf=0.0,
+        neginf=0.0,
+    )
     h = int(height)
     w = int(width)
     y_u8 = np.linspace(0, 255, h, dtype=np.uint8)[:, None]
     x_u8 = np.linspace(0, 255, w, dtype=np.uint8)[None, :]
     image = np.zeros((h, w, 3), dtype=np.uint8)
-    image[:, :, 0] = (x_u8 + int((positions[0] + 2.0) * 35.0)) % 255
-    image[:, :, 1] = (y_u8 + int((positions[1] + 2.0) * 35.0)) % 255
+    x_phase = int((float(positions[0]) + 2.0) * 35.0) % 255
+    y_phase = int((float(positions[1]) + 2.0) * 35.0) % 255
+    image[:, :, 0] = (x_u8.astype(np.uint16) + x_phase) % 255
+    image[:, :, 1] = (y_u8.astype(np.uint16) + y_phase) % 255
     image[:, :, 2] = 90
 
     x = np.linspace(-1.0, 1.0, w, dtype=np.float32)[None, :]
@@ -150,7 +157,8 @@ def synthetic_rgbd(positions, width=CAMERA_WIDTH, height=CAMERA_HEIGHT):
     image[cyl_mask] = [40, 80, 230]
     depth[cyl_mask] = 0.61
 
-    invalid_mask = ((xx + 2 * yy + int(abs(float(positions[4])) * 100.0)) % 97) == 0
+    invalid_phase = int(abs(float(positions[4])) * 100.0) % 97
+    invalid_mask = ((xx + 2 * yy + invalid_phase) % 97) == 0
     depth[invalid_mask] = np.nan
     return image, depth.astype(np.float32)
 

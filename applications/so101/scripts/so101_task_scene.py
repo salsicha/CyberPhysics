@@ -58,7 +58,7 @@ def _rotation_degrees(entry):
     return Gf.Vec3f(*(math.degrees(float(value)) for value in rpy[:3]))
 
 
-def create_box(stage, path, entry, kinematic=False):
+def create_box(stage, path, entry, kinematic=False, collision=True):
     cube = UsdGeom.Cube.Define(stage, path)
     cube.CreateSizeAttr(1.0)
     cube.CreateDisplayColorAttr([Gf.Vec3f(*_color(entry))])
@@ -67,7 +67,8 @@ def create_box(stage, path, entry, kinematic=False):
     translate.Set(Gf.Vec3d(*entry.get("xyz", [0.0, 0.0, 0.0])[:3]))
     xform.AddRotateXYZOp().Set(_rotation_degrees(entry))
     xform.AddScaleOp().Set(Gf.Vec3f(*entry.get("size", [0.05, 0.05, 0.05])[:3]))
-    UsdPhysics.CollisionAPI.Apply(cube.GetPrim())
+    if collision:
+        UsdPhysics.CollisionAPI.Apply(cube.GetPrim())
     if kinematic:
         body = UsdPhysics.RigidBodyAPI.Apply(cube.GetPrim())
         body.CreateKinematicEnabledAttr(True)
@@ -75,7 +76,7 @@ def create_box(stage, path, entry, kinematic=False):
     return translate
 
 
-def create_cylinder(stage, path, entry, kinematic=False):
+def create_cylinder(stage, path, entry, kinematic=False, collision=True):
     cylinder = UsdGeom.Cylinder.Define(stage, path)
     cylinder.CreateRadiusAttr(float(entry.get("radius_m", 0.025)))
     cylinder.CreateHeightAttr(float(entry.get("height_m", 0.05)))
@@ -85,7 +86,8 @@ def create_cylinder(stage, path, entry, kinematic=False):
     translate = xform.AddTranslateOp()
     translate.Set(Gf.Vec3d(*entry.get("xyz", [0.0, 0.0, 0.0])[:3]))
     xform.AddRotateXYZOp().Set(_rotation_degrees(entry))
-    UsdPhysics.CollisionAPI.Apply(cylinder.GetPrim())
+    if collision:
+        UsdPhysics.CollisionAPI.Apply(cylinder.GetPrim())
     if kinematic:
         body = UsdPhysics.RigidBodyAPI.Apply(cylinder.GetPrim())
         body.CreateKinematicEnabledAttr(True)
@@ -124,6 +126,7 @@ class SO101TaskScene:
         self.reported_success = False
         self.samples = []
         self.telemetry_path = Path(telemetry_path) if telemetry_path else None
+        self.telemetry_error_reported = False
         self.metrics_path = (
             self.telemetry_path.with_name(self.telemetry_path.stem + "_metrics.json")
             if self.telemetry_path else None
@@ -136,11 +139,19 @@ class SO101TaskScene:
             create_box(self.stage, f"/World/Task/{_safe_name(asset['name'])}", asset)
         for entry in self.scenario.get("objects", []):
             path = f"/World/Task/{_safe_name(entry['id'])}"
+            is_target = entry["id"] == self.target["id"]
+            # The deterministic demo attaches the target kinematically once
+            # the jaws close. A second kinematic collision body on that same
+            # target blocks the arm before attachment can occur.
             if entry.get("shape") == "cylinder":
-                translate = create_cylinder(self.stage, path, entry, kinematic=True)
+                translate = create_cylinder(
+                    self.stage, path, entry, kinematic=True, collision=not is_target
+                )
             else:
-                translate = create_box(self.stage, path, entry, kinematic=True)
-            if entry["id"] == self.target["id"]:
+                translate = create_box(
+                    self.stage, path, entry, kinematic=True, collision=not is_target
+                )
+            if is_target:
                 self.target_translate = translate
 
     def _set_target_position(self, position):
@@ -230,13 +241,21 @@ class SO101TaskScene:
     def _flush(self, now):
         if self.telemetry_path is None:
             return
-        self.telemetry_path.parent.mkdir(parents=True, exist_ok=True)
         payload = self.telemetry(now)
-        self.telemetry_path.write_text(json.dumps(payload, indent=2) + "\n")
+        try:
+            self.telemetry_path.parent.mkdir(parents=True, exist_ok=True)
+            self.telemetry_path.write_text(json.dumps(payload, indent=2) + "\n")
+        except OSError as exc:
+            self._disable_telemetry(exc)
+            return
         self.last_flush_at = now
         if self.status == "solved" and self.metrics_path is not None and not self.reported_success:
             metrics = score(self.scenario, payload, self.task_id)
-            self.metrics_path.write_text(json.dumps(metrics, indent=2) + "\n")
+            try:
+                self.metrics_path.write_text(json.dumps(metrics, indent=2) + "\n")
+            except OSError as exc:
+                self._disable_telemetry(exc)
+                return
             self.reported_success = True
             print(
                 f"SO-101 TASK SOLVED: success={metrics['success']} "
@@ -244,3 +263,14 @@ class SO101TaskScene:
                 f"duration={metrics['duration_s']:.2f}s",
                 flush=True,
             )
+
+    def _disable_telemetry(self, exc):
+        path = self.telemetry_path
+        if not self.telemetry_error_reported:
+            print(
+                f"SO-101 telemetry disabled after write failure at {path}: {exc}",
+                flush=True,
+            )
+            self.telemetry_error_reported = True
+        self.telemetry_path = None
+        self.metrics_path = None

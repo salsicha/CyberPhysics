@@ -1,6 +1,7 @@
 # Aerostack2 Isaac NavSim
 
 This system runs an Isaac Sim sensor bridge for Aerostack2, DemNav, and WildNav.
+The Compose stack is pinned to Isaac Sim 6.0.1 and uses its bundled ROS 2 bridge.
 It publishes the same simulated contract as the Gazebo navsim system:
 
 - `/drone_sim_0/sensor_measurements/gps`
@@ -22,6 +23,9 @@ Run the stack:
 ```bash
 docker compose --profile navsim -f compositions/aerostack2_isaac.yaml up --force-recreate
 ```
+
+The network-disabled `isaacsim_cache_init` dependency automatically prepares
+the persistent mounts for the container's UID/GID 1234 before Isaac Sim starts.
 
 To start a flight somewhere else, override the origin. The `demnav_assets` and
 `wildnav_assets` services seed the required DEM and satellite caches into Docker

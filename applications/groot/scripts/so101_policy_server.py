@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 import argparse
+import json
 import math
 import os
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -69,9 +71,10 @@ class MockSO101Policy(BasePolicy):
 class DemoSO101Policy(BasePolicy):
     """GR00T-compatible deterministic baseline for the tabletop task demo."""
 
-    def __init__(self):
+    def __init__(self, scenario=None):
         super().__init__(strict=False)
-        self.controller = ScriptedPickPlaceController()
+        self.controller = ScriptedPickPlaceController(scenario=scenario)
+        self.last_waypoint = None
 
     def check_observation(self, observation: dict[str, Any]) -> None:
         pass
@@ -81,6 +84,7 @@ class DemoSO101Policy(BasePolicy):
 
     def reset(self, options: dict[str, Any] | None = None) -> dict[str, Any]:
         self.controller.reset()
+        self.last_waypoint = None
         return {"reset": True}
 
     def get_modality_config(self) -> dict[str, Any]:
@@ -92,9 +96,13 @@ class DemoSO101Policy(BasePolicy):
 
     def _get_action(self, observation: dict[str, Any], options: dict[str, Any] | None = None):
         action = self.controller.get_action(observation)
+        waypoint = self.controller.status
+        if waypoint != self.last_waypoint:
+            print(f"SO-101 GR00T waypoint: {waypoint}", flush=True)
+            self.last_waypoint = waypoint
         return {
             "joint_positions": action.reshape(1, 1, 6)
-        }, {"mode": "demo", "waypoint": self.controller.status}
+        }, {"mode": "demo", "waypoint": waypoint}
 
 
 def build_real_policy(args):
@@ -109,6 +117,25 @@ def build_real_policy(args):
     )
 
 
+def load_demo_scenario(path, task_id=""):
+    if not path:
+        return None
+    scenario_path = Path(path)
+    try:
+        scenario = json.loads(scenario_path.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SystemExit(f"Unable to load demo scenario {scenario_path}: {exc}") from exc
+    tasks = scenario.get("tasks", [])
+    if task_id:
+        selected = next((task for task in tasks if task.get("id") == task_id), None)
+        if selected is None:
+            raise SystemExit(f"Task {task_id!r} not found in demo scenario {scenario_path}")
+        scenario["selected_task"] = selected
+    elif tasks:
+        scenario["selected_task"] = tasks[0]
+    return scenario
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", default="0.0.0.0")
@@ -121,6 +148,8 @@ def main():
     parser.add_argument("--model-path", default=os.environ.get("GR00T_MODEL_PATH"))
     parser.add_argument("--embodiment-tag", default=os.environ.get("GR00T_EMBODIMENT_TAG", "new_embodiment"))
     parser.add_argument("--device", default=os.environ.get("GR00T_DEVICE", "cuda"))
+    parser.add_argument("--scenario-file", default=os.environ.get("SO101_SCENARIO_FILE", ""))
+    parser.add_argument("--task-id", default=os.environ.get("SO101_TASK_ID", ""))
     parser.add_argument("--strict", action="store_true")
     parser.add_argument("--mock-amplitude", type=float, default=0.35)
     args = parser.parse_args()
@@ -130,7 +159,7 @@ def main():
             raise SystemExit("--model-path or GR00T_MODEL_PATH is required for --mode real")
         policy = build_real_policy(args)
     elif args.mode == "demo":
-        policy = DemoSO101Policy()
+        policy = DemoSO101Policy(load_demo_scenario(args.scenario_file, args.task_id))
     else:
         policy = MockSO101Policy(amplitude=args.mock_amplitude)
 

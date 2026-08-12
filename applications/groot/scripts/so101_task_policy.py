@@ -167,10 +167,14 @@ def build_pick_place_plan(scenario: dict[str, Any]) -> list[TaskWaypoint]:
 class ScriptedPickPlaceController:
     """Advance through a task plan as measured joints reach each waypoint."""
 
-    def __init__(self, tolerance=0.025, dwell_steps=2, max_step=0.08):
+    def __init__(self, tolerance=0.055, dwell_steps=2, max_step=0.08, scenario=None):
+        # Isaac's force-driven joints settle up to 0.05 rad from a commanded
+        # pose under gravity or while the gripper contacts the destination bin.
+        # A tighter gate leaves an otherwise valid pick/place parked forever.
         self.tolerance = float(tolerance)
         self.dwell_steps = int(dwell_steps)
         self.max_step = float(max_step)
+        self.scenario = scenario
         self.plan: list[TaskWaypoint] | None = None
         self.index = 0
         self.dwell = 0
@@ -194,7 +198,7 @@ class ScriptedPickPlaceController:
             state, dtype=np.float32
         ).reshape(-1, 6)[-1]
         if self.plan is None:
-            scenario = observation.get("metadata", {}).get("scenario")
+            scenario = observation.get("metadata", {}).get("scenario") or self.scenario
             if not scenario:
                 raise ValueError("SO-101 demo policy requires scenario metadata")
             self.plan = build_pick_place_plan(scenario)

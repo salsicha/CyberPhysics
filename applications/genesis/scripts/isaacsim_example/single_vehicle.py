@@ -39,7 +39,7 @@ simulation_app = SimulationApp({"headless": False})
 
 import omni.timeline
 
-from omni.isaac.core.world import World
+from isaacsim.core.api import World
 
 
 # Import the Pegasus API for simulating drones

@@ -10,7 +10,7 @@ sys.path.insert(0, str(ROOT / "applications" / "groot" / "scripts"))
 sys.path.insert(0, str(ROOT / "applications" / "so101" / "scripts"))
 
 from score_picking_task import score
-from so101_common import JOINT_NAMES, safe_hardware_target
+from so101_common import JOINT_NAMES, safe_hardware_target, synthetic_rgbd
 from so101_task_policy import (
     ScriptedPickPlaceController,
     build_pick_place_plan,
@@ -59,6 +59,34 @@ def test_task_plan_is_reachable_and_completes():
     assert controller.status == "solved"
 
 
+def test_demo_controller_accepts_server_side_scenario():
+    scenario = load_scenario()
+    scenario["selected_task"] = scenario["tasks"][0]
+    controller = ScriptedPickPlaceController(scenario=scenario)
+    current = np.zeros(len(JOINT_NAMES), dtype=np.float32)
+    action = controller.get_action({
+        "state": {"joint_positions": current.reshape(1, 1, -1)},
+    })
+    assert controller.plan is not None
+    assert action.shape == current.shape
+    controller.reset()
+    controller.get_action({"state": {"joint_positions": current.reshape(1, 1, -1)}})
+    assert controller.plan is not None
+
+
+def test_demo_controller_advances_with_force_drive_settling_error():
+    scenario = load_scenario()
+    scenario["selected_task"] = scenario["tasks"][0]
+    controller = ScriptedPickPlaceController(scenario=scenario)
+    controller.get_action({"state": {"joint_positions": np.zeros((1, 1, len(JOINT_NAMES)))}})
+    settled = controller.plan[0].joints.copy()
+    settled[1] += 0.05
+    observation = {"state": {"joint_positions": settled.reshape(1, 1, -1)}}
+    for _ in range(controller.dwell_steps):
+        controller.get_action(observation)
+    assert controller.status == "grasp"
+
+
 def test_scripted_task_telemetry_passes_acceptance_scorer():
     scenario = load_scenario()
     plan = build_pick_place_plan(scenario)
@@ -102,3 +130,12 @@ def test_hil_safety_target_limits_step_and_joint_range():
             pass
         else:
             raise AssertionError("non-finite HIL command was accepted")
+
+
+def test_synthetic_rgbd_handles_extreme_joint_samples():
+    positions = np.array([35140.0, -64000.0, np.inf, -np.inf, np.nan, 0.0])
+    image, depth = synthetic_rgbd(positions, width=64, height=48)
+    assert image.shape == (48, 64, 3)
+    assert image.dtype == np.uint8
+    assert depth.shape == (48, 64)
+    assert depth.dtype == np.float32

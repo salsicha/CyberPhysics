@@ -2,10 +2,41 @@
 # Isaac Sim Docker Compose File
 
 services:
+  isaacsim_cache_init:
+    image: nvcr.io/nvidia/isaac-sim:6.0.1
+    user: "0:0"
+    network_mode: none
+    volumes:
+      - ~/docker/isaac-sim/6.0.1/cache/kit:/isaac-sim/kit/cache:rw
+      - ~/docker/isaac-sim/6.0.1/cache/user:/isaac-sim/.cache:rw
+      - ~/docker/isaac-sim/6.0.1/cache/ov:/isaac-sim/.cache/ov:rw
+      - ~/docker/isaac-sim/6.0.1/cache/pip:/isaac-sim/.cache/pip:rw
+      - ~/docker/isaac-sim/6.0.1/cache/glcache:/isaac-sim/.cache/nvidia/GLCache:rw
+      - ~/docker/isaac-sim/6.0.1/cache/computecache:/isaac-sim/.nv/ComputeCache:rw
+      - ~/docker/isaac-sim/6.0.1/logs:/isaac-sim/.nvidia-omniverse/logs:rw
+      - ~/docker/isaac-sim/6.0.1/data:/isaac-sim/.local/share/ov/data:rw
+      - ~/docker/isaac-sim/6.0.1/documents:/isaac-sim/Documents:rw
+    entrypoint: ["/bin/chown"]
+    command:
+      - "1234:1234"
+      - /isaac-sim/kit/cache
+      - /isaac-sim/.cache
+      - /isaac-sim/.cache/ov
+      - /isaac-sim/.cache/pip
+      - /isaac-sim/.cache/nvidia/GLCache
+      - /isaac-sim/.nv/ComputeCache
+      - /isaac-sim/.nvidia-omniverse/logs
+      - /isaac-sim/.local/share/ov/data
+      - /isaac-sim/Documents
+    restart: "no"
+
   isaacsim:
     network_mode: "host"
-    image: nvcr.io/nvidia/isaac-sim:5.1.0
+    image: nvcr.io/nvidia/isaac-sim:6.0.1
     container_name: isaacsim
+    depends_on:
+      isaacsim_cache_init:
+        condition: service_completed_successfully
     environment:
       - "DISPLAY=${DISPLAY}"
       - XAUTHORITY=/tmp/.XAuthority
@@ -15,17 +46,19 @@ services:
       - "/tmp/.X11-unix:/tmp/.X11-unix"
       - /dev/shm:/dev/shm
       - ${XAUTHORITY:-/tmp/.Xauthority}:/tmp/.XAuthority:ro
-      - ~/docker/isaac-sim/cache/kit:/isaac-sim/kit/cache:rw
-      - ~/docker/isaac-sim/cache/ov:/root/.cache/ov:rw
-      - ~/docker/isaac-sim/cache/pip:/root/.cache/pip:rw
-      - ~/docker/isaac-sim/cache/glcache:/root/.cache/nvidia/GLCache:rw
-      - ~/docker/isaac-sim/cache/computecache:/root/.nv/ComputeCache:rw
-      - ~/docker/isaac-sim/logs:/root/.nvidia-omniverse/logs:rw
-      - ~/docker/isaac-sim/data:/root/.local/share/ov/data:rw
-      - ~/docker/isaac-sim/documents:/root/Documents:rw
+      - ~/docker/isaac-sim/6.0.1/cache/kit:/isaac-sim/kit/cache:rw
+      - ~/docker/isaac-sim/6.0.1/cache/user:/isaac-sim/.cache:rw
+      - ~/docker/isaac-sim/6.0.1/cache/ov:/isaac-sim/.cache/ov:rw
+      - ~/docker/isaac-sim/6.0.1/cache/pip:/isaac-sim/.cache/pip:rw
+      - ~/docker/isaac-sim/6.0.1/cache/glcache:/isaac-sim/.cache/nvidia/GLCache:rw
+      - ~/docker/isaac-sim/6.0.1/cache/computecache:/isaac-sim/.nv/ComputeCache:rw
+      - ~/docker/isaac-sim/6.0.1/logs:/isaac-sim/.nvidia-omniverse/logs:rw
+      - ~/docker/isaac-sim/6.0.1/data:/isaac-sim/.local/share/ov/data:rw
+      - ~/docker/isaac-sim/6.0.1/documents:/isaac-sim/Documents:rw
+    entrypoint: []
     command: >
       stdbuf -o L
-      runapp.sh
+      ./runapp.sh
     deploy:
       resources:
         reservations:
@@ -33,5 +66,3 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
-
-

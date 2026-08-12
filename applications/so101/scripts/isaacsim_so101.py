@@ -4,6 +4,10 @@
 import argparse
 import json
 import os
+import subprocess
+import sys
+import time
+import traceback
 from pathlib import Path
 
 import numpy as np
@@ -51,15 +55,77 @@ parser.add_argument("--task-telemetry", default=os.environ.get("SO101_TASK_TELEM
 parser.add_argument("--camera-source", choices=("rendered", "synthetic"), default="rendered")
 parser.add_argument(
     "--experience",
-    default="/isaac-sim/apps/isaacsim.exp.base.python.kit",
-    help="Isaac Sim .kit experience to launch. The base Python experience avoids streaming/RTX UI startup for headless ROS demos.",
+    default=os.environ.get("SO101_ISAAC_EXPERIENCE"),
+    help="Isaac Sim .kit experience to launch. Defaults to the full editor for GUI mode and the base Python experience for headless mode.",
 )
 args, _ = parser.parse_known_args()
 
-simulation_app = SimulationApp({"headless": args.headless}, experience=args.experience)
+if not args.experience:
+    args.experience = (
+        "/isaac-sim/apps/isaacsim.exp.base.python.kit"
+        if args.headless
+        else "/isaac-sim/apps/isaacsim.exp.full.kit"
+    )
 
-import omni.kit.app
-import omni.kit.commands
+launch_config = {"headless": args.headless}
+workarea_guard_process = None
+if not args.headless:
+    window_x = int(os.environ.get("SO101_ISAAC_WINDOW_X", "0"))
+    window_y = int(os.environ.get("SO101_ISAAC_WINDOW_Y", "0"))
+    window_width = int(os.environ.get("SO101_ISAAC_WINDOW_WIDTH", "1440"))
+    window_height = int(os.environ.get("SO101_ISAAC_WINDOW_HEIGHT", "900"))
+    launch_config.update({
+        "hide_ui": False,
+        "window_width": window_width,
+        "window_height": window_height,
+        "extra_args": [
+            f"--/app/window/x={window_x}",
+            f"--/app/window/y={window_y}",
+            # The full editor restores these values from its persistent cache
+            # after applying /app/window/{width,height}. Override both paths so
+            # a stale or invalid multi-monitor geometry cannot win at startup.
+            f"--/persistent/app/window/width={window_width}",
+            f"--/persistent/app/window/height={window_height}",
+            "--/app/window/fullscreen=false",
+            "--/app/window/maximized=false",
+            "--/persistent/app/window/maximized=false",
+            "--/app/window/scaleToMonitor=false",
+            "--/app/window/saveSizeOnExit=false",
+        ],
+    })
+
+    fix_x11_workarea = os.environ.get("SO101_ISAAC_X11_WORKAREA_FIX", "true").lower()
+    if os.environ.get("DISPLAY") and fix_x11_workarea not in {"0", "false", "no", "off"}:
+        guard_script = Path(__file__).with_name("x11_workarea_guard.py")
+        workarea_guard_process = subprocess.Popen(
+            [
+                sys.executable,
+                str(guard_script),
+                "--parent-pid",
+                str(os.getpid()),
+                "--window-height",
+                str(window_height),
+            ],
+            stdout=subprocess.PIPE,
+            text=True,
+            close_fds=True,
+        )
+        guard_status = workarea_guard_process.stdout.readline().strip()
+        if guard_status == "expanded":
+            print("Temporarily expanded truncated X11 work area for Isaac GUI startup", flush=True)
+
+try:
+    simulation_app = SimulationApp(launch_config, experience=args.experience)
+finally:
+    if workarea_guard_process is not None:
+        if workarea_guard_process.poll() is None:
+            workarea_guard_process.terminate()
+        try:
+            workarea_guard_process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            workarea_guard_process.kill()
+            workarea_guard_process.wait()
+
 import omni.usd
 from isaacsim.core.utils.extensions import enable_extension
 
@@ -68,9 +134,11 @@ enable_extension("isaacsim.asset.importer.urdf")
 enable_extension("isaacsim.ros2.bridge")
 simulation_app.update()
 
-from isaacsim.asset.importer.urdf._urdf import UrdfJointTargetType
+from isaacsim.asset.importer.urdf import URDFImporter, URDFImporterConfig
 from isaacsim.core.api import World
-from isaacsim.core.prims import Articulation
+from isaacsim.core.prims import SingleArticulation
+from isaacsim.core.utils.stage import add_reference_to_stage
+from isaacsim.core.utils.types import ArticulationAction
 from so101_task_scene import SO101TaskScene, load_scenario
 
 try:
@@ -276,28 +344,37 @@ class IsaacBridge(Node):
         return info
 
 
-def import_robot(urdf_path):
-    result, config = omni.kit.commands.execute("URDFCreateImportConfig")
-    if not result:
-        raise RuntimeError("Failed to create Isaac Sim URDF import configuration")
-    config.fix_base = True
-    config.merge_fixed_joints = False
-    config.import_inertia_tensor = True
-    config.make_default_prim = True
-    config.self_collision = False
-    config.default_drive_type = UrdfJointTargetType.JOINT_DRIVE_POSITION
-    config.default_drive_strength = 80.0
-    config.default_position_drive_damping = 8.0
-    config.distance_scale = 1.0
+def import_robot(urdf_path, stage_output_path):
+    stage_output = Path(stage_output_path or "/tmp/so101.usd")
+    import_dir = stage_output.with_suffix("")
+    import_dir = import_dir.parent / f"{import_dir.name}_urdf"
+    import_dir.mkdir(parents=True, exist_ok=True)
 
-    result, prim_path = omni.kit.commands.execute(
-        "URDFParseAndImportFile",
+    drive_type = os.environ.get("SO101_ISAAC_JOINT_DRIVE_TYPE", "force")
+    drive_stiffness = float(os.environ.get("SO101_ISAAC_JOINT_STIFFNESS", "400"))
+    drive_damping = float(os.environ.get("SO101_ISAAC_JOINT_DAMPING", "40"))
+    config = URDFImporterConfig(
         urdf_path=urdf_path,
-        import_config=config,
-        get_articulation_root=True,
+        usd_path=str(import_dir),
+        # Merge the URDF's empty ``world`` link into ``base_link`` before
+        # fixing the base. Keeping both creates an invalid extra root in Isaac
+        # Sim 6.0.1 and non-finite PhysX broad-phase bounds every frame.
+        merge_fixed_joints=True,
+        merge_mesh=False,
+        collision_from_visuals=False,
+        allow_self_collision=False,
+        fix_base=True,
+        joint_drive_type=drive_type,
+        joint_target_type="position",
+        override_joint_stiffness=drive_stiffness,
+        override_joint_damping=drive_damping,
     )
-    if not result:
+    imported_usd = URDFImporter(config).import_urdf()
+    if not imported_usd:
         raise RuntimeError(f"Failed to import SO-101 URDF: {urdf_path}")
+
+    prim_path = "/World/so101"
+    add_reference_to_stage(usd_path=imported_usd, prim_path=prim_path)
     return prim_path
 
 
@@ -305,6 +382,12 @@ def main():
     if not os.path.isfile(args.urdf):
         raise FileNotFoundError(args.urdf)
 
+    ready_file = Path("/tmp/so101_isaac_ready")
+    ready_file.unlink(missing_ok=True)
+    heartbeat_seconds = max(
+        0.0,
+        float(os.environ.get("SO101_LOG_HEARTBEAT_SECONDS", "30")),
+    )
     world = World(stage_units_in_meters=1.0)
     world.scene.add_default_ground_plane()
     scenario = load_scenario(args.scenario)
@@ -318,17 +401,34 @@ def main():
     rendered_camera = None
     if args.camera_source == "rendered":
         rendered_camera = create_rendered_camera(camera_config)
-    prim_path = import_robot(args.urdf)
-    robot = world.scene.add(Articulation(prim_path=prim_path, name="so101"))
+    prim_path = import_robot(args.urdf, args.usd)
+    robot = world.scene.add(SingleArticulation(prim_path=prim_path, name="so101"))
+    initial_joints = np.zeros(len(JOINT_NAMES), dtype=np.float32)
+    robot.set_joints_default_state(
+        positions=initial_joints,
+        velocities=np.zeros_like(initial_joints),
+    )
     world.reset()
-    robot.initialize()
+    drive_stiffness = float(os.environ.get("SO101_ISAAC_JOINT_STIFFNESS", "400"))
+    drive_damping = float(os.environ.get("SO101_ISAAC_JOINT_DAMPING", "40"))
+    articulation_controller = robot.get_articulation_controller()
+    articulation_controller.set_gains(
+        kps=np.full(robot.num_dof, drive_stiffness, dtype=np.float32),
+        kds=np.full(robot.num_dof, drive_damping, dtype=np.float32),
+    )
+    actual_kps, actual_kds = articulation_controller.get_gains()
+    print(
+        "SO-101 articulation gains: "
+        f"kp={actual_kps.tolist()} kd={actual_kds.tolist()}",
+        flush=True,
+    )
     robot_spawn = scenario.get("robot_spawn", {})
     robot.set_world_pose(
         position=np.asarray(robot_spawn.get("xyz", [0.0, 0.0, 0.0]), dtype=np.float64),
         orientation=isaac_orientation_from_rpy(robot_spawn.get("rpy", [0.0, 0.0, 0.0])),
     )
-    if args.usd:
-        omni.usd.get_context().save_as_stage(args.usd)
+    if args.usd and not omni.usd.get_context().get_stage().Export(args.usd):
+        raise RuntimeError(f"Failed to export composed SO-101 stage: {args.usd}")
 
     index_by_name = {name: index for index, name in enumerate(robot.dof_names)}
     missing = [name for name in JOINT_NAMES if name not in index_by_name]
@@ -338,19 +438,50 @@ def main():
 
     rclpy.init()
     bridge = IsaacBridge(rendered_camera=rendered_camera, camera_source=args.camera_source)
+    step_count = 0
+    last_heartbeat = time.monotonic()
     try:
         while simulation_app.is_running() and rclpy.ok():
             rclpy.spin_once(bridge, timeout_sec=0.0)
-            robot.set_joint_position_targets(bridge.target, joint_indices=indices)
+            robot.apply_action(
+                ArticulationAction(joint_positions=bridge.target, joint_indices=indices)
+            )
             world.step(render=(not args.headless) or args.camera_source == "rendered")
             positions = robot.get_joint_positions(joint_indices=indices)
             velocities = robot.get_joint_velocities(joint_indices=indices)
             task_scene.update(positions, bridge.command_received)
             bridge.publish_state(positions, velocities)
             bridge.publish_task_status(task_scene.summary())
+            step_count += 1
+            now = time.monotonic()
+            if step_count == 1:
+                ready_file.write_text("ready\n")
+                print(
+                    "SO-101 simulation loop running "
+                    f"(headless={args.headless}, camera_source={args.camera_source})",
+                    flush=True,
+                )
+                last_heartbeat = now
+            elif heartbeat_seconds and now - last_heartbeat >= heartbeat_seconds:
+                print(
+                    f"SO-101 simulation heartbeat: steps={step_count} "
+                    f"status={task_scene.status}",
+                    flush=True,
+                )
+                last_heartbeat = now
     except KeyboardInterrupt:
-        pass
+        print("SO-101 loop received KeyboardInterrupt", flush=True)
+    except BaseException as exc:
+        print(f"SO-101 loop aborted by {type(exc).__name__}: {exc!r}", flush=True)
+        traceback.print_exc()
+        raise
     finally:
+        ready_file.unlink(missing_ok=True)
+        print(
+            f"SO-101 loop stopped after {step_count} steps "
+            f"(kit_running={simulation_app.is_running()}, ros_ok={rclpy.ok()})",
+            flush=True,
+        )
         task_scene.close()
         bridge.destroy_node()
         rclpy.shutdown()

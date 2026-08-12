@@ -4,41 +4,112 @@
 # Add --profile observe to expose ROS topics to Foxglove over rosbridge.
 
 services:
+  isaacsim_xauth_init:
+    profiles: [sim]
+    image: nvcr.io/nvidia/isaac-sim:6.0.1
+    user: "0:0"
+    network_mode: none
+    volumes:
+      - ${XAUTHORITY:-/tmp/.Xauthority}:/host.Xauthority:ro
+      - so101_isaac_xauth:/workspace/xauth:rw
+    entrypoint: ["/bin/bash", "-lc"]
+    command:
+      - |
+        if [ -f /host.Xauthority ]; then
+          cp /host.Xauthority /workspace/xauth/Xauthority
+          chown 1234:1234 /workspace/xauth/Xauthority
+          chmod 0600 /workspace/xauth/Xauthority
+        else
+          rm -f /workspace/xauth/Xauthority
+        fi
+    restart: "no"
+
+  isaacsim_cache_init:
+    profiles: [sim]
+    image: nvcr.io/nvidia/isaac-sim:6.0.1
+    user: "0:0"
+    network_mode: none
+    volumes:
+      - ${CYBERPHYSICS_ISAAC_CACHE:-/tmp/cyberphysics/isaac-sim/6.0.1/so101}/kit:/isaac-sim/kit/cache:rw
+      - ${CYBERPHYSICS_ISAAC_CACHE:-/tmp/cyberphysics/isaac-sim/6.0.1/so101}/user:/isaac-sim/.cache:rw
+      - ${CYBERPHYSICS_ISAAC_CACHE:-/tmp/cyberphysics/isaac-sim/6.0.1/so101}/ov:/isaac-sim/.cache/ov:rw
+      - ${CYBERPHYSICS_ISAAC_CACHE:-/tmp/cyberphysics/isaac-sim/6.0.1/so101}/pip:/isaac-sim/.cache/pip:rw
+      - ${CYBERPHYSICS_ISAAC_CACHE:-/tmp/cyberphysics/isaac-sim/6.0.1/so101}/glcache:/isaac-sim/.cache/nvidia/GLCache:rw
+      - ${CYBERPHYSICS_ISAAC_CACHE:-/tmp/cyberphysics/isaac-sim/6.0.1/so101}/computecache:/isaac-sim/.nv/ComputeCache:rw
+      - ../data/groot/telemetry:/workspace/telemetry:rw
+    entrypoint: ["/bin/chown"]
+    command:
+      - "1234:1234"
+      - /isaac-sim/kit/cache
+      - /isaac-sim/.cache
+      - /isaac-sim/.cache/ov
+      - /isaac-sim/.cache/pip
+      - /isaac-sim/.cache/nvidia/GLCache
+      - /isaac-sim/.nv/ComputeCache
+      - /workspace/telemetry
+    restart: "no"
+
   isaacsim:
     profiles: [sim]
-    image: nvcr.io/nvidia/isaac-sim:5.1.0
+    image: nvcr.io/nvidia/isaac-sim:6.0.1
     container_name: so101_groot_isaacsim
+    depends_on:
+      isaacsim_cache_init:
+        condition: service_completed_successfully
+      isaacsim_xauth_init:
+        condition: service_completed_successfully
     network_mode: host
     ipc: host
     environment:
       - DISPLAY=${DISPLAY:-:0}
       - ACCEPT_EULA=Y
-      - PRIVACY_CONSENT=Y
+      - PRIVACY_CONSENT=${PRIVACY_CONSENT:-Y}
+      - XAUTHORITY=/isaac-sim/.xauth/Xauthority
       - ROS_DISTRO=jazzy
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - RMW_IMPLEMENTATION=${RMW_IMPLEMENTATION:-rmw_fastrtps_cpp}
+      - LD_LIBRARY_PATH=/isaac-sim/exts/isaacsim.ros2.core/jazzy/lib
       - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
       - NVIDIA_DRIVER_CAPABILITIES=${NVIDIA_DRIVER_CAPABILITIES:-graphics,utility,compute}
-      - SO101_HEADLESS=${SO101_HEADLESS:-true}
+      - SO101_HEADLESS=${SO101_HEADLESS:-false}
+      - SO101_LOG_HEARTBEAT_SECONDS=${SO101_LOG_HEARTBEAT_SECONDS:-30}
+      - SO101_ISAAC_WINDOW_X=${SO101_ISAAC_WINDOW_X:-0}
+      - SO101_ISAAC_WINDOW_Y=${SO101_ISAAC_WINDOW_Y:-0}
+      - SO101_ISAAC_WINDOW_WIDTH=${SO101_ISAAC_WINDOW_WIDTH:-1440}
+      - SO101_ISAAC_WINDOW_HEIGHT=${SO101_ISAAC_WINDOW_HEIGHT:-900}
+      - SO101_ISAAC_X11_WORKAREA_FIX=${SO101_ISAAC_X11_WORKAREA_FIX:-true}
+      - SO101_ISAAC_JOINT_DRIVE_TYPE=${SO101_ISAAC_JOINT_DRIVE_TYPE:-force}
+      - SO101_ISAAC_JOINT_STIFFNESS=${SO101_ISAAC_JOINT_STIFFNESS:-400}
+      - SO101_ISAAC_JOINT_DAMPING=${SO101_ISAAC_JOINT_DAMPING:-40}
       - SO101_TASK_ID=${SO101_TASK_ID:-pick_red_block_left_bin}
-      - SO101_TASK_TELEMETRY=/workspace/data/so101_task_telemetry.json
+      - SO101_TASK_TELEMETRY=/workspace/telemetry/so101_task_telemetry.json
     volumes:
       - /dev/shm:/dev/shm
       - /tmp/.X11-unix:/tmp/.X11-unix
+      - so101_isaac_xauth:/isaac-sim/.xauth:ro
       - ../systems:/workspace/systems:ro
       - ../applications/so101:/workspace/so101:ro
       - ../data/groot:/workspace/data
-      - ${CYBERPHYSICS_ISAAC_CACHE:-/tmp/cyberphysics/isaac-sim/so101}/kit:/isaac-sim/kit/cache:rw
-      - ${CYBERPHYSICS_ISAAC_CACHE:-/tmp/cyberphysics/isaac-sim/so101}/ov:/root/.cache/ov:rw
-      - ${CYBERPHYSICS_ISAAC_CACHE:-/tmp/cyberphysics/isaac-sim/so101}/pip:/root/.cache/pip:rw
-      - ${CYBERPHYSICS_ISAAC_CACHE:-/tmp/cyberphysics/isaac-sim/so101}/glcache:/root/.cache/nvidia/GLCache:rw
-      - ${CYBERPHYSICS_ISAAC_CACHE:-/tmp/cyberphysics/isaac-sim/so101}/computecache:/root/.nv/ComputeCache:rw
+      - ../data/groot/telemetry:/workspace/telemetry:rw
+      - ${CYBERPHYSICS_ISAAC_CACHE:-/tmp/cyberphysics/isaac-sim/6.0.1/so101}/kit:/isaac-sim/kit/cache:rw
+      - ${CYBERPHYSICS_ISAAC_CACHE:-/tmp/cyberphysics/isaac-sim/6.0.1/so101}/user:/isaac-sim/.cache:rw
+      - ${CYBERPHYSICS_ISAAC_CACHE:-/tmp/cyberphysics/isaac-sim/6.0.1/so101}/ov:/isaac-sim/.cache/ov:rw
+      - ${CYBERPHYSICS_ISAAC_CACHE:-/tmp/cyberphysics/isaac-sim/6.0.1/so101}/pip:/isaac-sim/.cache/pip:rw
+      - ${CYBERPHYSICS_ISAAC_CACHE:-/tmp/cyberphysics/isaac-sim/6.0.1/so101}/glcache:/isaac-sim/.cache/nvidia/GLCache:rw
+      - ${CYBERPHYSICS_ISAAC_CACHE:-/tmp/cyberphysics/isaac-sim/6.0.1/so101}/computecache:/isaac-sim/.nv/ComputeCache:rw
+    healthcheck:
+      test: ["CMD", "test", "-f", "/tmp/so101_isaac_ready"]
+      interval: 5s
+      timeout: 2s
+      start_period: 180s
+      retries: 3
+    entrypoint: []
     command: >
       ./python.sh /workspace/so101/scripts/isaacsim_so101.py
-        --experience /isaac-sim/apps/isaacsim.exp.base.python.kit
         --urdf /workspace/systems/so101/urdf/so101.urdf
         --scenario /workspace/systems/so101/scenarios/picking_table.json
         --task-id ${SO101_TASK_ID:-pick_red_block_left_bin}
-        --task-telemetry /workspace/data/so101_task_telemetry.json
+        --task-telemetry /workspace/telemetry/so101_task_telemetry.json
         --camera-source ${SO101_ISAAC_CAMERA_SOURCE:-rendered}
     deploy:
       resources:
@@ -64,13 +135,19 @@ services:
       - GR00T_MODEL_PATH=${GR00T_MODEL_PATH:-}
       - GR00T_EMBODIMENT_TAG=${GR00T_EMBODIMENT_TAG:-so101}
       - GR00T_DEVICE=${GR00T_DEVICE:-cuda}
+      - SO101_SCENARIO_FILE=/workspace/systems/so101/scenarios/picking_table.json
+      - SO101_TASK_ID=${SO101_TASK_ID:-pick_red_block_left_bin}
     volumes:
       - ../data/groot:/workspace/data
       - ../cache/groot:/workspace/cache
+      - ../applications/groot/scripts:/workspace/groot_scripts:ro
+      - ../systems:/workspace/systems:ro
     command: >
-      python /workspace/so101_policy_server.py
+      python /workspace/groot_scripts/so101_policy_server.py
         --mode ${SO101_GROOT_MODE:-demo}
         --port ${SO101_GROOT_PORT:-5555}
+        --scenario-file /workspace/systems/so101/scenarios/picking_table.json
+        --task-id ${SO101_TASK_ID:-pick_red_block_left_bin}
 
   so101_groot_bridge:
     profiles: [sim]
@@ -85,8 +162,9 @@ services:
       - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
     volumes:
       - ../systems:/workspace/systems:ro
+      - ../applications/so101/scripts:/workspace/so101_scripts:ro
     command: >
-      python3 /workspace/src/so101_description/scripts/groot_so101_bridge.py
+      python3 /workspace/so101_scripts/groot_so101_bridge.py
         --ros-args
         --params-file /workspace/systems/so101/config/groot_demo.yaml
         -p task_id:=${SO101_TASK_ID:-pick_red_block_left_bin}
@@ -125,8 +203,9 @@ services:
       - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
     volumes:
       - ../systems:/workspace/systems:ro
+      - ../applications/so101/scripts:/workspace/so101_scripts:ro
     command: >
-      python3 /workspace/src/so101_description/scripts/groot_so101_bridge.py
+      python3 /workspace/so101_scripts/groot_so101_bridge.py
         --ros-args
         --params-file /workspace/systems/so101/config/groot_demo.yaml
         -p task_id:=${SO101_TASK_ID:-pick_red_block_left_bin}
@@ -146,8 +225,10 @@ services:
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
       - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+    volumes:
+      - ../applications/so101/scripts:/workspace/so101_scripts:ro
     command: >
-      python3 /workspace/src/so101_description/scripts/so101_hil_guard.py
+      python3 /workspace/so101_scripts/so101_hil_guard.py
         --ros-args
         -p armed:=${SO101_HIL_ARMED:-false}
         -p input_command_topic:=/so101/hil/policy_commands
@@ -168,3 +249,6 @@ services:
     command: >
       stdbuf -o L
       ros2 launch rosbridge_server rosbridge_websocket_launch.xml
+
+volumes:
+  so101_isaac_xauth:
