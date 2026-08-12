@@ -97,6 +97,8 @@ build_submarine: cleanup build_aerostack2
 	APP=submarine ./_build_it.sh
 build_tello: cleanup build_ros2
 	APP=tello ./_build_it.sh
+build_turret_sim: cleanup build_pantiltros
+	APP=turret_sim ./_build_it.sh
 build_unrealengine: cleanup build_ros2
 	APP=unrealengine ./_build_it.sh
 build_vinsmono: cleanup build_ros2

@@ -78,33 +78,42 @@
     "emergency_stop_intervals_s": []
   },
   "yolo": {
-    "family": "YOLO26",
+    "family": "YOLOE-26",
     "task": "instance_segmentation",
+    "runtime": "ultralytics",
+    "default_checkpoint": "yoloe-26s-seg.pt",
+    "open_vocabulary": true,
     "cpu_smoke_backend": "simulated_yolo26_seg",
     "cpu_smoke_checkpoint": "yolo26n-seg.pt",
-    "gpu_validation_checkpoint_pattern": "yolo26*-seg.pt",
-    "min_confidence": 0.35,
+    "gpu_validation_checkpoint_pattern": "yoloe-26*-seg.pt",
+    "min_confidence": 0.003,
     "min_target_iou": 0.6,
     "max_cpu_smoke_latency_ms": 35.0,
-    "model_check": "Before GPU/nightly runs, query the installed Ultralytics release for the newest available YOLO26 segmentation checkpoint and record the exact checkpoint in run metadata."
+    "model_check": "Compose pins Ultralytics 8.4.52 and defaults to YOLOE-26s segmentation. Override TURRET_YOLO_MODEL with a compatible custom segmentation checkpoint when validating trained turret classes."
   },
   "target": {
     "id": "cart_blue_01",
     "class": "cart",
-    "description": "Blue rolling parts cart selected before the run."
+    "description": "Blue rolling parts cart selected before the run.",
+    "initial_selection_px": [
+      83.0,
+      271.0
+    ],
+    "association_gate_px": 140.0
   },
   "objects": [
     {
       "id": "cart_blue_01",
       "class": "cart",
+      "yolo_prompt": "blue utility cart",
       "color": [
         40,
         110,
         220
       ],
       "size_px_at_5m": [
-        96,
-        62
+        160,
+        110
       ],
       "trajectory": [
         {
@@ -156,6 +165,7 @@
     {
       "id": "person_01",
       "class": "person",
+      "yolo_prompt": "warehouse worker",
       "color": [
         230,
         170,
@@ -196,6 +206,7 @@
     {
       "id": "box_red_01",
       "class": "box",
+      "yolo_prompt": "red cardboard box",
       "color": [
         210,
         70,
@@ -230,6 +241,7 @@
     {
       "id": "drone_yellow_01",
       "class": "drone",
+      "yolo_prompt": "yellow quadcopter drone",
       "color": [
         220,
         200,
@@ -270,14 +282,15 @@
     {
       "id": "cart_green_02",
       "class": "cart",
+      "yolo_prompt": "green utility cart",
       "color": [
         50,
         170,
         90
       ],
       "size_px_at_5m": [
-        90,
-        60
+        160,
+        110
       ],
       "trajectory": [
         {

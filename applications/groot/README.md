@@ -31,6 +31,12 @@ The SO-101 task server supports three policy modes:
 - `mock`: sinusoidal joint motion for transport smoke tests.
 - `real`: a fine-tuned `Gr00tPolicy` checkpoint.
 
+The image contains the GR00T runtime, not model weights. SO-100/SO-101 uses the
+`NEW_EMBODIMENT` tag and requires a fine-tuned checkpoint; the base
+`nvidia/GR00T-N1.7-3B` model does not provide zero-shot SO-101 actions. N1.7
+also requires Hugging Face access to its gated `nvidia/Cosmos-Reason2-2B`
+backbone.
+
 ## Interactive Shell
 
 ```bash

@@ -131,10 +131,12 @@ services:
       - NVIDIA_DRIVER_CAPABILITIES=${NVIDIA_DRIVER_CAPABILITIES:-graphics,utility,compute}
       - HF_HOME=/workspace/cache/huggingface
       - TORCH_HOME=/workspace/cache/torch
-      - SO101_GROOT_MODE=${SO101_GROOT_MODE:-demo}
-      - GR00T_MODEL_PATH=${GR00T_MODEL_PATH:-}
-      - GR00T_EMBODIMENT_TAG=${GR00T_EMBODIMENT_TAG:-so101}
-      - GR00T_DEVICE=${GR00T_DEVICE:-cuda}
+      - HF_TOKEN=${HF_TOKEN:-}
+      - SO101_GROOT_MODE=${SO101_GROOT_MODE:-real}
+      - GR00T_MODEL_PATH=${GR00T_MODEL_PATH:-/workspace/data/models/so101-checkpoint}
+      - GR00T_EMBODIMENT_TAG=${GR00T_EMBODIMENT_TAG:-NEW_EMBODIMENT}
+      - GR00T_DEVICE=${GR00T_DEVICE:-cuda:0}
+      - SO101_GROOT_ALLOW_LOW_VRAM=${SO101_GROOT_ALLOW_LOW_VRAM:-false}
       - SO101_SCENARIO_FILE=/workspace/systems/so101/scenarios/picking_table.json
       - SO101_TASK_ID=${SO101_TASK_ID:-pick_red_block_left_bin}
     volumes:
@@ -144,10 +146,20 @@ services:
       - ../systems:/workspace/systems:ro
     command: >
       python /workspace/groot_scripts/so101_policy_server.py
-        --mode ${SO101_GROOT_MODE:-demo}
+        --mode ${SO101_GROOT_MODE:-real}
         --port ${SO101_GROOT_PORT:-5555}
+        --model-path ${GR00T_MODEL_PATH:-/workspace/data/models/so101-checkpoint}
+        --embodiment-tag ${GR00T_EMBODIMENT_TAG:-NEW_EMBODIMENT}
+        --device ${GR00T_DEVICE:-cuda:0}
         --scenario-file /workspace/systems/so101/scenarios/picking_table.json
         --task-id ${SO101_TASK_ID:-pick_red_block_left_bin}
+        --strict
+    healthcheck:
+      test: ["CMD", "python", "/workspace/groot_scripts/policy_healthcheck.py"]
+      interval: 15s
+      timeout: 8s
+      start_period: 10m
+      retries: 4
 
   so101_groot_bridge:
     profiles: [sim]
@@ -155,11 +167,12 @@ services:
     container_name: so101_groot_bridge
     network_mode: host
     depends_on:
-      - isaacsim
-      - groot_policy
+      isaacsim:
+        condition: service_healthy
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
       - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+      - SO101_GROOT_HOST=${SO101_GROOT_HOST:-127.0.0.1}
     volumes:
       - ../systems:/workspace/systems:ro
       - ../applications/so101/scripts:/workspace/so101_scripts:ro
@@ -167,6 +180,8 @@ services:
       python3 /workspace/so101_scripts/groot_so101_bridge.py
         --ros-args
         --params-file /workspace/systems/so101/config/groot_demo.yaml
+        -p policy_host:=${SO101_GROOT_HOST:-127.0.0.1}
+        -p policy_schema:=auto
         -p task_id:=${SO101_TASK_ID:-pick_red_block_left_bin}
 
   so101_depth_camera:

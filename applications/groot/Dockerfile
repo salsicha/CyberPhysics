@@ -53,8 +53,9 @@ RUN --mount=type=cache,target=/root/.cache/uv,sharing=locked \
 COPY scripts/smoke_test.py /workspace/smoke_test.py
 COPY scripts/so101_policy_server.py /workspace/so101_policy_server.py
 COPY scripts/so101_task_policy.py /workspace/so101_task_policy.py
+COPY scripts/policy_healthcheck.py /workspace/policy_healthcheck.py
 COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh /workspace/smoke_test.py /workspace/so101_policy_server.py
+RUN chmod +x /entrypoint.sh /workspace/smoke_test.py /workspace/so101_policy_server.py /workspace/policy_healthcheck.py
 
 RUN mkdir -p /usr/share/glvnd/egl_vendor.d && \
     printf '%s\n' \

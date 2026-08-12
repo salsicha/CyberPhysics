@@ -113,7 +113,10 @@ def score_one(run, thresholds):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--metrics', nargs='+', required=True, help='Metric JSON files or directories')
-    parser.add_argument('--thresholds', default='systems/turret/validation/acceptance_thresholds.json')
+    parser.add_argument(
+        '--thresholds',
+        default='applications/turret_sim/validation/acceptance_thresholds.json',
+    )
     parser.add_argument('--output')
     args = parser.parse_args()
 

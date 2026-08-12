@@ -109,9 +109,57 @@ def build_real_policy(args):
     from gr00t.data.embodiment_tags import EmbodimentTag
     from gr00t.policy.gr00t_policy import Gr00tPolicy
 
+    model_path = str(args.model_path)
+    local_model_path = Path(model_path).expanduser()
+    if model_path.startswith("/") and not local_model_path.is_dir():
+        raise SystemExit(
+            f"SO-101 GR00T checkpoint directory does not exist: {local_model_path}. "
+            "Install a fine-tuned SO-100/SO-101 checkpoint there or set "
+            "GR00T_MODEL_PATH to its Hugging Face repository ID."
+        )
+
+    embodiment_tag = EmbodimentTag.resolve(args.embodiment_tag)
+    if model_path.rstrip("/") == "nvidia/GR00T-N1.7-3B" and embodiment_tag.name == "NEW_EMBODIMENT":
+        raise SystemExit(
+            "nvidia/GR00T-N1.7-3B does not contain an SO-101 NEW_EMBODIMENT "
+            "policy. Fine-tune it on an SO-100/SO-101 dataset first, then set "
+            "GR00T_MODEL_PATH to that checkpoint."
+        )
+
+    hf_home = Path(os.environ.get("HF_HOME", Path.home() / ".cache" / "huggingface"))
+    if not os.environ.get("HF_TOKEN") and not (hf_home / "token").is_file():
+        print(
+            "WARNING: no Hugging Face token was found. GR00T N1.7 checkpoints "
+            "load the gated nvidia/Cosmos-Reason2-2B backbone; authenticate or "
+            "model loading may fail with GatedRepoError.",
+            flush=True,
+        )
+
+    if str(args.device).startswith("cuda"):
+        import torch
+
+        if not torch.cuda.is_available():
+            raise SystemExit(f"GR00T device {args.device!r} requested, but CUDA is unavailable")
+        total_gib = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+        if total_gib < 16.0 and os.environ.get("SO101_GROOT_ALLOW_LOW_VRAM", "false").lower() not in (
+            "1",
+            "true",
+            "yes",
+        ):
+            raise SystemExit(
+                f"GR00T N1.7 requires at least 16 GiB VRAM for inference; "
+                f"this GPU reports {total_gib:.1f} GiB. Use a remote policy server "
+                "or set SO101_GROOT_ALLOW_LOW_VRAM=true to attempt it anyway."
+            )
+
+    print(
+        f"Loading real SO-101 GR00T policy checkpoint={model_path} "
+        f"embodiment={embodiment_tag.name} device={args.device}",
+        flush=True,
+    )
     return Gr00tPolicy(
-        embodiment_tag=EmbodimentTag.resolve(args.embodiment_tag),
-        model_path=args.model_path,
+        embodiment_tag=embodiment_tag,
+        model_path=model_path,
         device=args.device,
         strict=args.strict,
     )
@@ -146,7 +194,7 @@ def main():
         default=os.environ.get("SO101_GROOT_MODE", "demo"),
     )
     parser.add_argument("--model-path", default=os.environ.get("GR00T_MODEL_PATH"))
-    parser.add_argument("--embodiment-tag", default=os.environ.get("GR00T_EMBODIMENT_TAG", "new_embodiment"))
+    parser.add_argument("--embodiment-tag", default=os.environ.get("GR00T_EMBODIMENT_TAG", "NEW_EMBODIMENT"))
     parser.add_argument("--device", default=os.environ.get("GR00T_DEVICE", "cuda"))
     parser.add_argument("--scenario-file", default=os.environ.get("SO101_SCENARIO_FILE", ""))
     parser.add_argument("--task-id", default=os.environ.get("SO101_TASK_ID", ""))

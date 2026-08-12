@@ -1,18 +1,44 @@
-
-# Pan Tilt ROS
+# Standalone PanTiltROS YOLO/controller node for an existing ROS camera and
+# pan/tilt actuator graph.  The complete simulated and physical stacks are in
+# turret_sim.yaml and turret_hardware.yaml respectively.
 
 services:
-  pantiltros:
-    network_mode: "host"
-    image: cyberphysics/pantiltros
-    container_name: pantiltros
+  pantilt_yolo:
+    image: cyberphysics/pantiltros:${CYBERPHYSICS_TAG:-latest}
+    pull_policy: build
+    build:
+      context: ../applications/pantiltros
+    container_name: pantilt_yolo
+    network_mode: host
+    ipc: host
+    gpus: all
+    shm_size: 8gb
+    working_dir: /workspace/cache/models
     environment:
-      - "DISPLAY=${DISPLAY}"
-      - XAUTHORITY=/tmp/.XAuthority
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+      - YOLO_CONFIG_DIR=/workspace/cache/ultralytics
+      - TORCH_HOME=/workspace/cache/torch
+      - PANTILT_MODEL_DIR=/workspace/cache/models
     volumes:
-      - "/tmp/.X11-unix:/tmp/.X11-unix"
+      - ../applications/pantiltros/config:/workspace/pantiltros/config:ro
+      - ../cache/turret:/workspace/cache
       - /dev/shm:/dev/shm
-      - ${XAUTHORITY:-/tmp/.Xauthority}:/tmp/.XAuthority:ro
-    # command: >
-    #   stdbuf -o L
-      
+    command: >
+      python3 /scripts/pantilt_yolo_tracker.py
+      --ros-args
+      --params-file /workspace/pantiltros/config/yolo_tracker.yaml
+      -p camera_topic:=${TURRET_CAMERA_TOPIC:-/turret/camera/image_raw}
+      -p camera_info_topic:=${TURRET_CAMERA_INFO_TOPIC:-/turret/camera/camera_info}
+      -p model_path:=${TURRET_YOLO_MODEL:-yoloe-26s-seg.pt}
+      -p device:="'${TURRET_YOLO_DEVICE:-0}'"
+      -p image_size:=${TURRET_YOLO_IMAGE_SIZE:-640}
+      -p confidence:=${TURRET_YOLO_CONFIDENCE:-0.003}
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /tmp/pantilt_yolo_ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 90
+      start_period: 10m
+    restart: unless-stopped

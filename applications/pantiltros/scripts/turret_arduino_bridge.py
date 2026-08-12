@@ -40,8 +40,7 @@ class TurretArduinoBridge(Node):
             "dry_run", env_bool("TURRET_ARDUINO_DRY_RUN", False)
         )
         self.declare_parameter("diagnostic_rate_hz", 1.0)
-        # Defaults match the turret contract in
-        # systems/turret/scenarios/warehouse_tracking.json: tilt is restricted
+        # Defaults match the shared PanTiltROS turret contract: tilt is restricted
         # to keep the payload clear of the base.
         self.declare_parameter("pan_min_rad", -1.5708)
         self.declare_parameter("pan_max_rad", 1.5708)

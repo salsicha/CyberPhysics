@@ -62,6 +62,9 @@ class PolicyClient:
     def get_action(self, observation: dict):
         return self.call("get_action", {"observation": observation, "options": None})
 
+    def get_modality_config(self):
+        return self.call("get_modality_config", requires_input=False)
+
 
 class SO101GrootBridge(Node):
     def __init__(self):
@@ -74,6 +77,7 @@ class SO101GrootBridge(Node):
         self.declare_parameter("scenario_file", "")
         self.declare_parameter("task_id", "")
         self.declare_parameter("camera_topic", "/so101/camera/image_raw")
+        self.declare_parameter("wrist_camera_topic", "")
         self.declare_parameter("depth_topic", "/so101/camera/depth/image_rect_raw")
         self.declare_parameter("camera_info_topic", "/so101/camera/camera_info")
         self.declare_parameter("joint_state_topic", "/joint_states")
@@ -82,6 +86,7 @@ class SO101GrootBridge(Node):
         self.declare_parameter("depth_key", "front_depth")
         self.declare_parameter("state_key", "joint_positions")
         self.declare_parameter("action_key", "joint_positions")
+        self.declare_parameter("policy_schema", "auto")
         self.declare_parameter("image_width", 224)
         self.declare_parameter("image_height", 224)
         self.declare_parameter("joint_history_size", 4)
@@ -91,6 +96,7 @@ class SO101GrootBridge(Node):
         self.depth_key = self.get_parameter("depth_key").value
         self.state_key = self.get_parameter("state_key").value
         self.action_key = self.get_parameter("action_key").value
+        self.policy_schema = self.get_parameter("policy_schema").value
         self.instruction = self.get_parameter("instruction").value
         self.image_width = int(self.get_parameter("image_width").value)
         self.image_height = int(self.get_parameter("image_height").value)
@@ -104,6 +110,7 @@ class SO101GrootBridge(Node):
         self.client = PolicyClient(host, port, timeout_ms)
 
         self.latest_image = None
+        self.latest_wrist_image = None
         self.latest_depth = None
         self.latest_camera_info = None
         self.latest_positions = np.zeros(len(JOINT_NAMES), dtype=np.float32)
@@ -111,11 +118,36 @@ class SO101GrootBridge(Node):
         self.have_joint_state = False
         self._policy_busy = False
         self._policy_lock = threading.Lock()
+        self._missing_wrist_warned = False
+        self._modality_configured = False
+        self.video_keys = [self.video_key]
+        self.state_keys = [self.state_key]
+        self.action_keys = [self.action_key]
+        self.language_key = "task"
+        self.video_horizon = 1
+        self.state_horizon = self.joint_history_size
+
+        if self.policy_schema == "legacy":
+            self._modality_configured = True
+        elif self.policy_schema == "so101":
+            self._set_policy_modalities(
+                video_keys=["front", "wrist"],
+                state_keys=["single_arm", "gripper"],
+                action_keys=["single_arm", "gripper"],
+                language_key="annotation.human.task_description",
+                video_horizon=1,
+                state_horizon=1,
+            )
+        elif self.policy_schema != "auto":
+            raise ValueError("policy_schema must be one of: auto, legacy, so101")
 
         self.command_pub = self.create_publisher(
             Float64MultiArray, self.get_parameter("command_topic").value, 10
         )
         self.create_subscription(Image, self.get_parameter("camera_topic").value, self._image_cb, 5)
+        wrist_camera_topic = self.get_parameter("wrist_camera_topic").value
+        if wrist_camera_topic:
+            self.create_subscription(Image, wrist_camera_topic, self._wrist_image_cb, 5)
         depth_topic = self.get_parameter("depth_topic").value
         if depth_topic:
             self.create_subscription(Image, depth_topic, self._depth_cb, 5)
@@ -157,17 +189,27 @@ class SO101GrootBridge(Node):
             scenario["selected_task"] = selected
         return scenario
 
-    def _image_cb(self, msg: Image):
+    def _decode_image(self, msg: Image):
         if msg.encoding not in ("rgb8", "bgr8", "rgba8", "bgra8"):
             self.get_logger().warn(f"Unsupported image encoding {msg.encoding}; expected rgb8/bgr8/rgba8/bgra8")
-            return
+            return None
         channels = 4 if msg.encoding in ("rgba8", "bgra8") else 3
         arr = np.frombuffer(msg.data, dtype=np.uint8).reshape(msg.height, msg.step)
         arr = arr[:, :msg.width * channels].reshape(msg.height, msg.width, channels)
         arr = arr[:, :, :3]
         if msg.encoding in ("bgr8", "bgra8"):
             arr = arr[:, :, ::-1]
-        self.latest_image = self._resize_nearest(arr, self.image_height, self.image_width)
+        return self._resize_nearest(arr, self.image_height, self.image_width)
+
+    def _image_cb(self, msg: Image):
+        image = self._decode_image(msg)
+        if image is not None:
+            self.latest_image = image
+
+    def _wrist_image_cb(self, msg: Image):
+        image = self._decode_image(msg)
+        if image is not None:
+            self.latest_wrist_image = image
 
     def _depth_cb(self, msg: Image):
         raw = np.frombuffer(msg.data, dtype=np.uint8).reshape(msg.height, msg.step)
@@ -206,21 +248,112 @@ class SO101GrootBridge(Node):
         x = np.linspace(0, image.shape[1] - 1, width).astype(np.int32)
         return image[y][:, x]
 
-    def _joint_history_array(self) -> np.ndarray:
+    def _joint_history_array(self, horizon=None) -> np.ndarray:
         if not self.joint_history:
             self.joint_history.append(self.latest_positions.copy())
-        while len(self.joint_history) < self.joint_history_size:
-            self.joint_history.appendleft(self.joint_history[0].copy())
-        return np.stack(tuple(self.joint_history), axis=0).reshape(1, self.joint_history_size, -1)
+        horizon = max(1, int(horizon or self.joint_history_size))
+        history = list(self.joint_history)[-horizon:]
+        while len(history) < horizon:
+            history.insert(0, history[0].copy())
+        return np.stack(history, axis=0).reshape(1, horizon, -1)
+
+    @staticmethod
+    def _modality_payload(value):
+        if isinstance(value, dict) and (
+            value.get("__ModalityConfig__") or value.get("__ModalityConfig_class__")
+        ):
+            value = value.get("as_json", {})
+        if isinstance(value, str):
+            value = json.loads(value)
+        return value if isinstance(value, dict) else {}
+
+    def _set_policy_modalities(
+        self,
+        *,
+        video_keys,
+        state_keys,
+        action_keys,
+        language_key,
+        video_horizon,
+        state_horizon,
+    ):
+        supported_state = len(state_keys) == 1 or state_keys == ["single_arm", "gripper"]
+        supported_action = len(action_keys) == 1 or action_keys == ["single_arm", "gripper"]
+        if not supported_state or not supported_action:
+            raise ValueError(
+                "Unsupported GR00T checkpoint schema: expected one six-joint state/action "
+                "key or SO-101 keys ['single_arm', 'gripper']; got "
+                f"state={state_keys}, action={action_keys}"
+            )
+        self.video_keys = video_keys
+        self.state_keys = state_keys
+        self.action_keys = action_keys
+        self.language_key = language_key
+        self.video_horizon = max(1, int(video_horizon))
+        self.state_horizon = max(1, int(state_horizon))
+        self._modality_configured = True
+        self.get_logger().info(
+            "GR00T checkpoint modalities: "
+            f"video={video_keys}, state={state_keys}, action={action_keys}, "
+            f"language={language_key}"
+        )
+
+    def _configure_from_policy(self):
+        config = self.client.get_modality_config()
+        if not isinstance(config, dict):
+            raise ValueError(f"Invalid GR00T modality config response: {type(config)}")
+
+        video = self._modality_payload(config.get("video"))
+        state = self._modality_payload(config.get("state"))
+        action = self._modality_payload(config.get("action"))
+        language = self._modality_payload(config.get("language"))
+        video_keys = list(video.get("modality_keys", []))
+        state_keys = list(state.get("modality_keys", []))
+        action_keys = list(action.get("modality_keys", []))
+        language_keys = list(language.get("modality_keys", []))
+        if not video_keys or not state_keys or not action_keys or not language_keys:
+            raise ValueError(f"Incomplete GR00T modality config: {config}")
+        self._set_policy_modalities(
+            video_keys=video_keys,
+            state_keys=state_keys,
+            action_keys=action_keys,
+            language_key=language_keys[0],
+            video_horizon=len(video.get("delta_indices", [0])),
+            state_horizon=len(state.get("delta_indices", [0])),
+        )
 
     def _observation(self) -> dict:
         image = self.latest_image
         if image is None:
             image = np.zeros((self.image_height, self.image_width, 3), dtype=np.uint8)
+
+        video = {}
+        for key in self.video_keys:
+            key_image = image
+            if key == "wrist":
+                if self.latest_wrist_image is not None:
+                    key_image = self.latest_wrist_image
+                elif not self._missing_wrist_warned:
+                    self.get_logger().warning(
+                        "Checkpoint expects a wrist camera but wrist_camera_topic is empty or has no frame; "
+                        "using the front image for the wrist input"
+                    )
+                    self._missing_wrist_warned = True
+            frame = key_image.reshape(1, 1, self.image_height, self.image_width, 3)
+            video[key] = np.repeat(frame, self.video_horizon, axis=1)
+
+        joint_history = self._joint_history_array(self.state_horizon)
+        if self.state_keys == ["single_arm", "gripper"]:
+            state = {
+                "single_arm": joint_history[..., :5],
+                "gripper": joint_history[..., 5:6],
+            }
+        else:
+            state = {self.state_keys[0]: joint_history}
         observation = {
-            "video": {self.video_key: image.reshape(1, 1, self.image_height, self.image_width, 3)},
-            "state": {self.state_key: self._joint_history_array()},
-            "language": {"task": [[self.instruction]]},
+            "video": video,
+            "state": state,
+            "language": {self.language_key: [[self.instruction]]},
             "metadata": {
                 "joint_names": JOINT_NAMES,
                 "camera_info": self.latest_camera_info,
@@ -249,7 +382,17 @@ class SO101GrootBridge(Node):
             action = response[0]
         else:
             action = response
-        if self.action_key in action:
+        if self.action_keys == ["single_arm", "gripper"]:
+            if not all(key in action for key in self.action_keys):
+                raise ValueError(
+                    f"GR00T response is missing SO-101 action keys {self.action_keys}: {list(action)}"
+                )
+            raw = np.concatenate(
+                [np.asarray(action["single_arm"]), np.asarray(action["gripper"])], axis=-1
+            )
+        elif self.action_keys[0] in action:
+            raw = action[self.action_keys[0]]
+        elif self.action_key in action:
             raw = action[self.action_key]
         else:
             raw = next(iter(action.values()))
@@ -264,13 +407,13 @@ class SO101GrootBridge(Node):
             if self._policy_busy:
                 return
             self._policy_busy = True
-        observation = self._observation()
-        threading.Thread(
-            target=self._policy_worker, args=(observation,), daemon=True
-        ).start()
+        threading.Thread(target=self._policy_worker, daemon=True).start()
 
-    def _policy_worker(self, observation):
+    def _policy_worker(self):
         try:
+            if not self._modality_configured:
+                self._configure_from_policy()
+            observation = self._observation()
             response = self.client.get_action(observation)
             # Clamp against where the joints are now, not a pre-request
             # snapshot, so a slow policy round-trip cannot command a step

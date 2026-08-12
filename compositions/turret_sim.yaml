@@ -1,28 +1,86 @@
-# Turret PanTiltROS-compatible headless tracking simulation.
+# PanTiltROS tracking against a synthetic ROS camera and actuator plant.
+# YOLO and closed-loop control live in applications/pantiltros; the simulator
+# contains only the scene renderer, actuator dynamics, telemetry, and scoring.
+
+x-pantiltros-image: &pantiltros-image
+  image: cyberphysics/pantiltros:${CYBERPHYSICS_TAG:-latest}
+  pull_policy: build
+  build:
+    context: ../applications/pantiltros
 
 services:
-  turret_sim:
-    network_mode: "host"
-    image: cyberphysics/aerostack2
+  pantilt_yolo:
+    <<: *pantiltros-image
+    container_name: turret_pantilt_yolo
+    network_mode: host
+    ipc: host
+    gpus: all
+    shm_size: 8gb
+    working_dir: /workspace/cache/models
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+      - YOLO_CONFIG_DIR=/workspace/cache/ultralytics
+      - TORCH_HOME=/workspace/cache/torch
+      - PANTILT_MODEL_DIR=/workspace/cache/models
     volumes:
-      - ../systems/turret:/workspace/systems/turret:ro
-      - ../generated/turret:/workspace/generated/turret
+      - ../applications/pantiltros/config:/workspace/pantiltros/config:ro
+      - ../cache/turret:/workspace/cache
+      - /dev/shm:/dev/shm
     command: >
-      python3 /workspace/systems/turret/scripts/turret_sim.py
-        --scenario /workspace/systems/turret/scenarios/warehouse_tracking.json
-        --output /workspace/generated/turret/turret_tracking_metrics.json
+      python3 /scripts/pantilt_yolo_tracker.py
+      --ros-args
+      --params-file /workspace/pantiltros/config/yolo_tracker.yaml
+      -p model_path:=${TURRET_YOLO_MODEL:-yoloe-26s-seg.pt}
+      -p device:="'${TURRET_YOLO_DEVICE:-0}'"
+      -p image_size:=${TURRET_YOLO_IMAGE_SIZE:-640}
+      -p confidence:=${TURRET_YOLO_CONFIDENCE:-0.003}
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /tmp/pantilt_yolo_ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 90
+      start_period: 10m
+    restart: "no"
+
+  turret_sim:
+    <<: *pantiltros-image
+    container_name: turret_sim
+    network_mode: host
+    ipc: host
+    depends_on:
+      pantilt_yolo:
+        condition: service_healthy
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+    volumes:
+      - ../applications/turret_sim:/workspace/turret_sim:ro
+      - ../generated/turret:/workspace/generated/turret
+      - /dev/shm:/dev/shm
+    command: >
+      python3 /workspace/turret_sim/scripts/turret_ros_sim.py
+      --scenario /workspace/turret_sim/scenarios/warehouse_tracking.json
+      --output /workspace/generated/turret/turret_tracking_metrics.json
+      --variant ${TURRET_VARIANT:-nominal}
+      --save-frames /workspace/generated/turret/frames
+    restart: "no"
 
   turret_score:
+    <<: *pantiltros-image
     profiles: ["validation"]
-    network_mode: "host"
-    image: cyberphysics/aerostack2
+    container_name: turret_score
     depends_on:
       turret_sim:
         condition: service_completed_successfully
     volumes:
-      - ../systems/turret:/workspace/systems/turret:ro
+      - ../applications/turret_sim:/workspace/turret_sim:ro
       - ../generated/turret:/workspace/generated/turret
     command: >
-      python3 /workspace/systems/turret/scripts/score_tracking_task.py
-        --metrics /workspace/generated/turret/turret_tracking_metrics.json
-        --thresholds /workspace/systems/turret/validation/acceptance_thresholds.json
+      python3 /workspace/turret_sim/scripts/score_tracking_task.py
+      --metrics /workspace/generated/turret/turret_tracking_metrics.json
+      --thresholds /workspace/turret_sim/validation/acceptance_thresholds.json
+      --output /workspace/generated/turret/turret_score.json
+    restart: "no"

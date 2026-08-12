@@ -108,7 +108,7 @@ commands from the GR00T policy server through the bridge. The compose file sets
 `FASTDDS_BUILTIN_TRANSPORTS=UDPv4` so ROS samples flow reliably between Docker
 host-network containers.
 
-## SO-101 + GR00T Task-Solving Demo
+## SO-101 + GR00T Inference
 
 Build the reusable SO-101 and GR00T images, then select the simulation profile:
 
@@ -117,11 +117,52 @@ make -C applications build_so101 build_groot
 docker compose -f compositions/so101_groot_isaac.yaml --profile sim up
 ```
 
-The default `SO101_GROOT_MODE=demo` policy is a deterministic, GR00T-compatible
-benchmark baseline. It uses the fixed task specification and measured joint state
-to execute IK-generated pick, lift, transfer, place, and retreat waypoints. It does
-not read live simulator object poses. Use this mode to verify the complete system;
-use `real` mode for visual-policy evaluation.
+The stack defaults to `SO101_GROOT_MODE=real` and expects a fine-tuned SO-100
+or SO-101 `NEW_EMBODIMENT` checkpoint at
+`data/groot/models/so101-checkpoint/`. The GR00T runtime is installed in the
+container image, but model weights are deliberately stored outside the image.
+The base `nvidia/GR00T-N1.7-3B` checkpoint cannot control SO-101 zero-shot:
+SO-101 requires a checkpoint fine-tuned with its exact camera, joint-unit, and
+action schema.
+
+GR00T N1.7 also loads the gated `nvidia/Cosmos-Reason2-2B` backbone. Request
+access on Hugging Face, then either export `HF_TOKEN` before starting Compose
+or authenticate once into the mounted cache:
+
+```bash
+docker compose -f compositions/so101_groot_isaac.yaml \
+  --profile sim run --rm --no-deps groot_policy hf auth login
+```
+
+Install or copy a fine-tuned checkpoint and start inference:
+
+```bash
+mkdir -p data/groot/models/so101-checkpoint
+# Copy config.json, processor_config.json/statistics, and model weights here.
+
+GR00T_MODEL_PATH=/workspace/data/models/so101-checkpoint \
+GR00T_EMBODIMENT_TAG=NEW_EMBODIMENT \
+docker compose -f compositions/so101_groot_isaac.yaml --profile sim up
+```
+
+The bridge queries the loaded policy's modality configuration. It supports the
+official SO-101 `front`/`wrist`, `single_arm`/`gripper` schema and the
+repository's legacy single-vector schema. If a checkpoint expects a wrist camera
+but no `wrist_camera_topic` is configured, the bridge warns and duplicates the
+front frame; provide the camera stream used during training for meaningful
+inference.
+
+For interface and simulator validation without model weights, explicitly select
+the deterministic baseline:
+
+```bash
+SO101_GROOT_MODE=demo \
+docker compose -f compositions/so101_groot_isaac.yaml --profile sim up
+```
+
+That baseline uses the fixed task specification and measured joint state to
+execute IK-generated pick, lift, transfer, place, and retreat waypoints. It does
+not read live simulator object poses.
 
 Isaac now materializes the table, bins, target, distractors, and camera from
 `systems/so101/scenarios/picking_table.json`. For deterministic demo behavior it
@@ -170,13 +211,15 @@ Connect Foxglove to Rosbridge at `ws://localhost:9090`.
 
 Set `SO101_TASK_ID=pick_green_block_right_bin` to run the second scenario task.
 
-To use a fine-tuned SO-101 GR00T checkpoint stored under `data/groot/models/`:
+NVIDIA specifies at least 16 GiB GPU VRAM for N1.7 inference alone. Running
+Isaac Sim and GR00T on the same GPU needs additional headroom. To use a policy
+server on another machine, expose its TCP port and run only Isaac plus the
+bridge locally:
 
 ```bash
-SO101_GROOT_MODE=real \
-GR00T_MODEL_PATH=/workspace/data/models/so101-checkpoint \
-GR00T_EMBODIMENT_TAG=so101 \
-docker compose -f compositions/so101_groot_isaac.yaml --profile sim up
+SO101_GROOT_HOST=192.0.2.10 \
+docker compose -f compositions/so101_groot_isaac.yaml \
+  --profile sim up --scale groot_policy=0
 ```
 
 ### Optional Hardware In The Loop

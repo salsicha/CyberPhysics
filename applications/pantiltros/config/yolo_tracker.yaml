@@ -1,0 +1,39 @@
+pantilt_yolo_tracker:
+  ros__parameters:
+    camera_topic: /turret/camera/image_raw
+    camera_info_topic: /turret/camera/camera_info
+    joint_state_topic: /turret/joint_states
+    joint_command_topic: /turret/joint_commands
+    segments_topic: /turret/yolo/segments
+    target_mask_topic: /turret/yolo/target_mask
+    target_bbox_topic: /turret/yolo/target_bbox
+    target_confidence_topic: /turret/yolo/target_confidence
+    pixel_error_topic: /turret/target/pixel_error
+    angular_error_topic: /turret/target/angular_error
+    selected_id_topic: /turret/target/selected_id
+    locked_topic: /turret/target/locked
+    diagnostics_topic: /turret/diagnostics
+    model_path: /workspace/cache/models/yoloe-26s-seg.pt
+    device: "0"
+    image_size: 640
+    confidence: 0.003
+    class_prompts:
+      - blue utility cart
+      - warehouse worker
+      - red cardboard box
+      - yellow quadcopter drone
+      - green utility cart
+    target_id: cart_blue_01
+    target_class: blue utility cart
+    initial_selection_normalized: [0.13, 0.565]
+    association_gate_fraction: 0.50
+    command_enabled: true
+    kp: 0.82
+    kd: 0.08
+    pan_min_rad: -1.5708
+    pan_max_rad: 1.5708
+    tilt_min_rad: -0.65
+    tilt_max_rad: 0.75
+    lock_tolerance_px: 36.0
+    warmup: true
+    ready_file: /tmp/pantilt_yolo_ready
