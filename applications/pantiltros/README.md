@@ -18,6 +18,28 @@ Run against the ROS camera and actuator topics already on the host:
 docker compose -f compositions/pantiltros.yaml up --build
 ```
 
+The annotated camera stream is published by default on
+`/turret/yolo/annotated_image`. View it with RViz, Foxglove, or:
+
+```bash
+rqt_image_view /turret/yolo/annotated_image
+```
+
+To open the annotated OpenCV window directly from the container:
+
+```bash
+xhost +si:localuser:root
+TURRET_SHOW_WINDOW=true \
+docker compose -f compositions/pantiltros.yaml up --build
+```
+
+Press `q` or Escape to close only the window; ROS inference and publishers keep
+running. Revoke the temporary X11 permission afterward with
+`xhost -si:localuser:root`. Set `TURRET_PUBLISH_ANNOTATED=false` to disable the
+annotated ROS image when bandwidth matters, or change its name with
+`TURRET_ANNOTATED_TOPIC`.
+
+
 Run the complete simulation:
 
 ```bash
@@ -51,7 +73,8 @@ startup and persists in `cache/turret/models/`.  Override it with
 - Input: `/turret/camera/image_raw`, `/turret/camera/camera_info`,
   `/turret/joint_states`
 - Perception: `/turret/yolo/segments`, `/turret/yolo/target_mask`,
-  `/turret/yolo/target_bbox`, `/turret/yolo/target_confidence`
+  `/turret/yolo/target_bbox`, `/turret/yolo/target_confidence`,
+  `/turret/yolo/annotated_image`
 - Tracking: `/turret/target/pixel_error`, `/turret/target/angular_error`,
   `/turret/target/selected_id`, `/turret/target/locked`
 - Output: `/turret/joint_commands`, `/turret/diagnostics`

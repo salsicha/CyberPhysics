@@ -74,6 +74,19 @@ def mask_message(mask: np.ndarray, source: Image) -> Image:
     return msg
 
 
+def bgr_message(frame: np.ndarray, source: Image) -> Image:
+    """Create a ROS bgr8 image while preserving the source timestamp/frame."""
+    msg = Image()
+    msg.header = source.header
+    msg.height = int(frame.shape[0])
+    msg.width = int(frame.shape[1])
+    msg.encoding = "bgr8"
+    msg.is_bigendian = False
+    msg.step = int(frame.shape[1]) * 3
+    msg.data = np.ascontiguousarray(frame, dtype=np.uint8).tobytes()
+    return msg
+
+
 def joint_position(msg: JointState | None, name: str, default: float = 0.0) -> float:
     if msg is not None and name in msg.name:
         index = msg.name.index(name)
@@ -96,6 +109,7 @@ class PanTiltYoloTracker(Node):
             "target_confidence_topic": "/turret/yolo/target_confidence",
             "pixel_error_topic": "/turret/target/pixel_error",
             "angular_error_topic": "/turret/target/angular_error",
+            "annotated_image_topic": "/turret/yolo/annotated_image",
             "selected_id_topic": "/turret/target/selected_id",
             "locked_topic": "/turret/target/locked",
             "diagnostics_topic": "/turret/diagnostics",
@@ -116,6 +130,9 @@ class PanTiltYoloTracker(Node):
             "tilt_min_rad": -0.65,
             "tilt_max_rad": 0.75,
             "lock_tolerance_px": 36.0,
+            "publish_annotated_image": True,
+            "show_window": False,
+            "window_name": "PanTiltROS YOLO",
             "warmup": True,
             "ready_file": "/tmp/pantilt_yolo_ready",
         }
@@ -144,6 +161,17 @@ class PanTiltYoloTracker(Node):
         self.tilt_min = float(self.parameter("tilt_min_rad"))
         self.tilt_max = float(self.parameter("tilt_max_rad"))
         self.lock_tolerance = float(self.parameter("lock_tolerance_px"))
+        self.publish_annotated_image = bool(
+            self.parameter("publish_annotated_image")
+        )
+        self.show_window = bool(self.parameter("show_window"))
+        self.window_name = str(self.parameter("window_name"))
+        self.window_initialized = False
+        if self.show_window and not os.environ.get("DISPLAY"):
+            self.get_logger().warning(
+                "show_window is enabled but DISPLAY is unset; disabling the window"
+            )
+            self.show_window = False
         self.ready_file = Path(str(self.parameter("ready_file")))
 
         self.camera_info: CameraInfo | None = None
@@ -171,6 +199,11 @@ class PanTiltYoloTracker(Node):
         )
         self.angular_error_pub = self.create_publisher(
             Float32MultiArray, str(self.parameter("angular_error_topic")), 10
+        )
+        self.annotated_pub = self.create_publisher(
+            Image,
+            str(self.parameter("annotated_image_topic")),
+            qos_profile_sensor_data,
         )
         self.selected_id_pub = self.create_publisher(
             String, str(self.parameter("selected_id_topic")), 10
@@ -272,7 +305,9 @@ class PanTiltYoloTracker(Node):
         latency_ms = (time.perf_counter() - started) * 1000.0
         detections = self._detections(result, width, height)
         target = self._associate_target(detections, width, height)
-        self._publish_outputs(msg, target, detections, latency_ms, width, height)
+        self._publish_outputs(
+            msg, frame, target, detections, latency_ms, width, height
+        )
         self.frame_count += 1
 
     def _detections(self, result: Any, width: int, height: int) -> list[dict[str, Any]]:
@@ -351,6 +386,7 @@ class PanTiltYoloTracker(Node):
     def _publish_outputs(
         self,
         source: Image,
+        frame: np.ndarray,
         target: dict[str, Any] | None,
         detections: list[dict[str, Any]],
         latency_ms: float,
@@ -391,7 +427,108 @@ class PanTiltYoloTracker(Node):
         )
         self.selected_id_pub.publish(String(data=selected_id))
         self.locked_pub.publish(Bool(data=locked))
+        if self.publish_annotated_image or self.show_window:
+            annotated = self._annotate(
+                frame, detections, target, latency_ms, locked, cx, cy
+            )
+            if self.publish_annotated_image:
+                self.annotated_pub.publish(bgr_message(annotated, source))
+            if self.show_window:
+                self._show(annotated)
         self._publish_diagnostics(latency_ms, len(detections), target is not None)
+
+    def _annotate(
+        self,
+        frame: np.ndarray,
+        detections: list[dict[str, Any]],
+        target: dict[str, Any] | None,
+        latency_ms: float,
+        locked: bool,
+        center_x: float,
+        center_y: float,
+    ) -> np.ndarray:
+        annotated = frame.copy()
+        for detection in detections:
+            is_target = detection is target
+            color = (40, 220, 40) if is_target else (0, 180, 255)
+            mask = detection["mask"] > 0
+            if np.any(mask):
+                annotated[mask] = (
+                    0.55 * annotated[mask]
+                    + 0.45 * np.asarray(color, dtype=np.float32)
+                ).astype(np.uint8)
+
+            box_x, box_y, box_w, box_h = detection["bbox_xywh"]
+            x1 = max(0, int(round(box_x - box_w * 0.5)))
+            y1 = max(0, int(round(box_y - box_h * 0.5)))
+            x2 = min(
+                annotated.shape[1] - 1, int(round(box_x + box_w * 0.5))
+            )
+            y2 = min(
+                annotated.shape[0] - 1, int(round(box_y + box_h * 0.5))
+            )
+            cv2.rectangle(
+                annotated, (x1, y1), (x2, y2), color, 3 if is_target else 2
+            )
+            label_prefix = "TARGET " if is_target else ""
+            label = (
+                f"{label_prefix}{detection['class']} "
+                f"{detection['confidence']:.2f}"
+            )
+            cv2.putText(
+                annotated,
+                label,
+                (x1, max(18, y1 - 7)),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                color,
+                2,
+                cv2.LINE_AA,
+            )
+            centroid = tuple(
+                int(round(value)) for value in detection["centroid_px"]
+            )
+            cv2.circle(annotated, centroid, 4, color, -1)
+
+        center = (int(round(center_x)), int(round(center_y)))
+        cv2.drawMarker(
+            annotated,
+            center,
+            (255, 255, 255),
+            cv2.MARKER_CROSS,
+            28,
+            2,
+        )
+        status = "LOCKED" if locked else "SEARCHING"
+        status_color = (40, 220, 40) if locked else (0, 180, 255)
+        cv2.putText(
+            annotated,
+            f"{status}  {latency_ms:.1f} ms",
+            (16, 30),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.7,
+            status_color,
+            2,
+            cv2.LINE_AA,
+        )
+        return annotated
+
+    def _show(self, frame: np.ndarray) -> None:
+        try:
+            if not self.window_initialized:
+                cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
+                self.window_initialized = True
+            cv2.imshow(self.window_name, frame)
+            if (cv2.waitKey(1) & 0xFF) in (ord("q"), 27):
+                cv2.destroyWindow(self.window_name)
+                self.window_initialized = False
+                self.show_window = False
+                self.get_logger().info(
+                    "Display window closed; ROS publishers remain active"
+                )
+        except cv2.error as exc:
+            self.get_logger().error(f"Unable to show OpenCV window: {exc}")
+            self.show_window = False
 
     def _publish_command(self, angular_x: float, angular_y: float) -> None:
         if not self.command_enabled:
@@ -438,6 +575,8 @@ class PanTiltYoloTracker(Node):
 
     def destroy_node(self) -> bool:
         try:
+            if self.window_initialized:
+                cv2.destroyWindow(self.window_name)
             self.ready_file.unlink(missing_ok=True)
         finally:
             return super().destroy_node()
