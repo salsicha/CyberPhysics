@@ -24,10 +24,12 @@ services:
       - YOLO_CONFIG_DIR=/workspace/cache/ultralytics
       - TORCH_HOME=/workspace/cache/torch
       - PANTILT_MODEL_DIR=/workspace/cache/models
+      - DISPLAY=${DISPLAY:-:0}
     volumes:
       - ../applications/pantiltros/config:/workspace/pantiltros/config:ro
       - ../cache/turret:/workspace/cache
       - /dev/shm:/dev/shm
+      - /tmp/.X11-unix:/tmp/.X11-unix
     command: >
       python3 /scripts/pantilt_yolo_tracker.py
       --ros-args
@@ -36,6 +38,7 @@ services:
       -p device:="'${TURRET_YOLO_DEVICE:-0}'"
       -p image_size:=${TURRET_YOLO_IMAGE_SIZE:-640}
       -p confidence:=${TURRET_YOLO_CONFIDENCE:-0.003}
+      -p show_window:=${TURRET_SHOW_WINDOW:-false}
     healthcheck:
       test: ["CMD-SHELL", "test -f /tmp/pantilt_yolo_ready"]
       interval: 10s

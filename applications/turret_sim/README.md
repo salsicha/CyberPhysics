@@ -24,6 +24,27 @@ remaining YOLO service, or clean up with:
 docker compose -f compositions/turret_sim.yaml down
 ```
 
+### Annotated preview window
+
+On a Linux desktop using X11 or XWayland, grant the container temporary display
+access and enable the YOLO node's annotated OpenCV window:
+
+```bash
+xhost +si:localuser:root
+TURRET_SHOW_WINDOW=true \
+docker compose -f compositions/turret_sim.yaml up --build
+```
+
+Press `q` or Escape to close the window without stopping inference. Revoke the
+temporary display permission after the run with:
+
+```bash
+xhost -si:localuser:root
+```
+
+The preview is disabled by default, so headless runs continue to work without a
+display server.
+
 Override runtime settings without editing Compose:
 
 ```bash
