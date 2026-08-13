@@ -48,14 +48,18 @@ WORKDIR /opt/Isaac-GR00T
 RUN --mount=type=cache,target=/root/.cache/uv,sharing=locked \
     set -euo pipefail && \
     UV_PREVIEW=1 UV_HTTP_TIMEOUT=300 UV_CONCURRENT_DOWNLOADS=4 uv sync --frozen --no-install-project --extra dev && \
-    uv pip install --python /opt/Isaac-GR00T/.venv/bin/python -e . --no-deps
+    uv pip install --python /opt/Isaac-GR00T/.venv/bin/python -e . --no-deps && \
+    uv pip install --python /opt/Isaac-GR00T/.venv/bin/python "rosbags>=0.10,<0.11"
 
 COPY scripts/smoke_test.py /workspace/smoke_test.py
 COPY scripts/so101_policy_server.py /workspace/so101_policy_server.py
 COPY scripts/so101_task_policy.py /workspace/so101_task_policy.py
 COPY scripts/policy_healthcheck.py /workspace/policy_healthcheck.py
+COPY config/ /workspace/groot_config/
+COPY scripts/ /workspace/groot_scripts/
 COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh /workspace/smoke_test.py /workspace/so101_policy_server.py /workspace/policy_healthcheck.py
+RUN chmod +x /entrypoint.sh /workspace/smoke_test.py /workspace/so101_policy_server.py /workspace/policy_healthcheck.py && \
+    find /workspace/groot_scripts -type f -name '*.sh' -exec chmod +x {} +
 
 RUN mkdir -p /usr/share/glvnd/egl_vendor.d && \
     printf '%s\n' \

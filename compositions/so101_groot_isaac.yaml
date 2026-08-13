@@ -142,6 +142,7 @@ services:
     volumes:
       - ../data/groot:/workspace/data
       - ../cache/groot:/workspace/cache
+      - ../applications/groot/config:/workspace/groot_config:ro
       - ../applications/groot/scripts:/workspace/groot_scripts:ro
       - ../systems:/workspace/systems:ro
     command: >
@@ -176,6 +177,7 @@ services:
     volumes:
       - ../systems:/workspace/systems:ro
       - ../applications/so101/scripts:/workspace/so101_scripts:ro
+      - ../data/groot/bags:/workspace/data/bags:rw
     command: >
       python3 /workspace/so101_scripts/groot_so101_bridge.py
         --ros-args
