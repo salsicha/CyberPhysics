@@ -51,6 +51,8 @@ build_isaac: cleanup
 	APP=isaac ./_build_it.sh
 build_groot: cleanup
 	APP=groot ./_build_it.sh
+build_smolvla: cleanup
+	APP=smolvla ./_build_it.sh
 build_demnav: cleanup build_aerostack2
 	APP=demnav ./_build_it.sh
 build_matlab: cleanup build_ros2

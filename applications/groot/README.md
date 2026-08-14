@@ -73,6 +73,14 @@ need additional headroom. The default fine-tune trains the projector and
 diffusion action head; tuning the visual encoder or LLM requires substantially
 more memory.
 
+> **Fine-tuning hardware note:** Use an Ampere-generation or newer NVIDIA GPU
+> with at least 40 GiB of VRAM (for example, an A100 40 GB, L40 48 GB, or H100).
+> A 32 GB V100 is not supported for N1.7 fine-tuning: it is below NVIDIA's VRAM
+> minimum and its Volta architecture cannot run the required FlashAttention
+> kernels. The upstream N1.7 trainer does not currently provide an official
+> 4-bit, 8-bit, LoRA, or QLoRA fine-tuning mode. Multiple data-parallel GPUs do
+> not combine their VRAM because each worker holds its own model replica.
+
 Required host components:
 
 - Linux with an NVIDIA driver compatible with CUDA 12.8.

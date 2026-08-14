@@ -21,6 +21,7 @@ docker compose -f compositions/marimo.yaml up
 docker compose -f compositions/racecarneo.yaml up
 docker compose -f compositions/turret_sim.yaml --profile validation up
 docker compose -f compositions/so101_groot_isaac.yaml --profile sim up
+docker compose -f compositions/so101_smolvla_isaac.yaml --profile sim up
 docker compose -f compositions/nvblox.yaml up
 docker compose -f compositions/boat_sim.yaml up
 docker compose -f compositions/submarine_sim.yaml up
@@ -39,6 +40,7 @@ docker compose -f compositions/lunar_rover_hardware.yaml up
 docker compose -f compositions/racecarneo.yaml up
 docker compose -f compositions/turret_sim.yaml --profile validation up
 docker compose -f compositions/so101_groot_isaac.yaml --profile sim up
+docker compose -f compositions/so101_smolvla_isaac.yaml --profile sim up
 ```
 
 NiceGUI is served on `http://localhost:8080`.
