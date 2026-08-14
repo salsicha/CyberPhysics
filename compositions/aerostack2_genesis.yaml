@@ -1,99 +1,198 @@
 services:
-  genesis:
-    network_mode: "host"
-    image: cyberphysics/genesis:${CYBERPHYSICS_TAG:-latest}
-    container_name: aerostack2_genesis
-    ipc: host
-    env_file:
-      - ../systems/aerostack2_genesis/config/nav_topics.env
+  demnav_assets:
+    image: cyberphysics/demnav:${CYBERPHYSICS_TAG:-latest}
+    network_mode: host
+    env_file: [../systems/aerodrone/config/topics.env, ../applications/aerostack2/config/mount_tamalpais.env]
+    volumes: [demnav_genesis_cache:/data/demnav_cache]
+    command: >
+      /venv/bin/python3 -m demnav_pkg.seed_cache
+        --lat ${INITIAL_LAT:-37.9234} --lon ${INITIAL_LON:--122.5967}
+        --area-km ${AREA_KM:-8.0} --resolution-m ${DEM_RESOLUTION_M:-10.0}
+        --cache-dir /data/demnav_cache
+    restart: "no"
+
+  wildnav_assets:
+    image: cyberphysics/wildnav:${CYBERPHYSICS_TAG:-latest}
+    network_mode: host
+    env_file: [../systems/aerodrone/config/topics.env, ../applications/aerostack2/config/mount_tamalpais.env]
     environment:
-      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
-      - GENESIS_BACKEND=${GENESIS_BACKEND:-cpu}
-      - PYOPENGL_PLATFORM=${PYOPENGL_PLATFORM:-egl}
-      - NVIDIA_DRIVER_CAPABILITIES=all
+      WILDNAV_TILE_URL: ${WILDNAV_TILE_URL:-https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}}
+    volumes: [wildnav_genesis_cache:/data/wildnav_cache]
+    command: >
+      /venv/bin/python3 -m wildnav_pkg.seed_cache
+        --lat ${INITIAL_LAT:-37.9234} --lon ${INITIAL_LON:--122.5967}
+        --zoom ${WILDNAV_ZOOM:-17} --search-radius-m ${WILDNAV_SEARCH_RADIUS_M:-1100.0}
+        --max-tiles ${WILDNAV_MAX_TILES:-169}
+        --feature-backend ${WILDNAV_FEATURE_BACKEND:-SIFT}
+        --tile-url-template ${WILDNAV_TILE_URL:-https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}}
+        --cache-dir /data/wildnav_cache
+    restart: "no"
+
+  terrain_assets:
+    image: cyberphysics/demnav:${CYBERPHYSICS_TAG:-latest}
+    network_mode: none
+    depends_on:
+      demnav_assets: {condition: service_completed_successfully}
+      wildnav_assets: {condition: service_completed_successfully}
+    env_file: [../systems/aerodrone/config/topics.env, ../applications/aerostack2/config/mount_tamalpais.env]
+    volumes:
+      - ../applications/ardupilot_sitl/scripts:/workspace/applications/ardupilot_sitl/scripts:ro
+      - ../applications/demnav/scripts:/workspace/applications/demnav/scripts:ro
+      - ../applications/aerostack2/missions:/workspace/missions:ro
+      - demnav_genesis_cache:/data/demnav_cache:ro
+      - wildnav_genesis_cache:/data/wildnav_cache:ro
+      - navsim_genesis_assets:/data/navsim_assets
+    command: >
+      /venv/bin/python3 /workspace/applications/demnav/scripts/build_georeferenced_terrain.py
+        --lat ${INITIAL_LAT:-37.9234} --lon ${INITIAL_LON:--122.5967}
+        --origin-alt ${ORIGIN_ALT:-781.0} --area-km ${AREA_KM:-8.0}
+        --resolution-m ${DEM_RESOLUTION_M:-10.0} --zoom ${WILDNAV_ZOOM:-17}
+        --mission /workspace/missions/wilderness_missions.json
+    restart: "no"
+
+  genesis:
+    image: cyberphysics/genesis:${CYBERPHYSICS_TAG:-latest}
+    network_mode: host
+    ipc: host
+    runtime: nvidia
+    depends_on:
+      terrain_assets: {condition: service_completed_successfully}
+    env_file: [../systems/aerodrone/config/topics.env, ../applications/aerostack2/config/mount_tamalpais.env]
+    environment:
+      ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
+      GENESIS_BACKEND: ${GENESIS_BACKEND:-gpu}
+      GENESIS_LOG_LEVEL: ${GENESIS_LOG_LEVEL:-info}
+      GENESIS_MAX_ROTOR_RPM: ${GENESIS_MAX_ROTOR_RPM:-21700}
+      PYOPENGL_PLATFORM: ${PYOPENGL_PLATFORM:-egl}
+      NVIDIA_DRIVER_CAPABILITIES: all
     volumes:
       - /dev/shm:/dev/shm
-      - ../systems/aerostack2_genesis:/workspace/systems/aerostack2_genesis:ro
+      - ../applications/ardupilot_sitl/scripts:/workspace/applications/ardupilot_sitl/scripts:ro
+      - ../applications/genesis:/workspace/applications/genesis:ro
+      - ../systems/aerodrone:/workspace/systems/aerodrone:ro
+      - navsim_genesis_assets:/data/navsim_assets:ro
     command: >
-      python3 /workspace/systems/aerostack2_genesis/scripts/genesis_aerostack2_navsim.py
-        --backend ${GENESIS_BACKEND:-cpu}
-        --lat ${INITIAL_LAT:-37.8044}
-        --lon ${INITIAL_LON:--122.4661}
-        --origin-alt ${ORIGIN_ALT:-0.0}
-        --altitude-m ${GENESIS_FLIGHT_ALTITUDE_M:-300.0}
-        --radius-m ${GENESIS_FLIGHT_RADIUS_M:-60.0}
+      python3 /workspace/applications/genesis/scripts/aerodrone_navsim.py
+        --backend ${GENESIS_BACKEND:-gpu}
+        --lat ${INITIAL_LAT:-37.9234} --lon ${INITIAL_LON:--122.5967}
+        --origin-alt ${ORIGIN_ALT:-781.0} --assets /data/navsim_assets
     deploy:
       resources:
         reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
+          devices: [{driver: nvidia, count: all, capabilities: [gpu]}]
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /tmp/genesis_sim_ready"]
+      interval: 2s
+      timeout: 1s
+      retries: 120
+      start_period: 5s
+
+  navigator_sitl:
+    image: cyberphysics/navigator:${CYBERPHYSICS_TAG:-latest}
+    network_mode: host
+    depends_on:
+      genesis: {condition: service_healthy}
+    env_file: [../systems/aerodrone/config/topics.env, ../applications/aerostack2/config/mount_tamalpais.env]
+    environment:
+      SIM_JSON_HOST: 127.0.0.1
+      ARDUCOPTER_PARAM_FILE: /workspace/applications/genesis/config/aerodrone_sitl.params
+    volumes:
+      - ../applications/ardupilot_sitl/scripts:/workspace/applications/ardupilot_sitl/scripts:ro
+      - ../applications/genesis:/workspace/applications/genesis:ro
+      - ../systems/aerodrone:/workspace/systems/aerodrone:ro
+      - navsim_genesis_assets:/data/navsim_assets:ro
+    command: /workspace/applications/ardupilot_sitl/scripts/run_arducopter_sitl.sh
+
+  mavros:
+    image: cyberphysics/aerostack2:${CYBERPHYSICS_TAG:-latest}
+    network_mode: host
+    ipc: host
+    depends_on: [navigator_sitl]
+    environment: {ROS_DOMAIN_ID: "${ROS_DOMAIN_ID:-0}"}
+    command: ros2 launch mavros apm.launch fcu_url:=tcp://127.0.0.1:5760
 
   demnav:
-    profiles: ["navsim"]
-    network_mode: "host"
     image: cyberphysics/demnav:${CYBERPHYSICS_TAG:-latest}
-    container_name: demnav_genesis
-    depends_on:
-      - genesis
-    environment:
-      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
-      - INITIAL_LAT=${INITIAL_LAT:-37.8044}
-      - INITIAL_LON=${INITIAL_LON:--122.4661}
-    env_file:
-      - ../systems/aerostack2_genesis/config/nav_topics.env
-    volumes:
-      - /dev/shm:/dev/shm
+    network_mode: host
+    ipc: host
+    depends_on: [genesis, mavros]
+    env_file: [../systems/aerodrone/config/topics.env, ../applications/aerostack2/config/mount_tamalpais.env]
+    volumes: [/dev/shm:/dev/shm, demnav_genesis_cache:/data/demnav_cache:ro]
     command: >
-      stdbuf -o L
       ros2 launch demnav_pkg demnav.launch.py
-        gps_topic:=${GPS_TOPIC:-/drone_sim_0/sensor_measurements/gps}
-        odom_topic:=${ODOM_TOPIC:-/drone_sim_0/sensor_measurements/odom}
-        depth_topic:=${DEPTH_TOPIC:-/drone_sim_0/sensor_measurements/downward_rgbd/depth}
-        camera_info_topic:=${CAMERA_INFO_TOPIC:-/drone_sim_0/sensor_measurements/downward_rgbd/depth/camera_info}
-        initial_lat:=${INITIAL_LAT:-37.8044}
-        initial_lon:=${INITIAL_LON:--122.4661}
-        origin_alt:=${ORIGIN_ALT:-0.0}
-        area_km:=${AREA_KM:-10.0}
-        search_radius_m:=${SEARCH_RADIUS_M:-1000.0}
-        dem_resolution_m:=${DEM_RESOLUTION_M:-30.0}
-        fov_deg:=${FOV_DEG:-90.0}
-        min_correlation:=${DEMNAV_MIN_CORRELATION:--1.0}
-        min_dem_footprint_pixels:=${DEMNAV_MIN_FOOTPRINT_PIXELS:-3}
+        gps_topic:=${GPS_TOPIC:-/aerodrone/sensor_measurements/gps}
+        odom_topic:=${ODOM_TOPIC:-/aerodrone/sensor_measurements/odom}
+        depth_topic:=${DEPTH_TOPIC:-/aerodrone/sensor_measurements/downward_rgbd/depth}
+        camera_info_topic:=${CAMERA_INFO_TOPIC:-/aerodrone/sensor_measurements/downward_rgbd/depth/camera_info}
+        initial_lat:=${INITIAL_LAT:-37.9234} initial_lon:=${INITIAL_LON:--122.5967}
+        origin_alt:=${ORIGIN_ALT:-781.0} area_km:=${AREA_KM:-8.0}
+        search_radius_m:=${SEARCH_RADIUS_M:-900.0}
+        dem_resolution_m:=${DEM_RESOLUTION_M:-10.0} fov_deg:=${FOV_DEG:-69.0}
+        min_correlation:=${MIN_CORRELATION:-0.35} cache_dir:=/data/demnav_cache
 
   wildnav:
-    profiles: ["navsim"]
     image: cyberphysics/wildnav:${CYBERPHYSICS_TAG:-latest}
-    container_name: wildnav_genesis
+    network_mode: host
+    ipc: host
+    depends_on: [genesis, demnav]
+    env_file: [../systems/aerodrone/config/topics.env, ../applications/aerostack2/config/mount_tamalpais.env]
+    volumes: [/dev/shm:/dev/shm, wildnav_genesis_cache:/data/wildnav_cache:ro]
+    command: >
+      ros2 launch wildnav_pkg wildnav.launch.py
+        image_topic:=${WILDNAV_IMAGE_TOPIC:-/aerodrone/sensor_measurements/downward_rgb/image_raw}
+        camera_info_topic:=${WILDNAV_CAMERA_INFO_TOPIC:-/aerodrone/sensor_measurements/downward_rgb/camera_info}
+        prediction_odom_topic:=${RAW_ODOM_TOPIC:-/aerodrone/sensor_measurements/odom}
+        raw_odom_topic:=${RAW_ODOM_TOPIC:-/aerodrone/sensor_measurements/odom}
+        gps_topic:=${GPS_TOPIC:-/aerodrone/sensor_measurements/gps}
+        demnav_odom_topic:=${DEMNAV_ODOM_TOPIC:-/demnav/odometry}
+        navigation_output_topic:=${NAVIGATION_ODOM_TOPIC:-/navigation/odometry}
+        initial_lat:=${INITIAL_LAT:-37.9234} initial_lon:=${INITIAL_LON:--122.5967}
+        origin_alt:=${ORIGIN_ALT:-781.0} zoom:=${WILDNAV_ZOOM:-17}
+        search_radius_m:=${WILDNAV_SEARCH_RADIUS_M:-1100.0}
+        max_tiles:=${WILDNAV_MAX_TILES:-169} max_tile_downloads_per_cycle:=0
+        match_rate_hz:=${WILDNAV_RATE_HZ:-0.2}
+        min_matches:=${WILDNAV_MIN_MATCHES:-16} min_inliers:=${WILDNAV_MIN_INLIERS:-10}
+        min_inlier_ratio:=${WILDNAV_MIN_INLIER_RATIO:-0.25} cache_dir:=/data/wildnav_cache
+
+  aerostack2_autonomy:
+    image: cyberphysics/aerostack2:${CYBERPHYSICS_TAG:-latest}
+    network_mode: host
+    ipc: host
+    depends_on: [mavros, wildnav]
+    volumes: [/dev/shm:/dev/shm]
+    command: >
+      ros2 launch as2_platform_blueos blueos_autonomy.launch.py
+        namespace:=aerodrone mavros_namespace:=/mavros
+        navigation_odom_topic:=/navigation/odometry takeoff_altitude:=35.0
+
+  flight_ready:
+    image: cyberphysics/aerostack2:${CYBERPHYSICS_TAG:-latest}
+    network_mode: host
+    ipc: host
+    depends_on: [mavros, aerostack2_autonomy]
+    volumes:
+      - /dev/shm:/dev/shm
+      - ../applications/aerostack2/scripts:/workspace/applications/aerostack2/scripts:ro
+    command: >
+      python3 /workspace/applications/aerostack2/scripts/wait_for_mavros_navigation.py
+        --namespace /mavros --timeout 900 --settle-seconds 3
+    restart: "no"
+
+  wilderness_mission:
+    image: cyberphysics/aerostack2:${CYBERPHYSICS_TAG:-latest}
     network_mode: host
     ipc: host
     depends_on:
-      - genesis
-      - demnav
-    environment:
-      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
-    env_file:
-      - ../systems/aerostack2_genesis/config/nav_topics.env
-    volumes:
-      - /dev/shm:/dev/shm
+      aerostack2_autonomy: {condition: service_started}
+      flight_ready: {condition: service_completed_successfully}
+      terrain_assets: {condition: service_completed_successfully}
+    volumes: [/dev/shm:/dev/shm, navsim_genesis_assets:/data/navsim_assets:ro]
     command: >
-      ros2 launch wildnav_pkg wildnav.launch.py
-        image_topic:=${WILDNAV_IMAGE_TOPIC:-/drone_sim_0/sensor_measurements/downward_rgb/image_raw}
-        camera_info_topic:=${WILDNAV_CAMERA_INFO_TOPIC:-/drone_sim_0/sensor_measurements/downward_rgb/camera_info}
-        prediction_odom_topic:=${NAVIGATION_ODOM_TOPIC:-/navigation/odometry}
-        raw_odom_topic:=${RAW_ODOM_TOPIC:-/drone_sim_0/sensor_measurements/odom}
-        gps_topic:=${GPS_TOPIC:-/drone_sim_0/sensor_measurements/gps}
-        demnav_odom_topic:=${DEMNAV_ODOM_TOPIC:-/demnav/odometry}
-        navigation_output_topic:=${NAVIGATION_ODOM_TOPIC:-/navigation/odometry}
-        initial_lat:=${INITIAL_LAT:-37.8044}
-        initial_lon:=${INITIAL_LON:--122.4661}
-        origin_alt:=${ORIGIN_ALT:-0.0}
-        zoom:=${WILDNAV_ZOOM:-18}
-        search_radius_m:=${WILDNAV_SEARCH_RADIUS_M:-250.0}
-        max_tiles:=${WILDNAV_MAX_TILES:-49}
-        max_tile_downloads_per_cycle:=${WILDNAV_MAX_DOWNLOADS:-8}
-        match_rate_hz:=${WILDNAV_RATE_HZ:-0.2}
-        min_matches:=${WILDNAV_MIN_MATCHES:-16}
-        min_inliers:=${WILDNAV_MIN_INLIERS:-10}
-        min_inlier_ratio:=${WILDNAV_MIN_INLIER_RATIO:-0.25}
+      ros2 launch as2_behavior_tree behavior_trees.launch.py
+        drone_id:=aerodrone use_sim_time:=false
+        tree:=/data/navsim_assets/wilderness_mission.xml server_timeout:=120000
+
+volumes:
+  demnav_genesis_cache:
+  wildnav_genesis_cache:
+  navsim_genesis_assets:

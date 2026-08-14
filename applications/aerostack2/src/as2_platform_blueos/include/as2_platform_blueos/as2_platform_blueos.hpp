@@ -1,6 +1,7 @@
 #ifndef AS2_PLATFORM_BLUEOS__AS2_PLATFORM_BLUEOS_HPP_
 #define AS2_PLATFORM_BLUEOS__AS2_PLATFORM_BLUEOS_HPP_
 
+#include <atomic>
 #include <chrono>
 #include <memory>
 #include <string>
@@ -9,6 +10,7 @@
 #include <as2_msgs/msg/control_mode.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <geometry_msgs/msg/twist_stamped.hpp>
+#include <mavros_msgs/msg/extended_state.hpp>
 #include <mavros_msgs/msg/state.hpp>
 #include <mavros_msgs/srv/command_bool.hpp>
 #include <mavros_msgs/srv/command_long.hpp>
@@ -48,6 +50,11 @@ private:
   std::string stop_mode_;
   double takeoff_altitude_;
   double vehicle_yaw_{0.0};
+  std::atomic_uint8_t landed_state_{
+    mavros_msgs::msg::ExtendedState::LANDED_STATE_UNDEFINED};
+  std::atomic_bool takeoff_in_progress_{false};
+  std::atomic<double> vehicle_altitude_{0.0};
+  std::atomic<double> takeoff_start_altitude_{0.0};
   std::chrono::milliseconds service_timeout_;
 
   as2_msgs::msg::ControlMode requested_control_mode_;
@@ -61,6 +68,7 @@ private:
   rclcpp::Publisher<sensor_msgs::msg::BatteryState>::SharedPtr as2_battery_pub_;
 
   rclcpp::Subscription<mavros_msgs::msg::State>::SharedPtr state_sub_;
+  rclcpp::Subscription<mavros_msgs::msg::ExtendedState>::SharedPtr extended_state_sub_;
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
   rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_sub_;
   rclcpp::Subscription<sensor_msgs::msg::NavSatFix>::SharedPtr gps_sub_;

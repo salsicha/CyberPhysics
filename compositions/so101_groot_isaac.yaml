@@ -6,7 +6,7 @@
 services:
   isaacsim_xauth_init:
     profiles: [sim]
-    image: nvcr.io/nvidia/isaac-sim:6.0.1
+    image: cyberphysics/isaac:${CYBERPHYSICS_TAG:-latest}
     user: "0:0"
     network_mode: none
     volumes:
@@ -26,7 +26,7 @@ services:
 
   isaacsim_cache_init:
     profiles: [sim]
-    image: nvcr.io/nvidia/isaac-sim:6.0.1
+    image: cyberphysics/isaac:${CYBERPHYSICS_TAG:-latest}
     user: "0:0"
     network_mode: none
     volumes:
@@ -51,7 +51,7 @@ services:
 
   isaacsim:
     profiles: [sim]
-    image: nvcr.io/nvidia/isaac-sim:6.0.1
+    image: cyberphysics/isaac:${CYBERPHYSICS_TAG:-latest}
     container_name: so101_groot_isaacsim
     depends_on:
       isaacsim_cache_init:

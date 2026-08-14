@@ -3,7 +3,7 @@
 
 services:
   isaacsim_cache_init:
-    image: nvcr.io/nvidia/isaac-sim:6.0.1
+    image: cyberphysics/isaac:${CYBERPHYSICS_TAG:-latest}
     user: "0:0"
     network_mode: none
     volumes:
@@ -32,7 +32,7 @@ services:
 
   isaacsim:
     network_mode: "host"
-    image: nvcr.io/nvidia/isaac-sim:6.0.1
+    image: cyberphysics/isaac:${CYBERPHYSICS_TAG:-latest}
     container_name: isaacsim
     depends_on:
       isaacsim_cache_init:

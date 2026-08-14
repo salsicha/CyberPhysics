@@ -1,17 +1,16 @@
-# ardupilot_sitl
+# ArduPilot SITL
 
-ArduPlane SITL prebuilt at the pinned `ARDUPILOT_REF` (see
-`systems/airplane/config/sitl.env`), plus JSBSim for the optional
-higher-fidelity airframe model. Replaces the old clone-and-compile-at-
-startup pattern so simulations boot offline in seconds and CI can run them.
+This image pins ArduPilot `Plane-4.6.3` and prebuilds ArduPlane, ArduCopter,
+ArduRover, and ArduSub. It also includes JSBSim for the airplane backend.
 
-Build: `make -C applications build_ardupilot_sitl`
+Build it with:
 
-Run (see `compositions/airplane_sim.yaml`):
+```bash
+make -C applications build_ardupilot_sitl
+```
 
-    python3 Tools/autotest/sim_vehicle.py -v ArduPlane -f plane \
-        --no-rebuild --no-mavproxy --custom-location=... \
-        --add-param-file=...
-
-`--no-rebuild` is required — the binary is already at
-`/ardupilot/build/sitl/bin/arduplane`.
+The Aerostack2 simulator compositions run ArduCopter through its JSON
+external-physics protocol. Boat and submarine compositions run ArduRover and
+ArduSub. Every launcher uses `--no-rebuild`; no firmware is cloned or compiled
+at simulation startup. Shared JSON transport and SITL launch helpers live in
+`scripts/`; vehicle parameters remain in each physical `systems/` directory.

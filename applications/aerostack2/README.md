@@ -48,22 +48,16 @@ The map page loads Leaflet, OpenStreetMap tiles, and roslib.js from their public
 CDNs, so the browser needs network access.
 
 
-## Gazebo Simulation
+## Aerodrone simulation
 
-The hardware/simulation-specific Aerostack2 Gazebo files live in
-`systems/aerostack2_gazebo/`. Start the base simulation with:
+`systems/aerodrone/` is the single physical quadrotor definition used by hardware and every simulation backend. Simulator assets and adapters are owned by `applications/gazebo/`, `applications/genesis/`, and `applications/isaac/`; the Mount Tamalpais mission and validation contracts are owned by this application.
+
+Run a backend with one of:
 
 ```bash
 docker compose -f compositions/aerostack2_sim.yaml up
+docker compose -f compositions/aerostack2_genesis.yaml up
+docker compose -f compositions/aerostack2_isaac.yaml up
 ```
 
-Start the same simulation with DemNav and WildNav consumers enabled:
-
-```bash
-docker compose --profile navsim -f compositions/aerostack2_sim.yaml up
-```
-
-The `navsim` profile uses simulated GPS, odometry, RGB, depth, and camera-info
-topics. Override topic names with the variables documented in
-`systems/aerostack2_gazebo/config/nav_topics.env` if the installed AS2 Gazebo
-assets publish different names.
+All three use Navigator/ArduCopter through the same MAVROS and `as2_platform_blueos` boundary, build the same georeferenced terrain, and execute the generated behavior-tree mission. Topic names are defined in `systems/aerodrone/config/topics.env`; deployment values are in `applications/aerostack2/config/mount_tamalpais.env`.

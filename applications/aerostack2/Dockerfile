@@ -42,7 +42,8 @@ RUN . /venv/bin/activate && pip3 install -r /requirements.txt
 COPY synthetic_world /workspace/synthetic_world
 COPY mavros_mirror /workspace/mavros_mirror
 RUN . /venv/bin/activate && \
-    pip3 install /workspace/synthetic_world /workspace/mavros_mirror
+    pip3 install /workspace/synthetic_world && \
+    pip3 install /workspace/mavros_mirror
 
 COPY src /workspace/src
 RUN . /opt/ros/${ROS_DISTRO}/setup.bash && \

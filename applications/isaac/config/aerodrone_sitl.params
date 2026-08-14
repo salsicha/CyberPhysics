@@ -1,0 +1,2 @@
+# Isaac-only physics compensation layered after systems/aerodrone/config/arducopter.params.
+MOT_THST_HOVER,0.43

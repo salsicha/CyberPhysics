@@ -1,7 +1,17 @@
 
-## Navigator with Aerostack2
+## BlueOS Navigator controller boundary
 
-The production drone composition does not run the legacy
+The `cyberphysics/navigator` image inherits the pinned ArduPilot SITL firmware
+image and is the controller used by the drone, boat, and submarine simulation
+compositions. It builds ArduCopter, ArduRover, and ArduSub at the same pinned
+revision so each simulated vehicle crosses the same MAVLink/MAVROS boundary as
+a production BlueOS Navigator installation.
+
+Simulation cannot emulate the physical Navigator HAT. Production deployments
+replace SITL with BlueOS/ArduPilot on that board without changing the MAVROS or
+Aerostack2 command boundary.
+
+The production and simulation compositions do not run the legacy
 `blueos_ros2_bridge.py`. BlueOS and ArduPilot own the mounted Navigator HAT,
 including its IMU, barometer, ADC, PWM outputs, motor mixing, EKF, RC input,
 and vehicle failsafes. MAVROS exposes the resulting autopilot state and command

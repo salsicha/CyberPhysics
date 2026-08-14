@@ -13,8 +13,8 @@ SHELL ["/bin/bash", "-c"]
 COPY scripts/ /scripts/
 
 RUN python3 -m venv /venv
-RUN . /venv/bin/activate && pip3 install torch  --index-url https://download.pytorch.org/whl/cu121
-RUN . /venv/bin/activate && pip3 install genesis-world
+RUN . /venv/bin/activate && pip3 install 'torch>=2.8,<2.9' --index-url https://download.pytorch.org/whl/cu128
+RUN . /venv/bin/activate && pip3 install genesis-world==1.3.3
 
 COPY entrypoint.sh /
 RUN chmod +x /entrypoint.sh

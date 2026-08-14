@@ -11,12 +11,12 @@ ARG JSBSIM_REF=v1.2.2
 USER root
 SHELL ["/bin/bash", "-c"]
 
-# ArduPlane SITL built at the pinned ref, so containers boot offline in
+# ArduPilot Plane, Copter, Rover, and Sub SITL built at the pinned ref, so containers boot offline in
 # seconds instead of cloning and compiling on first start.
 RUN git clone --recurse-submodules --depth=1 --branch "${ARDUPILOT_REF}" \
         https://github.com/ArduPilot/ardupilot.git /ardupilot
 WORKDIR /ardupilot
-RUN ./waf configure --board sitl && ./waf plane
+RUN ./waf configure --board sitl && ./waf plane copter rover sub
 
 # JSBSim for the optional higher-fidelity airframe model
 # (AIRPLANE_SITL_MODEL=jsbsim).

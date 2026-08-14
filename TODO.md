@@ -155,17 +155,17 @@ satellite maps.
      variants.
 2. Simulate all hardware sensors and interfaces from `hardware/aerodrone.txt`.
    - GPS fix and covariance on the Aerostack topic used by
-     `systems/aerostack2_gazebo/config/nav_topics.env`, with multipath,
+     `systems/aerodrone/config/topics.env`, with multipath,
      dropouts, and degraded-accuracy modes.
    - Odometry on `/drone0/sensor_measurements/odom` or the simulation namespace
      equivalent, including velocity, acceleration, covariance, and time sync.
    - Flight-controller IMU, compass, and barometer noise models, with vibration
      and bias drift.
    - Downward OAK-1 high-resolution RGB on `/oak1/image_highres` or
-     `/drone_sim_0/sensor_measurements/downward_rgb/image_raw`, with matching
+     `/aerodrone/sensor_measurements/downward_rgb/image_raw`, with matching
      camera_info and realistic nadir camera intrinsics/extrinsics.
    - OAK-1 MegaDepth relative depth on `/oak1/relative_depth` or
-     `/drone_sim_0/sensor_measurements/downward_rgbd/depth`, including scale
+     `/aerodrone/sensor_measurements/downward_rgbd/depth`, including scale
      ambiguity, invalid pixels, motion blur, terrain texture failures, and
      camera footprint limits.
    - Downward rangefinder altitude with saturation, minimum range, terrain slope

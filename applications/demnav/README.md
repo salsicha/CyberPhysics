@@ -34,4 +34,4 @@ The Docker image seeds a default Golden Gate Park DEM cache at build time (`37.7
 - `NAV_ASSET_LAT` and `NAV_ASSET_LON` set the cache center.
 - `DEMNAV_AREA_KM` and `DEMNAV_DEM_RESOLUTION_M` set the generated DEM window.
 
-Generated DEM cache files belong in the image or a runtime volume, not in the repository.
+Generated DEM cache files belong in the image or a runtime volume, not in the repository. The simulator-neutral georeferenced terrain builder and collision generator live in `scripts/`; simulator-specific loading remains with each simulator application.

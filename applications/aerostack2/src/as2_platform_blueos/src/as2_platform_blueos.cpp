@@ -68,11 +68,27 @@ void BlueOSPlatform::configureSensors()
     [this](const mavros_msgs::msg::State::SharedPtr msg) {
       platform_info_msg_.connected = msg->connected;
       platform_info_msg_.armed = msg->armed;
-      platform_info_msg_.offboard = msg->guided || msg->mode == guided_mode_;
+      platform_info_msg_.offboard = msg->mode == guided_mode_;
+    });
+  extended_state_sub_ = this->create_subscription<mavros_msgs::msg::ExtendedState>(
+    mavros_ns_ + "/extended_state", 10,
+    [this](const mavros_msgs::msg::ExtendedState::SharedPtr msg) {
+      landed_state_.store(msg->landed_state);
+      if (msg->landed_state == mavros_msgs::msg::ExtendedState::LANDED_STATE_IN_AIR) {
+        takeoff_in_progress_.store(false);
+      }
     });
   odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
     mavros_ns_ + "/local_position/odom", rclcpp::SensorDataQoS(),
     [this](const nav_msgs::msg::Odometry::SharedPtr msg) {
+      const double altitude = msg->pose.pose.position.z;
+      vehicle_altitude_.store(altitude);
+      if (takeoff_in_progress_.load() &&
+        altitude > takeoff_start_altitude_.load() + 0.5 &&
+        takeoff_in_progress_.exchange(false))
+      {
+        RCLCPP_INFO(this->get_logger(), "Navigator altitude confirms airborne");
+      }
       const auto & q = msg->pose.pose.orientation;
       vehicle_yaw_ = std::atan2(
         2.0 * (q.w * q.z + q.x * q.y),
@@ -127,6 +143,9 @@ bool BlueOSPlatform::setFlightMode(const std::string & mode)
 
 bool BlueOSPlatform::ownSetArmingState(bool state)
 {
+  if (platform_info_msg_.armed == state) {
+    return true;
+  }
   if (!waitForService(arm_client_)) {
     return false;
   }
@@ -143,6 +162,9 @@ bool BlueOSPlatform::ownSetArmingState(bool state)
 
 bool BlueOSPlatform::ownSetOffboardControl(bool offboard)
 {
+  if (platform_info_msg_.offboard == offboard) {
+    return true;
+  }
   return setFlightMode(offboard ? guided_mode_ : manual_mode_);
 }
 
@@ -169,6 +191,24 @@ bool BlueOSPlatform::ownSetPlatformControlMode(const as2_msgs::msg::ControlMode 
 
 bool BlueOSPlatform::ownSendCommand()
 {
+  const bool landed_climb_command =
+    landed_state_.load() == mavros_msgs::msg::ExtendedState::LANDED_STATE_ON_GROUND &&
+    requested_control_mode_.control_mode == as2_msgs::msg::ControlMode::SPEED &&
+    command_twist_msg_.twist.linear.z > 0.05;
+  if (!takeoff_in_progress_.load() && landed_climb_command) {
+    RCLCPP_INFO(
+      this->get_logger(),
+      "Converting landed climb command into ArduPilot takeoff");
+    if (!ownTakeoff()) {
+      return false;
+    }
+  }
+  if (takeoff_in_progress_.load()) {
+    RCLCPP_INFO_THROTTLE(
+      this->get_logger(), *this->get_clock(), 2000,
+      "Holding motion setpoints until Navigator reports airborne");
+    return true;
+  }
   switch (requested_control_mode_.control_mode) {
     case as2_msgs::msg::ControlMode::HOVER: {
         geometry_msgs::msg::TwistStamped hover;
@@ -206,7 +246,10 @@ bool BlueOSPlatform::ownSendCommand()
 
 bool BlueOSPlatform::ownTakeoff()
 {
+  takeoff_start_altitude_.store(vehicle_altitude_.load());
+  takeoff_in_progress_.store(true);
   if (!waitForService(takeoff_client_)) {
+    takeoff_in_progress_.store(false);
     return false;
   }
   auto request = std::make_shared<mavros_msgs::srv::CommandTOL::Request>();
@@ -215,9 +258,15 @@ bool BlueOSPlatform::ownTakeoff()
   if (rclcpp::spin_until_future_complete(service_node_, future, service_timeout_) !=
     rclcpp::FutureReturnCode::SUCCESS)
   {
+    takeoff_in_progress_.store(false);
     return false;
   }
-  return future.get()->success;
+  const bool success = future.get()->success;
+  RCLCPP_INFO(this->get_logger(), "ArduPilot takeoff command result: %s", success ? "accepted" : "rejected");
+  if (!success) {
+    takeoff_in_progress_.store(false);
+  }
+  return success;
 }
 
 bool BlueOSPlatform::ownLand()

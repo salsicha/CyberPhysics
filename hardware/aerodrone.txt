@@ -84,8 +84,8 @@ Recommended assembly order
 
 Useful purchase references
 
-- Project Aerostack2 nav topics: systems/aerostack2_gazebo/config/nav_topics.env
-- Project Aerostack2 simulation notes: systems/aerostack2_gazebo/README.md
+- Project Aerostack2 nav topics: systems/aerodrone/config/topics.env
+- Project Aerostack2 simulation notes: applications/gazebo/AERODRONE.md
 - Project BlueOS/OAK-1 Aerostack composition:
   compositions/blueos_aerostack.yaml
 - Project OAK-1 MegaDepth node: applications/oak1/scripts/megadepth_ros.py

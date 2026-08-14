@@ -12,7 +12,8 @@ services:
       - NVIDIA_DRIVER_CAPABILITIES=all
     volumes:
       - /dev/shm:/dev/shm
-      - ../systems/aerostack2_genesis:/workspace/systems/aerostack2_genesis:ro
+      - ../applications/ardupilot_sitl/scripts:/workspace/applications/ardupilot_sitl/scripts:ro
+      - ../applications/genesis:/workspace/applications/genesis:ro
     command: >
-      python3 /workspace/systems/aerostack2_genesis/scripts/genesis_aerostack2_navsim.py
+      python3 /workspace/applications/genesis/scripts/aerodrone_navsim.py
         --backend ${GENESIS_BACKEND:-cpu}

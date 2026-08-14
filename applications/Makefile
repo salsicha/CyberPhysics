@@ -47,6 +47,8 @@ build_gazebo: cleanup build_ros2
 	APP=gazebo ./_build_it.sh
 build_genesis: cleanup build_aerostack2
 	APP=genesis ./_build_it.sh
+build_isaac: cleanup
+	APP=isaac ./_build_it.sh
 build_groot: cleanup
 	APP=groot ./_build_it.sh
 build_demnav: cleanup build_aerostack2
@@ -59,7 +61,7 @@ build_lerobot: cleanup
 	APP=so101 TARGET=lerobot BUILD_STAGE=lerobot ./_build_it.sh
 build_navigation2: cleanup build_ros2
 	APP=navigation2 ./_build_it.sh
-build_navigator: cleanup
+build_navigator: cleanup build_ardupilot_sitl
 	APP=navigator ./_build_it.sh
 build_nicegui: cleanup build_ros2
 	APP=nicegui ./_build_it.sh

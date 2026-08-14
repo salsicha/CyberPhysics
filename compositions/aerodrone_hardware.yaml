@@ -1,9 +1,22 @@
 # Physical Aerodrone stack.
 #
-# This is the Raspberry Pi/BlueOS/OAK-1 hardware composition for the aerodrone
-# described in hardware/aerodrone.txt. It reuses the existing BlueOS Aerostack2
-# stack, which runs MAVROS, Aerostack2, OAK-1 MegaDepth, DemNav, WildNav,
-# behavior tree, rosbridge, and the lightweight web GUI.
+# This is the Raspberry Pi/BlueOS/OAK-1 hardware composition for the one
+# Aerodrone described in hardware/aerodrone.txt and systems/aerodrone/.
 
 include:
   - blueos_aerostack.yaml
+
+x-aerodrone-system: &aerodrone-system
+  env_file: [../systems/aerodrone/config/topics.env]
+
+# Merge the canonical physical interface into every included service. Scenario
+# coordinates remain deployment inputs and do not belong in systems/aerodrone.
+services:
+  mavros: *aerodrone-system
+  oak1: *aerodrone-system
+  demnav: *aerodrone-system
+  wildnav: *aerodrone-system
+  rosbridge: *aerodrone-system
+  aerostack: *aerodrone-system
+  behavior_tree: *aerodrone-system
+  aerostack_gui: *aerodrone-system
