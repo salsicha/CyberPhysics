@@ -35,7 +35,7 @@ services:
       - ${CYBERPHYSICS_ISAAC_CACHE:-/tmp/cyberphysics/isaac-sim/6.0.1/so101}/pip:/isaac-sim/.cache/pip:rw
       - ${CYBERPHYSICS_ISAAC_CACHE:-/tmp/cyberphysics/isaac-sim/6.0.1/so101}/glcache:/isaac-sim/.cache/nvidia/GLCache:rw
       - ${CYBERPHYSICS_ISAAC_CACHE:-/tmp/cyberphysics/isaac-sim/6.0.1/so101}/computecache:/isaac-sim/.nv/ComputeCache:rw
-      - ../data/smolvla/telemetry:/workspace/telemetry:rw
+      - ../applications/smolvla/smolvla/telemetry:/workspace/telemetry:rw
     entrypoint: ["/bin/chown"]
     command:
       - "1234:1234"
@@ -88,7 +88,7 @@ services:
       - so101_smolvla_isaac_xauth:/isaac-sim/.xauth:ro
       - ../systems:/workspace/systems:ro
       - ../applications/so101:/workspace/so101:ro
-      - ../data/smolvla/telemetry:/workspace/telemetry:rw
+      - ../applications/smolvla/smolvla/telemetry:/workspace/telemetry:rw
       - ${CYBERPHYSICS_ISAAC_CACHE:-/tmp/cyberphysics/isaac-sim/6.0.1/so101}/kit:/isaac-sim/kit/cache:rw
       - ${CYBERPHYSICS_ISAAC_CACHE:-/tmp/cyberphysics/isaac-sim/6.0.1/so101}/user:/isaac-sim/.cache:rw
       - ${CYBERPHYSICS_ISAAC_CACHE:-/tmp/cyberphysics/isaac-sim/6.0.1/so101}/ov:/isaac-sim/.cache/ov:rw
@@ -143,7 +143,7 @@ services:
       - SMOLVLA_LOCAL_FILES_ONLY=${SMOLVLA_LOCAL_FILES_ONLY:-false}
       - SMOLVLA_PORT=${SMOLVLA_PORT:-5556}
     volumes:
-      - ../data/smolvla:/workspace/data
+      - ../applications/smolvla/smolvla:/workspace/data
       - ../cache/smolvla:/workspace/cache
       - ../applications/smolvla/scripts:/workspace/smolvla_scripts:ro
     command: >

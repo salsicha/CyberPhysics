@@ -67,14 +67,16 @@ Create model, training, telemetry, and cache directories once:
 
 ```bash
 mkdir -p \
-  data/smolvla/models \
-  data/smolvla/training \
-  data/smolvla/telemetry \
+  applications/smolvla/smolvla/models \
+  applications/smolvla/smolvla/training \
+  applications/smolvla/smolvla/telemetry \
   cache/smolvla
 ```
 
-The compose stack mounts `data/smolvla` at `/workspace/data` and
-`cache/smolvla` at `/workspace/cache`.
+The compose stack mounts `applications/smolvla/smolvla` at `/workspace/data`
+and `cache/smolvla` at `/workspace/cache`. The Docker image also copies the
+directory into `/workspace/data`, so the same layout is available when the
+image is run without Compose.
 
 ## Download the base model
 
@@ -249,7 +251,7 @@ default port 5555.
 Render and validate the composition without starting it:
 
 ```bash
-mkdir -p data/smolvla/telemetry cache/smolvla
+mkdir -p applications/smolvla/smolvla/telemetry cache/smolvla
 docker compose \
   -f compositions/so101_smolvla_isaac.yaml \
   --profile sim config

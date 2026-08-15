@@ -69,10 +69,14 @@ ENV PATH=/opt/lerobot/.venv/bin:/usr/local/bin:/usr/bin:/bin \
     VIRTUAL_ENV=/opt/lerobot/.venv
 
 COPY scripts/ /workspace/smolvla_scripts/
+COPY smolvla/ /workspace/data/
 COPY entrypoint.sh /entrypoint.sh
 
 RUN chmod +x /entrypoint.sh /workspace/smolvla_scripts/*.py && \
-    mkdir -p /workspace/cache /workspace/data && \
+    mkdir -p /workspace/cache \
+      /workspace/data/models \
+      /workspace/data/training \
+      /workspace/data/telemetry && \
     python /workspace/smolvla_scripts/smoke_test.py
 
 WORKDIR /opt/lerobot
