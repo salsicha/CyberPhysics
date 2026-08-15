@@ -16,7 +16,7 @@ make -C applications build_marimo
 
 The image includes:
 
-- `arraydataengine==0.3.0`
+- `arraydataengine==0.3.1`
 - `open3d==0.19.0`
 - Marimo with its recommended dependencies
 
