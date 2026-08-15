@@ -1,6 +1,0 @@
-# Ignore generated runtime artifacts while retaining the documented layout.
-*
-!.gitignore
-!README.md
-!*/
-!**/.gitkeep
