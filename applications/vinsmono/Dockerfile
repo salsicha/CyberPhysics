@@ -1,41 +1,48 @@
-ARG TAG=amd64
+ARG ROS_DISTRO=jazzy
 
-FROM cyberphysics/ros2:${TAG} AS build
+FROM ros:${ROS_DISTRO}-ros-base
 
-ENV LANG=en_US.UTF-8 \
-    LANGUAGE=en_US.UTF-8 \
-    TERM=xterm \
-    PYTHONIOENCODING=UTF-8 \
-    ROS2_DISTRO=jazzy \
-    DEBIAN_FRONTEND=noninteractive \
-    PATH="/venv/bin:$PATH" \
-    QT_QPA_PLATFORM=xcb \
-    ROS_DISTRO=jazzy
+ARG ROS_DISTRO
 
-# RUN apt update && apt install -y --no-install-recommends \
-#     ? \
-#     && rm -rf /var/lib/apt/lists/*
+ENV DEBIAN_FRONTEND=noninteractive \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8 \
+    ROS_DISTRO=${ROS_DISTRO}
 
-COPY vins_mono_ros2/ /workspace/src/vins_mono_ros2/
+SHELL ["/bin/bash", "-c"]
+
+RUN apt-get update && apt-get install -q -y --no-install-recommends \
+      build-essential \
+      cmake \
+      libboost-all-dev \
+      libceres-dev \
+      libeigen3-dev \
+      libopencv-dev \
+      python3-colcon-common-extensions \
+      ros-${ROS_DISTRO}-cv-bridge \
+      ros-${ROS_DISTRO}-image-transport \
+      ros-${ROS_DISTRO}-tf2-ros \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspace
+COPY vins_mono_ros2/ src/vins_mono_ros2/
 
-# Micro-ROS agent
-RUN . /venv/bin/activate && . /opt/ros/$ROS2_DISTRO/setup.bash && \
-    apt update && \
-    rosdep update && rosdep install --from-paths src --ignore-src -y && \
-    colcon build --merge-install --install-base /opt/ros/$ROS2_DISTRO
+RUN source /opt/ros/${ROS_DISTRO}/setup.bash && \
+    colcon build \
+      --merge-install \
+      --packages-select \
+        camera_model \
+        config_pkg \
+        feature_tracker \
+        vins_estimator \
+        pose_graph \
+      --cmake-args -DCMAKE_BUILD_TYPE=Release
 
-# RUN . /venv/bin/activate && pip install ?
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh && mkdir -p /data/vinsmono
 
-COPY ./entrypoint.sh /
-RUN chmod +x /entrypoint.sh
-
-#####################################################################
-FROM scratch
-
-COPY --from=build / /
-
-ENTRYPOINT [ "/entrypoint.sh" ]
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["ros2", "launch", "vins_estimator", "vins_mono.launch.py", \
+     "config_file:=/etc/vinsmono/calibration.yaml"]
 
 

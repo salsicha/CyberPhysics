@@ -105,7 +105,7 @@ build_turret_sim: cleanup build_pantiltros
 	APP=turret_sim ./_build_it.sh
 build_unrealengine: cleanup build_ros2
 	APP=unrealengine ./_build_it.sh
-build_vinsmono: cleanup build_ros2
+build_vinsmono: cleanup
 	APP=vinsmono ./_build_it.sh
 build_wildnav: cleanup build_aerostack2
 	APP=wildnav ./_build_it.sh

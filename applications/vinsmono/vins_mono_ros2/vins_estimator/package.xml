@@ -3,9 +3,9 @@
 <package format="3">
   <name>vins_estimator</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
-  <maintainer email="db@todo.todo">db</maintainer>
-  <license>TODO: License declaration</license>
+  <description>Visual-inertial odometry estimator and launch files for VINS-Mono.</description>
+  <maintainer email="opensource@cyberphysics.dev">CyberPhysics maintainers</maintainer>
+  <license>GPL-3.0-only</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
@@ -21,6 +21,10 @@
   <depend>cv_bridge</depend>
   <depend>camera_model</depend>
   <depend>image_transport</depend>
+
+  <exec_depend>ament_index_python</exec_depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

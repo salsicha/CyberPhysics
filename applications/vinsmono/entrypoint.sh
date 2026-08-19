@@ -1,5 +1,7 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -e
-source /opt/ros/jazzy/setup.bash
-source /venv/bin/activate
+
+source "/opt/ros/${ROS_DISTRO}/setup.bash"
+source /workspace/install/setup.bash
+
 exec "$@"

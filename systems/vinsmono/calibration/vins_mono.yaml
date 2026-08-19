@@ -1,0 +1,78 @@
+%YAML:1.0
+
+# ROS interfaces
+image_topic: "/camera/image_raw"
+imu_topic: "/camera/imu"
+output_path: "/data/vinsmono"
+
+# Example pinhole calibration. Replace these values with sensor calibration.
+model_type: PINHOLE
+camera_name: camera
+image_width: 640
+image_height: 480
+distortion_parameters:
+   k1: 0.0
+   k2: 0.0
+   p1: 0.0
+   p2: 0.0
+projection_parameters:
+   fx: 525.0
+   fy: 525.0
+   cx: 319.5
+   cy: 239.5
+
+# Camera-to-IMU transform. Identity is an example only.
+estimate_extrinsic: 0
+extrinsicRotation: !!opencv-matrix
+   rows: 3
+   cols: 3
+   dt: d
+   data: [1.0, 0.0, 0.0,
+          0.0, 1.0, 0.0,
+          0.0, 0.0, 1.0]
+extrinsicTranslation: !!opencv-matrix
+   rows: 3
+   cols: 1
+   dt: d
+   data: [0.0, 0.0, 0.0]
+
+# Feature tracker
+max_cnt: 150
+min_dist: 30
+freq: 10
+F_threshold: 1.0
+show_track: 1
+equalize: 0
+fisheye: 0
+
+# Estimator
+max_solver_time: 0.04
+max_num_iterations: 8
+keyframe_parallax: 10.0
+
+# IMU noise model. Replace with values measured for the target IMU.
+acc_n: 0.1
+gyr_n: 0.01
+acc_w: 0.0002
+gyr_w: 0.00002
+g_norm: 9.81
+
+# Loop closure
+loop_closure: 0
+fast_relocalization: 0
+load_previous_pose_graph: 0
+pose_graph_save_path: "/data/vinsmono/pose_graph"
+support_path: "/workspace/install/share/config_pkg/support_files"
+
+# Camera/IMU timing
+estimate_td: 0
+td: 0.0
+
+# Shutter model
+rolling_shutter: 0
+rolling_shutter_tr: 0.0
+
+# Visualization and pose graph data
+save_image: 0
+visualize_imu_forward: 0
+visualize_camera_size: 0.4

@@ -30,6 +30,7 @@ docker compose -f compositions/airplane_sim.yaml up
 docker compose -f compositions/airplane_hardware.yaml up
 docker compose -f compositions/turret_hardware.yaml up
 docker compose -f compositions/lunar_rover_hardware.yaml up
+docker compose -f compositions/vinsmono.yaml up --build
 ```
 
 ## RACECAR Neo

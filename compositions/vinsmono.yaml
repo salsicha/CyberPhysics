@@ -1,0 +1,27 @@
+# Generic ROS 2 VINS-Mono stack. Camera and IMU publishers run separately on
+# the host ROS domain; their topics are selected by the mounted system YAML.
+
+services:
+  vinsmono:
+    image: cyberphysics/vinsmono:${CYBERPHYSICS_TAG:-latest}
+    pull_policy: build
+    build:
+      context: ../applications/vinsmono
+    container_name: vinsmono
+    network_mode: host
+    ipc: host
+    restart: unless-stopped
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - RMW_IMPLEMENTATION=${RMW_IMPLEMENTATION:-rmw_fastrtps_cpp}
+      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+    volumes:
+      - ../systems/vinsmono/calibration/vins_mono.yaml:/etc/vinsmono/calibration.yaml:ro
+      - ../generated/vinsmono:/data/vinsmono
+      - /dev/shm:/dev/shm
+    command: >
+      ros2 launch vins_estimator vins_mono.launch.py
+        config_file:=/etc/vinsmono/calibration.yaml
+        enable_estimator:=${VINS_ENABLE_ESTIMATOR:-true}
+        enable_pose_graph:=${VINS_ENABLE_POSE_GRAPH:-false}
+        use_sim_time:=${VINS_USE_SIM_TIME:-false}
