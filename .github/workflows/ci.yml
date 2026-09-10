@@ -12,13 +12,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.12'
       - name: Install test dependencies
-        run: pip install numpy opencv-python-headless pytest pyyaml
+        run: pip install numpy opencv-python-headless pytest pyyaml msgpack msgpack-numpy pyzmq
       - name: Install synthetic_world
         run: pip install ./applications/aerostack2/synthetic_world
       - name: Run unit tests
-        run: python -m pytest tests/ -v
+        run: python -m pytest tests/ applications/smolvla/tests/ -v
       - name: Byte-compile navigation sources
         run: >
           python -m compileall -q
@@ -43,6 +43,22 @@ jobs:
             echo "== $f"
             docker compose -f "$f" config --quiet
           done
+
+  vinsmono-runtime:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - name: Build VINS-Mono
+        run: docker build -t cyberphysics/vinsmono:ci applications/vinsmono
+      - name: Check sensor flow and normal shutdown
+        run: >
+          docker run --rm --network none
+          -v "$PWD:/repo:ro"
+          cyberphysics/vinsmono:ci
+          python3 /repo/applications/vinsmono/scripts/runtime_smoke_test.py
+          --config /repo/systems/vinsmono/calibration/vins_mono.yaml
 
   ardupilot-params:
     runs-on: ubuntu-latest

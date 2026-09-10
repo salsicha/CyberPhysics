@@ -3,6 +3,7 @@ from pathlib import Path
 import sys
 
 import numpy as np
+import pytest
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -87,7 +88,7 @@ def test_demo_controller_advances_with_force_drive_settling_error():
     assert controller.status == "grasp"
 
 
-def test_scripted_task_telemetry_passes_acceptance_scorer():
+def completed_telemetry():
     scenario = load_scenario()
     plan = build_pick_place_plan(scenario)
     target = next(entry for entry in scenario["objects"] if entry["id"] == "red_block_target")
@@ -112,9 +113,41 @@ def test_scripted_task_telemetry_passes_acceptance_scorer():
         "failed_grasps": [],
         "samples": samples,
     }
+    return scenario, telemetry
+
+
+def test_scripted_task_telemetry_passes_acceptance_scorer():
+    scenario, telemetry = completed_telemetry()
     metrics = score(scenario, telemetry, telemetry["task_id"])
     assert metrics["success"] is True
     assert all(metrics["checks"].values())
+
+
+@pytest.mark.parametrize("failure", ["above_bin", "still_grasped", "outside_footprint", "moving", "no_dwell"])
+def test_acceptance_rejects_incomplete_placement(failure):
+    scenario, telemetry = completed_telemetry()
+    samples = telemetry["samples"]
+    if failure == "above_bin":
+        for sample in samples[-2:]:
+            sample["object_xyz"][2] += 0.3
+    elif failure == "still_grasped":
+        for sample in samples[-2:]:
+            sample["gripper_width_m"] = 0.01
+    elif failure == "outside_footprint":
+        # Still within the old radial tolerance, but the block overhangs the bin.
+        for sample in samples[-2:]:
+            sample["object_xyz"][1] += 0.05
+    elif failure == "moving":
+        samples[-2]["object_xyz"][0] += 0.02
+    else:
+        samples[-1]["time"] = samples[-2]["time"] + 0.1
+    assert not score(scenario, telemetry)["success"]
+
+
+def test_acceptance_rejects_missing_final_object_sample():
+    scenario, telemetry = completed_telemetry()
+    del telemetry["samples"][-1]["object_xyz"]
+    assert not score(scenario, telemetry)["success"]
 
 
 def test_hil_safety_target_limits_step_and_joint_range():
@@ -130,6 +163,14 @@ def test_hil_safety_target_limits_step_and_joint_range():
             pass
         else:
             raise AssertionError("non-finite HIL command was accepted")
+
+
+@pytest.mark.parametrize("joint,value", [(0, 2.1), (0, -2.1), (5, -0.01), (5, 0.05)])
+def test_hil_rejects_out_of_range_feedback(joint, value):
+    current = np.zeros(len(JOINT_NAMES))
+    current[joint] = value
+    with pytest.raises(ValueError, match="measured state"):
+        safe_hardware_target(current, current, 0.04)
 
 
 def test_synthetic_rgbd_handles_extreme_joint_samples():

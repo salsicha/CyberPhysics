@@ -184,13 +184,7 @@ class SO101TaskScene:
                 if joints[5] >= 0.03:
                     self.attached = False
                     self.released = True
-                    place_error = float(np.linalg.norm(
-                        self.target_position[:2] - self.destination_position[:2]
-                    ))
-                    tolerance = float(
-                        self.task.get("success", {}).get("place_position_tolerance_m", 0.055)
-                    )
-                    self.status = "solved" if place_error <= tolerance else "released_outside_destination"
+                    self.status = "target_released"
 
             if now - self.last_sample_at >= 0.05 or self.status == "solved":
                 self.samples.append({
@@ -198,9 +192,13 @@ class SO101TaskScene:
                     "end_effector_xyz": end_effector.tolist(),
                     "object_xyz": self.target_position.tolist(),
                     "gripper_width_m": float(joints[5]),
+                    "attached": self.attached,
                     "policy_used_ground_truth": False,
                 })
                 self.last_sample_at = now
+                if self.released:
+                    metrics = score(self.scenario, self.telemetry(now), self.task_id)
+                    self.status = "solved" if metrics["success"] else "target_released"
 
         if self.status != self.last_printed_status:
             print(f"SO-101 task status: {self.status}", flush=True)

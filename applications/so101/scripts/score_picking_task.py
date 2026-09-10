@@ -16,6 +16,10 @@ DEFAULT_THRESHOLDS = {
     "workspace_radius_m": 0.62,
     "workspace_min_z_m": 0.40,
     "recovery_window_s": 20.0,
+    "placement_height_tolerance_m": 0.02,
+    "placement_settle_time_s": 0.5,
+    "placement_settle_distance_m": 0.01,
+    "grasp_release_width_m": 0.03,
 }
 
 
@@ -92,6 +96,64 @@ def final_place_error(samples, object_key, destination_xyz):
     return math.inf
 
 
+def placement_checks(samples, target, destination, thresholds):
+    """Require a released object resting on the destination for a dwell period.
+
+    Scenario bins are represented by box-shaped support surfaces. Check the
+    object's footprint against the surface and its centre against resting height.
+    """
+    checks = dict(object_inside_destination=False, object_released=False,
+                  placement_settled=False)
+    if not samples:
+        return checks
+    size = np.asarray(destination["size"], dtype=float)
+    object_size = np.asarray(target.get("size", [
+        2 * target.get("radius_m", 0.0), 2 * target.get("radius_m", 0.0),
+        target.get("height_m", 0.0)]), dtype=float)
+    centre = np.asarray(destination["xyz"], dtype=float)
+    resting_z = centre[2] + 0.5 * (size[2] + object_size[2])
+    yaw = float(destination.get("rpy", [0, 0, 0])[2])
+    rotation = np.array([[math.cos(yaw), math.sin(yaw)],
+                         [-math.sin(yaw), math.cos(yaw)]])
+
+    def inside(sample):
+        position = xyz(sample, "object_xyz")
+        if position is None or position.shape != (3,) or not np.all(np.isfinite(position)):
+            return False
+        object_yaw = float(sample.get("object_rpy", target.get("rpy", [0, 0, 0]))[2]) - yaw
+        c, s = abs(math.cos(object_yaw)), abs(math.sin(object_yaw))
+        footprint = np.array([[c, s], [s, c]]) @ object_size[:2]
+        return bool(
+            np.all(np.abs(rotation @ (position[:2] - centre[:2])) + footprint / 2 <= size[:2] / 2)
+            and abs(position[2] - resting_z) <= thresholds["placement_height_tolerance_m"])
+
+    def released(sample):
+        width = float(sample.get("gripper_width_m", math.nan))
+        return (math.isfinite(width) and width >= thresholds["grasp_release_width_m"]
+                and not sample.get("attached", False))
+
+    final = samples[-1]
+    checks["object_inside_destination"] = inside(final)
+    checks["object_released"] = released(final)
+    if not all(checks[key] for key in ("object_inside_destination", "object_released")):
+        return checks
+    final_position = xyz(final, "object_xyz")
+    finish = float(final.get("time", math.nan))
+    previous = finish
+    for sample in reversed(samples):
+        time = float(sample.get("time", math.nan))
+        if (not math.isfinite(time) or not math.isfinite(finish) or time > previous
+                or not inside(sample) or not released(sample)
+                or np.linalg.norm(xyz(sample, "object_xyz") - final_position)
+                > thresholds["placement_settle_distance_m"]):
+            break
+        previous = time
+        if finish - time >= thresholds["placement_settle_time_s"]:
+            checks["placement_settled"] = True
+            break
+    return checks
+
+
 def has_ground_truth_leak(telemetry):
     if telemetry.get("policy_used_ground_truth", False):
         return True
@@ -152,6 +214,8 @@ def score(scenario, telemetry, task_id=""):
         "failed_grasp_recovery": bool(recovered),
         "no_policy_ground_truth": bool(no_ground_truth),
     }
+    if success_rules.get("object_inside_destination", False):
+        checks.update(placement_checks(samples, target, destination, thresholds))
     metrics = {
         "task_id": task["id"],
         "target_object": task["target_object"],

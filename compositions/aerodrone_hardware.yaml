@@ -4,19 +4,7 @@
 # Aerodrone described in hardware/aerodrone.txt and systems/aerodrone/.
 
 include:
-  - blueos_aerostack.yaml
-
-x-aerodrone-system: &aerodrone-system
-  env_file: [../systems/aerodrone/config/topics.env]
-
-# Merge the canonical physical interface into every included service. Scenario
-# coordinates remain deployment inputs and do not belong in systems/aerodrone.
-services:
-  mavros: *aerodrone-system
-  oak1: *aerodrone-system
-  demnav: *aerodrone-system
-  wildnav: *aerodrone-system
-  rosbridge: *aerodrone-system
-  aerostack: *aerodrone-system
-  behavior_tree: *aerodrone-system
-  aerostack_gui: *aerodrone-system
+  # Interpolate the included commands with the physical vehicle identity.
+  # Service env_file entries only set container variables after interpolation.
+  - path: blueos_aerostack.yaml
+    env_file: ../systems/aerodrone/config/topics.env

@@ -33,6 +33,7 @@ extern rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr pub_ca
 extern nav_msgs::msg::Path path;
 
 void registerPub(rclcpp::Node::SharedPtr n);
+void unregisterPub();
 
 void pubLatestOdometry(const Eigen::Vector3d &P, const Eigen::Quaterniond &Q, const Eigen::Vector3d &V, const std_msgs::msg::Header &header);
 

@@ -50,6 +50,25 @@ void registerPub(rclcpp::Node::SharedPtr n)
     keyframebasevisual.setLineWidth(0.01);
 }
 
+void unregisterPub()
+{
+    // Release ROS entities before process-wide middleware singletons disappear.
+    br.reset();
+    pub_latest_odometry.reset();
+    pub_path.reset();
+    pub_relo_path.reset();
+    pub_odometry.reset();
+    pub_point_cloud.reset();
+    pub_margin_cloud.reset();
+    pub_key_poses.reset();
+    pub_camera_pose.reset();
+    pub_camera_pose_visual.reset();
+    pub_keyframe_pose.reset();
+    pub_keyframe_point.reset();
+    pub_extrinsic.reset();
+    pub_relo_relative_pose.reset();
+}
+
 void pubLatestOdometry(const Eigen::Vector3d &P, const Eigen::Quaterniond &Q, const Eigen::Vector3d &V, const std_msgs::msg::Header &header)
 {
     Eigen::Quaterniond quadrotor_Q = Q ;
@@ -319,6 +338,7 @@ void pubTF(const Estimator &estimator, const std_msgs::msg::Header &header)
     correct_q = estimator.Rs[WINDOW_SIZE];
 
     transform.header.frame_id = "world";
+    transform.header.stamp = header.stamp;
     transform.child_frame_id = "body";
 
     transform.transform.translation.x = correct_t(0);

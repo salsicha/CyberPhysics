@@ -59,6 +59,7 @@ def generate_launch_description():
             common_parameters,
             {
                 "support_file": str(config_share / "support_files"),
+                "enable_loop_closure": True,
                 "visualization_shift_x": 0,
                 "visualization_shift_y": 0,
                 "skip_cnt": 0,

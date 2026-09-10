@@ -89,6 +89,8 @@ def safe_hardware_target(requested, current, max_joint_step):
     current = np.asarray(current, dtype=np.float64).reshape(len(JOINT_NAMES))
     if not np.all(np.isfinite(requested)) or not np.all(np.isfinite(current)):
         raise ValueError("SO-101 HIL state and command must be finite")
+    if np.any(current < LOWER_LIMITS) or np.any(current > UPPER_LIMITS):
+        raise ValueError("SO-101 HIL measured state is outside joint limits")
     step = np.asarray(max_joint_step, dtype=np.float64)
     if step.ndim == 0:
         step = np.full(len(JOINT_NAMES), float(step))

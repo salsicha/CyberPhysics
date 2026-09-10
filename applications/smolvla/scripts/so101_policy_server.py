@@ -271,13 +271,15 @@ class PolicyServer:
         print(f"SmolVLA SO101 policy server listening on {self.host}:{self.port}", flush=True)
         try:
             while True:
-                request = unpack(socket.recv())
+                payload = socket.recv()
                 try:
+                    request = unpack(payload)
                     response = self._dispatch(request)
+                    response_payload = pack(response)
                 except Exception as exc:
                     traceback.print_exc()
-                    response = {"error": f"{type(exc).__name__}: {exc}"}
-                socket.send(pack(response))
+                    response_payload = pack({"error": f"{type(exc).__name__}: {exc}"})
+                socket.send(response_payload)
         except KeyboardInterrupt:
             pass
         finally:

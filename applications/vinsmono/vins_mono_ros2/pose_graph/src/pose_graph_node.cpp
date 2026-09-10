@@ -96,6 +96,8 @@ void image_callback(const sensor_msgs::msg::Image::ConstPtr image_msg)
         return;
     m_buf.lock();
     image_buf.push(image_msg);
+    while (image_buf.size() > 100)
+        image_buf.pop();
     m_buf.unlock();
     //printf(" image time %f \n", image_msg->header.stamp.toSec());
 
@@ -117,6 +119,8 @@ void point_callback(const sensor_msgs::msg::PointCloud::ConstPtr point_msg)
         return;
     m_buf.lock();
     point_buf.push(point_msg);
+    while (point_buf.size() > 100)
+        point_buf.pop();
     m_buf.unlock();
     /*
     for (unsigned int i = 0; i < point_msg->points.size(); i++)
@@ -137,6 +141,8 @@ void pose_callback(const nav_msgs::msg::Odometry::ConstPtr pose_msg)
         return;
     m_buf.lock();
     pose_buf.push(pose_msg);
+    while (pose_buf.size() > 100)
+        pose_buf.pop();
     m_buf.unlock();
     /*
     printf("pose t: %f, %f, %f   q: %f, %f, %f %f \n", pose_msg->pose.pose.position.x,
@@ -484,7 +490,9 @@ int main(int argc, char **argv)
 
 
     LOOP_CLOSURE = fsSettings["loop_closure"];
+    LOOP_CLOSURE = n->declare_parameter<bool>("enable_loop_closure", LOOP_CLOSURE != 0);
     std::string IMAGE_TOPIC;
+    fsSettings["image_topic"] >> IMAGE_TOPIC;
     int LOAD_PREVIOUS_POSE_GRAPH;
     if (LOOP_CLOSURE)
     {
@@ -539,7 +547,7 @@ int main(int argc, char **argv)
 
     auto sub_imu_forward = n->create_subscription<nav_msgs::msg::Odometry>("/vins_estimator/imu_propagate", rclcpp::QoS(rclcpp::KeepLast(2000)), imu_forward_callback);
     auto sub_vio = n->create_subscription<nav_msgs::msg::Odometry>("/vins_estimator/odometry", rclcpp::QoS(rclcpp::KeepLast(2000)), vio_callback);
-    auto sub_image = n->create_subscription<sensor_msgs::msg::Image>(IMAGE_TOPIC, rclcpp::QoS(rclcpp::KeepLast(2000)), image_callback);
+    auto sub_image = n->create_subscription<sensor_msgs::msg::Image>(IMAGE_TOPIC, rclcpp::SensorDataQoS().keep_last(100), image_callback);
     auto sub_pose = n->create_subscription<nav_msgs::msg::Odometry>("/vins_estimator/keyframe_pose", rclcpp::QoS(rclcpp::KeepLast(2000)), pose_callback);
     auto sub_extrinsic = n->create_subscription<nav_msgs::msg::Odometry>("/vins_estimator/extrinsic", rclcpp::QoS(rclcpp::KeepLast(2000)), extrinsic_callback);
     auto sub_point = n->create_subscription<sensor_msgs::msg::PointCloud>("/vins_estimator/keyframe_point", rclcpp::QoS(rclcpp::KeepLast(2000)), point_callback);

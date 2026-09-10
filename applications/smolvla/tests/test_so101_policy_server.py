@@ -1,16 +1,26 @@
 #!/usr/bin/env python3
 
 import unittest
+import importlib.util
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 
-from so101_policy_server import (
-    _latest_joint_state,
-    _latest_rgb,
-    _task_text,
-    isaac_to_so101_units,
-    so101_to_isaac_units,
+# GR00T has a script with the same filename. Import this adapter by its path
+# so collecting both applications' tests cannot silently select the other one.
+spec = importlib.util.spec_from_file_location(
+    "smolvla_so101_policy_server",
+    Path(__file__).resolve().parents[1] / "scripts" / "so101_policy_server.py",
 )
+server = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(server)
+_latest_joint_state = server._latest_joint_state
+_latest_rgb = server._latest_rgb
+_task_text = server._task_text
+isaac_to_so101_units = server.isaac_to_so101_units
+so101_to_isaac_units = server.so101_to_isaac_units
 
 
 class SO101AdapterTest(unittest.TestCase):
@@ -37,6 +47,30 @@ class SO101AdapterTest(unittest.TestCase):
     def test_invalid_joint_vector_is_rejected(self):
         with self.assertRaises(ValueError):
             isaac_to_so101_units(np.zeros(5, dtype=np.float32))
+
+    def test_malformed_request_does_not_stop_next_request(self):
+        socket = MagicMock()
+        socket.recv.side_effect = [b'\xc1', server.pack({'endpoint': 'health'}), KeyboardInterrupt]
+        policy = SimpleNamespace(model_path='test', device='cpu')
+        with patch.object(server.zmq, 'Context') as context:
+            context.return_value.socket.return_value = socket
+            server.PolicyServer(policy, '127.0.0.1', 5556).run()
+        replies = [server.unpack(call.args[0]) for call in socket.send.call_args_list]
+        self.assertIn('error', replies[0])
+        self.assertEqual(replies[1]['status'], 'ok')
+        socket.close.assert_called_once()
+
+    def test_unserializable_response_does_not_stop_next_request(self):
+        socket = MagicMock()
+        socket.recv.side_effect = [server.pack({'endpoint': 'reset'}),
+                                  server.pack({'endpoint': 'health'}), KeyboardInterrupt]
+        policy = SimpleNamespace(model_path='test', device='cpu', reset=lambda: object())
+        with patch.object(server.zmq, 'Context') as context:
+            context.return_value.socket.return_value = socket
+            server.PolicyServer(policy, '127.0.0.1', 5556).run()
+        replies = [server.unpack(call.args[0]) for call in socket.send.call_args_list]
+        self.assertIn('error', replies[0])
+        self.assertEqual(replies[1]['status'], 'ok')
 
 
 if __name__ == "__main__":

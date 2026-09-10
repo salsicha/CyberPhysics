@@ -234,7 +234,7 @@ int main(int argc, char **argv)
         }
     }
 
-    auto sub_img = n->create_subscription<sensor_msgs::msg::Image>(IMAGE_TOPIC, rclcpp::QoS(rclcpp::KeepLast(100)), img_callback);
+    auto sub_img = n->create_subscription<sensor_msgs::msg::Image>(IMAGE_TOPIC, rclcpp::SensorDataQoS().keep_last(100), img_callback);
 
     pub_img = n->create_publisher<sensor_msgs::msg::PointCloud>("feature", 1000);
     pub_match = n->create_publisher<sensor_msgs::msg::Image>("feature_img",1000);
@@ -244,6 +244,11 @@ int main(int argc, char **argv)
         cv::namedWindow("vis", cv::WINDOW_NORMAL);
     */
     rclcpp::spin(n);
+    pub_img.reset();
+    pub_match.reset();
+    pub_restart.reset();
+    if (rclcpp::ok())
+        rclcpp::shutdown();
     return 0;
 }
 

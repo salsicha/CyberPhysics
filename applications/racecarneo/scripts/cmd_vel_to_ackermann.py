@@ -26,7 +26,7 @@ class CmdVelToAckermann(Node):
         if abs(speed) < 1e-6:
             steering = 0.0
         else:
-            steering = math.atan2(float(msg.angular.z) * self.wheelbase, speed)
+            steering = math.atan(float(msg.angular.z) * self.wheelbase / speed)
         steering = max(-self.max_steering_angle, min(self.max_steering_angle, steering))
 
         out = AckermannDriveStamped()

@@ -26,6 +26,16 @@ std::mutex m_buf;
 std::mutex m_state;
 std::mutex i_buf;
 std::mutex m_estimator;
+bool stop_measurements = false;  // guarded by m_buf
+
+void stopMeasurements()
+{
+    {
+        std::lock_guard<std::mutex> lock(m_buf);
+        stop_measurements = true;
+    }
+    con.notify_all();
+}
 
 double latest_time;
 Eigen::Vector3d tmp_P;
@@ -216,11 +226,14 @@ void process()
         std::unique_lock<std::mutex> lk(m_buf);
         con.wait(lk, [&]
                  {
-            return (measurements = getMeasurements()).size() != 0;
+            return stop_measurements || !(measurements = getMeasurements()).empty();
                  });
 
+        if (stop_measurements)
+            return;
+
         lk.unlock();
-        m_estimator.lock();
+        std::unique_lock<std::mutex> estimator_lock(m_estimator);
         for (auto &measurement : measurements)
         {
             auto img_msg = measurement.second;
@@ -268,10 +281,13 @@ void process()
             }
             // set relocalization frame
             sensor_msgs::msg::PointCloud::SharedPtr relo_msg = NULL;
-            while (!relo_buf.empty())
             {
-                relo_msg = relo_buf.front();
-                relo_buf.pop();
+                std::lock_guard<std::mutex> buffer_lock(m_buf);
+                while (!relo_buf.empty())
+                {
+                    relo_msg = relo_buf.front();
+                    relo_buf.pop();
+                }
             }
             if (relo_msg != NULL)
             {
@@ -327,14 +343,14 @@ void process()
             // pubKeyPoses(estimator, header);
             // pubCameraPose(estimator, header);
             // pubPointCloud(estimator, header);
-            // pubTF(estimator, header);
-            // pubKeyframe(estimator);
+            pubTF(estimator, header);
+            pubKeyframe(estimator);
 
             if (relo_msg != NULL)
                 pubRelocalization(estimator);
             //RCUTILS_LOG_ERROR("end: %f, at %f", img_msg->header.stamp.toSec(), ros::Time::now().toSec());
         }
-        m_estimator.unlock();
+        estimator_lock.unlock();
         m_buf.lock();
         m_state.lock();
         if (estimator.solver_flag == Estimator::SolverFlag::NON_LINEAR)
@@ -357,13 +373,36 @@ int main(int argc, char **argv)
 
     registerPub(n);
 
-    auto sub_imu = n->create_subscription<sensor_msgs::msg::Imu>(IMU_TOPIC, rclcpp::QoS(rclcpp::KeepLast(2000)), imu_callback);
+    auto sub_imu = n->create_subscription<sensor_msgs::msg::Imu>(IMU_TOPIC, rclcpp::SensorDataQoS().keep_last(2000), imu_callback);
     auto sub_image = n->create_subscription<sensor_msgs::msg::PointCloud>("/feature_tracker/feature", rclcpp::QoS(rclcpp::KeepLast(2000)), feature_callback);
     auto sub_restart = n->create_subscription<std_msgs::msg::Bool>("/feature_tracker/restart", rclcpp::QoS(rclcpp::KeepLast(2000)), restart_callback);
     auto sub_relo_points = n->create_subscription<sensor_msgs::msg::PointCloud>("/pose_graph/match_points", rclcpp::QoS(rclcpp::KeepLast(2000)), relocalization_callback);
 
-    std::thread measurement_process{process};
-    rclcpp::spin(n);
+    rclcpp::on_shutdown(stopMeasurements);
+    std::thread measurement_process{[] {
+        try {
+            process();
+        } catch (const rclcpp::exceptions::RCLError &error) {
+            // Publishers may observe the invalidated context during shutdown.
+            if (rclcpp::ok()) {
+                RCUTILS_LOG_ERROR("measurement processing failed: %s", error.what());
+                rclcpp::shutdown();
+            }
+        }
+    }};
+    try {
+        rclcpp::spin(n);
+    } catch (...) {
+        stopMeasurements();
+        measurement_process.join();
+        unregisterPub();
+        throw;
+    }
+    stopMeasurements();
+    measurement_process.join();
+    unregisterPub();
+    if (rclcpp::ok())
+        rclcpp::shutdown();
 
     return 0;
 }
