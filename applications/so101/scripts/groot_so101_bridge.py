@@ -15,7 +15,7 @@ from sensor_msgs.msg import CameraInfo, Image, JointState
 from std_msgs.msg import Float64MultiArray
 import zmq
 
-from so101_common import JOINT_NAMES, LOWER_LIMITS, UPPER_LIMITS
+from so101_common import JOINT_NAMES, safe_hardware_target
 
 
 def pack(data: Any) -> bytes:
@@ -236,10 +236,16 @@ class SO101GrootBridge(Node):
         }
 
     def _joint_cb(self, msg: JointState):
-        by_name = {name: i for i, name in enumerate(msg.name)}
-        if not all(name in by_name for name in JOINT_NAMES):
+        positions = dict(zip(msg.name, msg.position))
+        try:
+            current = np.asarray([positions[name] for name in JOINT_NAMES], dtype=np.float64)
+            safe_hardware_target(current, current, self.max_joint_step)
+        except (KeyError, ValueError) as exc:
+            self.have_joint_state = False
+            self.joint_history.clear()
+            self.get_logger().warning(f"Ignoring invalid SO-101 joint feedback: {exc}")
             return
-        self.latest_positions = np.asarray([msg.position[by_name[name]] for name in JOINT_NAMES], dtype=np.float32)
+        self.latest_positions = current
         self.joint_history.append(self.latest_positions.copy())
         self.have_joint_state = True
 
@@ -396,9 +402,8 @@ class SO101GrootBridge(Node):
             raw = action[self.action_key]
         else:
             raw = next(iter(action.values()))
-        target = np.asarray(raw, dtype=np.float32).reshape(-1, len(JOINT_NAMES))[0]
-        delta = np.clip(target - positions, -self.max_joint_step, self.max_joint_step)
-        return np.clip(positions + delta, LOWER_LIMITS, UPPER_LIMITS)
+        target = np.asarray(raw, dtype=np.float64).reshape(-1, len(JOINT_NAMES))[0]
+        return safe_hardware_target(target, positions, self.max_joint_step)
 
     def _tick(self):
         if not self.have_joint_state:
@@ -415,6 +420,8 @@ class SO101GrootBridge(Node):
                 self._configure_from_policy()
             observation = self._observation()
             response = self.client.get_action(observation)
+            if not self.have_joint_state:
+                raise ValueError("Joint feedback became invalid while waiting for the policy")
             # Clamp against where the joints are now, not a pre-request
             # snapshot, so a slow policy round-trip cannot command a step
             # larger than max_joint_step from the arm's actual position.

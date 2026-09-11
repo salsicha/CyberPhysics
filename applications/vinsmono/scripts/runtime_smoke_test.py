@@ -15,13 +15,14 @@ from sensor_msgs.msg import Image, Imu, PointCloud
 
 
 @contextmanager
-def running_node(package, config, stop_signal=signal.SIGINT):
+def running_node(package, config, stop_signal=signal.SIGINT, parameters=()):
     executable = Path(get_package_prefix(package)) / 'lib' / package / package
     with tempfile.TemporaryFile(mode='w+') as log:
         process = subprocess.Popen([
             str(executable), '--ros-args', '-r', f'__ns:=/{package}',
             '-p', f'config_file:={config}',
-        ], stdout=log, stderr=log)
+            *[arg for value in parameters for arg in ('-p', value)],
+        ], stdin=subprocess.PIPE, stdout=log, stderr=log)
         try:
             yield process
         finally:
@@ -33,6 +34,8 @@ def running_node(package, config, stop_signal=signal.SIGINT):
                 process.kill()
                 process.wait()
                 raise AssertionError(f'{package} did not stop within 10 seconds')
+            finally:
+                process.stdin.close()
             if code != 0:
                 log.seek(0)
                 raise AssertionError(f'{package} exited {code}:\n{log.read()}')
@@ -63,6 +66,18 @@ def main():
                 wait_until(node, lambda: imu_pub.get_subscription_count() > 0, [estimator])
             wait_until(node, lambda: imu_pub.get_subscription_count() == 0, [])
             print(f'PASS idle estimator shutdown on {stop_signal.name}', flush=True)
+
+        for enabled in (False, True):
+            for stop_signal in (signal.SIGINT, signal.SIGTERM):
+                parameters = (
+                    f'enable_loop_closure:={str(enabled).lower()}',
+                    'support_file:=/workspace/install/share/config_pkg/support_files',
+                )
+                with running_node('pose_graph', args.config, stop_signal, parameters) as graph:
+                    wait_until(node, lambda: node.count_publishers('/pose_graph/match_points') > 0,
+                               [graph], timeout=30)
+                wait_until(node, lambda: node.count_publishers('/pose_graph/match_points') == 0, [])
+                print(f'PASS pose graph loop_closure={enabled} shutdown on {stop_signal.name}', flush=True)
 
         with running_node('vins_estimator', args.config) as estimator:
             with running_node('feature_tracker', args.config) as tracker:

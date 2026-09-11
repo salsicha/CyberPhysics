@@ -5,7 +5,6 @@ PoseGraph::PoseGraph()
     posegraph_visualization = new CameraPoseVisualization(1.0, 0.0, 1.0, 1.0);
     posegraph_visualization->setScale(0.1);
     posegraph_visualization->setLineWidth(0.01);
-	t_optimization = std::thread(&PoseGraph::optimize4DoF, this);
     earliest_loop_index = -1;
     t_drift = Eigen::Vector3d(0, 0, 0);
     yaw_drift = 0;
@@ -16,12 +15,30 @@ PoseGraph::PoseGraph()
     sequence_cnt = 0;
     sequence_loop.push_back(0);
     base_sequence = 1;
+	t_optimization = std::thread(&PoseGraph::optimize4DoF, this);
 
 }
 
 PoseGraph::~PoseGraph()
 {
-	t_optimization.join();
+	shutdown();
+}
+
+void PoseGraph::shutdown()
+{
+    {
+        std::lock_guard<std::mutex> lock(stop_mutex);
+        stopping = true;
+    }
+    stop_condition.notify_all();
+    if (t_optimization.joinable())
+        t_optimization.join();
+    // Destroy ROS entities while the node and middleware are still alive.
+    pub_pg_path.reset();
+    pub_base_path.reset();
+    pub_pose_graph.reset();
+    for (auto &publisher : pub_path)
+        publisher.reset();
 }
 
 void PoseGraph::registerPub(rclcpp::Node::SharedPtr n)
@@ -402,7 +419,7 @@ void PoseGraph::addKeyFrameIntoVoc(KeyFrame* keyframe)
 
 void PoseGraph::optimize4DoF()
 {
-    while(true)
+    while(!stopping)
     {
         int cur_index = -1;
         int first_looped_index = -1;
@@ -573,8 +590,8 @@ void PoseGraph::optimize4DoF()
             updatePath();
         }
 
-        std::chrono::milliseconds dura(2000);
-        std::this_thread::sleep_for(dura);
+        std::unique_lock<std::mutex> lock(stop_mutex);
+        stop_condition.wait_for(lock, std::chrono::seconds(2), [this] { return stopping.load(); });
     }
 }
 

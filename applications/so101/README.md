@@ -277,6 +277,11 @@ configured skew budget.
 
 ## Picking Task Validation
 
+The policy bridge rejects non-finite actions and incomplete, non-finite, or
+out-of-range joint feedback. Invalid feedback blocks new commands until a valid
+six-joint state arrives. Valid targets use the same limit and step checks as the
+hardware guard.
+
 Score scenario telemetry against the selected SO-101 picking task:
 
 ```bash
@@ -315,6 +320,14 @@ python3 applications/so101/scripts/so101_acceptance_report.py \
   --metrics /tmp/so101_metrics/*.json \
   --thresholds systems/so101/validation/acceptance_thresholds.json
 ```
+
+Each acceptance run must include measured `collision_count`,
+`joint_limit_violations`, `command_saturation_fraction`, `policy_latency_ms`, and
+`observation_age_ms`, along with placement error and a boolean
+`failed_grasp_recovery` result (at the top level or under `checks`). The picking
+scorer alone does not collect all of these measurements. Missing or invalid
+measurements produce failed checks, `null` aggregate metrics, and explanations
+in `measurement_errors`; they cannot qualify a run for acceptance.
 
 The report checks success rate by object class and clutter level, mean and worst
 place error, total collisions, joint-limit violations, command saturation,

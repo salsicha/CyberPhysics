@@ -17,6 +17,19 @@ def stamp_ns(stamp):
     return int(stamp.sec) * 1_000_000_000 + int(stamp.nanosec)
 
 
+def finite_odometry(msg):
+    """Validate all numeric fields copied into fused odometry."""
+    pose, twist = msg.pose.pose, msg.twist.twist
+    vectors = (pose.position, twist.linear, twist.angular)
+    values = [value for vector in vectors for value in (vector.x, vector.y, vector.z)]
+    q = pose.orientation
+    values.extend((q.x, q.y, q.z, q.w))
+    values.extend(msg.pose.covariance)
+    values.extend(msg.twist.covariance)
+    return (all(math.isfinite(value) for value in values)
+            and all(msg.pose.covariance[index] >= 0 for index in (0, 7, 14)))
+
+
 @dataclass
 class Correction:
     valid: bool = False
@@ -107,10 +120,20 @@ class NavigationFusionNode(Node):
             self._accept_pending(source, state)
 
     def _on_confidence(self, source, state, msg):
-        state.confidence = float(msg.data)
+        confidence = float(msg.data)
+        state.confidence = confidence if math.isfinite(confidence) and 0 <= confidence <= 1 else 0.0
+        if state.confidence == 0:
+            state.received_ns = 0
         self._accept_pending(source, state)
 
     def _on_raw(self, msg):
+        if not finite_odometry(msg):
+            self.get_logger().warning('Rejected non-finite or invalid raw odometry')
+            return
+        if not all(math.isfinite(value) for value in (self.offset_east, self.offset_north)):
+            self.offset_east = self.offset_north = 0.0
+            self.last_publish_ns = None
+            self.get_logger().warning('Reset invalid navigation correction offsets')
         self.latest_raw = msg
         message_time = stamp_ns(msg.header.stamp)
         if message_time == 0:
@@ -175,14 +198,18 @@ class NavigationFusionNode(Node):
             return
         minimum = float(
             self.get_parameter(f'minimum_{source}_confidence').value)
-        if state.confidence < minimum:
+        if not math.isfinite(state.confidence) or not 0 < state.confidence <= 1 or state.confidence < minimum:
+            return
+        if not finite_odometry(msg):
+            state.received_ns = 0
+            self.get_logger().warning(f'Rejected invalid {source} correction')
             return
         correction_time = stamp_ns(msg.header.stamp)
         raw_east, raw_north = self._raw_at(correction_time)
         east = msg.pose.pose.position.x - raw_east
         north = msg.pose.pose.position.y - raw_north
         magnitude = math.hypot(east, north)
-        if magnitude > float(
+        if not math.isfinite(magnitude) or magnitude > float(
                 self.get_parameter('maximum_correction_m').value):
             self.get_logger().warning(
                 f'Rejected {source} correction of {magnitude:.1f} m')
@@ -190,7 +217,7 @@ class NavigationFusionNode(Node):
         covariance = msg.pose.covariance
         state.east = east
         state.north = north
-        state.variance = max(1.0, 0.5 * (covariance[0] + covariance[7]))
+        state.variance = max(1.0, 0.5 * covariance[0] + 0.5 * covariance[7])
         state.received_ns = self.get_clock().now().nanoseconds
         state.processed_stamp_ns = message_stamp
         self._update_global_reference(source, state)
@@ -205,6 +232,12 @@ class NavigationFusionNode(Node):
         if fix_stamp and odom_stamp and abs(fix_stamp - odom_stamp) > 1_000_000_000:
             return
         position = state.pending.pose.pose.position
+        if (not all(math.isfinite(value) for value in (
+                state.fix.latitude, state.fix.longitude, state.fix.altitude,
+                position.x, position.y, position.z))
+                or not -90 <= state.fix.latitude <= 90
+                or not -180 <= state.fix.longitude <= 180):
+            return
         self.global_reference = (
             state.fix.latitude,
             state.fix.longitude,
@@ -219,6 +252,9 @@ class NavigationFusionNode(Node):
         if self.global_reference is None:
             return
         lat, lon, alt, ref_east, ref_north, ref_up, _ = self.global_reference
+        if not all(math.isfinite(value) for value in (lat, lon, alt, ref_east, ref_north, ref_up)):
+            self.global_reference = None
+            return
         east = fused.pose.pose.position.x - ref_east
         north = fused.pose.pose.position.y - ref_north
         fix = NavSatFix()
@@ -255,14 +291,20 @@ class NavigationFusionNode(Node):
             minimum = float(
                 self.get_parameter(f'minimum_{name}_confidence').value)
             if (
-                    state.valid and state.confidence >= minimum and
+                    state.valid and 0 < state.confidence <= 1 and state.confidence >= minimum and
+                    all(math.isfinite(value) for value in (
+                        state.east, state.north, state.confidence, state.variance)) and
+                    state.variance > 0 and
                     state.received_ns > 0 and
                     now - state.received_ns <= timeout_ns):
                 weight = state.confidence * state.confidence / state.variance
-                active.append((name, state, weight))
+                if math.isfinite(weight) and weight > 0:
+                    active.append((name, state, weight))
         if not active:
             return self.offset_east, self.offset_north, '', 0.0, 0.0
         total = sum(item[2] for item in active)
+        if not math.isfinite(1.0 / total):
+            return self.offset_east, self.offset_north, '', 0.0, 0.0
         east = sum(item[1].east * item[2] for item in active) / total
         north = sum(item[1].north * item[2] for item in active) / total
         source = '+'.join(item[0] for item in active)

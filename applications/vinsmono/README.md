@@ -60,6 +60,9 @@ messages each when a matching stream is unavailable.
 
 Run the sensor and shutdown smoke checks without hardware:
 
+The checks include SIGINT and SIGTERM for the optional pose graph with loop
+closure both enabled and disabled, including an open stdin pipe with no input.
+
 ```bash
 docker run --rm --network none -v "$PWD:/repo:ro" cyberphysics/vinsmono:latest \
   python3 /repo/applications/vinsmono/scripts/runtime_smoke_test.py \

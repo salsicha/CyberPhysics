@@ -13,6 +13,9 @@
 #include <mutex>
 #include <queue>
 #include <thread>
+#include <atomic>
+#include <poll.h>
+#include <unistd.h>
 #include <eigen3/Eigen/Dense>
 #include <opencv2/opencv.hpp>
 #include <opencv2/core/eigen.hpp>
@@ -30,6 +33,7 @@ queue<nav_msgs::msg::Odometry::ConstPtr> pose_buf;
 queue<Eigen::Vector3d> odometry_buf;
 std::mutex m_buf;
 std::mutex m_process;
+std::atomic<bool> stopping{false};
 int frame_index  = 0;
 int sequence = 1;
 PoseGraph posegraph;
@@ -300,7 +304,7 @@ void process()
 {
     if (!LOOP_CLOSURE)
         return;
-    while (true)
+    while (!stopping && rclcpp::ok())
     {
         sensor_msgs::msg::Image::ConstPtr image_msg = NULL;
         sensor_msgs::msg::PointCloud::ConstPtr point_msg = NULL;
@@ -436,9 +440,19 @@ void command()
 {
     if (!LOOP_CLOSURE)
         return;
-    while(1)
+    while(!stopping && rclcpp::ok())
     {
-        char c = getchar();
+        // A container may have no stdin, or an open pipe with no input.
+        // Poll so joining this worker never waits for a keyboard character.
+        pollfd input{STDIN_FILENO, POLLIN, 0};
+        int ready = poll(&input, 1, 100);
+        if (ready < 0)
+            return;
+        if (ready == 0)
+            continue;
+        char c;
+        if (!(input.revents & POLLIN) || read(STDIN_FILENO, &c, 1) != 1)
+            return;
         if (c == 's')
         {
             m_process.lock();
@@ -566,7 +580,26 @@ int main(int argc, char **argv)
     keyboard_command_process = std::thread(command);
 
 
-    rclcpp::spin(n);
+    auto cleanup = [&] {
+        stopping = true;
+        measurement_process.join();
+        keyboard_command_process.join();
+        posegraph.shutdown();
+        pub_match_img.reset();
+        pub_camera_pose_visual.reset();
+        pub_key_odometrys.reset();
+        pub_vio_path.reset();
+        pub_match_points.reset();
+    };
+    try {
+        rclcpp::spin(n);
+    } catch (...) {
+        cleanup();
+        throw;
+    }
+    cleanup();
+    if (rclcpp::ok())
+        rclcpp::shutdown();
 
     return 0;
 }

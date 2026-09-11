@@ -9,6 +9,11 @@ optional complement to DemNav:
 - `navigation_fusion_node` applies accepted corrections to high-rate MAVROS
   odometry and publishes `/navigation/odometry` for Aerostack.
 
+Fusion rejects non-finite odometry and corrections, invalid covariance, and
+confidence values outside 0–1. An invalid correction cannot update the fused
+offset. If an existing offset becomes non-finite, the next valid raw sample
+resets it and allows valid corrections to resume without restarting the node.
+
 The original [TIERS WildNav](https://github.com/TIERS/wildnav) demonstration is
 an offline SuperPoint/SuperGlue batch processor. This package retains its
 image-to-satellite homography approach, but uses cached SIFT descriptors and a

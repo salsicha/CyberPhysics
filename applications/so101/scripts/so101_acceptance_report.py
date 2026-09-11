@@ -42,11 +42,11 @@ def load_runs(paths):
 
 def run_success(run):
     if "success" in run:
-        return bool(run["success"])
+        return run["success"] is True
     checks = run.get("checks")
-    if not checks:
+    if not isinstance(checks, dict) or not checks:
         return False
-    return all(checks.values())
+    return all(value is True for value in checks.values())
 
 
 def run_group(run):
@@ -56,35 +56,59 @@ def run_group(run):
 
 
 def acceptance_report(runs, thresholds):
+    if not runs:
+        raise ValueError("At least one run is required for acceptance")
+    measurement_errors = []
+
+    def measured(field, *, integer=False, maximum=None):
+        values = []
+        for index, run in enumerate(runs):
+            value = run.get(field)
+            if (isinstance(value, bool) or not isinstance(value, (int, float))
+                    or not np.isfinite(value) or value < 0
+                    or (integer and value != int(value))
+                    or (maximum is not None and value > maximum)):
+                measurement_errors.append(f"run {index}: missing or invalid {field}")
+                values.append(np.nan)
+            else:
+                values.append(float(value))
+        return np.asarray(values)
+
+    def aggregate(values, reducer):
+        if not np.all(np.isfinite(values)):
+            return None
+        result = float(reducer(values))
+        return result if np.isfinite(result) else None
+
     success = np.asarray([run_success(run) for run in runs], dtype=bool)
-    place_errors = np.asarray([float(run.get("final_place_error_m", np.inf)) for run in runs], dtype=np.float64)
-    collisions = int(sum(int(run.get("collision_count", 0)) for run in runs))
-    joint_violations = int(sum(int(run.get("joint_limit_violations", 0)) for run in runs))
-    saturation = [float(run.get("command_saturation_fraction", 0.0)) for run in runs]
+    place_errors = measured("final_place_error_m")
+    collisions = aggregate(measured("collision_count", integer=True), np.sum)
+    joint_violations = aggregate(measured("joint_limit_violations", integer=True), np.sum)
+    saturation = measured("command_saturation_fraction", maximum=1)
     recoveries = []
-    latencies = []
-    observation_ages = []
+    latencies = measured("policy_latency_ms")
+    observation_ages = measured("observation_age_ms")
     grouped = defaultdict(list)
 
-    for run in runs:
+    for index, run in enumerate(runs):
         grouped[run_group(run)].append(run_success(run))
-        checks = run.get("checks", {})
-        if "failed_grasp_recovery" in checks:
-            recoveries.append(bool(checks["failed_grasp_recovery"]))
-        elif "failed_grasp_recovery" in run:
-            recoveries.append(bool(run["failed_grasp_recovery"]))
-        if "policy_latency_ms" in run:
-            latencies.append(float(run["policy_latency_ms"]))
-        if "observation_age_ms" in run:
-            observation_ages.append(float(run["observation_age_ms"]))
+        checks = run.get("checks")
+        if not isinstance(checks, dict):
+            checks = {}
+        recovery = checks.get("failed_grasp_recovery", run.get("failed_grasp_recovery"))
+        if not isinstance(recovery, bool):
+            measurement_errors.append(f"run {index}: missing or invalid failed_grasp_recovery")
+            recoveries.append(np.nan)
+        else:
+            recoveries.append(float(recovery))
 
     success_rate = float(np.mean(success))
-    mean_place_error = float(np.mean(place_errors))
-    worst_place_error = float(np.max(place_errors))
-    max_saturation = float(np.max(saturation)) if saturation else 0.0
-    recovery_rate = float(np.mean(recoveries)) if recoveries else 1.0
-    max_latency = float(np.max(latencies)) if latencies else 0.0
-    max_observation_age = float(np.max(observation_ages)) if observation_ages else 0.0
+    mean_place_error = aggregate(place_errors, np.mean)
+    worst_place_error = aggregate(place_errors, np.max)
+    max_saturation = aggregate(saturation, np.max)
+    recovery_rate = aggregate(recoveries, np.mean)
+    max_latency = aggregate(latencies, np.max)
+    max_observation_age = aggregate(observation_ages, np.max)
 
     group_rates = {
         f"{object_class}:{clutter}": float(np.mean(values))
@@ -95,19 +119,20 @@ def acceptance_report(runs, thresholds):
         "success_rate_by_object_and_clutter": all(
             rate >= thresholds["min_success_rate"] for rate in group_rates.values()
         ),
-        "mean_place_error": mean_place_error <= thresholds["max_mean_place_error_m"],
-        "worst_place_error": worst_place_error <= thresholds["max_worst_place_error_m"],
-        "collision_count": collisions <= thresholds["max_collision_count_total"],
-        "joint_limit_violations": joint_violations <= thresholds["max_joint_limit_violations_total"],
-        "command_saturation": max_saturation <= thresholds["max_command_saturation_fraction"],
-        "failed_grasp_recovery": recovery_rate >= thresholds["min_failed_grasp_recovery_rate"],
-        "policy_latency": max_latency <= thresholds["max_policy_latency_ms"],
-        "observation_age": max_observation_age <= thresholds["max_observation_age_ms"],
+        "mean_place_error": mean_place_error is not None and mean_place_error <= thresholds["max_mean_place_error_m"],
+        "worst_place_error": worst_place_error is not None and worst_place_error <= thresholds["max_worst_place_error_m"],
+        "collision_count": collisions is not None and collisions <= thresholds["max_collision_count_total"],
+        "joint_limit_violations": joint_violations is not None and joint_violations <= thresholds["max_joint_limit_violations_total"],
+        "command_saturation": max_saturation is not None and max_saturation <= thresholds["max_command_saturation_fraction"],
+        "failed_grasp_recovery": recovery_rate is not None and recovery_rate >= thresholds["min_failed_grasp_recovery_rate"],
+        "policy_latency": max_latency is not None and max_latency <= thresholds["max_policy_latency_ms"],
+        "observation_age": max_observation_age is not None and max_observation_age <= thresholds["max_observation_age_ms"],
     }
     return {
         "run_count": len(runs),
         "success": all(checks.values()),
         "checks": {name: bool(value) for name, value in checks.items()},
+        "measurement_errors": measurement_errors,
         "metrics": {
             "success_rate": success_rate,
             "success_rate_by_object_and_clutter": group_rates,

@@ -64,5 +64,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install upstream metadata generator dependency
+        run: pip install lxml
       - name: Check .params names against the pinned ArduPilot ref
         run: python3 tools/check_ardupilot_params.py
