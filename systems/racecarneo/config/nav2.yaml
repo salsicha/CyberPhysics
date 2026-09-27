@@ -8,6 +8,9 @@ bt_navigator:
     default_server_timeout: 20
     wait_for_service_timeout: 1000
     action_server_result_timeout: 900.0
+    # Stock trees minus Spin, which an Ackermann car cannot execute.
+    default_nav_to_pose_bt_xml: /workspace/config/navigate_to_pose_ackermann.xml
+    default_nav_through_poses_bt_xml: /workspace/config/navigate_through_poses_ackermann.xml
     navigators: [navigate_to_pose, navigate_through_poses]
     navigate_to_pose:
       plugin: nav2_bt_navigator::NavigateToPoseNavigator
@@ -122,7 +125,9 @@ global_costmap:
         plugin: nvblox::nav2::NvbloxCostmapLayer
         enabled: true
         nav2_costmap_global_frame: map
-        nvblox_map_slice_topic: /nvblox_node/combined_map_slice
+        # nvblox publishes combined_map_slice only in dynamic/human mapping
+        # modes; nvblox.yaml uses static_tsdf.
+        nvblox_map_slice_topic: /nvblox_node/static_map_slice
         convert_to_binary_costmap: true
       obstacle_layer:
         plugin: nav2_costmap_2d::ObstacleLayer
@@ -151,10 +156,18 @@ planner_server:
     costmap_update_timeout: 1.0
     planner_plugins: [GridBased]
     GridBased:
-      plugin: nav2_navfn_planner::NavfnPlanner
+      # Kinematically feasible plans for Ackermann steering; NavFn ignores
+      # the turning radius. Forward-only (DUBIN) because RPP does not reverse.
+      plugin: nav2_smac_planner::SmacPlannerHybrid
+      motion_model_for_search: DUBIN
+      # wheelbase / tan(max_steering_angle) = 0.33 / tan(0.42) ~= 0.74 m
+      minimum_turning_radius: 0.75
       tolerance: 0.5
-      use_astar: false
       allow_unknown: true
+      max_planning_time: 2.0
+      # The post-smoother tightens turns past minimum_turning_radius (a
+      # U-turn plan measured 0.61 m smoothed vs 0.75 m unsmoothed).
+      smooth_path: false
 
 smoother_server:
   ros__parameters:

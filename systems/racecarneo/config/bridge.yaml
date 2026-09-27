@@ -35,4 +35,5 @@ racecarneo_bridge:
     battery_sag_per_speed: 0.8
     manual_override: false
     estop_engaged: false
+    command_timeout_s: 0.5
     publish_actuator_feedback: true

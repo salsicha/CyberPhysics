@@ -72,6 +72,13 @@ services:
         max_depth:=80.0
         publish_pointcloud:=true
         pointcloud_stride:=4
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu, compute, utility]
 
   racecarneo_nvblox:
     network_mode: host
@@ -92,6 +99,13 @@ services:
     command: >
       ros2 launch /workspace/racecarneo_nvblox.launch.py
         config_file:=/workspace/config/nvblox.yaml
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu, compute, utility]
 
   racecarneo_slam:
     network_mode: host
@@ -113,7 +127,8 @@ services:
   racecarneo_nav2:
     network_mode: host
     pull_policy: if_not_present
-    image: cyberphysics/racecarneo:${CYBERPHYSICS_TAG:-latest}
+    # The nvblox image ships nvblox_nav2 (NvbloxCostmapLayer) alongside Nav2.
+    image: cyberphysics/nvblox:${CYBERPHYSICS_TAG:-latest}
     container_name: racecarneo_nav2
     depends_on:
       - racecarneo_bridge
@@ -123,6 +138,9 @@ services:
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
       - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+      # ros-jazzy-ompl installs libompl.so here without adding it to the
+      # library path, so the Smac planner fails to load without this.
+      - LD_LIBRARY_PATH=/opt/ros/jazzy/lib/x86_64-linux-gnu
     volumes:
       - ../systems/racecarneo/config:/workspace/config:ro
     command: >

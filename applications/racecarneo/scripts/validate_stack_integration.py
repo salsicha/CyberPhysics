@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate RACECAR Neo simulation stack topic freshness and TF connectivity."""
+"""Validate RACECAR Neo simulation stack topics, TF connectivity, and Nav2 state."""
 
 import argparse
 import time
@@ -11,6 +11,7 @@ from rclpy.duration import Duration
 from rclpy.node import Node
 from rclpy.time import Time
 from sensor_msgs.msg import CameraInfo, Image, Imu, LaserScan
+from std_srvs.srv import Trigger
 from tf2_ros import Buffer, TransformException, TransformListener
 
 
@@ -24,10 +25,13 @@ TOPIC_TYPES = {
     '/odom': Odometry,
     '/ackermann_feedback': AckermannDriveStamped,
 }
+# This image has no nvblox_msgs, so these are checked for a live publisher
+# rather than subscribed to. A topic name alone proves nothing: Nav2's costmap
+# subscription creates it even when nvblox is down.
 NVBLOX_TOPICS = [
     '/nvblox_node/static_map_slice',
-    '/nvblox_node/combined_map_slice',
 ]
+NAV2_LIFECYCLE_MANAGER = '/lifecycle_manager_navigation'
 REQUIRED_TF = [
     ('map', 'odom'),
     ('odom', 'base_link'),
@@ -47,6 +51,9 @@ class StackValidator(Node):
         self.tf_listener = TransformListener(self.tf_buffer, self)
         for topic, msg_type in TOPIC_TYPES.items():
             self.create_subscription(msg_type, topic, self._seen(topic), 10)
+        self.nav2_active = False
+        self._nav2_future = None
+        self._nav2_client = self.create_client(Trigger, f'{NAV2_LIFECYCLE_MANAGER}/is_active')
 
     def _seen(self, topic):
         def callback(_msg):
@@ -60,9 +67,21 @@ class StackValidator(Node):
             seen = self.last_seen.get(topic)
             if seen is None or now - seen > self.freshness_s:
                 missing.append(topic)
-        topic_names = {name for name, _types in self.get_topic_names_and_types()}
-        missing.extend(topic for topic in NVBLOX_TOPICS if topic not in topic_names)
+        missing.extend(topic for topic in NVBLOX_TOPICS if self.count_publishers(topic) == 0)
         return missing
+
+    def poll_nav2(self):
+        """Ask Nav2's lifecycle manager whether every managed node is active."""
+        if self._nav2_future is not None:
+            if not self._nav2_future.done():
+                return
+            result = self._nav2_future.result()
+            self.nav2_active = bool(result is not None and result.success)
+            self._nav2_future = None
+        if self._nav2_client.service_is_ready():
+            self._nav2_future = self._nav2_client.call_async(Trigger.Request())
+        else:
+            self.nav2_active = False
 
     def missing_transforms(self):
         missing = []
@@ -86,14 +105,16 @@ def main():
     try:
         while rclpy.ok() and time.monotonic() < deadline:
             rclpy.spin_once(node, timeout_sec=0.1)
+            node.poll_nav2()
             missing_topics = node.missing_topics()
             missing_tf = node.missing_transforms()
-            if not missing_topics and not missing_tf:
+            if not missing_topics and not missing_tf and node.nav2_active:
                 node.get_logger().info('RACECAR Neo stack validation passed')
                 return
         raise SystemExit(
             'RACECAR Neo stack validation failed; '
-            f'missing/stale topics={node.missing_topics()} missing_tf={node.missing_transforms()}'
+            f'missing/stale topics={node.missing_topics()} missing_tf={node.missing_transforms()} '
+            f'nav2_active={node.nav2_active}'
         )
     finally:
         node.destroy_node()

@@ -13,6 +13,7 @@ import rclpy
 from ackermann_msgs.msg import AckermannDriveStamped
 from geometry_msgs.msg import TransformStamped
 from nav_msgs.msg import Odometry
+from rcl_interfaces.msg import SetParametersResult
 from rclpy.node import Node
 from sensor_msgs.msg import CameraInfo, Image, Imu, LaserScan
 from std_msgs.msg import Bool, Float32, Header
@@ -57,6 +58,7 @@ class RacecarNeoBridge(Node):
         self.declare_parameter('battery_sag_per_speed', 0.8)
         self.declare_parameter('manual_override', False)
         self.declare_parameter('estop_engaged', False)
+        self.declare_parameter('command_timeout_s', 0.5)
         self.declare_parameter('publish_actuator_feedback', True)
 
         self.frame_prefix = self.get_parameter('frame_prefix').value
@@ -95,7 +97,11 @@ class RacecarNeoBridge(Node):
         self.battery_sag_per_speed = float(self.get_parameter('battery_sag_per_speed').value)
         self.manual_override = bool(self.get_parameter('manual_override').value)
         self.estop_engaged = bool(self.get_parameter('estop_engaged').value)
+        self.command_timeout_s = float(self.get_parameter('command_timeout_s').value)
         self.publish_actuator_feedback = bool(self.get_parameter('publish_actuator_feedback').value)
+        # E-stop, manual override, and the watchdog timeout can change at
+        # runtime, e.g. `ros2 param set /racecarneo_bridge estop_engaged true`.
+        self.add_on_set_parameters_callback(self._on_set_parameters)
 
         self._x = 0.0
         self._y = 0.0
@@ -107,6 +113,7 @@ class RacecarNeoBridge(Node):
         self._cmd_lock = threading.Lock()
         self._speed = 0.0
         self._steering = 0.0
+        self._last_cmd_time: Optional[float] = None
         self._actual_speed_cmd = 0.0
         self._actual_steering_cmd = 0.0
         self._rc = None
@@ -128,11 +135,31 @@ class RacecarNeoBridge(Node):
         self.create_subscription(AckermannDriveStamped, 'ackermann_cmd', self._cmd_callback, 10)
 
     def _cmd_callback(self, msg: AckermannDriveStamped) -> None:
-        speed = max(-1.0, min(1.0, float(msg.drive.speed)))
-        steering = max(-1.0, min(1.0, float(msg.drive.steering_angle)))
+        speed = float(msg.drive.speed)
+        steering = float(msg.drive.steering_angle)
+        # min/max would turn NaN into a full-scale command; drop it and let
+        # the watchdog stop the car if valid commands do not resume.
+        if not (math.isfinite(speed) and math.isfinite(steering)):
+            self.get_logger().warn('Ignoring non-finite ackermann_cmd', throttle_duration_sec=1.0)
+            return
+        speed = max(-1.0, min(1.0, speed))
+        steering = max(-1.0, min(1.0, steering))
         with self._cmd_lock:
             self._speed = speed
             self._steering = steering
+            self._last_cmd_time = time.monotonic()
+
+    def _on_set_parameters(self, params) -> SetParametersResult:
+        with self._cmd_lock:
+            for param in params:
+                if param.name == 'estop_engaged':
+                    self.estop_engaged = bool(param.value)
+                    self.get_logger().warn(f'E-stop {"engaged" if self.estop_engaged else "released"}')
+                elif param.name == 'manual_override':
+                    self.manual_override = bool(param.value)
+                elif param.name == 'command_timeout_s':
+                    self.command_timeout_s = float(param.value)
+        return SetParametersResult(successful=True)
 
     def start(self) -> None:
         self._sim_thread = threading.Thread(target=self._run_racecar, daemon=True)
@@ -194,7 +221,9 @@ class RacecarNeoBridge(Node):
         now = self.get_clock().now()
         stamp = now.to_msg()
         speed_cmd, steering_cmd = self._update_vehicle_state(now)
-        self._rc.drive.set_speed_angle(speed_cmd, steering_cmd)
+        # ROS steering (and this bridge's odometry) is positive to the left;
+        # the RACECAR library's angle is -1 full left, +1 full right.
+        self._rc.drive.set_speed_angle(speed_cmd, -steering_cmd)
 
         if self.publish_camera:
             self._publish_color(stamp)
@@ -232,11 +261,20 @@ class RacecarNeoBridge(Node):
             return self._actual_speed_cmd, self._actual_steering_cmd
 
         with self._cmd_lock:
+            # Watchdog: never keep driving on a command stream that stopped.
+            timed_out = (self._last_cmd_time is None
+                         or time.monotonic() - self._last_cmd_time > self.command_timeout_s)
+            if timed_out and self._speed != 0.0:
+                self.get_logger().warn(
+                    f'No ackermann_cmd for {self.command_timeout_s:.2f}s; stopping')
+                self._speed = 0.0
             target_speed = self._speed
             target_steering = self._steering
-        if self.manual_override or self.estop_engaged:
+            manual_override = self.manual_override
+            estop_engaged = self.estop_engaged
+        if manual_override or estop_engaged:
             target_speed = 0.0
-            if self.estop_engaged:
+            if estop_engaged:
                 target_steering = 0.0
 
         throttle_alpha = min(1.0, dt / self.throttle_time_constant_s)
@@ -359,7 +397,10 @@ class RacecarNeoBridge(Node):
             return
         depth_m = depth_cm.astype(np.float32) / 100.0
         if self.depth_noise_std_m > 0.0:
-            depth_m += self.rng.normal(0.0, self.depth_noise_std_m, size=depth_m.shape).astype(np.float32)
+            # 0 means no return; noise must not turn it into a phantom surface.
+            valid = np.isfinite(depth_m) & (depth_m > 0.0)
+            noise = self.rng.normal(0.0, self.depth_noise_std_m, size=depth_m.shape).astype(np.float32)
+            depth_m = np.where(valid, depth_m + noise, depth_m)
         if self.depth_dropout_probability > 0.0:
             mask = self.rng.random(depth_m.shape) < self.depth_dropout_probability
             depth_m[mask] = np.nan
@@ -398,7 +439,10 @@ class RacecarNeoBridge(Node):
             return
         raw_m = np.asarray(raw_cm, dtype=np.float32) / 100.0
         if self.lidar_noise_std_m > 0.0:
-            raw_m += self.rng.normal(0.0, self.lidar_noise_std_m, size=raw_m.shape).astype(np.float32)
+            # 0 means no return; noise must not turn it into a phantom obstacle.
+            valid = np.isfinite(raw_m) & (raw_m > 0.0)
+            noise = self.rng.normal(0.0, self.lidar_noise_std_m, size=raw_m.shape).astype(np.float32)
+            raw_m = np.where(valid, raw_m + noise, raw_m)
         if self.lidar_dropout_probability > 0.0:
             raw_m[self.rng.random(raw_m.shape) < self.lidar_dropout_probability] = np.inf
         count = raw_m.shape[0]

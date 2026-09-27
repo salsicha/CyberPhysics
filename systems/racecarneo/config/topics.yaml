@@ -12,7 +12,6 @@ topics:
   estop: /racecarneo/estop
   battery_voltage: /racecarneo/battery_voltage
   nvblox_static_slice: /nvblox_node/static_map_slice
-  nvblox_combined_slice: /nvblox_node/combined_map_slice
 frames:
   base: base_link
   odom: odom
