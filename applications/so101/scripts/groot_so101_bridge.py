@@ -348,7 +348,9 @@ class SO101GrootBridge(Node):
             frame = key_image.reshape(1, 1, self.image_height, self.image_width, 3)
             video[key] = np.repeat(frame, self.video_horizon, axis=1)
 
-        joint_history = self._joint_history_array(self.state_horizon)
+        # Safety math runs in float64; GR00T's strict observation check
+        # requires float32 state arrays.
+        joint_history = self._joint_history_array(self.state_horizon).astype(np.float32)
         if self.state_keys == ["single_arm", "gripper"]:
             state = {
                 "single_arm": joint_history[..., :5],

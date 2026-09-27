@@ -28,6 +28,9 @@ UPPER_LIMITS = JOINT_LIMITS[:, 1]
 JOINT_VELOCITY_LIMITS = np.array([2.6, 2.6, 2.8, 3.4, 3.8, 0.12], dtype=np.float32)
 JOINT_QUANTIZATION = np.array([0.0015, 0.0015, 0.0015, 0.0015, 0.0020, 0.0005], dtype=np.float32)
 JOINT_BACKLASH = np.array([0.003, 0.003, 0.003, 0.0025, 0.0025, 0.0008], dtype=np.float32)
+# Measured joints may read up to one encoder step past a limit (quantization
+# of an at-limit position rounds outward); commands are still clamped exactly.
+JOINT_MEASUREMENT_TOLERANCE = JOINT_QUANTIZATION.astype(np.float64)
 
 RGB_TOPIC = "/so101/camera/image_raw"
 RGB_CAMERA_INFO_TOPIC = "/so101/camera/camera_info"
@@ -89,7 +92,8 @@ def safe_hardware_target(requested, current, max_joint_step):
     current = np.asarray(current, dtype=np.float64).reshape(len(JOINT_NAMES))
     if not np.all(np.isfinite(requested)) or not np.all(np.isfinite(current)):
         raise ValueError("SO-101 HIL state and command must be finite")
-    if np.any(current < LOWER_LIMITS) or np.any(current > UPPER_LIMITS):
+    if (np.any(current < LOWER_LIMITS - JOINT_MEASUREMENT_TOLERANCE)
+            or np.any(current > UPPER_LIMITS + JOINT_MEASUREMENT_TOLERANCE)):
         raise ValueError("SO-101 HIL measured state is outside joint limits")
     step = np.asarray(max_joint_step, dtype=np.float64)
     if step.ndim == 0:

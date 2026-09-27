@@ -22,6 +22,20 @@ JOINT_LIMITS = np.array([
 ], dtype=np.float32)
 
 
+def joint_positions_modality_config() -> dict[str, Any]:
+    """Modality config shared by the mock and demo policies.
+
+    Declares every modality a real GR00T checkpoint does, including language,
+    so the bridge's auto schema detection accepts it.
+    """
+    return {
+        "video": {"modality_keys": ["front"], "delta_indices": [0]},
+        "state": {"modality_keys": ["joint_positions"], "delta_indices": [0]},
+        "action": {"modality_keys": ["joint_positions"], "delta_indices": [0]},
+        "language": {"modality_keys": ["annotation.human.task_description"], "delta_indices": [0]},
+    }
+
+
 class MockSO101Policy(BasePolicy):
     def __init__(self, amplitude: float = 0.35):
         super().__init__(strict=False)
@@ -39,11 +53,7 @@ class MockSO101Policy(BasePolicy):
         return {"reset": True}
 
     def get_modality_config(self) -> dict[str, Any]:
-        return {
-            "video": {"modality_keys": ["front"], "delta_indices": [0]},
-            "state": {"modality_keys": ["joint_positions"], "delta_indices": [0]},
-            "action": {"modality_keys": ["joint_positions"], "delta_indices": [0]},
-        }
+        return joint_positions_modality_config()
 
     def _get_action(self, observation: dict[str, Any], options: dict[str, Any] | None = None):
         state = observation.get("state", {}).get("joint_positions")
@@ -88,11 +98,7 @@ class DemoSO101Policy(BasePolicy):
         return {"reset": True}
 
     def get_modality_config(self) -> dict[str, Any]:
-        return {
-            "video": {"modality_keys": ["front"], "delta_indices": [0]},
-            "state": {"modality_keys": ["joint_positions"], "delta_indices": [0]},
-            "action": {"modality_keys": ["joint_positions"], "delta_indices": [0]},
-        }
+        return joint_positions_modality_config()
 
     def _get_action(self, observation: dict[str, Any], options: dict[str, Any] | None = None):
         action = self.controller.get_action(observation)
