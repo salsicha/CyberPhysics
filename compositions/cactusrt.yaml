@@ -1,0 +1,42 @@
+# cactus-rt real-time demo (applications/cactusrt): cactus-rt's simple_example,
+# a 1 kHz control loop on a SCHED_FIFO (priority 80) thread pinned to CPU 2,
+# with all memory locked. It needs real-time scheduling (SYS_NICE, rtprio) and
+# an unlimited memlock limit for mlockall; it uses no network.
+#
+#   ./start.sh cactusrt                          # 30 s run, then a clean stop
+#   CACTUSRT_DURATION=0 ./start.sh cactusrt      # run until Ctrl-C
+#   ./start.sh cactusrt --profile tracing cactusrt_tracing
+#       # 15 s tracing_example; Perfetto traces in generated/cactusrt/
+
+x-cactusrt-realtime: &realtime
+  image: salsicha/cyberphysics:cactusrt-${CYBERPHYSICS_TAG:-latest}
+  pull_policy: if_not_present
+  network_mode: none
+  cap_add:
+    - SYS_NICE
+  ulimits:
+    rtprio: 99
+    memlock: -1
+  # The examples handle SIGINT/SIGTERM by stopping their threads and joining.
+  stop_signal: SIGINT
+  # To give the loop's core to it alone, isolate CPU 2 on the host (see
+  # applications/cactusrt/README.md) and uncomment. simple_example pins its
+  # thread to CPU 2, so the set must include it.
+  # cpuset: "2"
+
+services:
+  cactusrt:
+    <<: *realtime
+    container_name: cactusrt
+    # A duration of 0 disables the timeout
+    command: >
+      timeout --preserve-status --signal=INT ${CACTUSRT_DURATION:-30}
+        rt_simple_example
+
+  cactusrt_tracing:
+    <<: *realtime
+    profiles: ["tracing"]
+    container_name: cactusrt_tracing
+    volumes:
+      - ../generated/cactusrt:/workspace/build
+    command: rt_tracing_example

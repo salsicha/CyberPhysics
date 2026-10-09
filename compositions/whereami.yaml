@@ -1,0 +1,75 @@
+# WiFi-fingerprint room-level localization: the vendored kootenpv/whereami
+# (AGPL-3.0, applications/whereami/whereami/LICENSE) behind a ROS 2 node
+# publishing /whereami/location, /whereami/confidence and
+# /whereami/probabilities. See applications/whereami/README.md.
+#
+# Train each room with the machine standing in it (several samples, moving
+# around the room between them), then start the node:
+#
+#   docker compose -f compositions/whereami.yaml run --rm whereami_train learn -l kitchen -n 10
+#   docker compose -f compositions/whereami.yaml run --rm whereami_train learn -l lab -n 10
+#   docker compose -f compositions/whereami.yaml run --rm whereami_train locations
+#   docker compose -f compositions/whereami.yaml up -d
+#
+# Host requirements: NetworkManager manages the WiFi interface, and its
+# system D-Bus socket is mounted read-only for nmcli (WHEREAMI_SCANNER=nmcli).
+# Hosts without NetworkManager: WHEREAMI_SCANNER=iwlist and add
+# `cap_add: [NET_ADMIN]` to both services so iwlist can trigger scans
+# (without it the kernel only returns cached results). Train and run with the
+# same scanner: nmcli and iwlist report signal quality on different scales.
+#
+# Samples (<label>.txt) and model.pkl live in WHEREAMI_MODEL_DIR (default
+# cache/whereami, outside git); the node reloads model.pkl when it changes.
+
+services:
+  whereami:
+    image: salsicha/cyberphysics:whereami-${CYBERPHYSICS_TAG:-latest}
+    container_name: whereami
+    network_mode: host
+    ipc: host
+    restart: unless-stopped
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - WHEREAMI_SCANNER=${WHEREAMI_SCANNER:-nmcli}
+      - WHEREAMI_DEVICE=${WHEREAMI_DEVICE:-}
+    volumes:
+      - type: bind
+        source: ${WHEREAMI_MODEL_DIR:-../cache/whereami}
+        target: /root/.whereami
+        read_only: true
+        bind:
+          create_host_path: true
+      - type: bind
+        source: /run/dbus/system_bus_socket
+        target: /run/dbus/system_bus_socket
+        read_only: true
+        bind:
+          create_host_path: false
+      - /dev/shm:/dev/shm
+    command: >
+      python3 /scripts/whereami_node.py --ros-args
+        -p scan_period_s:=${WHEREAMI_SCAN_PERIOD_S:-10.0}
+
+  # One-off training CLI: `run --rm whereami_train <whereami command>`, e.g.
+  # learn -l <room> -n <samples>, locations, crossval, train, predict_proba.
+  whereami_train:
+    profiles: [train]
+    image: salsicha/cyberphysics:whereami-${CYBERPHYSICS_TAG:-latest}
+    network_mode: host
+    environment:
+      - WHEREAMI_SCANNER=${WHEREAMI_SCANNER:-nmcli}
+      - WHEREAMI_DEVICE=${WHEREAMI_DEVICE:-}
+    volumes:
+      - type: bind
+        source: ${WHEREAMI_MODEL_DIR:-../cache/whereami}
+        target: /root/.whereami
+        bind:
+          create_host_path: true
+      - type: bind
+        source: /run/dbus/system_bus_socket
+        target: /run/dbus/system_bus_socket
+        read_only: true
+        bind:
+          create_host_path: false
+    entrypoint: ["/entrypoint.sh", "python3", "/scripts/whereami_cli.py"]
+    command: ["--help"]

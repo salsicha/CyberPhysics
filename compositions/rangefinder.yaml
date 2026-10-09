@@ -1,0 +1,58 @@
+# Benewake TFmini-S / TF-Luna downward rangefinder (UART) publishing
+# sensor_msgs/Range on /aerodrone/rangefinder, DemNav's height-above-ground
+# input. See applications/rangefinder/README.md for wiring and frames.
+#
+#   RANGEFINDER_DEVICE=/dev/serial/by-id/usb-Silicon_Labs_CP2102_..-if00-port0 \
+#     docker compose -f compositions/rangefinder.yaml up
+#
+# Bench test without hardware (simulated sensor on a pty in the container).
+# It publishes on its own topic so a fake height never reaches DemNav on a
+# vehicle sharing the ROS domain:
+#
+#   docker compose -f compositions/rangefinder.yaml run --rm rangefinder_sim
+#   ros2 topic echo /rangefinder_sim/range
+
+services:
+  rangefinder:
+    image: salsicha/cyberphysics:rangefinder-${CYBERPHYSICS_TAG:-latest}
+    container_name: rangefinder
+    network_mode: host
+    ipc: host
+    restart: unless-stopped
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    # Only the sensor's serial port, not privileged. A USB-UART adapter that
+    # re-enumerates under another name needs a container restart; use the
+    # stable /dev/serial/by-id/ path.
+    devices:
+      - ${RANGEFINDER_DEVICE:-/dev/ttyUSB0}:/dev/rangefinder
+    volumes:
+      - /dev/shm:/dev/shm
+    command: >
+      python3 /scripts/rangefinder_node.py --ros-args
+        -p port:=/dev/rangefinder
+        -p baud_rate:=${RANGEFINDER_BAUD:-115200}
+        -p model:=${RANGEFINDER_MODEL:-tfmini_s}
+        -p topic:=${RANGEFINDER_TOPIC:-/aerodrone/rangefinder}
+        -p frame_id:=${RANGEFINDER_FRAME_ID:-rangefinder_link}
+
+  rangefinder_sim:
+    profiles: [sim]
+    image: salsicha/cyberphysics:rangefinder-${CYBERPHYSICS_TAG:-latest}
+    container_name: rangefinder_sim
+    network_mode: host
+    ipc: host
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    volumes:
+      - /dev/shm:/dev/shm
+    command:
+      - bash
+      - -c
+      - >
+        python3 /scripts/fake_benewake.py --link /tmp/tfmini --distances 1.5,2.0,2.5 --weak-every 10 &
+        sleep 1 &&
+        exec python3 /scripts/rangefinder_node.py --ros-args
+        -p port:=/tmp/tfmini
+        -p model:=${RANGEFINDER_MODEL:-tfmini_s}
+        -p topic:=${RANGEFINDER_SIM_TOPIC:-/rangefinder_sim/range}

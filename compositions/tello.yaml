@@ -1,0 +1,51 @@
+# DJI Tello driver (applications/tello, salsicha/tello-ros2). Join this host
+# to the drone's own WiFi (TELLO-XXXXXX) first: the driver sends SDK commands
+# to 192.168.10.1:8889 and receives state on UDP 8890 and H.264 video on UDP
+# 11111, so it runs with host networking. Until the drone answers it logs
+# "no connection to the drone" and retries every few seconds.
+#
+#   ./start.sh tello                       # driver + static map -> drone TF
+#   xhost +SI:localuser:root
+#   ./start.sh tello --profile teleop      # + keyboard teleop window
+#
+# Topics: /image_raw, /imu, /odom, /battery, /status, ... ; commands on
+# /takeoff, /land, /emergency (std_msgs/Empty) and /control (Twist, -100..100).
+
+services:
+  tello:
+    image: salsicha/cyberphysics:tello-${CYBERPHYSICS_TAG:-latest}
+    pull_policy: if_not_present
+    container_name: tello
+    network_mode: host
+    restart: unless-stopped
+    # ros2 launch shuts its nodes down on SIGINT; as PID 1 it ignores SIGTERM
+    stop_signal: SIGINT
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+    command: >
+      ros2 launch /tello-ros2/tello.launch.py
+        tf_base:=${TELLO_TF_BASE:-map}
+        tf_drone:=${TELLO_TF_DRONE:-drone}
+
+  # tello_control: focus its (blank) "Tello" window and use the keys
+  # T takeoff, L land, E emergency stop, F flip forward,
+  # arrows move, W/S up/down, A/D yaw.
+  tello_teleop:
+    profiles: ["teleop"]
+    image: salsicha/cyberphysics:tello-${CYBERPHYSICS_TAG:-latest}
+    pull_policy: if_not_present
+    container_name: tello_teleop
+    network_mode: host
+    depends_on:
+      - tello
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+      - DISPLAY=${DISPLAY:-:0}
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix
+    # The node itself rather than `ros2 run`, which as PID 1 would not pass a
+    # stop signal on to it
+    stop_signal: SIGINT
+    command: /tello-ros2/workspace/install/tello_control/lib/tello_control/tello_control

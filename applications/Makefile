@@ -119,6 +119,8 @@ build_unrealengine: build_ros2
 	APP=unrealengine ./_build_it.sh
 build_vinsmono:
 	APP=vinsmono ./_build_it.sh
+build_whereami: build_ros2
+	APP=whereami ./_build_it.sh
 build_wildnav: build_aerostack2
 	APP=wildnav ./_build_it.sh
 

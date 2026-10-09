@@ -9,26 +9,13 @@ ENV LANG=en_US.UTF-8 \
     ROS2_DISTRO=jazzy \
     DEBIAN_FRONTEND=noninteractive \
     PATH="/venv/bin:$PATH" \
-    QT_QPA_PLATFORM=xcb \
     ROS_DISTRO=jazzy
 
-# RUN apt update && apt install -y --no-install-recommends \
-#     ? \
-#     && rm -rf /var/lib/apt/lists/*
-
-# RUN . /venv/bin/activate && pip install ?
-
-# Put souce in /workspace/src/
-
-WORKDIR /workspace
-
-# Micro-ROS agent
-RUN . /venv/bin/activate && . /opt/ros/$ROS2_DISTRO/setup.bash && \
-    apt update && \
-    rosdep update && rosdep install --from-paths src --ignore-src -y && \
-    colcon build --merge-install --install-base /opt/ros/$ROS2_DISTRO
+# Serial driver for the Benewake TFmini-S / TF-Luna UART stream
+RUN . /venv/bin/activate && pip install --no-cache-dir pyserial==3.5
 
 COPY scripts/ /scripts/
+RUN chmod +x /scripts/rangefinder_node.py /scripts/fake_benewake.py
 
 COPY ./entrypoint.sh /
 RUN chmod +x /entrypoint.sh
@@ -36,8 +23,18 @@ RUN chmod +x /entrypoint.sh
 #####################################################################
 FROM scratch
 
+ENV LANG=en_US.UTF-8 \
+    LANGUAGE=en_US.UTF-8 \
+    TERM=xterm \
+    PYTHONIOENCODING=UTF-8 \
+    ROS2_DISTRO=jazzy \
+    DEBIAN_FRONTEND=noninteractive \
+    PATH="/venv/bin:$PATH" \
+    ROS_DISTRO=jazzy
+
 COPY --from=build / /
 
+WORKDIR /scripts
+
 ENTRYPOINT [ "/entrypoint.sh" ]
-
-
+CMD [ "python3", "/scripts/rangefinder_node.py" ]

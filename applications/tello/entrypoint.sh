@@ -2,4 +2,5 @@
 set -e
 source /opt/ros/jazzy/setup.bash
 source /venv/bin/activate
+source /tello-ros2/workspace/install/setup.bash
 exec "$@"
