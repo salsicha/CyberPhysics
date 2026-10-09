@@ -61,6 +61,71 @@ services:
         --params-file /workspace/systems/airplane/config/mavros_bridge.yaml
         -p namespace:=${AIRPLANE_NAMESPACE:-plane0}
 
+  airplane_navigation_ready:
+    # Requests 20 Hz local odometry/attitude from ArduPlane (its default SITL
+    # streams publish MAVROS odometry at 1 Hz) and exits once GPS and local
+    # odometry are valid.
+    image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
+    network_mode: host
+    ipc: host
+    restart: "no"
+    depends_on:
+      - airplane_mavros
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    volumes:
+      - ../applications/aerostack2/scripts:/workspace/applications/aerostack2/scripts:ro
+      - /dev/shm:/dev/shm
+    command: >
+      python3 /workspace/applications/aerostack2/scripts/wait_for_mavros_navigation.py
+        --namespace /mavros --timeout 900 --settle-seconds 3
+
+  airplane_ground_truth:
+    # Simulator ground truth (SIM_STATE physics truth, independent of the
+    # simulated GPS) for the camera and the evaluator.
+    image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
+    container_name: airplane_sim_ground_truth
+    network_mode: host
+    ipc: host
+    restart: unless-stopped
+    depends_on:
+      - airplane_mavros
+    env_file:
+      - ../systems/airplane/config/sitl.env
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    volumes:
+      - ../applications/ardupilot_sitl/scripts:/workspace/applications/ardupilot_sitl/scripts:ro
+      - /dev/shm:/dev/shm
+    command: >
+      python3 /workspace/applications/ardupilot_sitl/scripts/sitl_ground_truth.py
+        --ros-args
+        -p namespace:=${AIRPLANE_NAMESPACE:-plane0}
+        -p origin_lat:=${INITIAL_LAT:-37.9234}
+        -p origin_lon:=${INITIAL_LON:--122.5967}
+        -p origin_alt:=${ORIGIN_ALT:-280.0}
+
+  airplane_navigation_bridge:
+    # EKF origin -> /navigation/origin, the anchor of all local navigation
+    # outputs. (GPS_INPUT corrections are copter-only and stay off here.)
+    image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
+    container_name: airplane_sim_navigation_bridge
+    network_mode: host
+    ipc: host
+    restart: unless-stopped
+    depends_on:
+      - airplane_mavros
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    volumes:
+      - ../applications/aerostack2/scripts:/workspace/applications/aerostack2/scripts:ro
+      - /dev/shm:/dev/shm
+    command: >
+      python3 /workspace/applications/aerostack2/scripts/ardupilot_navigation_bridge.py
+        --ros-args -p mavros_namespace:=/mavros
+        -p correction_topic:=/airplane/navigation/correction_fix
+        -p autopilot_corrections_topic:=/airplane/navigation/autopilot_corrections_active
+
   airplane_satellite_camera:
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
     container_name: airplane_satellite_camera
@@ -68,7 +133,7 @@ services:
     ipc: host
     restart: unless-stopped
     depends_on:
-      - airplane_bridge
+      - airplane_ground_truth
     env_file:
       - ../systems/airplane/config/sitl.env
     environment:
@@ -76,12 +141,14 @@ services:
     volumes:
       - ../systems/airplane:/workspace/systems/airplane:ro
       - /dev/shm:/dev/shm
+    # Renders at the TRUE pose (altitude AMSL), so it keeps seeing the
+    # ground when the simulated GPS degrades or is disabled.
     command: >
       python3 /workspace/systems/airplane/scripts/satellite_camera_sim.py
         --ros-args
         --params-file /workspace/systems/airplane/config/satellite_camera_sim.yaml
-        -p gps_topic:=/${AIRPLANE_NAMESPACE:-plane0}/sensor_measurements/gps
-        -p odom_topic:=/${AIRPLANE_NAMESPACE:-plane0}/sensor_measurements/odom
+        -p gps_topic:=/${AIRPLANE_NAMESPACE:-plane0}/ground_truth/fix
+        -p odom_topic:=/${AIRPLANE_NAMESPACE:-plane0}/ground_truth/odom
         -p origin_lat:=${INITIAL_LAT:-37.9234}
         -p origin_lon:=${INITIAL_LON:--122.5967}
         -p altitude_agl_m:=${AIRPLANE_SIM_ALTITUDE_AGL_M:-180.0}
@@ -111,13 +178,21 @@ services:
         camera_info_topic:=/airplane/downward/camera_info
         initial_lat:=${INITIAL_LAT:-37.9234}
         initial_lon:=${INITIAL_LON:--122.5967}
-        origin_alt:=${ORIGIN_ALT:-280.0}
         area_km:=${AREA_KM:-12.0}
         search_radius_m:=${SEARCH_RADIUS_M:-1200.0}
         fov_deg:=${FOV_DEG:-69.0}
         dem_resolution_m:=${DEMNAV_RESOLUTION_M:-10.0}
         min_correlation:=${MIN_CORRELATION:-0.35}
         synthetic_terrain:=${DEMNAV_SYNTHETIC_TERRAIN:-true}
+        origin_topic:=/navigation/origin
+        prior_fix_topic:=/airplane/navigation/fix
+        prior_timeout_s:=2.0
+        search_radius_sigma_scale:=3.0
+        max_search_radius_m:=${MAX_SEARCH_RADIUS_M:-3600.0}
+        camera_mount_yaw_deg:=0.0
+        gps_altitude_datum:=ellipsoid
+        geoid_file:=/usr/share/GeographicLib/geoids/egm96-5.pgm
+        "rangefinder_topic:=''"
 
   airplane_wildnav:
     image: salsicha/cyberphysics:wildnav-${CYBERPHYSICS_TAG:-latest}
@@ -143,13 +218,16 @@ services:
         prediction_odom_topic:=/airplane/navigation/odometry
         raw_odom_topic:=/${AIRPLANE_NAMESPACE:-plane0}/sensor_measurements/odom
         gps_topic:=/${AIRPLANE_NAMESPACE:-plane0}/sensor_measurements/gps
-        demnav_odom_topic:=/demnav/odometry
         navigation_output_topic:=/airplane/navigation/odometry
         initial_lat:=${INITIAL_LAT:-37.9234}
         initial_lon:=${INITIAL_LON:--122.5967}
-        origin_alt:=${ORIGIN_ALT:-280.0}
+        origin_topic:=/navigation/origin
+        prior_fix_topic:=/airplane/navigation/fix
+        prior_timeout_s:=2.0
         zoom:=${WILDNAV_ZOOM:-17}
         search_radius_m:=${WILDNAV_SEARCH_RADIUS_M:-250.0}
+        search_radius_sigma_scale:=3.0
+        max_search_radius_m:=${WILDNAV_MAX_SEARCH_RADIUS_M:-750.0}
         max_tiles:=${WILDNAV_MAX_TILES:-25}
         max_tile_downloads_per_cycle:=${WILDNAV_MAX_DOWNLOADS:-8}
         match_rate_hz:=${WILDNAV_RATE_HZ:-0.2}
@@ -178,12 +256,10 @@ services:
     command: >
       ros2 run wildnav_pkg nav_evaluator
         --ros-args
-        -p truth_gps_topic:=/${AIRPLANE_NAMESPACE:-plane0}/sensor_measurements/gps
+        -p truth_gps_topic:=/${AIRPLANE_NAMESPACE:-plane0}/ground_truth/fix
         -p wildnav_fix_topic:=/wildnav/fix
         -p demnav_fix_topic:=/demnav/fix
-        -p fused_odom_topic:=/airplane/navigation/odometry
-        -p initial_lat:=${INITIAL_LAT:-37.9234}
-        -p initial_lon:=${INITIAL_LON:--122.5967}
+        -p fused_fix_topic:=/airplane/navigation/fix
         -p report_period_s:=${NAV_EVAL_REPORT_PERIOD_S:-30.0}
         -p assert_after_s:=${NAV_EVAL_ASSERT_AFTER_S:-0.0}
         -p max_rmse_m:=${NAV_EVAL_MAX_RMSE_M:-25.0}

@@ -1,0 +1,7 @@
+# SITL-ONLY relaxations layered after ardurover.params by
+# applications/ardupilot_sitl/scripts/run_vehicle_sitl.sh (boat_sim.yaml).
+# NEVER load this file on the boat: SITL has no RC transmitter or ground
+# station and arms from a script.
+ARMING_CHECK,0
+FS_THR_ENABLE,0
+FS_GCS_ENABLE,0

@@ -1,2 +1,6 @@
-ARMING_CHECK,0
-FS_GCS_ENABLE,0
+# BlueROV2 Navigator/ArduSub HARDWARE baseline: load this file on the ROV.
+# Pre-arm checks stay enabled; on loss of the GCS heartbeat the ROV disarms
+# (ArduSub default). compositions/submarine_sim.yaml layers
+# ardusub_sitl.params on top in SITL.
+ARMING_CHECK,1
+FS_GCS_ENABLE,2

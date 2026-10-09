@@ -1,0 +1,175 @@
+# Aerodrone GPS-denied SITL test stack (run it with tools/gps_denied_sitl_test.sh).
+#
+# The lightest stack that exercises ArduCopter + MAVROS + DemNav + WildNav +
+# navigation fusion + the ArduPilot navigation bridge end to end: ArduCopter
+# SITL with its built-in multicopter physics, simulator ground truth from
+# SIM_STATE, and a synthetic georeferenced nadir camera rendered at the TRUE
+# pose over the shared synthetic world (synthetic_world), which DemNav and
+# WildNav match against their synthetic DEM and satellite tiles. No Gazebo,
+# GPU or network access is needed.
+#
+# The working tree's Python sources are mounted over the images' installed
+# packages so the test exercises the repository, not a stale image.
+#
+# Environment (set by the test script): ROS_DOMAIN_ID, SITL_INSTANCE,
+# SITL_PORT (5760 + 10 * SITL_INSTANCE), ORIGIN_ALT (synthetic terrain
+# height at home), GPS_INPUT_CORRECTIONS, GPS_DENIED_OUTPUT and the mission
+# timing variables read by tools/gps_denied_sitl_mission.py.
+
+x-ros: &ros
+  network_mode: host
+  ipc: host
+  environment: &ros-env
+    ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
+    PYTHONPATH: /opt/synthetic_world:/opt/mavros_mirror
+    WILDNAV_TILE_URL: synthetic://aerodrone
+
+x-sources: &sources
+  - /dev/shm:/dev/shm
+  - ../applications/aerostack2/synthetic_world/synthetic_world:/opt/synthetic_world/synthetic_world:ro
+  - ../applications/aerostack2/mavros_mirror/mavros_mirror:/opt/mavros_mirror/mavros_mirror:ro
+  - ../applications/aerostack2/scripts:/workspace/applications/aerostack2/scripts:ro
+  - ../applications/ardupilot_sitl/scripts:/workspace/applications/ardupilot_sitl/scripts:ro
+  - ../systems/airplane/scripts:/workspace/systems/airplane/scripts:ro
+  - ../tools:/workspace/tools:ro
+  - ${GPS_DENIED_OUTPUT:-../generated/gps_denied_sitl}:/out
+
+services:
+  sitl:
+    image: salsicha/cyberphysics:navigator-${CYBERPHYSICS_TAG:-latest}
+    network_mode: host
+    environment:
+      ARDUCOPTER_SITL_MODEL: builtin
+      SITL_INSTANCE: ${SITL_INSTANCE:-0}
+      INITIAL_LAT: ${INITIAL_LAT:-37.9234}
+      INITIAL_LON: ${INITIAL_LON:--122.5967}
+      ORIGIN_ALT: ${ORIGIN_ALT:-102.0}
+      GPS_INPUT_CORRECTIONS: ${GPS_INPUT_CORRECTIONS:-true}
+      TERRAIN_MANIFEST: /nonexistent
+    volumes:
+      - ../applications/ardupilot_sitl/scripts:/workspace/applications/ardupilot_sitl/scripts:ro
+      - ../systems/aerodrone:/workspace/systems/aerodrone:ro
+    command: /workspace/applications/ardupilot_sitl/scripts/run_arducopter_sitl.sh
+
+  mavros:
+    <<: *ros
+    image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
+    depends_on: [sitl]
+    command: ros2 launch mavros apm.launch fcu_url:=tcp://127.0.0.1:${SITL_PORT:-5760}
+
+  mirror:
+    <<: *ros
+    image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
+    depends_on: [mavros]
+    working_dir: /
+    volumes: *sources
+    command: >
+      python3 -c "from mavros_mirror import main; main()"
+        --ros-args -p namespace:=aerodrone -p mavros_namespace:=/mavros
+
+  ground_truth:
+    <<: *ros
+    image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
+    depends_on: [mavros]
+    volumes: *sources
+    command: >
+      python3 /workspace/applications/ardupilot_sitl/scripts/sitl_ground_truth.py
+        --ros-args -p namespace:=aerodrone
+        -p origin_lat:=${INITIAL_LAT:-37.9234} -p origin_lon:=${INITIAL_LON:--122.5967}
+        -p origin_alt:=${ORIGIN_ALT:-102.0}
+
+  camera:
+    <<: *ros
+    image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
+    depends_on: [ground_truth]
+    volumes: *sources
+    command: >
+      python3 /workspace/systems/airplane/scripts/satellite_camera_sim.py
+        --ros-args
+        -p rate_hz:=${GPS_DENIED_CAMERA_HZ:-2.0}
+        -p image_topic:=/aerodrone/downward/image_highres
+        -p camera_info_topic:=/aerodrone/downward/image_highres/camera_info
+        -p preview_image_topic:=/aerodrone/downward/image_raw
+        -p preview_camera_info_topic:=/aerodrone/downward/camera_info
+        -p depth_topic:=/aerodrone/downward/relative_depth
+        -p depth_camera_info_topic:=/aerodrone/downward/camera_info
+        -p gps_topic:=/aerodrone/ground_truth/fix
+        -p odom_topic:=/aerodrone/ground_truth/odom
+        -p frame_id:=aerodrone/downward_optical_frame
+        -p origin_lat:=${INITIAL_LAT:-37.9234} -p origin_lon:=${INITIAL_LON:--122.5967}
+        -p camera_mount_yaw_deg:=0.0
+
+  navigation_bridge:
+    <<: *ros
+    image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
+    depends_on: [mavros]
+    volumes: *sources
+    command: >
+      python3 /workspace/applications/aerostack2/scripts/ardupilot_navigation_bridge.py
+        --ros-args -p mavros_namespace:=/mavros
+        -p gps_input_enabled:=${GPS_INPUT_CORRECTIONS:-true}
+
+  demnav:
+    <<: *ros
+    image: salsicha/cyberphysics:demnav-${CYBERPHYSICS_TAG:-latest}
+    depends_on: [mirror, camera]
+    volumes:
+      - /dev/shm:/dev/shm
+      - ../applications/aerostack2/synthetic_world/synthetic_world:/opt/synthetic_world/synthetic_world:ro
+      - ../applications/demnav/src/demnav_pkg/demnav_pkg:/workspace/install/lib/python3.10/site-packages/demnav_pkg:ro
+      - ../applications/demnav/src/demnav_pkg/launch/demnav.launch.py:/workspace/install/share/demnav_pkg/launch/demnav.launch.py:ro
+    command: >
+      ros2 launch demnav_pkg demnav.launch.py
+        gps_topic:=/aerodrone/sensor_measurements/gps
+        odom_topic:=/aerodrone/sensor_measurements/odom
+        depth_topic:=/aerodrone/downward/relative_depth
+        camera_info_topic:=/aerodrone/downward/camera_info
+        initial_lat:=${INITIAL_LAT:-37.9234} initial_lon:=${INITIAL_LON:--122.5967}
+        area_km:=4.0 dem_resolution_m:=10.0 synthetic_terrain:=true
+        search_radius_m:=300.0 search_radius_sigma_scale:=3.0 max_search_radius_m:=900.0
+        fov_deg:=69.0 min_correlation:=0.35
+        origin_topic:=/navigation/origin prior_fix_topic:=/navigation/fix prior_timeout_s:=2.0
+        camera_mount_yaw_deg:=0.0 gps_altitude_datum:=ellipsoid
+        geoid_file:=/usr/share/GeographicLib/geoids/egm96-5.pgm
+        "rangefinder_topic:=''" cache_dir:=/tmp/demnav_cache
+
+  wildnav:
+    <<: *ros
+    image: salsicha/cyberphysics:wildnav-${CYBERPHYSICS_TAG:-latest}
+    depends_on: [mirror, camera, demnav]
+    volumes:
+      - /dev/shm:/dev/shm
+      - ../applications/aerostack2/synthetic_world/synthetic_world:/opt/synthetic_world/synthetic_world:ro
+      - ../applications/wildnav/src/wildnav_pkg/wildnav_pkg:/workspace/install/lib/python3.10/site-packages/wildnav_pkg:ro
+      - ../applications/wildnav/src/wildnav_pkg/launch/wildnav.launch.py:/workspace/install/share/wildnav_pkg/launch/wildnav.launch.py:ro
+    command: >
+      ros2 launch wildnav_pkg wildnav.launch.py
+        image_topic:=/aerodrone/downward/image_highres
+        camera_info_topic:=/aerodrone/downward/image_highres/camera_info
+        prediction_odom_topic:=/aerodrone/sensor_measurements/odom
+        raw_odom_topic:=/aerodrone/sensor_measurements/odom
+        gps_topic:=/aerodrone/sensor_measurements/gps
+        navigation_output_topic:=/navigation/odometry
+        initial_lat:=${INITIAL_LAT:-37.9234} initial_lon:=${INITIAL_LON:--122.5967}
+        origin_topic:=/navigation/origin prior_fix_topic:=/navigation/fix prior_timeout_s:=2.0
+        zoom:=17 search_radius_m:=250.0 search_radius_sigma_scale:=3.0 max_search_radius_m:=750.0
+        max_tiles:=49 max_tile_downloads_per_cycle:=8 match_rate_hz:=${GPS_DENIED_WILDNAV_HZ:-0.5}
+        feature_backend:=SIFT min_matches:=16 min_inliers:=10 min_inlier_ratio:=0.25
+        cache_dir:=/tmp/wildnav_cache
+
+  mission:
+    <<: *ros
+    image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
+    depends_on: [navigation_bridge, demnav, wildnav]
+    volumes: *sources
+    environment:
+      <<: *ros-env
+      GPS_INPUT_CORRECTIONS: ${GPS_INPUT_CORRECTIONS:-true}
+      GPS_DENIED_TAKEOFF_ALT_M: ${GPS_DENIED_TAKEOFF_ALT_M:-150.0}
+      GPS_DENIED_LEG_M: ${GPS_DENIED_LEG_M:-300.0}
+      GPS_DENIED_DENY_AFTER_S: ${GPS_DENIED_DENY_AFTER_S:-60.0}
+      GPS_DENIED_DENIED_S: ${GPS_DENIED_DENIED_S:-300.0}
+      GPS_DENIED_RESTORE_S: ${GPS_DENIED_RESTORE_S:-30.0}
+    command: >
+      python3 /workspace/tools/gps_denied_sitl_mission.py --output /out/telemetry.json
+    restart: "no"

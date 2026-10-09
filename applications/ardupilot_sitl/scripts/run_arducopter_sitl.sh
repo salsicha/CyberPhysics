@@ -2,11 +2,24 @@
 set -euo pipefail
 
 sim_host="${SIM_JSON_HOST:-127.0.0.1}"
+# JSON:<host> drives an external physics backend (Gazebo, Genesis, Isaac);
+# "builtin" uses ArduPilot's own multicopter model (tools/gps_denied_sitl).
+sitl_model="${ARDUCOPTER_SITL_MODEL:-JSON:${sim_host}}"
+# Instance N serves MAVLink on TCP 5760 + 10 * N.
+sitl_instance="${SITL_INSTANCE:-0}"
 initial_lat="${INITIAL_LAT:-37.9234}"
 initial_lon="${INITIAL_LON:--122.5967}"
 origin_alt="${ORIGIN_ALT:-781.0}"
 terrain_manifest="${TERRAIN_MANIFEST:-/data/navsim_assets/manifest.json}"
-base_params="${ARDUCOPTER_BASE_PARAM_FILE:-/workspace/systems/aerodrone/config/arducopter.params}"
+config_dir=/workspace/systems/aerodrone/config
+# Layering order: hardware baseline -> SITL-only relaxations -> optional
+# GPS-denied corrections -> simulator backend compensation.
+base_params="${ARDUCOPTER_BASE_PARAM_FILE:-${config_dir}/arducopter.params}"
+sitl_params="${ARDUCOPTER_SITL_PARAM_FILE:-${config_dir}/arducopter_sitl.params}"
+gps_input_params=""
+if [[ "${GPS_INPUT_CORRECTIONS:-false}" == "true" ]]; then
+  gps_input_params="${ARDUCOPTER_GPS_INPUT_PARAM_FILE:-${config_dir}/arducopter_gps_input.params}"
+fi
 backend_params="${ARDUCOPTER_PARAM_FILE:-}"
 
 if [[ -r "$terrain_manifest" ]]; then
@@ -17,15 +30,21 @@ fi
 args=(
   -v ArduCopter
   -f quad
-  --model "JSON:${sim_host}"
   --no-rebuild
   --no-mavproxy
+  -I "${sitl_instance}"
   --custom-location="${initial_lat},${initial_lon},${origin_alt},0"
-  --add-param-file="${base_params}"
 )
-if [[ -n "$backend_params" && "$backend_params" != "$base_params" ]]; then
-  args+=(--add-param-file="${backend_params}")
+if [[ "$sitl_model" != "builtin" ]]; then
+  args+=(--model "$sitl_model")
 fi
+for params in "$base_params" "$sitl_params" "$gps_input_params" "$backend_params"; do
+  [[ -n "$params" ]] || continue
+  for added in "${args[@]}"; do
+    [[ "$added" == "--add-param-file=${params}" ]] && continue 2
+  done
+  args+=(--add-param-file="${params}")
+done
 
 cd /ardupilot
 exec python3 Tools/autotest/sim_vehicle.py "${args[@]}"

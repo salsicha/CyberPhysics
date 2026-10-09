@@ -6,3 +6,5 @@
     cmd_vel_topic: /boat0/cmd_vel
     mavros_velocity_topic: /mavros/setpoint_velocity/cmd_vel
     velocity_frame_id: map
+    # cmd_vel is body-frame (linear.x forward, angular.z yaw rate).
+    cmd_vel_frame: body_flu

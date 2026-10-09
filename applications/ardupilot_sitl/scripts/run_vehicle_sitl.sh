@@ -14,10 +14,12 @@ args=(
   --no-mavproxy
   --custom-location="${initial_lat},${initial_lon},${origin_alt},0"
 )
-if [[ -n "${ARDUPILOT_PARAM_FILE:-}" ]]; then
-  args+=(--add-param-file="${ARDUPILOT_PARAM_FILE}")
-fi
+# Hardware baseline first, then SITL-only relaxations.
+for params in "${ARDUPILOT_PARAM_FILE:-}" "${ARDUPILOT_SITL_PARAM_FILE:-}"; do
+  if [[ -n "$params" ]]; then
+    args+=(--add-param-file="${params}")
+  fi
+done
 
 cd /ardupilot
 exec python3 Tools/autotest/sim_vehicle.py "${args[@]}"
-

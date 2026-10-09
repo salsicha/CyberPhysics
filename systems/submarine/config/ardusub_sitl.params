@@ -1,0 +1,6 @@
+# SITL-ONLY relaxations layered after ardusub.params by
+# applications/ardupilot_sitl/scripts/run_vehicle_sitl.sh (submarine_sim.yaml).
+# NEVER load this file on the ROV: SITL has no ground station and arms from a
+# script.
+ARMING_CHECK,0
+FS_GCS_ENABLE,0

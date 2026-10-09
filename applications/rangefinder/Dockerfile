@@ -1,4 +1,4 @@
-ARG TAG=amd64
+ARG TAG=latest
 
 FROM salsicha/cyberphysics:ros2-${TAG} AS build
 
@@ -27,6 +27,8 @@ RUN . /venv/bin/activate && . /opt/ros/$ROS2_DISTRO/setup.bash && \
     apt update && \
     rosdep update && rosdep install --from-paths src --ignore-src -y && \
     colcon build --merge-install --install-base /opt/ros/$ROS2_DISTRO
+
+COPY scripts/ /scripts/
 
 COPY ./entrypoint.sh /
 RUN chmod +x /entrypoint.sh

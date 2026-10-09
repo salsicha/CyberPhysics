@@ -53,7 +53,10 @@ class GazeboArduPilotBackend(Node):
         )
         self.create_subscription(
             Imu,
-            os.environ.get("GAZEBO_IMU_TOPIC", "/aerodrone/sensor_measurements/imu"),
+            # Simulator-only Gazebo IMU (drone_bridges_isolated.py). Never the
+            # platform's sensor_measurements/imu: that is ArduPilot's own IMU
+            # output from MAVROS.
+            os.environ.get("GAZEBO_IMU_TOPIC", "/aerodrone/ground_truth/imu"),
             lambda msg: setattr(self, "imu", msg),
             qos_profile_sensor_data,
         )

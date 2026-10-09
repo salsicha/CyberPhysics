@@ -1,4 +1,13 @@
-"""AS2 Gazebo bridges with simulator truth isolated from autonomy TF."""
+"""AS2 Gazebo bridges with simulator truth isolated from autonomy TF.
+
+Simulator-only outputs stay out of the vehicle's hardware-equivalent topics:
+Gazebo TF goes to /simulation/tf, and the Gazebo IMU (the physics input that
+gazebo_ardupilot_backend.py feeds to ArduPilot SITL) goes to
+<namespace>/ground_truth/imu. <namespace>/sensor_measurements/imu belongs to
+the platform node, which republishes ArduPilot's IMU from MAVROS exactly as
+on hardware; sharing that topic would feed ArduPilot's own output back into
+SITL as its sensor input.
+"""
 
 from __future__ import annotations
 
@@ -11,6 +20,10 @@ from launch.actions import DeclareLaunchArgument, LogInfo, OpaqueFunction, Shutd
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 import yaml
+
+# Relative to the drone namespace.
+SIMULATED_IMU_TOPIC = "sensor_measurements/imu"
+GROUND_TRUTH_IMU_TOPIC = "ground_truth/imu"
 
 
 def drone_bridges(context):
@@ -34,6 +47,8 @@ def drone_bridges(context):
             source, destination = bridge.remapping()
             if destination == "/tf":
                 destination = "/simulation/tf"
+            elif destination == SIMULATED_IMU_TOPIC:
+                destination = GROUND_TRUTH_IMU_TOPIC
             remappings.append((source, destination))
 
         nodes = [Node(

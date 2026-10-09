@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
-"""Compare navigation estimates against a truth GPS stream.
+"""Compare navigation estimates against simulator ground truth.
 
-In SITL the simulated GPS is ground truth (plus small modelled noise), so
-subscribing to it alongside the WildNav/DemNav fixes and the fused odometry
-turns a simulation run into a measurable accuracy report instead of a pile
-of logs. The node keeps running horizontal-error statistics per source,
-logs a summary line periodically, and publishes the same summary as JSON on
-``summary_topic`` for dashboards and smoke tests.
+``truth_gps_topic`` must be the simulator's *ground truth* (e.g.
+``/plane0/ground_truth/fix`` from
+applications/ardupilot_sitl/scripts/sitl_ground_truth.py), not the
+simulated GPS: the GPS is what the navigation stack itself uses (and what a
+GPS-denial test switches off), so scoring against it is circular. The node
+compares the WildNav/DemNav fixes and the fused navigation fix
+(``fused_fix_topic``, latitude/longitude, so no local frame or origin has to
+be shared with the evaluator) with the truth sample nearest in time, keeps
+running horizontal-error statistics per source, logs a summary line
+periodically, and publishes the same summary as JSON on ``summary_topic``
+for dashboards and smoke tests.
 
 With ``assert_after_s`` set, the node evaluates pass/fail criteria after
 that long and exits with a nonzero code on failure, which is what
@@ -18,12 +23,11 @@ import sys
 from collections import deque
 
 import rclpy
-from nav_msgs.msg import Odometry
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import NavSatFix, NavSatStatus
 from std_msgs.msg import String
-from synthetic_world import latlon_to_local, local_to_latlon
+from synthetic_world import latlon_to_local
 
 
 def _stamp_ns(stamp):
@@ -59,13 +63,10 @@ class SourceStats:
 class NavEvaluator(Node):
     def __init__(self):
         super().__init__('nav_evaluator')
-        self.declare_parameter('truth_gps_topic',
-                               '/plane0/sensor_measurements/gps')
+        self.declare_parameter('truth_gps_topic', '/plane0/ground_truth/fix')
         self.declare_parameter('wildnav_fix_topic', '/wildnav/fix')
         self.declare_parameter('demnav_fix_topic', '/demnav/fix')
-        self.declare_parameter('fused_odom_topic', '/navigation/odometry')
-        self.declare_parameter('initial_lat', 0.0)
-        self.declare_parameter('initial_lon', 0.0)
+        self.declare_parameter('fused_fix_topic', '/navigation/fix')
         self.declare_parameter('summary_topic', '/nav_eval/summary')
         self.declare_parameter('report_period_s', 30.0)
         self.declare_parameter('match_tolerance_s', 0.5)
@@ -77,8 +78,6 @@ class NavEvaluator(Node):
         self.declare_parameter('max_rmse_m', 25.0)
         self.declare_parameter('min_fixes', 3)
 
-        self.origin_lat = float(self.get_parameter('initial_lat').value)
-        self.origin_lon = float(self.get_parameter('initial_lon').value)
         self.tolerance_ns = int(
             float(self.get_parameter('match_tolerance_s').value) * 1e9)
         self.truth = deque(maxlen=1200)
@@ -101,7 +100,7 @@ class NavEvaluator(Node):
             NavSatFix, str(self.get_parameter('demnav_fix_topic').value),
             lambda m: self._on_fix('demnav', m), qos_profile_sensor_data)
         self.create_subscription(
-            Odometry, str(self.get_parameter('fused_odom_topic').value),
+            NavSatFix, str(self.get_parameter('fused_fix_topic').value),
             self._on_fused, qos_profile_sensor_data)
         self.summary_pub = self.create_publisher(
             String, str(self.get_parameter('summary_topic').value), 10)
@@ -122,7 +121,7 @@ class NavEvaluator(Node):
         self.truth.append((t, float(msg.latitude), float(msg.longitude)))
 
     def _error_vs_truth(self, t_ns, lat, lon):
-        if not self.truth:
+        if not self.truth or not (math.isfinite(lat) and math.isfinite(lon)):
             return None
         nearest = min(self.truth, key=lambda s: abs(s[0] - t_ns))
         if abs(nearest[0] - t_ns) > self.tolerance_ns:
@@ -137,19 +136,15 @@ class NavEvaluator(Node):
         if error is not None:
             self.stats[source].add(error)
 
-    def _on_fused(self, msg: Odometry):
+    def _on_fused(self, msg: NavSatFix):
         t = _stamp_ns(msg.header.stamp)
         sample_ns = int(
             float(self.get_parameter('fused_sample_period_s').value) * 1e9)
         if t - self.last_fused_ns < sample_ns:
             return
-        if self.origin_lat == 0.0 and self.origin_lon == 0.0:
-            return
         self.last_fused_ns = t
-        lat, lon = local_to_latlon(
-            float(msg.pose.pose.position.x), float(msg.pose.pose.position.y),
-            self.origin_lat, self.origin_lon)
-        error = self._error_vs_truth(t, lat, lon)
+        error = self._error_vs_truth(
+            t, float(msg.latitude), float(msg.longitude))
         if error is not None:
             self.stats['fused'].add(error)
 

@@ -33,6 +33,19 @@ The autonomy launch consumes `/navigation/odometry`. The WildNav navigation
 fusion node publishes that topic at the MAVROS odometry rate while applying
 accepted DemNav and WildNav horizontal corrections.
 
+`scripts/ardupilot_navigation_bridge.py` runs beside MAVROS in every
+ArduPilot stack. It relays the ArduPilot EKF origin (MAVROS
+`global_position/gp_origin`, WGS-84 ellipsoid altitude) to
+`/navigation/origin` (reliable, transient-local), the single anchor of every
+local navigation output: DemNav, WildNav and the fusion node express local
+positions about it, and the fusion node converts DemNav/WildNav lat/lon fixes
+into that frame with `synthetic_world`'s projection. With
+`GPS_INPUT_CORRECTIONS=true` (experimental, ArduCopter only, needs
+`systems/aerodrone/config/arducopter_gps_input.params`) it also feeds accepted
+corrections to ArduPilot as GPS 2 and switches the EKF to its GPS-denied
+source set when the primary GPS loses its fix; see
+`tools/gps_denied_sitl_test.md`.
+
 ArduPilot remains responsible for stabilization, motor mixing, EKF operation,
 RC override, and vehicle failsafes.
 

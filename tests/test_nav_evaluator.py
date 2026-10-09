@@ -54,3 +54,23 @@ def test_error_vs_truth_rejects_stale_timestamps():
 
 def test_error_vs_truth_without_truth():
     assert make_evaluator()._error_vs_truth(0, *ORIGIN) is None
+
+
+def test_error_vs_truth_ignores_non_finite_estimates():
+    evaluator = make_evaluator()
+    evaluator.truth.append((1_000_000_000, ORIGIN[0], ORIGIN[1]))
+    assert evaluator._error_vs_truth(1_000_000_000, float('nan'), ORIGIN[1]) is None
+
+
+def test_fused_estimate_is_scored_from_its_fix_not_a_local_frame():
+    """The fused fix carries latitude/longitude, so scoring needs no origin
+    (fused odometry is about the EKF origin, not INITIAL_LAT/LON)."""
+    from types import SimpleNamespace as NS
+    evaluator = make_evaluator()
+    evaluator.stats = {'fused': SourceStats()}
+    evaluator.last_fused_ns = 0
+    evaluator.get_parameter = lambda name: NS(value=1.0)
+    evaluator.truth.append((5_000_000_000, ORIGIN[0], ORIGIN[1]))
+    lat, lon = sw.local_to_latlon(30.0, 40.0, *ORIGIN)
+    evaluator._on_fused(NS(header=NS(stamp=NS(sec=5, nanosec=0)), latitude=lat, longitude=lon))
+    assert evaluator.stats['fused'].summary()['max_m'] == pytest.approx(50.0, abs=0.01)

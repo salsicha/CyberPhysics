@@ -1,4 +1,4 @@
-ARG TAG=amd64
+ARG TAG=latest
 
 FROM ros:humble-ros-base AS build
 

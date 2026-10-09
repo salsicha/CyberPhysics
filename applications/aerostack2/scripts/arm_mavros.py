@@ -39,16 +39,30 @@ class ArmSession(Node):
     def activate(self, timeout):
         if not self.wait(timeout):
             raise RuntimeError("MAVROS did not connect before timeout")
-        mode_request = SetMode.Request()
-        mode_request.custom_mode = self.mode
-        response = self.call(self.mode_client, mode_request)
-        if response is None or not response.mode_sent:
-            raise RuntimeError(f"ArduPilot rejected mode {self.mode}")
-        arm_request = CommandBool.Request()
-        arm_request.value = True
-        response = self.call(self.arm_client, arm_request)
-        if response is None or not response.success:
-            raise RuntimeError("ArduPilot rejected arming")
+        # ArduPilot refuses GUIDED and arming until its EKF has a position
+        # (GPS lock, origin): keep asking until it accepts or time runs out.
+        deadline = time.monotonic() + timeout
+        while True:
+            mode_request = SetMode.Request()
+            mode_request.custom_mode = self.mode
+            response = self.call(self.mode_client, mode_request)
+            mode_ok = response is not None and response.mode_sent
+            arm_ok = False
+            if mode_ok:
+                arm_request = CommandBool.Request()
+                arm_request.value = True
+                response = self.call(self.arm_client, arm_request)
+                arm_ok = response is not None and response.success
+            if arm_ok:
+                break
+            if time.monotonic() >= deadline:
+                raise RuntimeError(
+                    f"ArduPilot rejected mode {self.mode}" if not mode_ok
+                    else "ArduPilot rejected arming")
+            self.get_logger().info("ArduPilot not ready for GUIDED/arming; retrying")
+            end = time.monotonic() + 3.0
+            while time.monotonic() < end:
+                rclpy.spin_once(self, timeout_sec=0.2)
         deadline = time.monotonic() + timeout
         while rclpy.ok() and time.monotonic() < deadline:
             rclpy.spin_once(self, timeout_sec=0.2)

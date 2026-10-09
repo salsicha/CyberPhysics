@@ -1,4 +1,8 @@
-ARMING_CHECK,0
-FS_THR_ENABLE,0
-FS_GCS_ENABLE,0
+# BlueBoat Navigator/ArduRover HARDWARE baseline: load this file on the boat.
+# Pre-arm checks and the RC (throttle) and GCS failsafes stay enabled.
+# compositions/boat_sim.yaml layers ardurover_sitl.params on top in SITL.
+ARMING_CHECK,1
+# 1 = enabled: FS_ACTION (default RTL) on loss of RC throttle / GCS heartbeat.
+FS_THR_ENABLE,1
+FS_GCS_ENABLE,1
 WP_SPEED,1.2

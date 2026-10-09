@@ -1,0 +1,26 @@
+# OPTIONAL, experimental GPS-denied corrections: accepted DemNav/WildNav fixes
+# reach ArduPilot as a second GPS (MAVLink GPS_INPUT via MAVROS) from
+# applications/aerostack2/scripts/ardupilot_navigation_bridge.py
+# (gps_input_enabled:=true). Load after arducopter.params only together with
+# that bridge setting; SITL layers it when GPS_INPUT_CORRECTIONS=true.
+# Measured behaviour and limits: tools/gps_denied_sitl_test.md.
+#
+# GPS 2 (type 14 = MAV) stays disabled here: a configured GPS 2 without a fix
+# fails the "GPS 2: Bad fix" pre-arm check, and visual fixes only exist in
+# flight. The bridge sets GPS2_TYPE=14 while GPS 1 is lost in flight and back
+# to 0 when disarmed.
+GPS2_TYPE,0
+# GPS 1 stays primary whenever it has a 3D fix.
+GPS_AUTO_SWITCH,4
+GPS_PRIMARY,0
+# Source set 2, selected by the bridge while GPS 1 has no 3D fix: GPS
+# position only (GPS_INPUT carries no velocity), barometer height, compass yaw.
+EK3_SRC2_POSXY,3
+EK3_SRC2_VELXY,0
+EK3_SRC2_POSZ,1
+EK3_SRC2_VELZ,0
+EK3_SRC2_YAW,1
+# Fuse only the active set's velocity sources. The default (1, fuse all)
+# keeps fusing set 1's GPS velocity, i.e. GPS_INPUT's absent velocity as
+# zero, which trips the EKF velocity check and lands the vehicle.
+EK3_SRC_OPTIONS,0

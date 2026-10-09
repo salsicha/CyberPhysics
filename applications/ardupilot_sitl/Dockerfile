@@ -1,4 +1,4 @@
-ARG TAG=amd64
+ARG TAG=latest
 ARG ARDUPILOT_BASE_TAG=v0.2.0
 
 FROM ardupilot/ardupilot-dev-base:${ARDUPILOT_BASE_TAG} AS build

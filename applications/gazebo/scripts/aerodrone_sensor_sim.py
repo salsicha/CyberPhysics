@@ -501,31 +501,59 @@ class AerodroneSensorSim(Node):
             return None
         east, north, local_z = self._latest_local_position()
         altitude_m = self.origin_alt_m + local_z
-        ground_width_m = 2.0 * altitude_m * math.tan(math.radians(self.fov_deg / 2.0))
-        ground_height_m = ground_width_m * self.synthetic_height / self.synthetic_width
-        cols = max(3, int(ground_width_m / self.dem_resolution_m))
-        rows = max(3, int(ground_height_m / self.dem_resolution_m))
         half_m = self.area_km * 500.0
         row_center = (half_m - north) / self.dem_resolution_m
         col_center = (east + half_m) / self.dem_resolution_m
-        patch = self._crop_grid(self.dem_grid, row_center, col_center, rows, cols)
+        # The footprint follows the height above the terrain under the
+        # vehicle, not the altitude above the datum.
+        nadir = self._crop_grid(self.dem_grid, row_center, col_center, 3, 3)
+        view_height_m = max(1.0, altitude_m - float(np.nanmean(nadir)))
+        ground_width_m = 2.0 * view_height_m * math.tan(
+            math.radians(self.fov_deg / 2.0))
+        metres_per_px = ground_width_m / self.synthetic_width
+        # A north-up square covering the rotated frame's diagonal, so the
+        # body-fixed view never samples outside real terrain.
+        diagonal_m = metres_per_px * math.hypot(
+            self.synthetic_width, self.synthetic_height)
+        cells = max(3, int(math.ceil(diagonal_m / self.dem_resolution_m)) + 4)
+        patch = self._crop_grid(self.dem_grid, row_center, col_center, cells, cells)
+        scale = self.dem_resolution_m / metres_per_px
+        side_px = max(self.synthetic_width, self.synthetic_height,
+                      int(round(cells * scale)))
+        scale = side_px / cells
         terrain = cv2.resize(
-            patch, (self.synthetic_width, self.synthetic_height),
-            interpolation=cv2.INTER_CUBIC)
-        yaw = self._latest_yaw()
-        if abs(yaw) > 1e-3:
-            matrix = cv2.getRotationMatrix2D(
-                (self.synthetic_width * 0.5, self.synthetic_height * 0.5),
-                math.degrees(yaw),
-                1.0)
-            terrain = cv2.warpAffine(
-                terrain, matrix, (self.synthetic_width, self.synthetic_height),
-                flags=cv2.INTER_LINEAR,
-                borderMode=cv2.BORDER_REFLECT)
+            patch, (side_px, side_px), interpolation=cv2.INTER_CUBIC)
+        # Vehicle position in the resized patch (cv2 maps source sample i
+        # to destination coordinate (i + 0.5) * scale - 0.5).
+        r0 = int(round(row_center - cells * 0.5))
+        c0 = int(round(col_center - cells * 0.5))
+        centre = ((col_center - c0 + 0.5) * scale - 0.5,
+                  (row_center - r0 + 0.5) * scale - 0.5)
+        terrain = self._body_fixed_view(terrain, centre)
         depth = (altitude_m - terrain).astype(np.float32)
         depth += self.rng.normal(0.0, 0.35, size=depth.shape).astype(np.float32)
         depth[(~np.isfinite(depth)) | (depth <= 0.2) | (depth > 500.0)] = np.nan
         return depth
+
+    def _body_fixed_view(self, north_up, centre):
+        """Turn a north-up image around the vehicle into the frame of a
+        body-fixed nadir camera (image top toward the nose) of the camera
+        size, with the vehicle (pixel ``centre`` of the input) at the
+        principal point (width/2, height/2).
+
+        The image top points along the ENU heading yaw, and north-up has
+        heading 90 deg up, so the content turns counter-clockwise by
+        90 deg - yaw: the inverse of DemNav's derotation_angle_deg
+        (heading - 90 deg) for a zero camera mount yaw. The input must
+        cover the rotated frame's diagonal.
+        """
+        matrix = cv2.getRotationMatrix2D(
+            centre, 90.0 - math.degrees(self._latest_yaw()), 1.0)
+        matrix[0, 2] += self.synthetic_width * 0.5 - centre[0]
+        matrix[1, 2] += self.synthetic_height * 0.5 - centre[1]
+        return cv2.warpAffine(
+            north_up, matrix, (self.synthetic_width, self.synthetic_height),
+            flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
 
     def _crop_grid(self, grid, row_center, col_center, rows, cols):
         rows = min(max(3, rows), grid.shape[0])
@@ -569,25 +597,21 @@ class AerodroneSensorSim(Node):
             if tile is None:
                 return None
         crop_w, crop_h = 128, 96
-        center_x = int(np.clip(pixel_x, crop_w * 0.5, 256 - crop_w * 0.5))
-        center_y = int(np.clip(pixel_y, crop_h * 0.5, 256 - crop_h * 0.5))
-        x0 = center_x - crop_w // 2
-        y0 = center_y - crop_h // 2
-        crop = tile[y0:y0 + crop_h, x0:x0 + crop_w]
+        # Square crop covering the rotated frame's diagonal (see
+        # _body_fixed_view), kept inside the 256 px tile.
+        side = int(math.ceil(math.hypot(crop_w, crop_h)))
+        center_x = int(np.clip(pixel_x, side * 0.5, 256 - side * 0.5))
+        center_y = int(np.clip(pixel_y, side * 0.5, 256 - side * 0.5))
+        x0 = center_x - side // 2
+        y0 = center_y - side // 2
+        crop = tile[y0:y0 + side, x0:x0 + side]
+        scale = self.synthetic_width / crop_w
+        side_px = int(round(side * scale))
         image = cv2.resize(
-            crop, (self.synthetic_width, self.synthetic_height),
-            interpolation=cv2.INTER_CUBIC)
-        yaw = self._latest_yaw()
-        if abs(yaw) > 1e-3:
-            matrix = cv2.getRotationMatrix2D(
-                (self.synthetic_width * 0.5, self.synthetic_height * 0.5),
-                math.degrees(yaw),
-                1.0)
-            image = cv2.warpAffine(
-                image, matrix, (self.synthetic_width, self.synthetic_height),
-                flags=cv2.INTER_LINEAR,
-                borderMode=cv2.BORDER_REFLECT)
-        return image
+            crop, (side_px, side_px), interpolation=cv2.INTER_CUBIC)
+        centre = ((pixel_x - x0 + 0.5) * scale - 0.5,
+                  (pixel_y - y0 + 0.5) * scale - 0.5)
+        return self._body_fixed_view(image, centre)
 
     def _latlon_to_tile_pixel(self, lat, lon, zoom):
         lat = max(-WEB_MERCATOR_LIMIT, min(WEB_MERCATOR_LIMIT, lat))

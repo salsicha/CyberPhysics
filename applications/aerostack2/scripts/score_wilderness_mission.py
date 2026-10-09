@@ -6,6 +6,11 @@ import json
 import math
 from pathlib import Path
 
+# Absolute correction sources. The fusion node reports 'demnav', 'wildnav'
+# or 'demnav+wildnav'; older telemetry used 'fused' for the combination.
+CORRECTION_SOURCES = {'demnav', 'wildnav', 'fused'}
+VISUAL_SOURCES = {'demnav', 'wildnav'}
+
 
 def _distance_xy(a, b):
     return math.hypot(float(a[0]) - float(b[0]), float(a[1]) - float(b[1]))
@@ -45,6 +50,13 @@ def _waypoints(mission):
     return points
 
 
+def _requires_corrections(mission):
+    """Missions whose phases require DemNav/WildNav corrections."""
+    return any(
+        VISUAL_SOURCES & set(phase.get('required_sources', []))
+        for phase in mission.get('phases', []))
+
+
 def _load_mission(path, mission_id):
     mission_file = json.loads(Path(path).read_text())
     missions = mission_file.get('missions', [])
@@ -60,6 +72,8 @@ def _validate_contract(mission_file, missions):
     geofence = mission_file.get('geofence', {})
     if not geofence.get('keep_in_polygon_enu_m'):
         errors.append('missing keep-in geofence')
+    if 'min_correction_coverage' not in mission_file.get('global_acceptance', {}):
+        errors.append('missing global_acceptance.min_correction_coverage')
     if not missions:
         errors.append('missing missions')
     for mission in missions:
@@ -104,7 +118,6 @@ def _score_mission(mission_file, mission, samples):
     no_fly_intrusions = 0
     min_seen_agl = float('inf')
     max_seen_agl = 0.0
-    correction_samples = 0
     confident_corrections = 0
     min_confidence = float(
         mission_file['global_acceptance']['min_correction_confidence'])
@@ -121,14 +134,16 @@ def _score_mission(mission_file, mission, samples):
         if any(_point_in_polygon(pos, polygon) for polygon in no_fly):
             no_fly_intrusions += 1
         source = str(sample.get('correction_source', sample.get('source', '')))
-        confidence = float(sample.get('correction_confidence', 0.0))
+        try:
+            confidence = float(sample.get('correction_confidence', 0.0))
+        except (TypeError, ValueError):
+            confidence = 0.0
+        components = set(source.split('+'))
         if (
-                source in {'demnav', 'wildnav', 'fused'}
-                or source.startswith('demnav')
-                or source.startswith('wildnav')):
-            correction_samples += 1
-            if confidence >= min_confidence:
-                confident_corrections += 1
+                components & CORRECTION_SOURCES
+                and math.isfinite(confidence)
+                and confidence >= min_confidence):
+            confident_corrections += 1
         landed = landed or bool(sample.get('landed', False))
 
     if mission.get('landing_zones') and samples:
@@ -138,7 +153,8 @@ def _score_mission(mission_file, mission, samples):
             for zone in mission['landing_zones'])
 
     completion = sum(completed) / max(1, len(completed))
-    correction_coverage = confident_corrections / max(1, correction_samples)
+    # Fraction of the flight with a confident absolute correction active.
+    correction_coverage = confident_corrections / max(1, len(samples))
     score = mission.get('score', {})
     pass_fail = {
         'waypoint_completion': completion >= float(
@@ -148,6 +164,11 @@ def _score_mission(mission_file, mission, samples):
         'no_fly': no_fly_intrusions <= int(score.get('max_no_fly_intrusions', 0)),
         'terrain_clearance': min_seen_agl >= min_agl and max_seen_agl <= max_agl,
     }
+    if _requires_corrections(mission):
+        pass_fail['correction_coverage'] = correction_coverage >= float(
+            score.get(
+                'min_correction_coverage',
+                mission_file['global_acceptance']['min_correction_coverage']))
     if score.get('require_landed'):
         pass_fail['landed'] = landed
     if landing_error_m is not None:

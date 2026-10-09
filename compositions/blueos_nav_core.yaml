@@ -1,4 +1,5 @@
-# Shared BlueOS navigation core: MAVROS, OAK-1 MegaDepth camera, DemNav,
+# Shared BlueOS navigation core: MAVROS, the ArduPilot navigation bridge
+# (EKF origin on /navigation/origin), OAK-1 MegaDepth camera, DemNav,
 # WildNav, and rosbridge.
 #
 # Defaults render the drone deployment (blueos_aerostack.yaml includes this
@@ -19,6 +20,32 @@ services:
     command: >
       ros2 launch mavros apm.launch
         fcu_url:=${BLUEOS_FCU_URL:-udp://0.0.0.0:14550@}
+
+  navigation_bridge:
+    # Relays the ArduPilot EKF origin to /navigation/origin, the anchor of
+    # every local navigation output. GPS_INPUT_CORRECTIONS=true also sends
+    # accepted DemNav/WildNav fixes to ArduPilot as GPS 2: experimental,
+    # copter only, and it needs systems/aerodrone/config/
+    # arducopter_gps_input.params on the autopilot (see
+    # tools/gps_denied_sitl_test.md).
+    image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-arm64}
+    container_name: ${NAVIGATION_BRIDGE_CONTAINER:-navigation_bridge}
+    network_mode: host
+    ipc: host
+    restart: unless-stopped
+    depends_on:
+      - mavros
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    volumes:
+      - /dev/shm:/dev/shm
+      - ../applications/aerostack2/scripts:/workspace/applications/aerostack2/scripts:ro
+    command: >
+      python3 /workspace/applications/aerostack2/scripts/ardupilot_navigation_bridge.py
+        --ros-args -p mavros_namespace:=/mavros
+        -p gps_input_enabled:=${GPS_INPUT_CORRECTIONS:-false}
+        -p correction_topic:=${NAVIGATION_TOPIC_PREFIX:-/navigation}/correction_fix
+        -p autopilot_corrections_topic:=${NAVIGATION_TOPIC_PREFIX:-/navigation}/autopilot_corrections_active
 
   oak1:
     image: salsicha/cyberphysics:oak1-${CYBERPHYSICS_TAG:-arm64}
@@ -67,11 +94,20 @@ services:
         camera_info_topic:=${CAMERA_TOPIC_ROOT:-/oak1}/camera_info
         initial_lat:=${INITIAL_LAT:-0.0}
         initial_lon:=${INITIAL_LON:-0.0}
-        origin_alt:=${ORIGIN_ALT:-0.0}
         area_km:=${AREA_KM:-10.0}
         search_radius_m:=${SEARCH_RADIUS_M:-200.0}
         fov_deg:=${FOV_DEG:-69.0}
         min_correlation:=${MIN_CORRELATION:-0.35}
+        origin_topic:=/navigation/origin
+        prior_fix_topic:=${NAVIGATION_TOPIC_PREFIX:-/navigation}/fix
+        prior_timeout_s:=2.0
+        search_radius_sigma_scale:=3.0
+        max_search_radius_m:=${MAX_SEARCH_RADIUS_M:-600.0}
+        camera_mount_yaw_deg:=${CAMERA_MOUNT_YAW_DEG:-0.0}
+        gps_altitude_datum:=ellipsoid
+        geoid_file:=/usr/share/GeographicLib/geoids/egm96-5.pgm
+        "rangefinder_topic:=${RANGEFINDER_TOPIC:-''}"
+        rangefinder_timeout_s:=0.5
 
   wildnav:
     image: salsicha/cyberphysics:wildnav-${CYBERPHYSICS_TAG:-arm64}
@@ -95,13 +131,16 @@ services:
         prediction_odom_topic:=${NAVIGATION_ODOM_TOPIC:-/navigation/odometry}
         raw_odom_topic:=/${VEHICLE_NAMESPACE:-${DRONE_NAMESPACE:-drone0}}/sensor_measurements/odom
         gps_topic:=/${VEHICLE_NAMESPACE:-${DRONE_NAMESPACE:-drone0}}/sensor_measurements/gps
-        demnav_odom_topic:=/demnav/odometry
         navigation_output_topic:=${NAVIGATION_ODOM_TOPIC:-/navigation/odometry}
         initial_lat:=${INITIAL_LAT:-0.0}
         initial_lon:=${INITIAL_LON:-0.0}
-        origin_alt:=${ORIGIN_ALT:-0.0}
+        origin_topic:=/navigation/origin
+        prior_fix_topic:=${NAVIGATION_TOPIC_PREFIX:-/navigation}/fix
+        prior_timeout_s:=2.0
         zoom:=${WILDNAV_ZOOM:-18}
         search_radius_m:=${WILDNAV_SEARCH_RADIUS_M:-250.0}
+        search_radius_sigma_scale:=3.0
+        max_search_radius_m:=${WILDNAV_MAX_SEARCH_RADIUS_M:-750.0}
         max_tiles:=${WILDNAV_MAX_TILES:-49}
         max_tile_downloads_per_cycle:=${WILDNAV_MAX_DOWNLOADS:-8}
         match_rate_hz:=${WILDNAV_RATE_HZ:-0.2}

@@ -187,7 +187,7 @@ def main():
         file="urdf/drones/cf2x.urdf", pos=tuple(home.tolist())))
     camera = scene.add_camera(
         res=(args.width, args.height), pos=tuple(home.tolist()),
-        lookat=(home[0], home[1], home[2] - 10.0), up=(0.0, 1.0, 0.0),
+        lookat=(home[0], home[1], home[2] - 10.0), up=(1.0, 0.0, 0.0),
         fov=args.fov_deg, near=0.3, far=300.0, GUI=False)
     print("Genesis scene build starting", flush=True)
     scene.build()
@@ -202,6 +202,7 @@ def main():
     camera_stride = max(1, int(round(args.rate_hz / args.camera_rate_hz)))
     maximum_rotor_rpm = env_float("GENESIS_MAX_ROTOR_RPM", 21700.0)
     previous_velocity = np.zeros(3)
+    camera_up = np.array([1.0, 0.0, 0.0])
     tick = 0
     start = time.monotonic()
     try:
@@ -232,10 +233,17 @@ def main():
                 reference_enu=home))
 
             if tick % camera_stride == 0:
+                # Body-fixed nadir camera: the image top points along the
+                # nose (horizontal body x axis), like the physical OAK-1 with
+                # camera_mount_yaw_deg 0 and the DemNav/WildNav de-rotation.
+                forward = quaternion_to_matrix(quaternion)[:, 0]
+                horizontal = np.array([forward[0], forward[1], 0.0])
+                if np.linalg.norm(horizontal) > 1e-6:
+                    camera_up = horizontal / np.linalg.norm(horizontal)
                 camera.set_pose(
                     pos=position.tolist(),
                     lookat=(position + np.array([0.0, 0.0, -10.0])).tolist(),
-                    up=(0.0, 1.0, 0.0))
+                    up=tuple(float(value) for value in camera_up))
                 rendered = camera.render(rgb=True, depth=True)
                 publisher.publish_camera(rendered[0], rendered[1])
                 publisher.publish_truth(position.tolist(), quaternion.tolist(),

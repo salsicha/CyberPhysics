@@ -99,6 +99,7 @@ services:
     env_file: [../systems/aerodrone/config/topics.env, ../applications/aerostack2/config/mount_tamalpais.env]
     environment:
       SIM_JSON_HOST: 127.0.0.1
+      GPS_INPUT_CORRECTIONS: ${GPS_INPUT_CORRECTIONS:-false}
     volumes:
       - ../applications/ardupilot_sitl/scripts:/workspace/applications/ardupilot_sitl/scripts:ro
       - ../systems/aerodrone:/workspace/systems/aerodrone:ro
@@ -126,6 +127,24 @@ services:
       ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
     command: ros2 launch mavros apm.launch fcu_url:=tcp://127.0.0.1:5760
 
+  navigation_bridge:
+    # Relays the ArduPilot EKF origin to /navigation/origin (the anchor of
+    # every local navigation output). GPS_INPUT_CORRECTIONS=true also sends
+    # accepted DemNav/WildNav fixes to ArduPilot as GPS 2 (experimental; see
+    # tools/gps_denied_sitl_test.md).
+    image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
+    network_mode: host
+    ipc: host
+    depends_on: [mavros]
+    environment: {ROS_DOMAIN_ID: "${ROS_DOMAIN_ID:-0}"}
+    volumes:
+      - /dev/shm:/dev/shm
+      - ../applications/aerostack2/scripts:/workspace/applications/aerostack2/scripts:ro
+    command: >
+      python3 /workspace/applications/aerostack2/scripts/ardupilot_navigation_bridge.py
+        --ros-args -p mavros_namespace:=/mavros
+        -p gps_input_enabled:=${GPS_INPUT_CORRECTIONS:-false}
+
   demnav:
     image: salsicha/cyberphysics:demnav-${CYBERPHYSICS_TAG:-latest}
     network_mode: host
@@ -144,10 +163,16 @@ services:
         depth_topic:=${DEPTH_TOPIC:-/aerodrone/sensor_measurements/downward_rgbd/depth}
         camera_info_topic:=${CAMERA_INFO_TOPIC:-/aerodrone/sensor_measurements/downward_rgbd/depth/camera_info}
         initial_lat:=${INITIAL_LAT:-37.9234} initial_lon:=${INITIAL_LON:--122.5967}
-        origin_alt:=${ORIGIN_ALT:-781.0} area_km:=${AREA_KM:-8.0}
+        area_km:=${AREA_KM:-8.0}
         search_radius_m:=${SEARCH_RADIUS_M:-900.0}
         dem_resolution_m:=${DEM_RESOLUTION_M:-10.0} fov_deg:=${FOV_DEG:-69.0}
         min_correlation:=${MIN_CORRELATION:-0.35} cache_dir:=/data/demnav_cache
+        origin_topic:=/navigation/origin prior_fix_topic:=/navigation/fix
+        prior_timeout_s:=2.0 search_radius_sigma_scale:=3.0
+        max_search_radius_m:=${MAX_SEARCH_RADIUS_M:-2700.0}
+        camera_mount_yaw_deg:=0.0
+        gps_altitude_datum:=ellipsoid geoid_file:=/usr/share/GeographicLib/geoids/egm96-5.pgm
+        rangefinder_topic:=${RANGEFINDER_TOPIC:-/aerodrone/rangefinder} rangefinder_timeout_s:=0.5
 
   wildnav:
     image: salsicha/cyberphysics:wildnav-${CYBERPHYSICS_TAG:-latest}
@@ -168,16 +193,18 @@ services:
         prediction_odom_topic:=${RAW_ODOM_TOPIC:-/aerodrone/sensor_measurements/odom}
         raw_odom_topic:=${RAW_ODOM_TOPIC:-/aerodrone/sensor_measurements/odom}
         gps_topic:=${GPS_TOPIC:-/aerodrone/sensor_measurements/gps}
-        demnav_odom_topic:=${DEMNAV_ODOM_TOPIC:-/demnav/odometry}
         navigation_output_topic:=${NAVIGATION_ODOM_TOPIC:-/navigation/odometry}
         initial_lat:=${INITIAL_LAT:-37.9234} initial_lon:=${INITIAL_LON:--122.5967}
-        origin_alt:=${ORIGIN_ALT:-781.0} zoom:=${WILDNAV_ZOOM:-17}
+        zoom:=${WILDNAV_ZOOM:-17}
         search_radius_m:=${WILDNAV_SEARCH_RADIUS_M:-1100.0}
         max_tiles:=${WILDNAV_MAX_TILES:-169} max_tile_downloads_per_cycle:=0
         match_rate_hz:=${WILDNAV_RATE_HZ:-0.2}
         feature_backend:=${WILDNAV_FEATURE_BACKEND:-SIFT}
         min_matches:=${WILDNAV_MIN_MATCHES:-16} min_inliers:=${WILDNAV_MIN_INLIERS:-10}
         min_inlier_ratio:=${WILDNAV_MIN_INLIER_RATIO:-0.25} cache_dir:=/data/wildnav_cache
+        origin_topic:=/navigation/origin prior_fix_topic:=/navigation/fix
+        prior_timeout_s:=2.0 search_radius_sigma_scale:=3.0
+        max_search_radius_m:=${WILDNAV_MAX_SEARCH_RADIUS_M:-3300.0}
 
   aerostack2_autonomy:
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}

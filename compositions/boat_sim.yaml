@@ -7,7 +7,9 @@ services:
     environment:
       ARDUPILOT_VEHICLE: Rover
       ARDUPILOT_FRAME: rover
+      # Hardware baseline, then SITL-only relaxations (never on the vehicle).
       ARDUPILOT_PARAM_FILE: /workspace/systems/boat/config/ardurover.params
+      ARDUPILOT_SITL_PARAM_FILE: /workspace/systems/boat/config/ardurover_sitl.params
       INITIAL_LAT: ${INITIAL_LAT:-37.9234}
       INITIAL_LON: ${INITIAL_LON:--122.5967}
       ORIGIN_ALT: ${ORIGIN_ALT:-0.0}
@@ -36,6 +38,10 @@ services:
   navigator_arm:
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
     network_mode: host
+    # Same IPC namespace as MAVROS: Fast DDS picks shared-memory transport
+    # between host-network containers, and without it no MAVROS state
+    # arrives and arming times out.
+    ipc: host
     depends_on: [boat_bridge]
     environment: {ROS_DOMAIN_ID: "${ROS_DOMAIN_ID:-0}"}
     volumes: [../applications/aerostack2/scripts:/workspace/applications/aerostack2/scripts:ro]

@@ -6,8 +6,8 @@ drones:
     rpy: [0.0, 0.0, 0.0]
     enable_velocity_control: false
     payload:
-      - model_type: gps
-        model_name: gps
+      # No Gazebo GPS payload: /aerodrone/sensor_measurements/gps is ArduPilot's
+      # GPS from MAVROS (one publisher, as on hardware).
       - model_type: hd_camera
         model_name: downward_rgb
         xyz: [0.0, 0.0, -0.05]

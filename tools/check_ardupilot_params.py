@@ -19,12 +19,17 @@ import tempfile
 REPO = Path(__file__).resolve().parents[1]
 DEFAULT_ENV_FILE = REPO / 'systems/airplane/config/sitl.env'
 DEFAULT_CHECKOUT = REPO / 'cache/ardupilot'
-VEHICLES = {
-    'ardupilot_plane.params': 'ArduPlane',
-    'arducopter.params': 'ArduCopter',
-    'ardurover.params': 'Rover',
-    'ardusub.params': 'ArduSub',
+# Parameter files are named after their firmware: the hardware baseline is
+# <prefix>.params, layered variants are <prefix>_<variant>.params (for example
+# arducopter_sitl.params, aerodrone_sitl.params).
+VEHICLE_PREFIXES = {
+    'ardupilot_plane': 'ArduPlane',
+    'arducopter': 'ArduCopter',
+    'aerodrone': 'ArduCopter',
+    'ardurover': 'Rover',
+    'ardusub': 'ArduSub',
 }
+VEHICLES = {f'{prefix}.params': vehicle for prefix, vehicle in VEHICLE_PREFIXES.items()}
 METADATA_DIR = 'Tools/autotest/param_metadata'
 
 
@@ -51,7 +56,10 @@ def param_names(path):
 
 
 def vehicle_for(path, override=None):
-    vehicle = override or VEHICLES.get(Path(path).name)
+    name = Path(path).name
+    vehicle = override or VEHICLES.get(name) or next(
+        (vehicle for prefix, vehicle in VEHICLE_PREFIXES.items()
+         if name.startswith(prefix + '_') and name.endswith('.params')), None)
     if vehicle is None:
         raise ValueError(f'Unknown vehicle for {path}; specify --vehicle')
     return vehicle
@@ -111,7 +119,9 @@ def main():
     parser.add_argument('--ref')
     parser.add_argument('--vehicle', choices=sorted(set(VEHICLES.values())))
     args = parser.parse_args()
-    files = args.params or sorted(REPO.glob('systems/*/config/*.params'))
+    files = args.params or sorted(
+        list(REPO.glob('systems/*/config/*.params'))
+        + list(REPO.glob('applications/*/config/*.params')))
     if not files:
         parser.error('No .params files found')
     ref = args.ref or read_ref(args.env_file)

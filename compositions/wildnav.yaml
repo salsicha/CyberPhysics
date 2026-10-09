@@ -1,3 +1,7 @@
+# Standalone WildNav + navigation fusion. Needs /navigation/origin (the
+# ArduPilot EKF origin from
+# applications/aerostack2/scripts/ardupilot_navigation_bridge.py) before
+# corrections are accepted.
 services:
   wildnav:
     image: salsicha/cyberphysics:wildnav-${CYBERPHYSICS_TAG:-arm64}
@@ -18,13 +22,16 @@ services:
         prediction_odom_topic:=${NAVIGATION_ODOM_TOPIC:-/navigation/odometry}
         raw_odom_topic:=${RAW_ODOM_TOPIC:-/drone0/sensor_measurements/odom}
         gps_topic:=${GPS_TOPIC:-/drone0/sensor_measurements/gps}
-        demnav_odom_topic:=${DEMNAV_ODOM_TOPIC:-/demnav/odometry}
         navigation_output_topic:=${NAVIGATION_ODOM_TOPIC:-/navigation/odometry}
         initial_lat:=${INITIAL_LAT:-0.0}
         initial_lon:=${INITIAL_LON:-0.0}
-        origin_alt:=${ORIGIN_ALT:-0.0}
+        origin_topic:=${ORIGIN_TOPIC:-/navigation/origin}
+        prior_fix_topic:=${PRIOR_FIX_TOPIC:-/navigation/fix}
+        prior_timeout_s:=2.0
         zoom:=${WILDNAV_ZOOM:-18}
         search_radius_m:=${WILDNAV_SEARCH_RADIUS_M:-250.0}
+        search_radius_sigma_scale:=3.0
+        max_search_radius_m:=${WILDNAV_MAX_SEARCH_RADIUS_M:-750.0}
         max_tiles:=${WILDNAV_MAX_TILES:-49}
         max_tile_downloads_per_cycle:=${WILDNAV_MAX_DOWNLOADS:-8}
         match_rate_hz:=${WILDNAV_RATE_HZ:-0.2}

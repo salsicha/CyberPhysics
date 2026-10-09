@@ -1,0 +1,10 @@
+# SITL-ONLY relaxations, layered after arducopter.params by
+# applications/ardupilot_sitl/scripts/run_arducopter_sitl.sh.
+# NEVER load this file on the aircraft.
+#
+# The simulators have no RC transmitter or ground station and arm from a
+# script, so RC/GCS failsafes, pre-arm checks and auto-disarm are disabled.
+ARMING_CHECK,0
+DISARM_DELAY,0
+FS_THR_ENABLE,0
+FS_GCS_ENABLE,0

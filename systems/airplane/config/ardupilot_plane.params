@@ -16,3 +16,5 @@ PTCH_LIM_MAX_DEG 20
 PTCH_LIM_MIN_DEG -25
 FS_SHORT_ACTN 0
 FS_LONG_ACTN 1
+# TAKEOFF mode (tools/sitl_smoke_test.sh): climb to 150 m and circle.
+TKOFF_ALT 150

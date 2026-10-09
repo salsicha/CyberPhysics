@@ -28,7 +28,7 @@ def test_hardware_commands_use_consistent_vehicle_identity(namespace):
     )
     services = json.loads(rendered.stdout)['services']
     vehicle = namespace or 'aerodrone'
-    assert len(services) == 8
+    assert len(services) == 9
     assert all(service.get('image') for service in services.values())
     assert f'namespace:={vehicle}' in services['aerostack']['command']
     assert f'drone_id:={vehicle}' in services['behavior_tree']['command']
@@ -37,3 +37,36 @@ def test_hardware_commands_use_consistent_vehicle_identity(namespace):
         assert f'{odom_arg}:=/{vehicle}/sensor_measurements/odom' in services[name]['command']
     assert 'depth_topic:=/oak1/relative_depth' in services['demnav']['command']
     assert 'image_topic:=/oak1/image_highres' in services['wildnav']['command']
+    # The EKF origin anchors every local navigation output; DemNav/WildNav
+    # search around the fused fix and DemNav uses the real camera mount.
+    assert 'ardupilot_navigation_bridge.py' in ' '.join(services['navigation_bridge']['command'])
+    assert 'gps_input_enabled:=false' in services['navigation_bridge']['command']
+    for name in ('demnav', 'wildnav'):
+        command = services[name]['command']
+        assert 'origin_topic:=/navigation/origin' in command
+        assert 'prior_fix_topic:=/navigation/fix' in command
+        assert not any(arg.startswith('origin_alt:=') for arg in command)
+    assert 'camera_mount_yaw_deg:=0.0' in services['demnav']['command']
+    assert 'rangefinder_topic:=/aerodrone/rangefinder' in services['demnav']['command']
+    assert 'gps_altitude_datum:=ellipsoid' in services['demnav']['command']
+
+
+def test_airplane_hardware_uses_its_namespaced_navigation_topics():
+    if not shutil.which('docker'):
+        pytest.skip('Docker Compose is not installed')
+    if subprocess.run(['docker', 'compose', 'version'], capture_output=True).returncode:
+        pytest.skip('Docker Compose is not installed')
+    env = {key: value for key, value in os.environ.items()
+           if key not in ('COMPOSE_FILE', 'COMPOSE_ENV_FILES')}
+    rendered = subprocess.run(
+        ['docker', 'compose', '-f', str(REPO / 'compositions/airplane_hardware.yaml'),
+         'config', '--format', 'json'],
+        env=env, check=True, capture_output=True, text=True)
+    services = json.loads(rendered.stdout)['services']
+    demnav = services['demnav']['command']
+    assert 'prior_fix_topic:=/airplane/navigation/fix' in services['wildnav']['command']
+    assert 'prior_fix_topic:=/airplane/navigation/fix' in demnav
+    # No downward rangefinder: the YAML empty string disables it.
+    assert "rangefinder_topic:=''" in demnav
+    bridge = services['navigation_bridge']['command']
+    assert 'correction_topic:=/airplane/navigation/correction_fix' in bridge
