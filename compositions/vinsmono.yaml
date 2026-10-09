@@ -8,6 +8,7 @@ services:
     build:
       context: ../applications/vinsmono
     container_name: vinsmono
+    stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     network_mode: host
     ipc: host
     restart: unless-stopped

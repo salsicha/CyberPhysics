@@ -5,6 +5,7 @@ services:
     init: true
     ipc: "host"
     image: salsicha/cyberphysics:blackfly-latest
+    stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     environment:
       - ROS_LOCALHOST_ONLY=$ROS_LOCALHOST_ONLY
       - ROS_DOMAIN_ID=$ROS_DOMAIN_ID

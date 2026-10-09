@@ -1,20 +1,45 @@
-# Unreal Engine Kubernetes container example
+# Unreal Engine on k3s: the unrealengine.yaml stack (bring your own packaged
+# UE project; applications/unrealengine/README.md) without the X11 display
+# plumbing, with kompose labels for a single-node k3s that uses the local
+# Docker image store (./install.sh --with-k3s installs k3s with --docker):
+#
+#   UE_BUILD_DIR=/abs/path/to/Linux kompose convert -f compositions/ue_k3s.yaml -o ue_k3s-manifests.yaml
+#
+# Review the generated manifests before applying them: every pod needs
+# hostNetwork: true (ROS 2 discovery, rosbridge on 9090) and ue_server needs
+# the GPU as resources.limits nvidia.com/gpu: 1 (NVIDIA device plugin); see
+# the README. It also still runs under docker compose:
+#   docker compose -f compositions/ue_k3s.yaml up
 
 services:
   ue_server:
-    network_mode: "host"
-    image: salsicha/cyberphysics:unrealengine-latest
+    network_mode: host
+    pull_policy: if_not_present
+    image: salsicha/cyberphysics:unrealengine-${CYBERPHYSICS_TAG:-latest}
     container_name: ue_server
-    volumes:
-      - ../applications/unrealengine/server:/server
-      - "/tmp/.X11-unix:/tmp/.X11-unix"
+    labels:
+      kompose.image-pull-policy: IfNotPresent
+      kompose.volume.type: hostPath
+    # The launcher forwards docker stop to the engine; init reaps its children
+    init: true
     environment:
-      - "DISPLAY=${DISPLAY}"
-      - XAUTHORITY
-      - NVIDIA_DRIVER_CAPABILITIES=all
-    command: >
-      stdbuf -o L
-      /server/Development/Linux/Environment.sh
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      # Launcher settings, passed through when set on the host; defaults and
+      # meaning in applications/unrealengine/server/run_server.sh
+      - UE_PROJECT_SCRIPT
+      - UE_MAP
+      - UE_RES_X
+      - UE_RES_Y
+      - UE_PORT
+      - UE_GRAPHICS_ADAPTER
+      - UE_RENDER_OFFSCREEN
+      - UE_NOSOUND
+      - UE_EXTRA_ARGS
+    volumes:
+      - ${UE_BUILD_DIR:-../applications/unrealengine/server/build}:/server/build
+      - /dev/shm:/dev/shm
+    command: /server/run_server.sh
+    # The image sets NVIDIA_DRIVER_CAPABILITIES (graphics for Vulkan)
     deploy:
       resources:
         reservations:
@@ -22,15 +47,48 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
-  ue_client:
-    network_mode: "host"
-    image: salsicha/cyberphysics:unrealengine-latest
-    container_name: ue_client
-    volumes:
-      - ../applications/unrealengine/client:/scripts
-      - "/tmp/.X11-unix:/tmp/.X11-unix"
+
+  ue_rosbridge:
+    network_mode: host
+    pull_policy: if_not_present
+    image: salsicha/cyberphysics:unrealengine-${CYBERPHYSICS_TAG:-latest}
+    container_name: ue_rosbridge
+    labels:
+      kompose.image-pull-policy: IfNotPresent
+      kompose.volume.type: hostPath
+    # ros2 launch (PID 1 here) ignores SIGTERM; SIGINT stops its nodes cleanly
+    stop_signal: SIGINT
     environment:
-      - "DISPLAY=${DISPLAY}"
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    volumes:
+      - /dev/shm:/dev/shm
+    # ROSIntegration only speaks BSON; set ROSBRIDGE_BSON_ONLY=false for
+    # JSON clients (roslibjs, other UE plugins)
     command: >
-      stdbuf -o L
-      bash -c "cd /scripts/ && python3 example.py"
+      ros2 launch rosbridge_server rosbridge_websocket_launch.xml
+        port:=${ROSBRIDGE_PORT:-9090}
+        bson_only_mode:=${ROSBRIDGE_BSON_ONLY:-true}
+
+  ue_client:
+    network_mode: host
+    pull_policy: if_not_present
+    image: salsicha/cyberphysics:unrealengine-${CYBERPHYSICS_TAG:-latest}
+    container_name: ue_client
+    labels:
+      kompose.image-pull-policy: IfNotPresent
+      kompose.volume.type: hostPath
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - /dev/shm:/dev/shm
+    # The example baked into the image (unrealengine.yaml mounts the source
+    # instead), so the pod needs no checkout of this repository
+    command: >
+      python3 /client/example.py --ros-args
+        -p image_topic:=${UE_IMAGE_TOPIC:-/ue/camera/image_raw}
+        -p pose_topic:=${UE_POSE_TOPIC:-/ue/odom}
+        -p pose_type:=${UE_POSE_TYPE:-odometry}
+        -p cmd_topic:=${UE_CMD_TOPIC:-/ue/cmd_vel}
+        -p linear_x:=${UE_CMD_LINEAR_X:-0.0}
+        -p angular_z:=${UE_CMD_ANGULAR_Z:-0.0}

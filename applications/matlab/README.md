@@ -16,15 +16,15 @@
         3. Install: ./mpm install
 
     * Running Matlab in docker:
-        (Be sure to "export" the environment variables!)
+        (From the repository root; be sure to "export" the environment variables!)
         ```
-        docker run -it --rm --net host -v /tmp/.X11-unix:/tmp/.X11-unix -e DISPLAY -e XAUTHORITY -e MLM_LICENSE_FILE=/network.lic -v /home/${whoami}/repos/CyberPhysics/applications/client/scripts/simulink:/home/matlab/simulink --shm-size=512M salsicha/cyberphysics:matlab-latest matlab
+        docker run -it --rm --net host -v /tmp/.X11-unix:/tmp/.X11-unix -e DISPLAY -e XAUTHORITY -e MLM_LICENSE_FILE=/network.lic -v "$PWD/applications/matlab/scripts":/home/matlab/scripts --shm-size=512M salsicha/cyberphysics:matlab-latest matlab
         ```
 
     * Example compose file
         ```
         volumes:
-            - ../applications/unrealengine/client/scripts/simulink:/home/matlab/simulink
+            - ../applications/matlab/scripts:/home/matlab/scripts
         environment:
             - MLM_LICENSE_FILE=/network.lic
             - shm-size=512M

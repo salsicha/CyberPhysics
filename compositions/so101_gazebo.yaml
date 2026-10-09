@@ -2,6 +2,7 @@ services:
   gazebo:
     image: salsicha/cyberphysics:so101-latest
     container_name: so101_gazebo
+    stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     network_mode: host
     ipc: host
     environment:

@@ -1,0 +1,7 @@
+# Packaged Unreal Engine builds (several GB, made with the user's own Epic
+# account) never go into git. The root .gitignore already ignores every build/
+# folder; re-include this one's placeholder so the folder exists in a checkout
+# and the compose bind mount never creates it as root.
+!/server/build/
+/server/build/*
+!/server/build/.gitkeep

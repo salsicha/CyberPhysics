@@ -1,16 +1,30 @@
+# Unreal Engine server fragment: a packaged UE Linux build (bring your own;
+# applications/unrealengine/README.md) run headless on the GPU, plus rosbridge
+# for ROSIntegration projects. Full stack: compositions/unrealengine.yaml.
 services:
-  airsim_server:
-    network_mode: "host"
-    image: salsicha/cyberphysics:unrealengine-latest
-    volumes:
-      - "/tmp/.X11-unix:/tmp/.X11-unix"
+  ue_server:
+    network_mode: host
+    pull_policy: if_not_present
+    image: salsicha/cyberphysics:unrealengine-${CYBERPHYSICS_TAG:-latest}
+    init: true
     environment:
-      - "DISPLAY=${DISPLAY}"
-      - XAUTHORITY
-      - NVIDIA_DRIVER_CAPABILITIES=all
-    command: >
-      stdbuf -o L
-      /server/Development/Linux/server.sh
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      # Launcher settings (applications/unrealengine/server/run_server.sh)
+      - UE_PROJECT_SCRIPT
+      - UE_MAP
+      - UE_RES_X
+      - UE_RES_Y
+      - UE_PORT
+      - UE_GRAPHICS_ADAPTER
+      - UE_RENDER_OFFSCREEN
+      - UE_NOSOUND
+      - UE_EXTRA_ARGS
+      - DISPLAY
+    volumes:
+      - ${UE_BUILD_DIR:-../../applications/unrealengine/server/build}:/server/build
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - /dev/shm:/dev/shm
+    command: /server/run_server.sh
     deploy:
       resources:
         reservations:
@@ -18,3 +32,17 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
+
+  ue_rosbridge:
+    network_mode: host
+    pull_policy: if_not_present
+    image: salsicha/cyberphysics:unrealengine-${CYBERPHYSICS_TAG:-latest}
+    stop_signal: SIGINT
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    volumes:
+      - /dev/shm:/dev/shm
+    command: >
+      ros2 launch rosbridge_server rosbridge_websocket_launch.xml
+        port:=${ROSBRIDGE_PORT:-9090}
+        bson_only_mode:=${ROSBRIDGE_BSON_ONLY:-true}

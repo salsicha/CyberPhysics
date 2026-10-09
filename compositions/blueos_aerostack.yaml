@@ -12,6 +12,7 @@ services:
   aerostack:
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-arm64}
     container_name: aerostack
+    stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     network_mode: host
     ipc: host
     restart: unless-stopped
@@ -31,6 +32,7 @@ services:
   behavior_tree:
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-arm64}
     container_name: aerostack_behavior_tree
+    stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     network_mode: host
     ipc: host
     restart: always

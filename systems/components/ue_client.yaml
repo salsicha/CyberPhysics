@@ -1,13 +1,21 @@
-
+# Unreal Engine example ROS 2 client fragment (camera/pose stats, Twist
+# commands). Full stack: compositions/unrealengine.yaml.
 services:
-  airsim_client:
-    network_mode: "host"
-    image: salsicha/cyberphysics:unrealengine-latest
-    volumes:
-      - ../../applications/unrealengine/client:/scripts
-      - "/tmp/.X11-unix:/tmp/.X11-unix"
+  ue_client:
+    network_mode: host
+    pull_policy: if_not_present
+    image: salsicha/cyberphysics:unrealengine-${CYBERPHYSICS_TAG:-latest}
     environment:
-      - "DISPLAY=${DISPLAY}"
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ../../applications/unrealengine/client:/scripts:ro
+      - /dev/shm:/dev/shm
     command: >
-      stdbuf -o L
-      bash -c "cd /scripts/ && python3 example.py"
+      python3 /scripts/example.py --ros-args
+        -p image_topic:=${UE_IMAGE_TOPIC:-/ue/camera/image_raw}
+        -p pose_topic:=${UE_POSE_TOPIC:-/ue/odom}
+        -p pose_type:=${UE_POSE_TYPE:-odometry}
+        -p cmd_topic:=${UE_CMD_TOPIC:-/ue/cmd_vel}
+        -p linear_x:=${UE_CMD_LINEAR_X:-0.0}
+        -p angular_z:=${UE_CMD_ANGULAR_Z:-0.0}

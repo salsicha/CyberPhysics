@@ -39,6 +39,11 @@ docker compose -f compositions/airplane_hardware.yaml up
 docker compose -f compositions/turret_hardware.yaml up
 docker compose -f compositions/lunar_rover_hardware.yaml up
 docker compose -f compositions/vinsmono.yaml up --build
+docker compose -f compositions/cactusrt.yaml up                 # 1 kHz real-time loop demo
+docker compose -f compositions/tello.yaml up                    # DJI Tello driver (join its WiFi first)
+docker compose -f compositions/rangefinder.yaml up              # Benewake TFmini-S/TF-Luna on a serial port
+docker compose -f compositions/whereami.yaml up                 # WiFi room-level localization
+docker compose -f compositions/unrealengine.yaml up             # your packaged Unreal Engine build + ROS bridge
 ```
 
 ## RACECAR Neo

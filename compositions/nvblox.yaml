@@ -5,6 +5,7 @@ services:
     privileged: true
     image: salsicha/cyberphysics:realsense-${CYBERPHYSICS_TAG:-latest}
     container_name: realsense
+    stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     devices:
       - /dev:/dev
     environment:
@@ -20,6 +21,7 @@ services:
     pull_policy: if_not_present
     image: salsicha/cyberphysics:nvblox-${CYBERPHYSICS_TAG:-latest}
     container_name: nvblox
+    stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     ipc: host
     privileged: true
     environment:
@@ -45,6 +47,7 @@ services:
     pull_policy: if_not_present
     image: salsicha/cyberphysics:nvblox-${CYBERPHYSICS_TAG:-latest}
     container_name: nvblox_quickstart
+    stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     ipc: host
     privileged: true
     profiles: [quickstart]
@@ -72,6 +75,7 @@ services:
     network_mode: host
     image: salsicha/cyberphysics:ros2-${CYBERPHYSICS_TAG:-latest}
     container_name: foxglove_bridge
+    stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
     volumes:

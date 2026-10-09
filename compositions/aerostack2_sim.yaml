@@ -55,6 +55,7 @@ services:
 
   gazebo:
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
+    stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     network_mode: host
     depends_on:
       terrain_assets: {condition: service_completed_successfully}
@@ -80,6 +81,7 @@ services:
 
   gazebo_bridges:
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
+    stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     network_mode: host
     depends_on: [gazebo]
     environment:
@@ -120,6 +122,7 @@ services:
 
   mavros:
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
+    stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     network_mode: host
     ipc: host
     depends_on: [navigator_sitl]
@@ -148,6 +151,7 @@ services:
 
   demnav:
     image: salsicha/cyberphysics:demnav-${CYBERPHYSICS_TAG:-latest}
+    stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     network_mode: host
     ipc: host
     depends_on: [gazebo_bridges, mavros]
@@ -177,6 +181,7 @@ services:
 
   wildnav:
     image: salsicha/cyberphysics:wildnav-${CYBERPHYSICS_TAG:-latest}
+    stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     network_mode: host
     ipc: host
     depends_on: [gazebo_bridges, demnav]
@@ -209,6 +214,7 @@ services:
 
   aerostack2_autonomy:
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
+    stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     network_mode: host
     ipc: host
     depends_on: [mavros, wildnav]
@@ -233,6 +239,7 @@ services:
 
   wilderness_mission:
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
+    stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     network_mode: host
     ipc: host
     depends_on:

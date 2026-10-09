@@ -21,6 +21,7 @@ services:
     privileged: true
     image: salsicha/cyberphysics:realsense-${CYBERPHYSICS_TAG:-latest}
     container_name: so101_depth_camera
+    stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     restart: unless-stopped
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
@@ -124,6 +125,7 @@ services:
     network_mode: host
     image: salsicha/cyberphysics:ros2-${CYBERPHYSICS_TAG:-latest}
     container_name: so101_foxglove_bridge
+    stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     restart: unless-stopped
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
@@ -131,4 +133,4 @@ services:
       - /dev/shm:/dev/shm
     command: >
       stdbuf -o L
-      ros2 launch rosbridge_server rosbridge_websocket_launch.xml
+      ros2 launch foxglove_bridge foxglove_bridge_launch.xml

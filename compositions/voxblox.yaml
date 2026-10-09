@@ -10,6 +10,7 @@ services:
     pull_policy: if_not_present
     image: salsicha/cyberphysics:nvblox-latest
     container_name: nvblox
+    stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     devices:
       - /dev:/dev
     environment:
@@ -35,6 +36,7 @@ services:
     network_mode: "host"
     image: salsicha/cyberphysics:ros2-latest
     container_name: foxglove_bridge
+    stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
     volumes:

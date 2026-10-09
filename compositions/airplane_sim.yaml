@@ -21,6 +21,7 @@ services:
   airplane_mavros:
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
     container_name: airplane_sim_mavros
+    stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     network_mode: host
     ipc: host
     restart: unless-stopped
@@ -159,6 +160,7 @@ services:
   airplane_demnav:
     image: salsicha/cyberphysics:demnav-${CYBERPHYSICS_TAG:-latest}
     container_name: airplane_sim_demnav
+    stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     network_mode: host
     ipc: host
     restart: unless-stopped
@@ -199,6 +201,7 @@ services:
   airplane_wildnav:
     image: salsicha/cyberphysics:wildnav-${CYBERPHYSICS_TAG:-latest}
     container_name: airplane_sim_wildnav
+    stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     network_mode: host
     ipc: host
     restart: unless-stopped
@@ -270,6 +273,7 @@ services:
   airplane_rosbridge:
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
     container_name: airplane_sim_rosbridge
+    stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     network_mode: host
     restart: unless-stopped
     environment:

@@ -1,0 +1,5 @@
+# The packaged UE build is bind-mounted at run time, never baked into the image
+server/build/*
+!server/build/.gitkeep
+**/__pycache__/
+**/*.pyc

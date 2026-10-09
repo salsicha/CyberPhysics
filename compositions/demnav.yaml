@@ -7,6 +7,7 @@ services:
     pull_policy: if_not_present
     image: salsicha/cyberphysics:demnav-latest
     container_name: demnav
+    stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
       - INITIAL_LAT=${INITIAL_LAT:-0.0}

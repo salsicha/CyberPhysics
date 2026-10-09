@@ -4,6 +4,7 @@ services:
     pull_policy: if_not_present
     image: salsicha/cyberphysics:depthanything-latest
     container_name: depthanything
+    stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
       - IMAGE_TOPIC=${IMAGE_TOPIC:-/camera/color/image_raw}

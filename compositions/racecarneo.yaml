@@ -18,6 +18,7 @@ services:
     pull_policy: if_not_present
     image: salsicha/cyberphysics:racecarneo-${CYBERPHYSICS_TAG:-latest}
     container_name: racecarneo_robot_state_publisher
+    stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
       - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
@@ -78,6 +79,7 @@ services:
     pull_policy: if_not_present
     image: salsicha/cyberphysics:depthanything-${CYBERPHYSICS_TAG:-latest}
     container_name: racecarneo_depthanything
+    stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     depends_on:
       - racecarneo_bridge
     environment:
@@ -111,6 +113,7 @@ services:
     pull_policy: if_not_present
     image: salsicha/cyberphysics:nvblox-${CYBERPHYSICS_TAG:-latest}
     container_name: racecarneo_nvblox
+    stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     depends_on:
       - racecarneo_bridge
       - racecarneo_depthanything
@@ -138,6 +141,7 @@ services:
     pull_policy: if_not_present
     image: salsicha/cyberphysics:racecarneo-${CYBERPHYSICS_TAG:-latest}
     container_name: racecarneo_slam
+    stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     depends_on:
       - racecarneo_bridge
     environment:
@@ -156,6 +160,7 @@ services:
     # The nvblox image ships nvblox_nav2 (NvbloxCostmapLayer) alongside Nav2.
     image: salsicha/cyberphysics:nvblox-${CYBERPHYSICS_TAG:-latest}
     container_name: racecarneo_nav2
+    stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     depends_on:
       - racecarneo_bridge
       - racecarneo_slam
@@ -231,6 +236,7 @@ services:
     network_mode: host
     image: salsicha/cyberphysics:ros2-${CYBERPHYSICS_TAG:-latest}
     container_name: racecarneo_foxglove_bridge
+    stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
     volumes:

@@ -20,6 +20,7 @@ services:
 
   mavros:
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
+    stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     network_mode: host
     ipc: host
     depends_on: [navigator_sitl]
@@ -62,6 +63,7 @@ services:
 
   boat_rosbridge:
     image: salsicha/cyberphysics:boat-${CYBERPHYSICS_TAG:-latest}
+    stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     network_mode: host
     environment: {ROS_DOMAIN_ID: "${ROS_DOMAIN_ID:-0}"}
     command: ros2 launch rosbridge_server rosbridge_websocket_launch.xml

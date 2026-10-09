@@ -4,6 +4,7 @@ services:
   submarine_mavros:
     image: salsicha/cyberphysics:submarine-${CYBERPHYSICS_TAG:-arm64}
     container_name: submarine_mavros
+    stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     network_mode: host
     ipc: host
     restart: unless-stopped
@@ -35,6 +36,7 @@ services:
   submarine_rosbridge:
     image: salsicha/cyberphysics:submarine-${CYBERPHYSICS_TAG:-arm64}
     container_name: submarine_rosbridge
+    stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     network_mode: host
     restart: unless-stopped
     environment:

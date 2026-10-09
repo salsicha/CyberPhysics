@@ -1,20 +1,47 @@
-# Unreal Engine container example
+# Unreal Engine: bring your own packaged UE project with a ROS plugin
+# (applications/unrealengine/README.md).
+#
+#   ue_server     runs the packaged Linux build from
+#                 applications/unrealengine/server/build/ (or $UE_BUILD_DIR,
+#                 an absolute path) headless on the GPU
+#   ue_rosbridge  rosbridge for ROSIntegration projects: ws://localhost:9090,
+#                 BSON. rclUE projects talk to ROS 2 directly (same
+#                 ROS_DOMAIN_ID) and do not need it.
+#   ue_client     example ROS 2 client: camera and pose rate/latency, Twist
+#                 commands; set the UE_*_TOPIC variables to your project's topics
+#
+#   ./start.sh unrealengine
+#   UE_BUILD_DIR=/abs/path/to/Linux UE_MAP=/Game/Maps/Warehouse ./start.sh unrealengine
 
 services:
   ue_server:
-    network_mode: "host"
-    image: salsicha/cyberphysics:unrealengine-latest
+    network_mode: host
+    pull_policy: if_not_present
+    image: salsicha/cyberphysics:unrealengine-${CYBERPHYSICS_TAG:-latest}
     container_name: ue_server
-    volumes:
-      - ../applications/unrealengine/server:/server
-      - "/tmp/.X11-unix:/tmp/.X11-unix"
+    # The launcher forwards docker stop to the engine; init reaps its children
+    init: true
     environment:
-      - "DISPLAY=${DISPLAY}"
-      - XAUTHORITY
-      - NVIDIA_DRIVER_CAPABILITIES=all
-    command: >
-      stdbuf -o L
-      /server/Development/Linux/Environment.sh
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      # Launcher settings, passed through when set on the host; defaults and
+      # meaning in applications/unrealengine/server/run_server.sh
+      - UE_PROJECT_SCRIPT
+      - UE_MAP
+      - UE_RES_X
+      - UE_RES_Y
+      - UE_PORT
+      - UE_GRAPHICS_ADAPTER
+      - UE_RENDER_OFFSCREEN
+      - UE_NOSOUND
+      - UE_EXTRA_ARGS
+      # Only for on-screen rendering (UE_RENDER_OFFSCREEN=0, after xhost +local:)
+      - DISPLAY
+    volumes:
+      - ${UE_BUILD_DIR:-../applications/unrealengine/server/build}:/server/build
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - /dev/shm:/dev/shm
+    command: /server/run_server.sh
+    # The image sets NVIDIA_DRIVER_CAPABILITIES (graphics for Vulkan)
     deploy:
       resources:
         reservations:
@@ -22,16 +49,41 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
-  ue_client:
-    network_mode: "host"
-    image: salsicha/cyberphysics:unrealengine-latest
-    container_name: ue_client
-    volumes:
-      - ../applications/unrealengine/client:/scripts
-      - "/tmp/.X11-unix:/tmp/.X11-unix"
-      - /data:/data
+
+  ue_rosbridge:
+    network_mode: host
+    pull_policy: if_not_present
+    image: salsicha/cyberphysics:unrealengine-${CYBERPHYSICS_TAG:-latest}
+    container_name: ue_rosbridge
+    # ros2 launch (PID 1 here) ignores SIGTERM; SIGINT stops its nodes cleanly
+    stop_signal: SIGINT
     environment:
-      - "DISPLAY=${DISPLAY}"
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    volumes:
+      - /dev/shm:/dev/shm
+    # ROSIntegration only speaks BSON; set ROSBRIDGE_BSON_ONLY=false for
+    # JSON clients (roslibjs, other UE plugins)
     command: >
-      stdbuf -o L
-      bash -c "cd /scripts/ && python3 example.py"
+      ros2 launch rosbridge_server rosbridge_websocket_launch.xml
+        port:=${ROSBRIDGE_PORT:-9090}
+        bson_only_mode:=${ROSBRIDGE_BSON_ONLY:-true}
+
+  ue_client:
+    network_mode: host
+    pull_policy: if_not_present
+    image: salsicha/cyberphysics:unrealengine-${CYBERPHYSICS_TAG:-latest}
+    container_name: ue_client
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ../applications/unrealengine/client:/scripts:ro
+      - /dev/shm:/dev/shm
+    command: >
+      python3 /scripts/example.py --ros-args
+        -p image_topic:=${UE_IMAGE_TOPIC:-/ue/camera/image_raw}
+        -p pose_topic:=${UE_POSE_TOPIC:-/ue/odom}
+        -p pose_type:=${UE_POSE_TYPE:-odometry}
+        -p cmd_topic:=${UE_CMD_TOPIC:-/ue/cmd_vel}
+        -p linear_x:=${UE_CMD_LINEAR_X:-0.0}
+        -p angular_z:=${UE_CMD_ANGULAR_Z:-0.0}
