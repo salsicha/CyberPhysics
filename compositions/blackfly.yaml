@@ -1,8 +1,13 @@
 # Blackfly camera test
-
-# Optional env to set before running docker compose
-# - CAMERA_SERIAL1
-# - ROS_DOMAIN_ID
+#
+# Required env:  CAMERA_SERIAL1  serial number of the Blackfly camera; the
+#                                camera service exits at once when it is unset.
+# Optional env:  ROS_DOMAIN_ID
+#
+# The record service's /shutdown (power off the host) service is disabled.
+# To enable it on a dedicated rig, add the opt-in override:
+#   docker compose -f compositions/blackfly.yaml \
+#     -f systems/components/record-host-shutdown.yaml up
 
 version: "3.9"
 services:
@@ -20,11 +25,16 @@ services:
     image: salsicha/cyberphysics:blackfly-latest
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}  # 0 is default value, to isolate ROS2 msgs use a domain id between 1-101
-    command: >
-      ros2 launch spinnaker_camera_driver blackfly_s_gige.launch.py
-        camera_name:='blackfly_1'
-        serial:="'${CAMERA_SERIAL1}'"
-        frame_rate:='10'
+      - CAMERA_SERIAL1=${CAMERA_SERIAL1:-}
+    command:
+      - bash
+      - -c
+      - >-
+        if [ -z "$$CAMERA_SERIAL1" ]; then
+        echo "CAMERA_SERIAL1 is not set: export the Blackfly serial number before docker compose up" >&2;
+        exit 1; fi;
+        exec ros2 launch spinnaker_camera_driver blackfly_s_gige.launch.py
+        camera_name:=blackfly_1 serial:="'$$CAMERA_SERIAL1'" frame_rate:=10
   record:
     restart: always
     pull_policy: never
@@ -33,11 +43,7 @@ services:
     volumes:
       - /dev/shm:/dev/shm
       - /data:/data
-      - ../systems/blackfly/env/:/env
-      - /bin/systemctl:/bin/systemctl # these folders (*) allow the docker container to shutdown host
-      - /run/systemd/system:/run/systemd/system # *
-      - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket # *
-      - /sys/fs/cgroup:/sys/fs/cgroup # *
+      - ../systems/blackfly/env/:/env:ro
     environment:
       - TOPICS_EXCLUDED="-x '(.*)/image|(.*)/image_color|(.*)/image_mono|(.*)/image_proc_debayer/(.*)'"
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}  # 0 is default value, to isolate ROS2 msgs use a domain id between 1-101

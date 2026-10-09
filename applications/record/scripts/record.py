@@ -22,12 +22,18 @@ BAGFILE_NAME = '{type}_{datetime}_bag'
 MAX_BAG_SIZE = 30000000000  # 30 GB
 MAX_BAG_DURATION = 300  # 5 min
 RECORDING = 'recording_{num:02d}'
-ENVLIST = '/env/env.list'
+# System env list copied into each recording; the entrypoint sources the same file.
+ENVLIST = os.environ.get('ENV_LIST', '/env/env.list')
 RUNLOG = 'run_log.json'
+RECORDER_NODE = 'rosbag2_recorder'
+
+
+def env_flag(name):
+    return os.environ.get(name, '').strip().lower() in {'1', 'true', 'yes', 'on'}
 
 
 class RosbagRecord(Node):
-    def __init__(self, proj_name, server_w_ip, server_eth_ip):
+    def __init__(self, proj_name, server_w_ip, server_eth_ip, enable_shutdown_service=False):
         super().__init__('python_backend')
         self.pilot_notes = None
         self.flight_number = None
@@ -49,7 +55,10 @@ class RosbagRecord(Node):
 
         self.create_subscription(String, '/pilot_notes', self.pilot_notes_callback, 10)
         self.create_subscription(String, '/flight_number', self.flight_number_callback, 10)
-        self.create_service(Trigger, '/shutdown', self.call_shutdown_service)
+        if enable_shutdown_service:
+            # Unauthenticated: any peer on the ROS domain can power off the host.
+            self.get_logger().warning('/shutdown service enabled: any ROS peer can power off this host')
+            self.create_service(Trigger, '/shutdown', self.call_shutdown_service)
 
         self.disk_space_pub = self.create_publisher(String, '/disk_usage', 10)
 
@@ -95,16 +104,12 @@ class RosbagRecord(Node):
         return response
 
     def backend_status_response(self, request, response):
-        record_check = "false"
-
-        list_cmd = subprocess.Popen("source /entrypoint.sh && ros2 node list", shell=True, executable='/bin/bash', stdout=subprocess.PIPE, universal_newlines=True)
-        list_output = list_cmd.stdout.read()
-        retcode = list_cmd.wait()
-
-        if retcode == 0:
-            for str in list_output.split("\n"):
-                if str == "/rosbag2_recorder":
-                    record_check = "true"
+        # Query the ROS graph in-process: a `ros2 node list` subprocess that
+        # sourced the entrypoint inherited its background ptp4l, so reading the
+        # pipe never reached EOF and this single-threaded node hung.
+        recording = any(name == RECORDER_NODE and namespace == '/'
+                        for name, namespace in self.get_node_names_and_namespaces())
+        record_check = "true" if recording else "false"
 
         # Backend response
         response.success = True
@@ -154,12 +159,14 @@ class RosbagRecord(Node):
         topics_excluded = ' '.join(shlex.quote(token) for token in shlex.split(topics_excluded))
 
         whole_bagfile = os.path.join(self.save_location, BAGFILE_NAME.format(type=WHOLE, datetime=date_time))
-        command1 = f"source /entrypoint.sh && ros2 bag record --include-hidden-topics -a " \
+        # The node already runs in the entrypoint's environment; sourcing the
+        # entrypoint again would start another ptp4l for every recording.
+        command1 = f"ros2 bag record --include-hidden-topics -a " \
                    f"-o {shlex.quote(whole_bagfile)} -b {MAX_BAG_SIZE} -d {MAX_BAG_DURATION} {topics_excluded}"
         self.get_logger().info(f"command1: {command1}")
 
         skim_bagfile = os.path.join(self.save_location, BAGFILE_NAME.format(type=SKIM, datetime=date_time))
-        command2 = f"source /entrypoint.sh && ros2 bag record " \
+        command2 = f"ros2 bag record " \
                    f"-a -o {shlex.quote(skim_bagfile)} -b {MAX_BAG_SIZE} -d {MAX_BAG_DURATION} -x '(.*)(image|camera)'"
         self.get_logger().info(f"command2: {command2}")
 
@@ -285,17 +292,25 @@ class RosbagRecord(Node):
             self.get_logger().info("Source file not found.")
 
 
-def main(args=None):
+def parse_args(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--proj_name", nargs='?', default="local")
     parser.add_argument("--server_w_ip", nargs='?', help='Provide Wireless IP address of main server')
     parser.add_argument("--server_eth_ip", nargs='?', help='Provide Ethernet IP address of main server')
+    parser.add_argument("--enable_shutdown_service", action='store_true',
+                        default=env_flag('RECORD_ENABLE_SHUTDOWN_SERVICE'),
+                        help='Offer the unauthenticated /shutdown service that powers off the host '
+                             '(also RECORD_ENABLE_SHUTDOWN_SERVICE=true); needs the host systemd mounts')
+    return parser.parse_args(argv)
 
-    args = parser.parse_args()
+
+def main(args=None):
+    args = parse_args(args)
 
     rclpy.init()
 
-    node = RosbagRecord(args.proj_name, args.server_w_ip, args.server_eth_ip)
+    node = RosbagRecord(args.proj_name, args.server_w_ip, args.server_eth_ip,
+                        enable_shutdown_service=args.enable_shutdown_service)
     try:
         rclpy.spin(node)
     except (KeyboardInterrupt, ExternalShutdownException):

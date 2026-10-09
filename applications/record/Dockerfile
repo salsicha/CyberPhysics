@@ -1,9 +1,8 @@
 # Cross platform support
+ARG TAG=latest
 
-# FROM --platform=$TARGETPLATFORM salsicha/cyberphysics:ros2-latest AS build
-FROM salsicha/cyberphysics:ros2-latest AS build
-
-ARG TAG
+# FROM --platform=$TARGETPLATFORM salsicha/cyberphysics:ros2-${TAG} AS build
+FROM salsicha/cyberphysics:ros2-${TAG} AS build
 
 ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US.UTF-8 \
@@ -27,7 +26,8 @@ RUN chmod +x /entrypoint.sh
 COPY scripts /scripts
 COPY tests /tests
 
-RUN touch /env.list
+# Compose files mount the system env list directory here (see entrypoint.sh).
+RUN mkdir -p /env
 
 #####################################################################
 # Final release build
@@ -52,4 +52,4 @@ WORKDIR /scripts
 
 ENTRYPOINT ["/entrypoint.sh"]
 
-CMD ["python3", "record.py", "example_system"]
+CMD ["python3", "record.py", "--proj_name", "example_system"]

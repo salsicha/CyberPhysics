@@ -19,15 +19,15 @@ docker compose -f blackfly.yml up --remove-orphans
 
 Open up ```http://localhost:8888``` and view the topic /blackfly_camera/image_color. You should the camera streaming.
 
-# Running the FTB system deployment
+# Running the Blackfly stack
 At the root of monorepo run
 ```sh
-./start.sh FTB
+CAMERA_SERIAL1=<serial> ./start.sh blackfly
 ```
 
 Verify everything is working by going to ```http://localhost:8888```. Select the camera topics. You should see video streaming for all the cameras.
 
-If you are seeing intermittent or no images it is possible the cameras are outputting too much data for the network to handle. Tweak the **CAMERA_THROUGHPUT_LIMIT** variable in ```systems/FTB/env/env.list```. You can also try lowering the frame rate by editing the blackflly yaml files.
+If you are seeing intermittent or no images it is possible the cameras are outputting too much data for the network to handle. Lower the `device_link_throughput_limit` parameter (see `src/spinnaker_camera_driver/config/blackfly_s*.cfg`), or lower the `frame_rate` in `compositions/blackfly.yaml`.
 
 
 # Spinview

@@ -124,17 +124,30 @@ CameraDriver::~CameraDriver()
 
 bool CameraDriver::stop()
 {
-  stopCamera();
-  if (wrapper_) {
-    wrapper_->deInitCamera();
+  try {
+    stopCamera();
+  } catch (const std::exception & e) {
+    RCLCPP_WARN_STREAM(get_logger(), "failed to stop camera: " << e.what());
   }
-  if (!statusTimer_->is_canceled()) {
-    statusTimer_->cancel();
+  // Join the publish thread before DeInit: it reads camera registers.
+  {
+    std::unique_lock<std::mutex> lock(mutex_);
+    keepRunning_ = false;
+    cv_.notify_all();
   }
-  keepRunning_ = false;
   if (thread_) {
     thread_->join();
     thread_ = 0;
+  }
+  if (wrapper_) {
+    try {
+      wrapper_->deInitCamera();
+    } catch (const std::exception & e) {
+      RCLCPP_WARN_STREAM(get_logger(), "failed to deinit camera: " << e.what());
+    }
+  }
+  if (!statusTimer_->is_canceled()) {
+    statusTimer_->cancel();
   }
   return (true);
 }
@@ -461,12 +474,20 @@ void CameraDriver::run()
           cv_.wait_for(lock, timeout);
         }
         if (!bufferQueue_.empty()) {
-          img = bufferQueue_.back();
-          bufferQueue_.pop_back();
+          // Oldest first, so stamps never go backwards after a stall.
+          img = bufferQueue_.front();
+          bufferQueue_.pop_front();
         }
       }  // -------- end of locked section
       if (img && keepRunning_ && rclcpp::ok()) {
-        doPublish(img);
+        // An exception escaping this thread would std::terminate the process
+        // (and every component in its container).
+        try {
+          doPublish(img);
+        } catch (const std::exception & e) {
+          RCLCPP_ERROR_STREAM_THROTTLE(
+            get_logger(), *get_clock(), 5000, "failed to publish image: " << e.what());
+        }
       }
     }
   }
@@ -536,8 +557,10 @@ rclcpp::Time CameraDriver::getAdjustedTimeStamp(uint64_t t, int64_t sensorTime)
 
 void CameraDriver::doPublish(const ImageConstPtr & im)
 {
+  // imageTime_ is the camera clock (ns since camera power-up); map it onto
+  // host time instead of publishing it raw.
   const auto t =
-    adjustTimeStamp_ ? rclcpp::Time(im->imageTime_) : rclcpp::Time(im->time_);
+    adjustTimeStamp_ ? getAdjustedTimeStamp(im->time_, im->imageTime_) : rclcpp::Time(im->time_);
   imageMsg_.header.stamp = t;
   cameraInfoMsg_.header.stamp = t;
 
@@ -568,13 +591,20 @@ void CameraDriver::doPublish(const ImageConstPtr & im)
   }
 
   if (cameraInfoExtPub_->get_subscription_count() > 0) {
-    cameraInfoExtMsg_.header.stamp = t;
-    cameraInfoExtMsg_.actual_frame_rate = wrapper_->camera()->AcquisitionResultingFrameRate.GetValue();
-    cameraInfoExtMsg_.uptime = wrapper_->camera()->DeviceUptime.GetValue();
-    cameraInfoExtMsg_.voltage = wrapper_->camera()->PowerSupplyVoltage.GetValue();
-    cameraInfoExtMsg_.current = wrapper_->camera()->PowerSupplyCurrent.GetValue();
-    cameraInfoExtMsg_.frames_dropped = static_cast<int>(im->frameDrop_);
-    cameraInfoExtPub_->publish(cameraInfoExtMsg_);
+    try {
+      cameraInfoExtMsg_.header.stamp = t;
+      cameraInfoExtMsg_.actual_frame_rate =
+        wrapper_->camera()->AcquisitionResultingFrameRate.GetValue();
+      cameraInfoExtMsg_.uptime = wrapper_->camera()->DeviceUptime.GetValue();
+      cameraInfoExtMsg_.voltage = wrapper_->camera()->PowerSupplyVoltage.GetValue();
+      cameraInfoExtMsg_.current = wrapper_->camera()->PowerSupplyCurrent.GetValue();
+      cameraInfoExtMsg_.frames_dropped = static_cast<int>(im->frameDrop_);
+      cameraInfoExtPub_->publish(cameraInfoExtMsg_);
+    } catch (const std::exception & e) {
+      // Register reads fail while the camera is disconnecting or deinitialized.
+      RCLCPP_WARN_STREAM_THROTTLE(
+        get_logger(), *get_clock(), 5000, "cannot read camera status registers: " << e.what());
+    }
   }
 
   if (metaPub_->get_subscription_count() != 0) {
@@ -698,9 +728,6 @@ bool CameraDriver::start()
     RCLCPP_ERROR_STREAM(get_logger(), "giving up, camera " << serial_ << " not found!");
     return (false);
   }
-  keepRunning_ = true;
-  thread_ = std::make_shared<std::thread>(&CameraDriver::run, this);
-
   if (wrapper_->initCamera(serial_)) {
     if (dumpNodeMap_) {
       RCLCPP_INFO_STREAM(get_logger(), "dumping node map!");
@@ -718,6 +745,11 @@ bool CameraDriver::start()
     cameraInfoExtMsg_.serial = wrapper_->camera()->DeviceSerialNumber.ToString();
     cameraInfoExtMsg_.model = wrapper_->camera()->DeviceModelName.ToString();
     cameraInfoExtMsg_.firmware = wrapper_->camera()->DeviceFirmwareVersion.ToString();
+    // Start the publish thread last: if anything above throws, no joinable
+    // std::thread is destroyed (std::terminate) while the exception unwinds.
+    // Frames delivered meanwhile wait in bufferQueue_.
+    keepRunning_ = true;
+    thread_ = std::make_shared<std::thread>(&CameraDriver::run, this);
   } else {
     RCLCPP_ERROR_STREAM(get_logger(), "init camera failed for cam: " << serial_);
   }

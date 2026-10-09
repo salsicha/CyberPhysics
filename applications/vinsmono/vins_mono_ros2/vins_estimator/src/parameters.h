@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cmath>
+#include <cstdint>
 #include <rclcpp/rclcpp.hpp>
 #include <rcutils/logging_macros.h>
 #include <vector>
@@ -65,3 +67,18 @@ enum NoiseOrder
     O_AW = 6,
     O_GW = 9
 };
+
+// rclcpp::Time(double) would treat the value as integer nanoseconds. Split the
+// seconds instead, so a header stamp converted to double and back compares
+// equal (relocalization matches frames by exact stamp).
+inline rclcpp::Time toRosTime(double seconds)
+{
+    double sec = std::floor(seconds);
+    int64_t nsec = std::llround((seconds - sec) * 1e9);
+    if (nsec >= 1000000000)
+    {
+        sec += 1.0;
+        nsec -= 1000000000;
+    }
+    return rclcpp::Time(static_cast<int32_t>(sec), static_cast<uint32_t>(nsec));
+}

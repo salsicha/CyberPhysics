@@ -8,7 +8,35 @@ in `applications/turret_sim`; ground truth never enters the controller.
 The YOLO node consumes a ROS camera image, camera intrinsics, and pan/tilt joint
 state.  It runs Ultralytics YOLOE segmentation, associates the configured target,
 and publishes masks, target errors, diagnostics, and closed-loop `JointState`
-commands.  Configuration is in `config/yolo_tracker.yaml`.
+commands.  Configuration is in `config/yolo_tracker.yaml` (simulator scene) and
+`config/yolo_tracker_hardware.yaml` (physical turret: generic `person` prompt,
+confidence 0.25, narrow association gate, commands only after the emergency
+stop is released).
+
+### Control loop
+
+Each detection's angular error is added to the turret position *when that
+frame was captured* (measured joint states interpolated at the image stamp, or,
+without measured feedback, the command in effect `actuator_latency_s` earlier)
+to estimate the target direction; the command moves `kp` of the way there per
+frame, limited to `max_rate_rad_s`. This makes the loop independent of camera,
+inference and actuator latency; if the compensation is wrong the update
+degrades to an integrator, stable for `kp < 2 sin(pi / (2 (2n + 1)))` with n
+frames of delay (1.0, 0.62, 0.45, 0.35 for n = 1..4). The defaults (0.4
+simulation, 0.3 hardware) stay stable for 3-4 uncompensated frames.
+
+Commands are published only while all of these hold:
+
+- `command_enabled` is true;
+- the emergency stop is not engaged (`/turret/emergency_stop`,
+  `std_msgs/msg/Bool`; with `require_estop_release` a `false` message must be
+  received first);
+- measured joint states arrived within `joint_state_timeout_s`, or the
+  actuator reports ready on `/turret/actuator_ready` within
+  `actuator_ready_timeout_s`. Without either, commands that nobody executes
+  would wind the turret to a joint limit.
+
+Non-finite errors and joint states are rejected.
 
 ## Run
 
@@ -71,7 +99,9 @@ startup and persists in `cache/turret/models/`.  Override it with
 ## ROS contract
 
 - Input: `/turret/camera/image_raw`, `/turret/camera/camera_info`,
-  `/turret/joint_states`
+  `/turret/joint_states` (measured positions only),
+  `/turret/emergency_stop` and `/turret/actuator_ready` (`std_msgs/msg/Bool`,
+  transient-local; the e-stop also accepts default-QoS publishers)
 - Perception: `/turret/yolo/segments`, `/turret/yolo/target_mask`,
   `/turret/yolo/target_bbox`, `/turret/yolo/target_confidence`,
   `/turret/yolo/annotated_image`
@@ -79,9 +109,32 @@ startup and persists in `cache/turret/models/`.  Override it with
   `/turret/target/selected_id`, `/turret/target/locked`
 - Output: `/turret/joint_commands`, `/turret/diagnostics`
 
-The Arduino bridge uses `config/arduino.env` and
-`config/arduino_bridge.yaml`. It forwards the shared joint-command contract to
-the physical controller and republishes joint state and diagnostics.
+The Arduino bridge (`scripts/turret_arduino_bridge.py`) uses
+`config/arduino.env` and `config/arduino_bridge.yaml`. It writes
+`SET pan_joint <rad> tilt_joint <rad>` lines for joint commands and `STOP` when
+the emergency stop engages, and publishes `/turret/joint_states` only from
+`POS pan_joint <rad> tilt_joint <rad>` lines sent by the firmware; it never
+echoes commands as joint states. Commands arriving while the port is closed,
+the Arduino is resetting, or the e-stop is engaged are dropped, not queued.
+`/turret/actuator_ready` is true only while commands are being written. The
+repository does not yet contain firmware for this protocol; see
+`hardware/turret.md`.
+
+Release (arm) or engage the emergency stop. The tracker and bridge keep the
+last value they received; do not leave two publishers with different values
+running at the same time:
+
+```bash
+ros2 topic pub --times 3 /turret/emergency_stop std_msgs/msg/Bool "{data: false}"  # release
+ros2 topic pub --times 3 /turret/emergency_stop std_msgs/msg/Bool "{data: true}"   # stop
+```
+
+A dedicated e-stop node should publish with transient-local, reliable QoS so
+nodes that start later receive the current state. With a default-QoS publisher
+such as the commands above, ROS warns about an incompatible `DURABILITY` policy
+for the latched subscription; the message still arrives through the second,
+volatile subscription. The software e-stop is not a
+substitute for a physical switch that removes servo power.
 
 The original package is based on
 [adityakamath/pan_tilt_ros](https://github.com/adityakamath/pan_tilt_ros).

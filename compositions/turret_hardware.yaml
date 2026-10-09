@@ -1,5 +1,8 @@
-# Physical PanTiltROS turret.  Its YOLO/controller service is the same service
-# used by turret_sim.yaml; the peers here are a real ROS camera and Arduino.
+# Physical PanTiltROS turret.  Its YOLO/controller service is the same code
+# used by turret_sim.yaml, with the conservative yolo_tracker_hardware.yaml
+# profile; the peers here are a real ROS camera and Arduino.  Nothing moves
+# until the emergency stop is released on /turret/emergency_stop and the
+# Arduino firmware implements the bridge's serial protocol (hardware/turret.md).
 
 x-pantiltros-image: &pantiltros-image
   image: salsicha/cyberphysics:pantiltros-${CYBERPHYSICS_TAG:-latest}
@@ -30,13 +33,13 @@ services:
     command: >
       python3 /scripts/pantilt_yolo_tracker.py
       --ros-args
-      --params-file /workspace/pantiltros/config/yolo_tracker.yaml
+      --params-file /workspace/pantiltros/config/yolo_tracker_hardware.yaml
       -p camera_topic:=${TURRET_CAMERA_TOPIC:-/camera/camera/color/image_raw}
       -p camera_info_topic:=${TURRET_CAMERA_INFO_TOPIC:-/camera/camera/color/camera_info}
       -p model_path:=${TURRET_YOLO_MODEL:-yoloe-26s-seg.pt}
       -p device:="'${TURRET_YOLO_DEVICE:-0}'"
       -p image_size:=${TURRET_YOLO_IMAGE_SIZE:-640}
-      -p confidence:=${TURRET_YOLO_CONFIDENCE:-0.003}
+      -p confidence:=${TURRET_YOLO_CONFIDENCE:-0.25}
     healthcheck:
       test: ["CMD-SHELL", "test -f /tmp/pantilt_yolo_ready"]
       interval: 10s

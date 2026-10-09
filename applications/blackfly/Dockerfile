@@ -1,6 +1,6 @@
 # Cross platform support
-ARG TAG
-FROM --platform=$TARGETPLATFORM cyberphysics/ros2:$TAG AS build
+ARG TAG=latest
+FROM --platform=$TARGETPLATFORM salsicha/cyberphysics:ros2-${TAG} AS build
 
 ARG TARGETARCH
 

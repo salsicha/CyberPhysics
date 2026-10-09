@@ -34,9 +34,12 @@ RUN python3 -m venv /venv
 
 COPY scripts /home/ubuntu/scripts
 
-## Arduino IDE
-## Fetch the latest Arduino Pro IDE release version
-RUN curl -L -o /arduino.zip $(curl --silent https://api.github.com/repos/arduino/arduino-ide/releases/latest | grep "browser_download_url.*Linux_64bit.zip" | cut -d : -f 2,3 | xargs)
+## Arduino IDE, pinned (checksum from the GitHub release asset)
+ARG ARDUINO_IDE_VERSION=2.3.10
+ARG ARDUINO_IDE_SHA256=cc8a0b01e763d4646b670ce70c1bc8c389a0fa14ab556dcc0749c03f475a7975
+RUN curl -fL -o /arduino.zip \
+      "https://github.com/arduino/arduino-ide/releases/download/${ARDUINO_IDE_VERSION}/arduino-ide_${ARDUINO_IDE_VERSION}_Linux_64bit.zip" && \
+    echo "${ARDUINO_IDE_SHA256}  /arduino.zip" | sha256sum -c -
 ## Unzip the Arduino Pro IDE
 RUN unzip /arduino.zip -d /opt && rm /arduino.zip
 RUN mv /opt/arduino* /opt/arduino-ide ||:
@@ -54,7 +57,8 @@ WORKDIR /home/ubuntu/
 
 ## PlatformIO
 WORKDIR /home/ubuntu/scripts
-RUN . /venv/bin/activate && pip3 install platformio
+ARG PLATFORMIO_VERSION=6.2.0
+RUN . /venv/bin/activate && pip3 install "platformio==${PLATFORMIO_VERSION}"
 
 ## Hack to fix pio trying to enforce its own python environment
 RUN mkdir -p /root/.platformio/penv/bin/

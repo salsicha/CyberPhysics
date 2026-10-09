@@ -462,7 +462,7 @@ bool KeyFrame::findConnection(KeyFrame* old_kf)
 	            	cv::Mat thumbimage;
 	            	cv::resize(loop_match_img, thumbimage, cv::Size(loop_match_img.cols / 2, loop_match_img.rows / 2));
 	    	    	sensor_msgs::msg::Image::SharedPtr msg = cv_bridge::CvImage(std_msgs::msg::Header(), "bgr8", thumbimage).toImageMsg();
-	                msg->header.stamp = rclcpp::Time(time_stamp);
+	                msg->header.stamp = toRosTime(time_stamp);
 	    	    	pub_match_img->publish(*msg);
 	            }
 	        }
@@ -488,7 +488,7 @@ bool KeyFrame::findConnection(KeyFrame* old_kf)
 	    	if(FAST_RELOCALIZATION)
 	    	{
 			    sensor_msgs::msg::PointCloud msg_match_points;
-			    msg_match_points.header.stamp = rclcpp::Time(time_stamp);
+			    msg_match_points.header.stamp = toRosTime(time_stamp);
 			    for (int i = 0; i < (int)matched_2d_old_norm.size(); i++)
 			    {
 		            geometry_msgs::msg::Point32 p;

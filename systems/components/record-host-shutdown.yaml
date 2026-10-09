@@ -1,0 +1,20 @@
+# Opt-in override: let the record service power off the host via its ROS
+# /shutdown Trigger service, e.g.
+#
+#   docker compose -f compositions/blackfly.yaml \
+#     -f systems/components/record-host-shutdown.yaml up
+#
+# WARNING: /shutdown is unauthenticated. Any process that can reach this ROS
+# domain (host networking: the whole LAN on the same ROS_DOMAIN_ID) can turn
+# the machine off. Only use it on an isolated rig network, preferably with
+# ROS_LOCALHOST_ONLY=1 or a dedicated ROS_DOMAIN_ID.
+services:
+  record:
+    environment:
+      - RECORD_ENABLE_SHUTDOWN_SERVICE=true
+    volumes:
+      # Host systemd access for `shutdown -h now` inside the container.
+      - /bin/systemctl:/bin/systemctl
+      - /run/systemd/system:/run/systemd/system
+      - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket
+      - /sys/fs/cgroup:/sys/fs/cgroup

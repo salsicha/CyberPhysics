@@ -67,6 +67,12 @@ The stock open-vocabulary model exercises actual inference and control, but the
 strict thresholds are intended for a turret checkpoint trained on representative
 camera data.
 
+`command_saturation_fraction` counts received commands at or beyond a joint
+limit, `emergency_stop_violation_count` counts commands that arrive more than
+`pantilt.emergency_stop_grace_s` (default two frames) after the emergency stop
+was raised, and the `command_dropout` variant drops commands during its
+interval (`dropped_command_count`).
+
 ## Offline regression helper
 
 `scripts/turret_sim.py` retains a deterministic synthetic detector solely for

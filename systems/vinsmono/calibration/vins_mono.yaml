@@ -61,7 +61,7 @@ g_norm: 9.81
 loop_closure: 0
 fast_relocalization: 0
 load_previous_pose_graph: 0
-pose_graph_save_path: "/data/vinsmono/pose_graph"
+pose_graph_save_path: "/data/vinsmono/pose_graph/"
 support_path: "/workspace/install/share/config_pkg/support_files"
 
 # Camera/IMU timing

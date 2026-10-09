@@ -1,3 +1,8 @@
 ## Record node for recording ROS topics via Web UI app
 
 * This node records a rosbag and stores pilot notes via the Web UI app which is used to start and stop recordings
+
+* Status (`/get_backend_status`) is answered from the node's own ROS graph view; no subprocess is spawned.
+* The system env list is read from `ENV_LIST` (default `/env/env.list`; compose mounts the system env directory at `/env`). The entrypoint sources it and each recording keeps a copy.
+* `ptp4l` is started once by the entrypoint on `PTP_INTERFACE` (default: the rig NIC; set it empty to disable).
+* The `/shutdown` service (powers off the host) is disabled by default. It is unauthenticated, so any peer on the ROS domain could call it. Enable it only on an isolated rig with `--enable_shutdown_service` or `RECORD_ENABLE_SHUTDOWN_SERVICE=true`, plus the host systemd mounts in `systems/components/record-host-shutdown.yaml`.

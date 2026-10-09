@@ -16,6 +16,7 @@
 #ifndef SPINNAKER_CAMERA_DRIVER__CAMERA_DRIVER_HPP_
 #define SPINNAKER_CAMERA_DRIVER__CAMERA_DRIVER_HPP_
 
+#include <atomic>
 #include <camera_info_manager/camera_info_manager.hpp>
 #include <deque>
 #include <flir_camera_msgs/msg/camera_control.hpp>
@@ -115,7 +116,7 @@ private:
   std::deque<ImageConstPtr> bufferQueue_;
   size_t maxBufferQueueSize_{4};
   std::shared_ptr<std::thread> thread_;
-  bool keepRunning_{true};
+  std::atomic<bool> keepRunning_{true};
   std::map<std::string, NodeInfo> parameterMap_;
   std::vector<std::string> parameterList_;  // remember original ordering
   rclcpp::Subscription<flir_camera_msgs::msg::CameraControl>::SharedPtr controlSub_;

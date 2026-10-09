@@ -1,3 +1,6 @@
+# Simulator profile (compositions/turret_sim.yaml, pantiltros.yaml): prompts,
+# initial selection and the very low confidence are tuned to the synthetic
+# warehouse scene. The physical turret uses yolo_tracker_hardware.yaml.
 pantilt_yolo_tracker:
   ros__parameters:
     camera_topic: /turret/camera/image_raw
@@ -14,6 +17,8 @@ pantilt_yolo_tracker:
     selected_id_topic: /turret/target/selected_id
     locked_topic: /turret/target/locked
     diagnostics_topic: /turret/diagnostics
+    emergency_stop_topic: /turret/emergency_stop
+    actuator_ready_topic: /turret/actuator_ready
     model_path: /workspace/cache/models/yoloe-26s-seg.pt
     device: "0"
     image_size: 640
@@ -29,8 +34,12 @@ pantilt_yolo_tracker:
     initial_selection_normalized: [0.13, 0.565]
     association_gate_fraction: 0.50
     command_enabled: true
-    kp: 0.82
-    kd: 0.08
+    require_estop_release: false
+    kp: 0.4
+    max_rate_rad_s: 1.5
+    actuator_latency_s: 0.1
+    joint_state_timeout_s: 0.5
+    actuator_ready_timeout_s: 1.0
     pan_min_rad: -1.5708
     pan_max_rad: 1.5708
     tilt_min_rad: -0.65

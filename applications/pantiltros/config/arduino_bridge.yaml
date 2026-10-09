@@ -3,6 +3,10 @@ turret_arduino_bridge:
     joint_command_topic: /turret/joint_commands
     joint_state_topic: /turret/joint_states
     diagnostics_topic: /turret/diagnostics
+    emergency_stop_topic: /turret/emergency_stop
+    actuator_ready_topic: /turret/actuator_ready
+    # SET lines are written only after a false message on emergency_stop_topic.
+    require_estop_release: true
     diagnostic_rate_hz: 1.0
     pan_min_rad: -1.5708
     pan_max_rad: 1.5708

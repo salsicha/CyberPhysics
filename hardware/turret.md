@@ -28,43 +28,70 @@ Baseline hardware
   segmentation. Use GPU acceleration for high-resolution YOLO26 segmentation
   tests.
 - 1 x regulated servo power supply sized for both servos at peak load.
-- 1 x emergency-stop input or joystick button mapped to the PanTiltROS
-  `stop_button` parameter.
+- 1 x physical emergency-stop switch that removes servo power, plus a way to
+  publish the software stop on `/turret/emergency_stop` (see below).
 - Cabling, strain relief, mounting hardware, and optional cable chain so the
   pan/tilt range cannot pull camera or servo cables tight.
 
 Arduino integration
 
-- The hardware stack should run `compositions/turret_hardware.yaml`, which
-  starts the PanTiltROS-compatible ROS side and the Arduino tooling profile.
-- The ROS side publishes and consumes the same `pan_joint` and `tilt_joint`
-  contract used in simulation, then forwards compact serial commands to the
-  Arduino.
-- The Arduino should run turret firmware that accepts host serial commands,
-  applies configured servo limits, drives the ST3215/STS3215 bus through the
-  half-duplex interface, and returns position/current/temperature/voltage
-  feedback.
+Status: the ROS side exists; the turret firmware does not. Nothing in this
+repository implements the serial protocol below on the Arduino yet
+(`applications/arduino/scripts` only holds micro-ROS/UDP demos), and the
+upstream ST3215 node `pan_tilt_ctrl_node` in `applications/pantiltros/pantiltros`
+is not built in the PanTiltROS image: it needs the Feetech `SCServo_Linux`
+library (`include/SCServo_Linux/libSCServo.a`), which is not vendored.
+
+- `compositions/turret_hardware.yaml` runs the YOLO tracker with
+  `applications/pantiltros/config/yolo_tracker_hardware.yaml` and the serial
+  bridge `applications/pantiltros/scripts/turret_arduino_bridge.py`; the
+  `arduino` profile adds the Arduino IDE container for flashing firmware.
+- Serial protocol (ASCII lines, `\n` terminated, radians, 115200 baud by
+  default, see `config/arduino.env`):
+  - host to firmware `SET pan_joint <pan> tilt_joint <tilt>`: move to the
+    position (already clamped to the joint limits by the bridge);
+  - host to firmware `STOP`: stop moving and hold (or disable torque). Sent
+    when the software e-stop engages, on bridge shutdown, and after
+    (re)connecting while the e-stop is engaged;
+  - firmware to host `POS pan_joint <pan> tilt_joint <tilt>`: measured joint
+    positions, e.g. at 20-50 Hz. These are the only source of
+    `/turret/joint_states`; the bridge never echoes commands;
+  - firmware to host `ERR <text>`: shown in the bridge diagnostics.
+- Firmware should also stop on its own when no `SET` arrives for ~0.5 s, apply
+  its own servo limits, and drive the ST3215/STS3215 bus through the
+  half-duplex interface.
+- The bridge waits 2 s after opening the port (Arduino reset) and drops
+  commands while disconnected, resetting or e-stopped, so stale commands are
+  never replayed. Without `POS` feedback the tracker drives open loop and only
+  while the bridge reports `/turret/actuator_ready`.
 - Keep servo power on a separate regulated supply with a shared signal ground
-  to the Arduino and a physical emergency-stop path that can remove actuator
+  to the Arduino and a physical emergency-stop path that removes actuator
   power.
 
 ROS contract
 
-- Manual command input: `sensor_msgs/msg/Joy` consumed by `pan_tilt_cmd_node`.
-- Commanded joints: `sensor_msgs/msg/JointState` for `pan_joint` and
-  `tilt_joint`.
-- Servo controller output and feedback: `pan_tilt_ctrl_node` commands the
-  ST3215 bus and publishes measured `sensor_msgs/msg/JointState` plus
-  `diagnostic_msgs/msg/DiagnosticArray`.
-- Camera stream: `/turret/camera/image_raw` with
-  `/turret/camera/camera_info`.
+- Camera stream: the hardware composition defaults to the RealSense topics
+  `/camera/camera/color/image_raw` and `/camera/camera/color/camera_info`
+  (`TURRET_CAMERA_TOPIC`, `TURRET_CAMERA_INFO_TOPIC`).
 - Segmentation output: `/turret/yolo/segments`, `/turret/yolo/target_mask`,
-  `/turret/yolo/target_bbox`, and `/turret/yolo/target_confidence`.
+  `/turret/yolo/target_bbox`, `/turret/yolo/target_confidence`, and
+  `/turret/yolo/annotated_image`.
 - Tracker output: `/turret/target/pixel_error`,
   `/turret/target/angular_error`, `/turret/target/selected_id`, and
   `/turret/target/locked`.
-- Actuator command output: `/turret/joint_commands` or the PanTiltROS
-  `JointState` command topic used by the simulated controller.
+- Joint commands: `sensor_msgs/msg/JointState` on `/turret/joint_commands`
+  with `pan_joint` and `tilt_joint`.
+- Measured joint state: `sensor_msgs/msg/JointState` on `/turret/joint_states`,
+  published by the bridge from firmware `POS` lines only.
+- Emergency stop: `std_msgs/msg/Bool` on `/turret/emergency_stop`. `true`
+  stops the tracker from commanding and makes the bridge send `STOP` and drop
+  commands. On hardware both start engaged and need an explicit `false`
+  (`require_estop_release`), e.g.
+  `ros2 topic pub --times 3 /turret/emergency_stop std_msgs/msg/Bool "{data: false}"`.
+- Actuator readiness: `std_msgs/msg/Bool` on `/turret/actuator_ready`
+  (transient-local), true only while the bridge is connected, settled, not
+  e-stopped and writing commands.
+- Diagnostics: `/turret/diagnostics` from the tracker and the bridge.
 
 Simulation compatibility notes
 

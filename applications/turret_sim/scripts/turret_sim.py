@@ -460,6 +460,7 @@ class TurretSim:
         quant = float(self.pantilt['quantization_rad'])
         backlash = float(self.pantilt['backlash_rad'])
         deadband = float(self.pantilt['deadband_rad'])
+        before = (self.pan, self.tilt)
         for axis in ('pan', 'tilt'):
             current = getattr(self, axis)
             command = getattr(self, f'{axis}_cmd')
@@ -476,6 +477,9 @@ class TurretSim:
             if current < limits[0] - 1e-9 or current > limits[1] + 1e-9:
                 self.joint_limit_violations += 1
             setattr(self, axis, clamp(current, limits[0], limits[1]))
+        if emergency_stop and (self.pan, self.tilt) != before:
+            # The joints must not move while the emergency stop is raised.
+            self.emergency_stop_violations += 1
 
     def run(self, max_frames=None):
         duration = float(self.scenario['duration_s'])

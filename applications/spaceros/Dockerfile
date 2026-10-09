@@ -1,5 +1,8 @@
 
-FROM osrf/space-ros:latest AS build
+# Pinned Space ROS release; the demos checkout below uses the matching tag.
+ARG SPACEROS_RELEASE=jazzy-2026.07.0
+FROM osrf/space-ros:${SPACEROS_RELEASE} AS build
+ARG SPACEROS_RELEASE
 
 ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US.UTF-8 \
@@ -7,7 +10,7 @@ ENV LANG=en_US.UTF-8 \
     PYTHONIOENCODING=UTF-8 \
     DEBIAN_FRONTEND=noninteractive \
     PATH="/venv/bin:$PATH" \
-    ROS_DISTRO=humble
+    ROS_DISTRO=jazzy
 
 # This prevents ROS setup.bash from failing
 SHELL ["/bin/bash","-c"]
@@ -19,7 +22,7 @@ RUN apt update && apt install -q -y --no-install-recommends \
 RUN python3 -m venv /venv
 
 # Demos
-RUN git clone https://github.com/space-ros/demos.git /demos
+RUN git clone --depth 1 --branch "${SPACEROS_RELEASE}" https://github.com/space-ros/demos.git /demos
 WORKDIR /demos/curiosity_rover
 RUN ./build.sh
 

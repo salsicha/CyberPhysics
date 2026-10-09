@@ -4,6 +4,8 @@
 #include "camodocal/camera_models/CataCamera.h"
 #include "camodocal/camera_models/PinholeCamera.h"
 #include <eigen3/Eigen/Dense>
+#include <cmath>
+#include <cstdint>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/image.hpp>
 #include <sensor_msgs/msg/point_cloud.hpp>
@@ -26,3 +28,18 @@ extern int DEBUG_IMAGE;
 extern int FAST_RELOCALIZATION;
 
 
+
+// rclcpp::Time(double) would treat the value as integer nanoseconds. Split the
+// seconds instead, so a header stamp converted to double and back compares
+// equal (relocalization matches frames by exact stamp).
+inline rclcpp::Time toRosTime(double seconds)
+{
+    double sec = std::floor(seconds);
+    int64_t nsec = std::llround((seconds - sec) * 1e9);
+    if (nsec >= 1000000000)
+    {
+        sec += 1.0;
+        nsec -= 1000000000;
+    }
+    return rclcpp::Time(static_cast<int32_t>(sec), static_cast<uint32_t>(nsec));
+}

@@ -1,6 +1,8 @@
 pan_tilt_ctrl_node:
   ros__parameters:
     joint_ids: [12, 13]
+    joint_names: [pan_joint, tilt_joint] # same order as joint_ids
+    command_timeout: 0.5 # s without joint commands before holding position
     stop_button: 4 # L1
     min_pos: [1024, 1600] # per-joint servo step limits, matches cmd_config.yaml
     max_pos: [3072, 3072]

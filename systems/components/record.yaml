@@ -1,3 +1,5 @@
+# The /shutdown (power off the host) service is disabled; see
+# record-host-shutdown.yaml for the opt-in override.
 services:
   record:
     restart: always
@@ -8,11 +10,9 @@ services:
     privileged: true
     volumes:
       - /data:/data
-      - ${PWD}/env/:/env
-      - /bin/systemctl:/bin/systemctl # these folders (*) allow the docker container to shutdown host
-      - /run/systemd/system:/run/systemd/system # *
-      - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket # *
-      - /sys/fs/cgroup:/sys/fs/cgroup # *
+      # Directory holding the system env.list; the entrypoint sources it and
+      # each recording keeps a copy.
+      - ${RECORD_ENV_DIR:?set RECORD_ENV_DIR to the directory containing the system env.list}:/env:ro
     environment:
       - TOPICS_EXCLUDED="-x '(.*)/image_raw_meta$$'"
       - TZ=America/Los_Angeles
@@ -20,4 +20,4 @@ services:
       - ROS_DOMAIN_ID=$ROS_DOMAIN_ID
     command: >
       stdbuf -o L
-      bash -c "source /env.list && python3 record.py --proj_name ${SYSTEM_NAME} --server_w_ip ${SERVER_IP} --server_eth_ip ${ETH_IP:-127.0.0.1}"
+      python3 record.py --proj_name ${SYSTEM_NAME} --server_w_ip ${SERVER_IP} --server_eth_ip ${ETH_IP:-127.0.0.1}

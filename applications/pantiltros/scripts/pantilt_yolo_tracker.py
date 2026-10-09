@@ -7,6 +7,8 @@ import json
 import math
 import os
 import time
+from bisect import bisect_right
+from collections import deque
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +19,7 @@ from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus, KeyValue
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from rclpy.qos import (
+    DurabilityPolicy,
     HistoryPolicy,
     QoSProfile,
     ReliabilityPolicy,
@@ -28,7 +31,147 @@ from ultralytics import YOLO
 
 
 def clamp(value: float, low: float, high: float) -> float:
+    if not math.isfinite(value):
+        raise ValueError(f"cannot clamp non-finite value {value!r}")
     return max(low, min(high, value))
+
+
+def finite(*values: Any) -> bool:
+    try:
+        return all(math.isfinite(float(value)) for value in values)
+    except (TypeError, ValueError):
+        return False
+
+
+def stamp_seconds(stamp: Any) -> float:
+    return float(stamp.sec) + float(stamp.nanosec) * 1e-9
+
+
+class PanTiltController:
+    """Latency-compensated pan/tilt position controller (no ROS dependencies).
+
+    A camera frame captured at time ``t`` reports the target's angular offset
+    ``e`` from the optical axis. The target direction in joint space is
+    ``theta = q(t) + e``, where ``q(t)`` is where the turret pointed when the
+    frame was captured: measured joint states interpolated at ``t`` when the
+    actuator reports them, otherwise the command in effect at
+    ``t - actuator_latency_s``. Each frame moves the command a fraction
+    ``gain`` of the way from the previous command toward ``theta``, at most
+    ``max_rate_rad_s``.
+
+    With the position at capture time known, ``theta`` does not depend on the
+    turret's own motion, so the loop is a first-order filter (pole
+    ``1 - gain``) whatever the camera/inference/actuator latency. If that
+    compensation were lost entirely, the update would degrade to integrating
+    the image error with an n-frame delay, which is stable only for
+    ``gain < 2 sin(pi / (2 (2 n + 1)))`` = 1.0, 0.62, 0.45, 0.35 for
+    n = 1..4 frames; the 0.82 per-frame gain this replaces is unstable from two
+    frames of delay (pole magnitude 1.09). Keep ``gain`` at or below 0.45 when
+    the latency estimate is uncertain.
+    """
+
+    def __init__(
+        self,
+        gain: float = 0.4,
+        max_rate_rad_s: float = 1.5,
+        pan_limits: tuple[float, float] = (-1.5708, 1.5708),
+        tilt_limits: tuple[float, float] = (-0.65, 0.75),
+        actuator_latency_s: float = 0.1,
+        feedback_timeout_s: float = 0.5,
+        resume_timeout_s: float = 0.5,
+        history_s: float = 5.0,
+        initial_position: tuple[float, float] = (0.0, 0.0),
+    ) -> None:
+        if not 0.0 < gain <= 1.0:
+            raise ValueError("gain must be in (0, 1]")
+        if not max_rate_rad_s > 0.0:
+            raise ValueError("max_rate_rad_s must be positive")
+        if actuator_latency_s < 0.0:
+            raise ValueError("actuator_latency_s must not be negative")
+        self.gain = float(gain)
+        self.max_rate = float(max_rate_rad_s)
+        self.limits = (
+            (float(pan_limits[0]), float(pan_limits[1])),
+            (float(tilt_limits[0]), float(tilt_limits[1])),
+        )
+        self.actuator_latency_s = float(actuator_latency_s)
+        self.feedback_timeout_s = float(feedback_timeout_s)
+        self.resume_timeout_s = float(resume_timeout_s)
+        self.history_s = float(history_s)
+        self.measured: deque[tuple[float, float, float]] = deque()
+        # Until a command is sent the turret is assumed to be at its start pose.
+        self.commanded: deque[tuple[float, float, float]] = deque(
+            [(-math.inf, float(initial_position[0]), float(initial_position[1]))]
+        )
+        self.last_command: tuple[float, float, float] | None = None
+
+    def add_measured(self, t: float, pan: float, tilt: float) -> bool:
+        if not finite(t, pan, tilt):
+            return False
+        if self.measured and t < self.measured[-1][0]:
+            self.measured.clear()  # source restarted or the clock jumped back
+        self.measured.append((float(t), float(pan), float(tilt)))
+        self._prune(self.measured, t)
+        return True
+
+    def has_feedback(self, now: float) -> bool:
+        return bool(self.measured) and now - self.measured[-1][0] <= self.feedback_timeout_s
+
+    def reference(self, t_image: float, now: float) -> tuple[tuple[float, float], str]:
+        """Turret position when the frame stamped ``t_image`` was captured."""
+        if self.has_feedback(now):
+            return self._lookup(self.measured, t_image, True), "measured"
+        return (
+            self._lookup(self.commanded, t_image - self.actuator_latency_s, False),
+            "commanded",
+        )
+
+    def update(
+        self, t_image: float, err_pan: float, err_tilt: float, now: float
+    ) -> tuple[float, float] | None:
+        """Return the next (pan, tilt) command, or None for invalid input."""
+        if not finite(t_image, err_pan, err_tilt, now):
+            return None
+        reference, _ = self.reference(t_image, now)
+        target = (reference[0] + err_pan, reference[1] + err_tilt)
+        if (
+            self.last_command is not None
+            and 0.0 <= now - self.last_command[0] <= self.resume_timeout_s
+        ):
+            previous = self.last_command[1:]
+            dt = max(1e-3, now - self.last_command[0])
+        else:
+            # First command, or resuming after a pause: start from the best
+            # estimate of where the turret is now rather than a stale command.
+            previous = (
+                self.measured[-1][1:] if self.has_feedback(now) else self.commanded[-1][1:]
+            )
+            dt = min(self.resume_timeout_s, 0.1)
+        step_limit = self.max_rate * dt
+        command = []
+        for prev, goal, (low, high) in zip(previous, target, self.limits):
+            step = max(-step_limit, min(step_limit, self.gain * (goal - prev)))
+            command.append(clamp(prev + step, low, high))
+        self.last_command = (float(now), command[0], command[1])
+        self.commanded.append(self.last_command)
+        self._prune(self.commanded, now)
+        return command[0], command[1]
+
+    def _prune(self, history: deque, now: float) -> None:
+        while len(history) > 2 and now - history[1][0] > self.history_s:
+            history.popleft()
+
+    @staticmethod
+    def _lookup(history: deque, t: float, interpolate: bool) -> tuple[float, float]:
+        times = [sample[0] for sample in history]
+        index = bisect_right(times, t)
+        if index == 0:
+            return history[0][1:]
+        if index == len(history) or not interpolate:
+            return history[index - 1][1:]
+        (t0, *first), (t1, *second) = history[index - 1], history[index]
+        ratio = (t - t0) / (t1 - t0) if t1 > t0 else 1.0
+        return tuple(a + (b - a) * ratio for a, b in zip(first, second))
 
 
 def image_to_bgr(msg: Image) -> np.ndarray:
@@ -87,12 +230,12 @@ def bgr_message(frame: np.ndarray, source: Image) -> Image:
     return msg
 
 
-def joint_position(msg: JointState | None, name: str, default: float = 0.0) -> float:
+def joint_position(msg: JointState | None, name: str) -> float | None:
     if msg is not None and name in msg.name:
         index = msg.name.index(name)
         if index < len(msg.position):
             return float(msg.position[index])
-    return default
+    return None
 
 
 class PanTiltYoloTracker(Node):
@@ -113,6 +256,8 @@ class PanTiltYoloTracker(Node):
             "selected_id_topic": "/turret/target/selected_id",
             "locked_topic": "/turret/target/locked",
             "diagnostics_topic": "/turret/diagnostics",
+            "emergency_stop_topic": "/turret/emergency_stop",
+            "actuator_ready_topic": "/turret/actuator_ready",
             "model_path": "/workspace/cache/models/yoloe-26s-seg.pt",
             "device": "0",
             "image_size": 640,
@@ -123,8 +268,16 @@ class PanTiltYoloTracker(Node):
             "initial_selection_normalized": [0.13, 0.565],
             "association_gate_fraction": 0.50,
             "command_enabled": True,
-            "kp": 0.82,
-            "kd": 0.08,
+            # Commands stay disabled until a false emergency-stop message arrives.
+            "require_estop_release": False,
+            # Fraction of the remaining pointing error corrected per frame; see
+            # PanTiltController for the latency/stability trade-off.
+            "kp": 0.4,
+            "max_rate_rad_s": 1.5,
+            # Command-to-motion delay used when no measured joint states arrive.
+            "actuator_latency_s": 0.1,
+            "joint_state_timeout_s": 0.5,
+            "actuator_ready_timeout_s": 1.0,
             "pan_min_rad": -1.5708,
             "pan_max_rad": 1.5708,
             "tilt_min_rad": -0.65,
@@ -154,12 +307,27 @@ class PanTiltYoloTracker(Node):
             self.parameter("association_gate_fraction")
         )
         self.command_enabled = bool(self.parameter("command_enabled"))
-        self.kp = float(self.parameter("kp"))
-        self.kd = float(self.parameter("kd"))
         self.pan_min = float(self.parameter("pan_min_rad"))
         self.pan_max = float(self.parameter("pan_max_rad"))
         self.tilt_min = float(self.parameter("tilt_min_rad"))
         self.tilt_max = float(self.parameter("tilt_max_rad"))
+        self.joint_state_timeout_s = float(self.parameter("joint_state_timeout_s"))
+        self.controller = PanTiltController(
+            gain=float(self.parameter("kp")),
+            max_rate_rad_s=float(self.parameter("max_rate_rad_s")),
+            pan_limits=(self.pan_min, self.pan_max),
+            tilt_limits=(self.tilt_min, self.tilt_max),
+            actuator_latency_s=float(self.parameter("actuator_latency_s")),
+            feedback_timeout_s=self.joint_state_timeout_s,
+        )
+        self.estop_engaged = bool(self.parameter("require_estop_release"))
+        self.actuator_ready = False
+        self.actuator_ready_time = -math.inf
+        self.actuator_ready_timeout_s = float(
+            self.parameter("actuator_ready_timeout_s")
+        )
+        self.command_state = "idle"
+        self.warned_stamp = False
         self.lock_tolerance = float(self.parameter("lock_tolerance_px"))
         self.publish_annotated_image = bool(
             self.parameter("publish_annotated_image")
@@ -175,10 +343,6 @@ class PanTiltYoloTracker(Node):
         self.ready_file = Path(str(self.parameter("ready_file")))
 
         self.camera_info: CameraInfo | None = None
-        self.joint_state: JointState | None = None
-        self.last_command = (0.0, 0.0)
-        self.last_error: tuple[float, float] | None = None
-        self.last_frame_time: float | None = None
         self.target_centroid: tuple[float, float] | None = None
         self.frame_count = 0
 
@@ -240,6 +404,28 @@ class PanTiltYoloTracker(Node):
             self._image,
             camera_qos,
         )
+        latched_qos = QoSProfile(
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=1,
+        )
+        # The latched subscription receives the last state from transient-local
+        # publishers; the volatile one also matches default-QoS publishers
+        # (e.g. a plain `ros2 topic pub`), which a transient-local reader cannot.
+        for qos in (latched_qos, 10):
+            self.create_subscription(
+                Bool,
+                str(self.parameter("emergency_stop_topic")),
+                self._emergency_stop,
+                qos,
+            )
+        self.create_subscription(
+            Bool,
+            str(self.parameter("actuator_ready_topic")),
+            self._actuator_ready,
+            latched_qos,
+        )
 
         self.get_logger().info(
             f"Loading Ultralytics checkpoint {self.model_path} on {self.device}"
@@ -268,8 +454,34 @@ class PanTiltYoloTracker(Node):
     def _camera_info(self, msg: CameraInfo) -> None:
         self.camera_info = msg
 
+    def _now(self) -> float:
+        return self.get_clock().now().nanoseconds * 1e-9
+
     def _joint_state(self, msg: JointState) -> None:
-        self.joint_state = msg
+        pan = joint_position(msg, "pan_joint")
+        tilt = joint_position(msg, "tilt_joint")
+        if pan is None or tilt is None:
+            return
+        stamp = stamp_seconds(msg.header.stamp)
+        now = self._now()
+        if stamp <= 0.0 or abs(stamp - now) > 2.0:
+            stamp = now
+        if not self.controller.add_measured(stamp, pan, tilt):
+            self.get_logger().warning(
+                "ignoring non-finite joint state", throttle_duration_sec=5.0
+            )
+
+    def _emergency_stop(self, msg: Bool) -> None:
+        engaged = bool(msg.data)
+        if engaged != self.estop_engaged:
+            self.get_logger().warning(
+                "emergency stop " + ("engaged" if engaged else "released")
+            )
+        self.estop_engaged = engaged
+
+    def _actuator_ready(self, msg: Bool) -> None:
+        self.actuator_ready = bool(msg.data)
+        self.actuator_ready_time = self._now()
 
     def _intrinsics(self, width: int, height: int) -> tuple[float, float, float, float]:
         if self.camera_info is not None and len(self.camera_info.k) == 9:
@@ -282,6 +494,17 @@ class PanTiltYoloTracker(Node):
         return float(width), float(width), width * 0.5, height * 0.5
 
     def _image(self, msg: Image) -> None:
+        received = self._now()
+        capture_time = stamp_seconds(msg.header.stamp)
+        if capture_time <= 0.0 or abs(capture_time - received) > 2.0:
+            # Unusable camera clock: fall back to the receive time, which only
+            # loses the transport delay from the latency compensation.
+            if not self.warned_stamp:
+                self.get_logger().warning(
+                    "camera stamps are not on this host's clock; using receive time"
+                )
+                self.warned_stamp = True
+            capture_time = received
         try:
             frame = image_to_bgr(msg)
         except ValueError as exc:
@@ -306,7 +529,7 @@ class PanTiltYoloTracker(Node):
         detections = self._detections(result, width, height)
         target = self._associate_target(detections, width, height)
         self._publish_outputs(
-            msg, frame, target, detections, latency_ms, width, height
+            msg, frame, target, detections, latency_ms, width, height, capture_time
         )
         self.frame_count += 1
 
@@ -392,6 +615,7 @@ class PanTiltYoloTracker(Node):
         latency_ms: float,
         width: int,
         height: int,
+        capture_time: float,
     ) -> None:
         public_detections = [
             {key: value for key, value in detection.items() if key != "mask"}
@@ -414,9 +638,7 @@ class PanTiltYoloTracker(Node):
             mask = target["mask"]
             selected_id = self.target_id
             locked = math.hypot(pixel_x, pixel_y) <= self.lock_tolerance
-            self._publish_command(angular_x, angular_y)
-        else:
-            self.last_error = None
+            self._publish_command(angular_x, angular_y, capture_time)
 
         self.mask_pub.publish(mask_message(mask, source))
         self.bbox_pub.publish(Float32MultiArray(data=bbox))
@@ -530,22 +752,37 @@ class PanTiltYoloTracker(Node):
             self.get_logger().error(f"Unable to show OpenCV window: {exc}")
             self.show_window = False
 
-    def _publish_command(self, angular_x: float, angular_y: float) -> None:
+    def _command_gate(self, now: float) -> str:
+        """Why commands are (not) being sent: 'measured'/'commanded' allow them."""
         if not self.command_enabled:
+            return "disabled"
+        if self.estop_engaged:
+            return "emergency_stop"
+        if self.controller.has_feedback(now):
+            return "measured"
+        if (
+            self.actuator_ready
+            and now - self.actuator_ready_time <= self.actuator_ready_timeout_s
+        ):
+            return "commanded"
+        # Without measured joint states or a live actuator, integrating
+        # commands that are never executed would wind the turret to a limit.
+        return "actuator_not_ready"
+
+    def _publish_command(
+        self, angular_x: float, angular_y: float, capture_time: float
+    ) -> None:
+        now = self._now()
+        self.command_state = self._command_gate(now)
+        if self.command_state not in ("measured", "commanded"):
             return
-        now = time.monotonic()
-        dt = 0.0 if self.last_frame_time is None else max(1e-4, now - self.last_frame_time)
-        derivative_x = derivative_y = 0.0
-        if self.last_error is not None and dt > 0.0:
-            derivative_x = (angular_x - self.last_error[0]) / dt
-            derivative_y = (angular_y - self.last_error[1]) / dt
-        self.last_frame_time = now
-        self.last_error = (angular_x, angular_y)
-        pan = joint_position(self.joint_state, "pan_joint", self.last_command[0])
-        tilt = joint_position(self.joint_state, "tilt_joint", self.last_command[1])
-        pan = clamp(pan + self.kp * angular_x + self.kd * derivative_x * dt, self.pan_min, self.pan_max)
-        tilt = clamp(tilt + self.kp * angular_y + self.kd * derivative_y * dt, self.tilt_min, self.tilt_max)
-        self.last_command = (pan, tilt)
+        command_position = self.controller.update(
+            capture_time, angular_x, angular_y, now
+        )
+        if command_position is None:
+            self.command_state = "invalid_error"
+            return
+        pan, tilt = command_position
         command = JointState()
         command.header.stamp = self.get_clock().now().to_msg()
         command.name = ["pan_joint", "tilt_joint"]
@@ -567,6 +804,8 @@ class PanTiltYoloTracker(Node):
             KeyValue(key="latency_ms", value=f"{latency_ms:.3f}"),
             KeyValue(key="detection_count", value=str(detection_count)),
             KeyValue(key="frame_count", value=str(self.frame_count)),
+            KeyValue(key="command_state", value=self.command_state),
+            KeyValue(key="emergency_stop", value=str(self.estop_engaged).lower()),
         ]
         message = DiagnosticArray()
         message.header.stamp = self.get_clock().now().to_msg()

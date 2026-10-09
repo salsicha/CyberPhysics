@@ -25,9 +25,19 @@ static Vector3d last_path(0.0, 0.0, 0.0);
 
 static std::shared_ptr<tf2_ros::TransformBroadcaster> br;
 
+// Paths are republished on every frame; keep the newest poses only (0 = unbounded).
+static int max_path_length = 2000;
+
+static void trimPath(nav_msgs::msg::Path &p)
+{
+    if (max_path_length > 0 && p.poses.size() > static_cast<size_t>(max_path_length))
+        p.poses.erase(p.poses.begin(), p.poses.end() - max_path_length);
+}
+
 
 void registerPub(rclcpp::Node::SharedPtr n)
 {
+    max_path_length = n->declare_parameter<int>("max_path_length", max_path_length);
     pub_latest_odometry = n->create_publisher<nav_msgs::msg::Odometry>("imu_propagate", 1000);
     pub_path = n->create_publisher<nav_msgs::msg::Path>("path", 1000);
     pub_relo_path = n->create_publisher<nav_msgs::msg::Path>("relocalization_path", 1000);
@@ -159,6 +169,7 @@ void pubOdometry(const Estimator &estimator, const std_msgs::msg::Header &header
         path.header = header;
         path.header.frame_id = "world";
         path.poses.push_back(pose_stamped);
+        trimPath(path);
         pub_path->publish(path);
 
         Vector3d correct_t;
@@ -178,13 +189,14 @@ void pubOdometry(const Estimator &estimator, const std_msgs::msg::Header &header
         relo_path.header = header;
         relo_path.header.frame_id = "world";
         relo_path.poses.push_back(pose_stamped);
+        trimPath(relo_path);
         pub_relo_path->publish(relo_path);
 
         // write result to file
         ofstream foutC(VINS_RESULT_PATH, ios::app);
         foutC.setf(ios::fixed, ios::floatfield);
-        foutC.precision(0);
-        foutC << header.stamp.sec + header.stamp.nanosec * (1e-9) << ",";
+        // Integer nanoseconds, as upstream VINS-Mono and EuRoC ground truth.
+        foutC << static_cast<int64_t>(header.stamp.sec) * 1000000000LL + header.stamp.nanosec << ",";
         foutC.precision(5);
         foutC << estimator.Ps[WINDOW_SIZE].x() << ","
               << estimator.Ps[WINDOW_SIZE].y() << ","
@@ -454,7 +466,7 @@ void pubKeyframe(const Estimator &estimator)
 void pubRelocalization(const Estimator &estimator)
 {
     nav_msgs::msg::Odometry odometry;
-    odometry.header.stamp = rclcpp::Time(estimator.relo_frame_stamp);
+    odometry.header.stamp = toRosTime(estimator.relo_frame_stamp);
     odometry.header.frame_id = "world";
     odometry.pose.pose.position.x = estimator.relo_relative_t.x();
     odometry.pose.pose.position.y = estimator.relo_relative_t.y();

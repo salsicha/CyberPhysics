@@ -73,6 +73,14 @@ class TurretRosSimulator(Node):
         self.occlusion_started: float | None = None
         self.was_detected = False
         self.false_lock_count = 0
+        # (time, saturated) for every accepted joint command.
+        self.command_log: list[tuple[float, bool]] = []
+        self.dropped_command_count = 0
+        self.emergency_stop_started: float | None = None
+        # Commands already in flight when the stop is raised are not violations.
+        self.emergency_stop_grace_s = float(
+            scenario["pantilt"].get("emergency_stop_grace_s", 2.0 * self.dt)
+        )
 
         self.latest: dict[str, Any] = {
             "segments": [],
@@ -127,10 +135,29 @@ class TurretRosSimulator(Node):
         positions = dict(zip(msg.name, msg.position))
         if "pan_joint" not in positions or "tilt_joint" not in positions:
             return
-        pan_limits = self.scenario["pantilt"]["pan_limit_rad"]
-        tilt_limits = self.scenario["pantilt"]["tilt_limit_rad"]
-        pan = max(float(pan_limits[0]), min(float(pan_limits[1]), float(positions["pan_joint"])))
-        tilt = max(float(tilt_limits[0]), min(float(tilt_limits[1]), float(positions["tilt_joint"])))
+        pan = float(positions["pan_joint"])
+        tilt = float(positions["tilt_joint"])
+        if not (math.isfinite(pan) and math.isfinite(tilt)):
+            return
+        if self.sim.command_dropped(self.current_t):
+            self.dropped_command_count += 1
+            return
+        if (
+            self.emergency_stop_started is not None
+            and self.current_t - self.emergency_stop_started > self.emergency_stop_grace_s
+        ):
+            # The controller must stop commanding while the e-stop is raised.
+            self.sim.emergency_stop_violations += 1
+            return
+        pan_limits = [float(value) for value in self.scenario["pantilt"]["pan_limit_rad"]]
+        tilt_limits = [float(value) for value in self.scenario["pantilt"]["tilt_limit_rad"]]
+        saturated = (
+            pan <= pan_limits[0] + 1e-6 or pan >= pan_limits[1] - 1e-6
+            or tilt <= tilt_limits[0] + 1e-6 or tilt >= tilt_limits[1] - 1e-6
+        )
+        self.command_log.append((self.current_t, saturated))
+        pan = max(pan_limits[0], min(pan_limits[1], pan))
+        tilt = max(tilt_limits[0], min(tilt_limits[1], tilt))
         execute_at = self.current_t + float(self.scenario["pantilt"]["command_latency_s"])
         self.sim.command_queue.append((execute_at, pan, tilt))
 
@@ -180,6 +207,10 @@ class TurretRosSimulator(Node):
             return
         self.current_t = round(self.frame_index * self.dt, 6)
         emergency_stop = self.sim.in_emergency_stop(self.current_t)
+        if not emergency_stop:
+            self.emergency_stop_started = None
+        elif self.emergency_stop_started is None:
+            self.emergency_stop_started = self.current_t
         self.sim.update_servo(self.current_t, self.dt, emergency_stop)
         frame, ground_truth_masks = self.sim.render_frame(self.current_t)
         self._record(ground_truth_masks, emergency_stop)
@@ -350,6 +381,9 @@ class TurretRosSimulator(Node):
         ]
         ious = [sample["derived"]["target_iou"] for sample in detected]
         latencies = [sample["derived"]["yolo_latency_ms"] for sample in scored]
+        scored_commands = [
+            saturated for t_s, saturated in self.command_log if t_s >= ignore_initial
+        ]
         summary = {
             "sample_count": len(self.records),
             "scored_sample_count": len(scored),
@@ -364,7 +398,10 @@ class TurretRosSimulator(Node):
             "target_min_iou": min(ious) if ious else 0.0,
             "false_lock_count": self.false_lock_count,
             "max_reacquire_time_s": max(self.reacquire_times) if self.reacquire_times else 0.0,
-            "command_saturation_fraction": 0.0,
+            "command_saturation_fraction": (
+                sum(scored_commands) / len(scored_commands) if scored_commands else 0.0
+            ),
+            "dropped_command_count": self.dropped_command_count,
             "joint_limit_violation_count": self.sim.joint_limit_violations,
             "emergency_stop_violation_count": self.sim.emergency_stop_violations,
             "max_yolo_latency_ms": max(latencies) if latencies else 0.0,

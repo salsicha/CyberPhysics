@@ -62,6 +62,8 @@ rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr pub_camera_po
 rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr pub_key_odometrys;
 rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr pub_vio_path;
 nav_msgs::msg::Path no_loop_path;
+// no_loop_path is republished on every VIO pose; keep the newest poses only (0 = unbounded).
+int MAX_PATH_LENGTH = 2000;
 
 std::string BRIEF_PATTERN_FILE;
 std::string POSE_GRAPH_SAVE_PATH;
@@ -283,6 +285,9 @@ void vio_callback(const nav_msgs::msg::Odometry::ConstPtr pose_msg)
         no_loop_path.header = pose_msg->header;
         no_loop_path.header.frame_id = "world";
         no_loop_path.poses.push_back(pose_stamped);
+        if (MAX_PATH_LENGTH > 0 && no_loop_path.poses.size() > static_cast<size_t>(MAX_PATH_LENGTH))
+            no_loop_path.poses.erase(no_loop_path.poses.begin(),
+                                     no_loop_path.poses.end() - MAX_PATH_LENGTH);
         pub_vio_path->publish(no_loop_path);
     }
 }
@@ -489,6 +494,8 @@ int main(int argc, char **argv)
     n->declare_parameter<double>("skip_dis", 0.0);
     n->get_parameter("skip_dis", SKIP_DIS);
 
+    MAX_PATH_LENGTH = n->declare_parameter<int>("max_path_length", MAX_PATH_LENGTH);
+
     std::string config_file;
     n->declare_parameter<std::string>("config_file", "");
     n->get_parameter("config_file", config_file);
@@ -513,19 +520,24 @@ int main(int argc, char **argv)
         ROW = fsSettings["image_height"];
         COL = fsSettings["image_width"];
         // std::string pkg_path = ament_index_cpp::get_package_share_directory("pose_graph");
+        // The YAML support_path is the default; the support_file parameter overrides it.
         std::string support_path = fsSettings["support_path"];
-        n->declare_parameter<std::string>("support_file", "");
-        n->get_parameter("support_file", support_path);
-        string vocabulary_file = support_path + "/../support_files/brief_k10L6.bin";
+        support_path = n->declare_parameter<std::string>("support_file", support_path);
+        if (!support_path.empty() && support_path.back() == '/')
+            support_path.pop_back();
+        string vocabulary_file = support_path + "/brief_k10L6.bin";
         cout << "vocabulary_file: " << vocabulary_file << endl;
         posegraph.loadVocabulary(vocabulary_file);
 
-        BRIEF_PATTERN_FILE = support_path + "/../support_files/brief_pattern.yml";
+        BRIEF_PATTERN_FILE = support_path + "/brief_pattern.yml";
         cout << "BRIEF_PATTERN_FILE" << BRIEF_PATTERN_FILE << endl;
         m_camera = camodocal::CameraFactory::instance()->generateCameraFromYamlFile(config_file.c_str());
 
         fsSettings["image_topic"] >> IMAGE_TOPIC;        
         fsSettings["pose_graph_save_path"] >> POSE_GRAPH_SAVE_PATH;
+        // Files are written as POSE_GRAPH_SAVE_PATH + name, so it must be a directory path.
+        if (!POSE_GRAPH_SAVE_PATH.empty() && POSE_GRAPH_SAVE_PATH.back() != '/')
+            POSE_GRAPH_SAVE_PATH += '/';
         fsSettings["output_path"] >> VINS_RESULT_PATH;
         fsSettings["save_image"] >> DEBUG_IMAGE;
 
