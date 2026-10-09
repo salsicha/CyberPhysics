@@ -3,6 +3,8 @@
 # profile; the peers here are a real ROS camera and Arduino.  Nothing moves
 # until the emergency stop is released on /turret/emergency_stop and the
 # Arduino firmware implements the bridge's serial protocol (hardware/turret.md).
+# The PanTiltROS and RealSense images both build on the repository's ROS 2
+# Jazzy base, so every node on this DDS graph runs the same distro.
 
 x-pantiltros-image: &pantiltros-image
   image: salsicha/cyberphysics:pantiltros-${CYBERPHYSICS_TAG:-latest}

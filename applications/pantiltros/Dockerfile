@@ -1,5 +1,7 @@
+ARG TAG=latest
 
-FROM ros:humble-ros-base AS build
+# ROS 2 Jazzy (Ubuntu 24.04, Python 3.12) base shared with the other apps
+FROM salsicha/cyberphysics:ros2-${TAG}
 
 ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US.UTF-8 \
@@ -7,36 +9,65 @@ ENV LANG=en_US.UTF-8 \
     PYTHONIOENCODING=UTF-8 \
     DEBIAN_FRONTEND=noninteractive \
     PATH="/venv/bin:$PATH" \
-    ROS_DISTRO=humble
+    ROS_DISTRO=jazzy \
+    ROS2_DISTRO=jazzy
 
 # This prevents ROS setup.bash from failing
 SHELL ["/bin/bash","-c"]
 
-RUN apt update && apt install -q -y --no-install-recommends \
-    curl gnupg2 lsb-release python3-pip python3-serial python3-venv vim wget && \
+# OpenCV (Ultralytics) needs libGL/GLib even for headless image conversion;
+# python3-serial is the Arduino bridge's serial port; xacro and the state
+# publishers are run-time dependencies of the pan_tilt_ros package below.
+RUN apt-get update && apt-get install -q -y --no-install-recommends \
+    libgl1 libglib2.0-0 python3-serial \
+    ros-${ROS_DISTRO}-xacro \
+    ros-${ROS_DISTRO}-robot-state-publisher \
+    ros-${ROS_DISTRO}-joint-state-publisher && \
     rm -rf /var/lib/apt/lists/*
 
+# The base image's /venv (first on PATH); let it also see apt Python packages
+# (python3-serial) as the depthanything image does.
 RUN python3 -m venv --system-site-packages /venv
 
+# Ultralytics YOLOE and its CLIP text tokenizer, pinned to the versions the
+# Humble image resolved (all have CPython 3.12 wheels). PyPI's x86_64 Torch
+# 2.14 wheels bundle CUDA 13 (needs an NVIDIA driver >= 580).
+ARG ULTRALYTICS_VERSION=8.4.52
+ARG TORCH_VERSION=2.14.1
+ARG TORCHVISION_VERSION=0.29.1
+ARG OPENCV_VERSION=5.0.0.93
+ARG CLIP_COMMIT=488e81a6711eea7346872b46ea928b367da8889d
 RUN . /venv/bin/activate && \
     pip3 install --no-cache-dir \
-      ultralytics==8.4.52 \
-      "git+https://github.com/ultralytics/CLIP.git@488e81a6711eea7346872b46ea928b367da8889d"
+      "torch==${TORCH_VERSION}" \
+      "torchvision==${TORCHVISION_VERSION}" \
+      "opencv-python==${OPENCV_VERSION}" \
+      "ultralytics==${ULTRALYTICS_VERSION}" \
+      "clip @ git+https://github.com/ultralytics/CLIP.git@${CLIP_COMMIT}"
 
-# The ROS Humble base's old pip misreads CLIP's PEP 621 metadata as UNKNOWN.
-# Upgrade packaging tools after the large, cacheable Torch layer and reinstall
-# the small text encoder with an explicit package name. OpenCV needs libGL even
-# for the headless ROS image conversion used by this node.
-RUN apt update && apt install -q -y --no-install-recommends \
-    libgl1 libglib2.0-0 && \
-    rm -rf /var/lib/apt/lists/*
-
-RUN --mount=type=cache,target=/root/.cache/pip \
-    . /venv/bin/activate && \
-    pip3 install --upgrade "pip<26" "setuptools>=77,<80" wheel && \
-    pip3 install ftfy regex tqdm && \
-    pip3 install --no-deps --force-reinstall \
-      "clip @ git+https://github.com/ultralytics/CLIP.git@488e81a6711eea7346872b46ea928b367da8889d"
+# pan_tilt_ros: upstream ST3215 pan/tilt nodes (adityakamath/pan_tilt_ros, which
+# supports Humble and Jazzy). Its SCServo_Linux submodule is not vendored here;
+# fetch the commit upstream pins and build the static library the package links
+# from source (the checkout's prebuilt libSCServo.a is aarch64, and its CMake
+# project also builds nanobind Python bindings from another submodule).
+ARG SCSERVO_LINUX_COMMIT=79e70ff57e37103a2c7f726bf67da69a361b7be3
+COPY pantiltros/ /opt/pantiltros_ws/src/pan_tilt_ros/
+RUN cd /opt/pantiltros_ws/src/pan_tilt_ros && \
+    git init -q include/SCServo_Linux && \
+    git -C include/SCServo_Linux fetch -q --depth 1 \
+      https://github.com/adityakamath/SCServo_Linux.git ${SCSERVO_LINUX_COMMIT} && \
+    git -C include/SCServo_Linux checkout -q FETCH_HEAD && \
+    cd include/SCServo_Linux && \
+    rm -rf .git extern examples src *.a *.so setup.py && \
+    for src in SMSCL SMS_STS SCSerial SCS SCSCL SMSBL; do \
+      g++ -std=c++17 -O3 -fPIC -c "${src}.cpp" -o "${src}.o"; \
+    done && \
+    ar rcs libSCServo.a ./*.o && rm -f ./*.o && \
+    cd /opt/pantiltros_ws && \
+    . /opt/ros/${ROS_DISTRO}/setup.bash && \
+    colcon build --install-base /opt/pantiltros_ws/install \
+      --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF && \
+    rm -rf /opt/pantiltros_ws/build /opt/pantiltros_ws/log
 
 # TODO:
 # https://github.com/adityakamath/pan_tilt_ros
@@ -46,20 +77,6 @@ RUN chmod +x /scripts/*.py
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
-
-
-#####################################################################
-
-FROM scratch
-
-ENV LANG=en_US.UTF-8 \
-    LANGUAGE=en_US.UTF-8 \
-    TERM=xterm \
-    PYTHONIOENCODING=UTF-8 \
-    DEBIAN_FRONTEND=noninteractive \
-    PATH="/venv/bin:$PATH"    
-
-COPY --from=build / /
 
 WORKDIR /workspace
 

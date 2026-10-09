@@ -1,8 +1,13 @@
 #!/bin/bash
 set -e
 
-if [ -f "/opt/ros/${ROS_DISTRO:-humble}/setup.bash" ]; then
-    source "/opt/ros/${ROS_DISTRO:-humble}/setup.bash"
+if [ -f "/opt/ros/${ROS_DISTRO:-jazzy}/setup.bash" ]; then
+    source "/opt/ros/${ROS_DISTRO:-jazzy}/setup.bash"
+fi
+
+# pan_tilt_ros (ST3215 nodes, URDF and launch files) built into the image
+if [ -f "/opt/pantiltros_ws/install/setup.bash" ]; then
+    source /opt/pantiltros_ws/install/setup.bash
 fi
 
 if [ -f "/workspace/install/setup.bash" ]; then

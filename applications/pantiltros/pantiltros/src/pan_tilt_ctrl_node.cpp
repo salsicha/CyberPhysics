@@ -53,6 +53,7 @@ public:
             RCLCPP_ERROR(this->get_logger(), "Failed to initialize motors");
             return;
         }
+        port_open_ = true;
 
         for (size_t i = 0; i < joint_ids_.size(); ++i) {
             stop_ = false;
@@ -69,6 +70,10 @@ public:
     }
 
     ~PanTiltCtrlNode() {
+        // Without an open port SCServo's select() on fd -1 aborts the process
+        if (!port_open_) {
+            return;
+        }
         for (size_t i = 0; i < joint_ids_.size(); ++i) {
             stop_ = true;
             st3215_.EnableTorque(static_cast<uint8_t>(joint_ids_[i]), 0);
@@ -87,6 +92,7 @@ private:
     double command_timeout_;
     bool stop_{true};
     bool torque_enabled_{true};
+    bool port_open_{false};
     rclcpp::Time last_cmd_time_;
 
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_subscriber_;

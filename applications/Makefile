@@ -83,13 +83,13 @@ build_nvblox: build_ros2
 	APP=nvblox ./_build_it.sh
 build_oak1: build_aerostack2
 	APP=oak1 ./_build_it.sh
-build_pantiltros:
+build_pantiltros: build_ros2
 	APP=pantiltros ./_build_it.sh
 build_pysimcoder:
 	APP=pysimcoder ./_build_it.sh
 build_qgroundcontrol: build_ros2
 	APP=qgroundcontrol ./_build_it.sh
-build_rai:
+build_rai: build_ros2
 	APP=rai ./_build_it.sh
 build_rangefinder: build_ros2
 	APP=rangefinder ./_build_it.sh

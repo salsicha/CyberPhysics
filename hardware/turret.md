@@ -37,10 +37,12 @@ Arduino integration
 
 Status: the ROS side exists; the turret firmware does not. Nothing in this
 repository implements the serial protocol below on the Arduino yet
-(`applications/arduino/scripts` only holds micro-ROS/UDP demos), and the
-upstream ST3215 node `pan_tilt_ctrl_node` in `applications/pantiltros/pantiltros`
-is not built in the PanTiltROS image: it needs the Feetech `SCServo_Linux`
-library (`include/SCServo_Linux/libSCServo.a`), which is not vendored.
+(`applications/arduino/scripts` only holds micro-ROS/UDP demos). The ST3215
+node `pan_tilt_ctrl_node` (package `pan_tilt_ros` in
+`applications/pantiltros/pantiltros`) is built in the PanTiltROS image, with
+the Feetech `SCServo_Linux` library compiled from source at the commit
+upstream pins; it drives the servos directly over their serial bus instead of
+through an Arduino, but has not been run against real ST3215 servos here.
 
 - `compositions/turret_hardware.yaml` runs the YOLO tracker with
   `applications/pantiltros/config/yolo_tracker_hardware.yaml` and the serial

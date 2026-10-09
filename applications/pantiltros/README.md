@@ -13,6 +13,14 @@ commands.  Configuration is in `config/yolo_tracker.yaml` (simulator scene) and
 confidence 0.25, narrow association gate, commands only after the emergency
 stop is released).
 
+The image is built on the repository's ROS 2 Jazzy base (`ros2`, Python 3.12;
+build it first with `make -C applications build_ros2`) and pins Ultralytics
+8.4.52 with Torch 2.14.1 (CUDA 13 wheels, NVIDIA driver >= 580). It also builds
+the upstream ST3215 package `pan_tilt_ros` (`pantiltros/`, with the
+`SCServo_Linux` library fetched at the commit upstream pins), so
+`ros2 launch pan_tilt_ros pan_tilt_launch.py` and `description_launch.py` are
+available in the container.
+
 ### Control loop
 
 Each detection's angular error is added to the turret position *when that
