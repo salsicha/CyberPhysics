@@ -1,6 +1,6 @@
 
 ARG TAG=latest
-FROM salsicha/cyberphysics:ros2-${TAG} AS build
+FROM salsicha/cyberphysics:ros2-${TAG}
 
 ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US.UTF-8 \
@@ -26,12 +26,6 @@ COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 COPY scripts/simulate_drone_sf.py /workspace/simulate_drone_sf.py
-
-#####################################################################
-
-FROM scratch
-
-COPY --from=build / /
 
 WORKDIR /workspace
 

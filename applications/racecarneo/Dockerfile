@@ -4,7 +4,7 @@ ARG TAG=latest
 # lidar samples, which racecarneo_ros_bridge.py does not expect.
 ARG RACECAR_SIM_VERSION=v2.8.3
 
-FROM salsicha/cyberphysics:ros2-${TAG} AS build
+FROM salsicha/cyberphysics:ros2-${TAG}
 
 ARG RACECAR_SIM_VERSION
 ENV LANG=en_US.UTF-8 \
@@ -94,25 +94,6 @@ COPY scripts/racecarneo_acceptance_report.py /workspace/racecarneo_acceptance_re
 COPY scripts/run_headless_sim.sh /workspace/run_headless_sim.sh
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh /workspace/racecarneo_ros_bridge.py /workspace/cmd_vel_to_ackermann.py /workspace/run_nav2_mission.py /workspace/validate_stack_integration.py /workspace/score_sensor_behavior.py /workspace/racecarneo_acceptance_report.py /workspace/run_headless_sim.sh
-
-FROM scratch
-
-ARG RACECAR_SIM_VERSION
-ENV LANG=en_US.UTF-8 \
-    LANGUAGE=en_US.UTF-8 \
-    TERM=xterm \
-    PYTHONIOENCODING=UTF-8 \
-    DEBIAN_FRONTEND=noninteractive \
-    ROS_DISTRO=jazzy \
-    ROS2_DISTRO=jazzy \
-    RACECAR_HOME=/opt/racecarneo \
-    RACECAR_SIM_DIR=/opt/racecarneo/RacecarNeo-Simulator/RacecarSim_Linux_${RACECAR_SIM_VERSION} \
-    RACECAR_LIBRARY_DIR=/opt/racecarneo/racecar-neo-library/library \
-    RACECAR_SIM_IP=127.0.0.1 \
-    PATH="/venv/bin:$PATH" \
-    PYTHONPATH="/opt/racecarneo/racecar-neo-library/library:/opt/racecarneo/racecar-neo-library/library/simulation"
-
-COPY --from=build / /
 
 WORKDIR /workspace
 

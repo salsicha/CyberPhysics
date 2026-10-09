@@ -1,6 +1,6 @@
 ARG TAG=latest
 
-FROM salsicha/cyberphysics:aerostack2-${TAG} AS build
+FROM salsicha/cyberphysics:aerostack2-${TAG}
 
 ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US.UTF-8 \
@@ -30,9 +30,7 @@ RUN chmod +x /scripts/megadepth_ros.py
 COPY ./entrypoint.sh /
 RUN chmod +x /entrypoint.sh
 
-#####################################################################
-FROM scratch
-
-COPY --from=build / /
+# Containers start in / (the build steps above ran in /scripts)
+WORKDIR /
 
 ENTRYPOINT [ "/entrypoint.sh" ]

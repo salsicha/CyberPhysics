@@ -1,6 +1,6 @@
 ARG TAG=latest
 
-FROM salsicha/cyberphysics:ros2-${TAG} AS build
+FROM salsicha/cyberphysics:ros2-${TAG}
 
 ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US.UTF-8 \
@@ -70,12 +70,13 @@ COPY src /workspace/src
 RUN . /venv/bin/activate && . /opt/ros/${ROS_DISTRO}/setup.bash && \
     apt-get update && \
     rosdep update && rosdep install --from-paths src --ignore-src -y && \
-    colcon build --merge-install --install-base /workspace/install
+    colcon build --merge-install --install-base /workspace/install && \
+    rm -rf /var/lib/apt/lists/*
 
 COPY ./entrypoint.sh /
 RUN chmod +x /entrypoint.sh
 
-FROM scratch
-COPY --from=build / /
+# Containers start in / (the build steps above ran in /workspace)
+WORKDIR /
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["ros2", "launch", "depthanything_pkg", "depthanything.launch.py"]

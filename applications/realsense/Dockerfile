@@ -1,6 +1,6 @@
 ARG TAG=latest
 
-FROM salsicha/cyberphysics:ros2-${TAG} AS build
+FROM salsicha/cyberphysics:ros2-${TAG}
 
 ENV LANGUAGE=en_US.UTF-8 \
     TERM=xterm \
@@ -17,15 +17,8 @@ RUN apt update && apt install -q -y --no-install-recommends \
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-#####################################################################
-FROM scratch
-
-ENV LANGUAGE=en_US.UTF-8 \
-    TERM=xterm \
-    PYTHONIOENCODING=UTF-8 \
-    ROS2_DISTRO=jazzy
-
-COPY --from=build / /
+# Containers start in / (the base image's working directory is /workspace)
+WORKDIR /
 
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["ros2", "launch", "realsense2_camera", "rs_launch.py"]

@@ -1,6 +1,6 @@
 ARG TAG=latest
 
-FROM salsicha/cyberphysics:aerostack2-${TAG} AS build
+FROM salsicha/cyberphysics:aerostack2-${TAG}
 
 ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US.UTF-8 \
@@ -17,9 +17,8 @@ RUN chmod +x /scripts/*.py
 COPY entrypoint.sh /
 RUN chmod +x /entrypoint.sh
 
-FROM scratch
-
-COPY --from=build / /
+# Containers start in / (the base image's working directory is /workspace)
+WORKDIR /
 
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["mavros_mirror"]

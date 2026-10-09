@@ -2,7 +2,7 @@
 # simple_example (a 1 kHz SCHED_FIFO loop, the default command) and
 # tracing_example (writes Perfetto traces of the loop's wakeup latency).
 
-FROM ubuntu:noble AS build
+FROM ubuntu:noble
 
 ENV LANG=C.UTF-8 \
     LC_ALL=C.UTF-8 \
@@ -47,18 +47,6 @@ RUN mkdir -p /workspace/build
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
-
-
-#####################################################################
-
-FROM scratch
-
-ENV LANG=C.UTF-8 \
-    LC_ALL=C.UTF-8 \
-    TERM=xterm \
-    DEBIAN_FRONTEND=noninteractive
-
-COPY --from=build / /
 
 WORKDIR /workspace
 

@@ -1,6 +1,6 @@
 ARG TAG=latest
 
-FROM salsicha/cyberphysics:aerostack2-${TAG} AS build
+FROM salsicha/cyberphysics:aerostack2-${TAG}
 
 ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US.UTF-8 \
@@ -49,9 +49,7 @@ RUN if [ "$SEED_NAV_ASSETS" = "1" ]; then \
 COPY ./entrypoint.sh /
 RUN chmod +x /entrypoint.sh
 
-#####################################################################
-FROM scratch
-
-COPY --from=build / /
+# Containers start in / (the build steps above ran in /workspace)
+WORKDIR /
 
 ENTRYPOINT [ "/entrypoint.sh" ]

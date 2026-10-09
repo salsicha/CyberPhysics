@@ -1,6 +1,6 @@
 ARG TAG=latest
 
-FROM salsicha/cyberphysics:ros2-${TAG} AS build
+FROM salsicha/cyberphysics:ros2-${TAG}
 
 ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US.UTF-8 \
@@ -19,20 +19,6 @@ RUN chmod +x /scripts/rangefinder_node.py /scripts/fake_benewake.py
 
 COPY ./entrypoint.sh /
 RUN chmod +x /entrypoint.sh
-
-#####################################################################
-FROM scratch
-
-ENV LANG=en_US.UTF-8 \
-    LANGUAGE=en_US.UTF-8 \
-    TERM=xterm \
-    PYTHONIOENCODING=UTF-8 \
-    ROS2_DISTRO=jazzy \
-    DEBIAN_FRONTEND=noninteractive \
-    PATH="/venv/bin:$PATH" \
-    ROS_DISTRO=jazzy
-
-COPY --from=build / /
 
 WORKDIR /scripts
 

@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM nvidia/cuda:12.8.0-devel-ubuntu22.04 AS build
+FROM nvidia/cuda:12.8.0-devel-ubuntu22.04
 
 SHELL ["/bin/bash", "-c"]
 
@@ -89,19 +89,12 @@ RUN mkdir -p /usr/share/glvnd/egl_vendor.d && \
       '    }' \
       '}' > /usr/share/vulkan/icd.d/nvidia_icd.json
 
-FROM scratch
-
-ENV DEBIAN_FRONTEND=noninteractive \
-    NVIDIA_DRIVER_CAPABILITIES=graphics,utility,compute \
-    CUDA_HOME=/usr/local/cuda \
-    PATH=/opt/Isaac-GR00T/.venv/bin:/usr/local/cuda/bin:${PATH} \
-    LD_LIBRARY_PATH=/usr/local/cuda/lib64 \
+# Runtime environment: the Isaac-GR00T venv first on PATH, EGL rendering
+ENV PATH=/opt/Isaac-GR00T/.venv/bin:${PATH} \
     VIRTUAL_ENV=/opt/Isaac-GR00T/.venv \
     MUJOCO_GL=egl \
     PYOPENGL_PLATFORM=egl \
     __EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/10_nvidia.json
-
-COPY --from=build / /
 
 WORKDIR /opt/Isaac-GR00T
 ENTRYPOINT ["/entrypoint.sh"]

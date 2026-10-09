@@ -1,5 +1,5 @@
 
-FROM ubuntu:noble AS build
+FROM ubuntu:noble
 
 # Pinned Sim release and the Bun version its package.json asks for
 ARG SIM_REF=v0.9.16
@@ -40,14 +40,7 @@ EXPOSE 3000
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-
-#####################################################################
-
-FROM scratch
-
 ENV NEXT_TELEMETRY_DISABLED=1
-
-COPY --from=build / /
 
 WORKDIR /app/sim
 

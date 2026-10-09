@@ -1,7 +1,7 @@
 
 # ROS2 Jazzy
 
-FROM ubuntu:noble AS build
+FROM ubuntu:noble
 
 ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US.UTF-8 \
@@ -37,7 +37,10 @@ RUN apt update && apt install -q -y --no-install-recommends \
 RUN python3 -m venv /venv
 # EM is preventing msgs from building...
 RUN pip3 uninstall -y em
-RUN pip3 install rosdep colcon-common-extensions pytest-rerunfailures numpy lark empy==3.3.4 pymongo psutil pillow tornado
+# cbor2: rosbridge_library imports it, and rosbridge_server runs on this venv's
+# python (the apt python3-cbor2, same version, is only visible to the system
+# python)
+RUN pip3 install --no-cache-dir rosdep colcon-common-extensions pytest-rerunfailures numpy lark empy==3.3.4 pymongo psutil pillow tornado cbor2==5.6.2
 
 # colcon --merge-install into /opt/ros replaces ROS's own setup scripts with
 # ones that only know the packages built here, which drops the environment
@@ -57,14 +60,16 @@ RUN . /venv/bin/activate && . /opt/ros/$ROS2_DISTRO/setup.bash && \
     rosdep init && \
     rosdep update && \
     rosdep install --from-paths src --ignore-src -y && \
-    colcon build --merge-install --install-base /opt/ros/$ROS2_DISTRO
+    colcon build --merge-install --install-base /opt/ros/$ROS2_DISTRO && \
+    rm -rf /var/lib/apt/lists/*
 
 # Micro-ROS agent
 RUN . /venv/bin/activate && . /opt/ros/$ROS2_DISTRO/setup.bash && \
     apt update && \
     ros2 run micro_ros_setup create_agent_ws.sh && \
     rosdep update && rosdep install --from-paths src --ignore-src -y && \
-    colcon build --merge-install --install-base /opt/ros/$ROS2_DISTRO
+    colcon build --merge-install --install-base /opt/ros/$ROS2_DISTRO && \
+    rm -rf /var/lib/apt/lists/*
 
 # Restore ROS's setup scripts; they also pick up the packages built above
 # through the ament index
@@ -72,20 +77,5 @@ RUN cp -a /opt/ros_setup_orig/. /opt/ros/$ROS2_DISTRO/ && rm -rf /opt/ros_setup_
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
-
-#####################################################################
-FROM scratch
-
-ENV LANG=en_US.UTF-8 \
-    LANGUAGE=en_US.UTF-8 \
-    TERM=xterm \
-    PYTHONIOENCODING=UTF-8 \
-    ROS2_DISTRO=jazzy \
-    DEBIAN_FRONTEND=noninteractive \
-    PATH="/venv/bin:$PATH"
-
-COPY --from=build / /
-
-WORKDIR /workspace
 
 ENTRYPOINT ["/entrypoint.sh"]

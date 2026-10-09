@@ -1,6 +1,6 @@
 ARG TAG=latest
 
-FROM salsicha/cyberphysics:ros2-${TAG} AS build
+FROM salsicha/cyberphysics:ros2-${TAG}
 
 ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US.UTF-8 \
@@ -44,20 +44,6 @@ RUN chmod +x /setup.sh && /setup.sh
 COPY entrypoint.sh /entrypoint.sh
 COPY racecarneo_nvblox.launch.py /workspace/racecarneo_nvblox.launch.py
 RUN chmod +x /entrypoint.sh
-
-FROM scratch
-
-ENV LANG=en_US.UTF-8 \
-    LANGUAGE=en_US.UTF-8 \
-    TERM=xterm \
-    PYTHONIOENCODING=UTF-8 \
-    ROS2_DISTRO=jazzy \
-    ISAAC_ROS_RELEASE_MAJOR=4 \
-    ISAAC_ROS_RELEASE_MINOR=4 \
-    NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics,video \
-    PATH=/usr/local/nvidia/bin:/usr/local/cuda/bin:/usr/src/tensorrt/bin:${PATH}
-
-COPY --from=build / /
 
 WORKDIR /workspace
 

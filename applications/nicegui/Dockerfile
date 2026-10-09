@@ -1,6 +1,6 @@
 ARG TAG=latest
 
-FROM salsicha/cyberphysics:ros2-${TAG} AS build
+FROM salsicha/cyberphysics:ros2-${TAG}
 
 ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US.UTF-8 \
@@ -33,18 +33,8 @@ COPY scripts /workspace/scripts
 COPY entrypoint.sh /
 RUN chmod +x /entrypoint.sh
 
-FROM scratch
-
-ENV LANG=en_US.UTF-8 \
-    LANGUAGE=en_US.UTF-8 \
-    TERM=xterm \
-    PYTHONIOENCODING=UTF-8 \
-    ROS2_DISTRO=jazzy \
-    ROS_DISTRO=jazzy \
-    DEBIAN_FRONTEND=noninteractive \
-    PATH="/venv/bin:$PATH"
-
-COPY --from=build / /
+# Containers start in / (the build steps above ran in /workspace)
+WORKDIR /
 
 EXPOSE 8080
 ENTRYPOINT ["/entrypoint.sh"]

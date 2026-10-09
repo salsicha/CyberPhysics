@@ -1,5 +1,5 @@
 
-FROM robertobucher/pysimcoder:latest AS build
+FROM robertobucher/pysimcoder:latest
 
 ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US.UTF-8 \
@@ -21,20 +21,6 @@ RUN printf '#!/bin/sh\nexec /pysimCoder/pysim-run.sh "$@"\n' > /usr/local/bin/ps
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
-
-
-#####################################################################
-
-FROM scratch
-
-ENV LANG=en_US.UTF-8 \
-    LANGUAGE=en_US.UTF-8 \
-    TERM=xterm \
-    PYTHONIOENCODING=UTF-8 \
-    DEBIAN_FRONTEND=noninteractive \
-    PYSUPSICTRL=/pysimCoder
-
-COPY --from=build / /
 
 WORKDIR /workspace
 

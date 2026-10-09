@@ -1,5 +1,5 @@
 
-FROM ubuntu:noble AS build
+FROM ubuntu:noble
 
 ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US.UTF-8 \
@@ -34,15 +34,15 @@ RUN python3 -m venv /venv
 
 COPY scripts /home/ubuntu/scripts
 
-## Arduino IDE, pinned (checksum from the GitHub release asset)
+## Arduino IDE, pinned (checksum from the GitHub release asset). Download,
+## unzip and delete the zip in one step so it is not kept in a layer.
 ARG ARDUINO_IDE_VERSION=2.3.10
 ARG ARDUINO_IDE_SHA256=cc8a0b01e763d4646b670ce70c1bc8c389a0fa14ab556dcc0749c03f475a7975
 RUN curl -fL -o /arduino.zip \
       "https://github.com/arduino/arduino-ide/releases/download/${ARDUINO_IDE_VERSION}/arduino-ide_${ARDUINO_IDE_VERSION}_Linux_64bit.zip" && \
-    echo "${ARDUINO_IDE_SHA256}  /arduino.zip" | sha256sum -c -
-## Unzip the Arduino Pro IDE
-RUN unzip /arduino.zip -d /opt && rm /arduino.zip
-RUN mv /opt/arduino* /opt/arduino-ide ||:
+    echo "${ARDUINO_IDE_SHA256}  /arduino.zip" | sha256sum -c - && \
+    unzip /arduino.zip -d /opt && rm /arduino.zip && \
+    { mv /opt/arduino* /opt/arduino-ide ||:; }
 
 WORKDIR /home/ubuntu/
 
@@ -72,19 +72,7 @@ RUN . /venv/bin/activate && bash -c 'for i in ./*/; do (cd "$i" && pio lib insta
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-#####################################################################
-FROM scratch
-
-ENV LANG=en_US.UTF-8 \
-    LANGUAGE=en_US.UTF-8 \
-    TERM=xterm \
-    PYTHONIOENCODING=UTF-8 \
-    ROS2_DISTRO=jazzy \
-    DEBIAN_FRONTEND=noninteractive \
-    PATH="/venv/bin:$PATH" \
-    DISPLAY=:0
-
-COPY --from=build / /
+ENV DISPLAY=:0
 
 WORKDIR /home/ubuntu/scripts
 

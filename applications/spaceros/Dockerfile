@@ -1,8 +1,12 @@
 
 # Pinned Space ROS release; the demos checkout below uses the matching tag.
 ARG SPACEROS_RELEASE=jazzy-2026.07.0
-FROM osrf/space-ros:${SPACEROS_RELEASE} AS build
+FROM osrf/space-ros:${SPACEROS_RELEASE}
 ARG SPACEROS_RELEASE
+
+# The base image runs as spaceros-user; installing packages and creating /venv
+# need root, and the container runs as root
+USER root
 
 ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US.UTF-8 \
@@ -31,20 +35,6 @@ RUN chmod +x /scripts/*.py
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
-
-
-#####################################################################
-
-FROM scratch
-
-ENV LANG=en_US.UTF-8 \
-    LANGUAGE=en_US.UTF-8 \
-    TERM=xterm \
-    PYTHONIOENCODING=UTF-8 \
-    DEBIAN_FRONTEND=noninteractive \
-    PATH="/venv/bin:$PATH"    
-
-COPY --from=build / /
 
 WORKDIR /workspace
 

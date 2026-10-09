@@ -1,8 +1,8 @@
 # Cross platform support
 ARG TAG=latest
 
-# FROM --platform=$TARGETPLATFORM salsicha/cyberphysics:ros2-${TAG} AS build
-FROM salsicha/cyberphysics:ros2-${TAG} AS build
+# FROM --platform=$TARGETPLATFORM salsicha/cyberphysics:ros2-${TAG}
+FROM salsicha/cyberphysics:ros2-${TAG}
 
 ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US.UTF-8 \
@@ -29,20 +29,14 @@ COPY tests /tests
 # Compose files mount the system env list directory here (see entrypoint.sh).
 RUN mkdir -p /env
 
-#####################################################################
-# Final release build
-FROM scratch
-
+# Release metadata (_build_it.sh --git), declared last so a new commit only
+# changes the image config, not the layers above
 ARG GIT_COMMIT
 # GIT_COMMIT=$(git rev-parse HEAD)
 ARG GIT_BRANCH
 # GIT_BRANCH=$(git branch --show-current)
 ARG GIT_TAG
 # GIT_TAG=$(git describe --tag)
-
-COPY --from=build / /
-
-ENV PATH="/venv/bin:$PATH"
 
 ENV GIT_COMMIT=${GIT_COMMIT}
 ENV GIT_BRANCH=${GIT_BRANCH}

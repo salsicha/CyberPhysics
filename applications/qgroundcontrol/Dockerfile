@@ -2,7 +2,7 @@
 
 ARG TAG=latest
 
-FROM salsicha/cyberphysics:ros2-${TAG} AS build
+FROM salsicha/cyberphysics:ros2-${TAG}
 
 # Official release AppImage, see https://github.com/mavlink/qgroundcontrol/releases
 ARG QGC_VERSION=v5.1.5
@@ -68,20 +68,6 @@ RUN usermod -a -G dialout ubuntu
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
-
-#####################################################################
-FROM scratch
-
-ENV LANG=en_US.UTF-8 \
-    LANGUAGE=en_US.UTF-8 \
-    TERM=xterm \
-    PYTHONIOENCODING=UTF-8 \
-    ROS2_DISTRO=jazzy \
-    ROS_DISTRO=jazzy \
-    DEBIAN_FRONTEND=noninteractive \
-    PATH="/venv/bin:$PATH"
-
-COPY --from=build / /
 
 USER ubuntu
 

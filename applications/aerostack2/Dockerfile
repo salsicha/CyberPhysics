@@ -1,6 +1,6 @@
 ARG TAG=latest
 
-FROM ros:humble-ros-base AS build
+FROM ros:humble-ros-base
 
 ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US.UTF-8 \
@@ -83,13 +83,6 @@ RUN . /opt/ros/${ROS_DISTRO}/setup.bash && \
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
-
-
-#####################################################################
-
-FROM scratch
-
-COPY --from=build / /
 
 WORKDIR /workspace
 
