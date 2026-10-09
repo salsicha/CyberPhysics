@@ -16,8 +16,8 @@
 # base_link -> racecarneo/{camera_link,lidar_link,imu_link} from the URDF.
 #
 # arm64/Jetson: not supported as is. The nvblox image installs x86_64 Isaac
-# ROS packages, the Nav2 LD_LIBRARY_PATH below is x86_64-specific, and the
-# depthanything image installs CPU-only PyTorch on arm64.
+# ROS packages, and the depthanything image installs CPU-only PyTorch on
+# arm64.
 
 services:
   racecarneo_camera:
@@ -58,9 +58,6 @@ services:
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
       - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
-      # The ros2 base image's setup.bash drops the vendor-package library
-      # paths that robot_state_publisher's sdformat URDF plugin needs.
-      - LD_LIBRARY_PATH=/opt/ros/jazzy/opt/sdformat_vendor/lib:/opt/ros/jazzy/opt/gz_math_vendor/lib:/opt/ros/jazzy/opt/gz_utils_vendor/lib
     volumes:
       - ../systems/racecarneo:/workspace/racecarneo:ro
     # The RealSense driver publishes camera_link -> optical frames itself.
@@ -181,9 +178,6 @@ services:
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
       - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
-      # ros-jazzy-ompl installs libompl.so here without adding it to the
-      # library path, so the Smac planner fails to load without this.
-      - LD_LIBRARY_PATH=/opt/ros/jazzy/lib/x86_64-linux-gnu
     volumes:
       - ../systems/racecarneo/config:/workspace/config:ro
     command: >
