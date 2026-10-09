@@ -63,20 +63,13 @@ docker run --rm salsicha/cyberphysics:smolvla-latest \
 
 ## Persistent directories
 
-Create model, training, telemetry, and cache directories once:
-
-```bash
-mkdir -p \
-  applications/smolvla/smolvla/models \
-  applications/smolvla/smolvla/training \
-  applications/smolvla/smolvla/telemetry \
-  cache/smolvla
-```
-
-The compose stack mounts `applications/smolvla/smolvla` at `/workspace/data`
-and `cache/smolvla` at `/workspace/cache`. The Docker image also copies the
-directory into `/workspace/data`, so the same layout is available when the
-image is run without Compose.
+The model, training, and telemetry directories below
+`applications/smolvla/smolvla` are tracked in Git. The compose stack mounts that
+directory at `/workspace/data` and keeps the Hugging Face/torch cache in the
+named Docker volume `smolvla_cache` at `/workspace/cache` (a missing host bind
+directory would otherwise be created root-owned by Docker). The Docker image
+also copies the data directory into `/workspace/data`, so the same layout is
+available when the image is run without Compose.
 
 ## Download the base model
 
@@ -139,9 +132,24 @@ Use a LeRobot dataset recorded with the standard SO101 joint order:
 5. `wrist_roll`
 6. `gripper`
 
-The default adapter expects the normal LeRobot SO101 units: the five arm joints
-in degrees and the gripper in the 0–100 range, where 0 is closed and 100 is
-open. A typical full fine-tune on a Hub dataset is:
+The default adapter (`SMOLVLA_CHECKPOINT_UNITS=so101`) expects data recorded by
+the LeRobot `so101_follower` with **`use_degrees=True`**: the five arm joints in
+degrees and the gripper in the 0–100 range. LeRobot's default
+`use_degrees=False` stores each arm joint as -100..100 of its calibrated travel;
+those values look like plausible degrees but are not, so the server refuses a
+checkpoint whose state statistics saturate at exactly ±100
+(`SMOLVLA_SKIP_UNIT_CHECK=true` overrides a false positive) and
+`--checkpoint-units so101_range100` is rejected outright: converting it needs
+the arm's calibration file.
+
+LeRobot's 0° is the middle of each joint's calibrated range, while this
+repository's URDF zero is the arm pointing straight up. The server maps
+`urdf_deg = sign * lerobot_deg + offset_deg` per joint and the gripper's
+`closed`/`open` readings to 0–0.04 m using
+`systems/so101/config/lerobot_joint_mapping.json` (`SMOLVLA_JOINT_MAPPING`). Its
+identity values are placeholders, not a calibration: measure the offsets and
+signs on your arm (pose it at known URDF angles and read LeRobot's degrees).
+The server warns while the mapping is the identity. A typical full fine-tune on a Hub dataset is:
 
 ```bash
 docker compose \
@@ -236,8 +244,11 @@ feature names from the selected checkpoint:
 | --- | --- | --- |
 | `SMOLVLA_MODEL_PATH` | `lerobot/smolvla_base` | Hub ID or path below `/workspace/data` |
 | `SMOLVLA_DEVICE` | `cuda` | Torch inference device |
-| `SMOLVLA_CHECKPOINT_UNITS` | `so101` | `so101` degrees/0–100 or `isaac` radians/metres |
+| `SMOLVLA_CHECKPOINT_UNITS` | `so101` | `so101` (use_degrees=True degrees/0–100) or `isaac` radians/metres |
+| `SMOLVLA_JOINT_MAPPING` | `/workspace/systems/so101/config/lerobot_joint_mapping.json` | LeRobot degrees to URDF sign/offset and gripper range |
+| `SMOLVLA_SKIP_UNIT_CHECK` | `false` | Accept a checkpoint whose state statistics look like -100..100 |
 | `SMOLVLA_ACTION_HORIZON` | `8` | Cached action steps before replanning |
+| `SMOLVLA_POLICY_FPS` | `30` | Bridge command rate; must equal the training dataset's fps so queued actions replay at their recorded rate |
 | `SMOLVLA_PORT` | `5556` | Local ZeroMQ policy port |
 | `SMOLVLA_LOCAL_FILES_ONLY` | `false` | Disable Hub access after precaching |
 | `SO101_MAX_JOINT_STEP` | `0.08` | Maximum simulated joint change per command |
@@ -246,12 +257,16 @@ feature names from the selected checkpoint:
 The SmolVLA server uses port 5556 so it does not collide with the GR00T server's
 default port 5555.
 
+The bridge resets the server (dropping its queued action chunk) before the first
+request, when joint feedback resumes after a gap such as an Isaac restart, and
+when the task changes. It sends camera frames at native resolution; SmolVLA's
+own preprocessing resizes with padding exactly as during training.
+
 ## Validation
 
 Render and validate the composition without starting it:
 
 ```bash
-mkdir -p applications/smolvla/smolvla/telemetry cache/smolvla
 docker compose \
   -f compositions/so101_smolvla_isaac.yaml \
   --profile sim config

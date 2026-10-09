@@ -12,10 +12,16 @@ import numpy as np
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import CameraInfo, Image, JointState
-from std_msgs.msg import Float64MultiArray
+from std_msgs.msg import Float64MultiArray, String
 import zmq
 
-from so101_common import JOINT_NAMES, safe_hardware_target
+from so101_common import (
+    CAMERA_HEIGHT,
+    CAMERA_WIDTH,
+    JOINT_NAMES,
+    POLICY_STATS_TOPIC,
+    safe_hardware_target,
+)
 
 
 def pack(data: Any) -> bytes:
@@ -24,6 +30,32 @@ def pack(data: Any) -> bytes:
 
 def unpack(data: bytes) -> Any:
     return msgpack.unpackb(data, object_hook=mnp.decode, raw=False)
+
+
+def letterbox_nearest(image: np.ndarray, height: int, width: int, fill=0) -> np.ndarray:
+    """Resize to height x width without distorting the aspect ratio.
+
+    The image is scaled (nearest neighbour) to fit and centred on a canvas of
+    ``fill``, the same resize-with-pad a LeRobot/SmolVLA preprocessor applies,
+    instead of squashing a 4:3 frame into a square.
+    """
+    source_height, source_width = image.shape[:2]
+    if (source_height, source_width) == (height, width):
+        return image
+    scale = min(height / source_height, width / source_width)
+    scaled_height = max(1, min(height, int(round(source_height * scale))))
+    scaled_width = max(1, min(width, int(round(source_width * scale))))
+    rows = np.minimum(
+        ((np.arange(scaled_height) + 0.5) / scale).astype(np.int64), source_height - 1
+    )
+    cols = np.minimum(
+        ((np.arange(scaled_width) + 0.5) / scale).astype(np.int64), source_width - 1
+    )
+    canvas = np.full((height, width) + image.shape[2:], fill, dtype=image.dtype)
+    top = (height - scaled_height) // 2
+    left = (width - scaled_width) // 2
+    canvas[top:top + scaled_height, left:left + scaled_width] = image[rows][:, cols]
+    return canvas
 
 
 class PolicyClient:
@@ -62,16 +94,33 @@ class PolicyClient:
     def get_action(self, observation: dict):
         return self.call("get_action", {"observation": observation, "options": None})
 
+    def reset(self):
+        # GR00T's PolicyServer calls policy.reset(**data); the SmolVLA server
+        # ignores the payload. Both drop any queued action chunk.
+        return self.call("reset", {"options": None})
+
     def get_modality_config(self):
         return self.call("get_modality_config", requires_input=False)
 
 
 class SO101GrootBridge(Node):
+    # Defaults for state that tests and older callers may not initialise.
+    stats_pub = None
+    send_ground_truth = False
+    episode_reset_gap_s = 1.0
+    latest_image_time = None
+    _last_joint_time = None
+    _reset_pending = True
+
     def __init__(self):
         super().__init__("so101_groot_bridge")
         self.declare_parameter("policy_host", "127.0.0.1")
         self.declare_parameter("policy_port", 5555)
         self.declare_parameter("policy_timeout_ms", 15000)
+        # Commands are produced at the rate the policy's training data was
+        # recorded at; a chunked policy (SmolVLA) replays its queued actions at
+        # this rate. GR00T datasets from convert_rosbags_to_lerobot.py default
+        # to --fps 5; LeRobot SO-101 recordings are usually 30 fps.
         self.declare_parameter("command_rate_hz", 5.0)
         self.declare_parameter("instruction", "move the SO-101 arm")
         self.declare_parameter("scenario_file", "")
@@ -87,10 +136,21 @@ class SO101GrootBridge(Node):
         self.declare_parameter("state_key", "joint_positions")
         self.declare_parameter("action_key", "joint_positions")
         self.declare_parameter("policy_schema", "auto")
-        self.declare_parameter("image_width", 224)
-        self.declare_parameter("image_height", 224)
+        # 0 sends frames at native resolution so the policy's own processor
+        # resizes them exactly as it did the (native 640x480) training videos.
+        # Positive values letterbox (aspect-preserving resize + pad).
+        self.declare_parameter("image_width", 0)
+        self.declare_parameter("image_height", 0)
         self.declare_parameter("joint_history_size", 4)
         self.declare_parameter("max_joint_step", 0.08)
+        # Joint feedback that resumes after this gap (e.g. a simulator restart)
+        # starts a new episode: the policy server is reset before the next
+        # request so no stale queued actions are executed.
+        self.declare_parameter("episode_reset_gap_s", 1.0)
+        # Include simulator object poses in observation metadata. Any policy
+        # given them is reported as having used privileged ground truth.
+        self.declare_parameter("send_ground_truth", False)
+        self.declare_parameter("stats_topic", POLICY_STATS_TOPIC)
 
         self.video_key = self.get_parameter("video_key").value
         self.depth_key = self.get_parameter("depth_key").value
@@ -102,7 +162,9 @@ class SO101GrootBridge(Node):
         self.image_height = int(self.get_parameter("image_height").value)
         self.joint_history_size = max(1, int(self.get_parameter("joint_history_size").value))
         self.max_joint_step = float(self.get_parameter("max_joint_step").value)
-        self.scenario = self._load_scenario()
+        self.episode_reset_gap_s = float(self.get_parameter("episode_reset_gap_s").value)
+        self.send_ground_truth = bool(self.get_parameter("send_ground_truth").value)
+        self.scenario = self._load_scenario(self.get_parameter("task_id").value)
 
         host = self.get_parameter("policy_host").value
         port = int(self.get_parameter("policy_port").value)
@@ -110,6 +172,7 @@ class SO101GrootBridge(Node):
         self.client = PolicyClient(host, port, timeout_ms)
 
         self.latest_image = None
+        self.latest_image_time = None
         self.latest_wrist_image = None
         self.latest_depth = None
         self.latest_camera_info = None
@@ -144,6 +207,9 @@ class SO101GrootBridge(Node):
         self.command_pub = self.create_publisher(
             Float64MultiArray, self.get_parameter("command_topic").value, 10
         )
+        stats_topic = self.get_parameter("stats_topic").value
+        if stats_topic:
+            self.stats_pub = self.create_publisher(String, stats_topic, 10)
         self.create_subscription(Image, self.get_parameter("camera_topic").value, self._image_cb, 5)
         wrist_camera_topic = self.get_parameter("wrist_camera_topic").value
         if wrist_camera_topic:
@@ -157,13 +223,36 @@ class SO101GrootBridge(Node):
         self.create_subscription(
             JointState, self.get_parameter("joint_state_topic").value, self._joint_cb, 10
         )
-        period = 1.0 / float(self.get_parameter("command_rate_hz").value)
-        self.timer = self.create_timer(period, self._tick)
-        print("SO-101 GR00T bridge initialized", flush=True)
+        command_rate_hz = float(self.get_parameter("command_rate_hz").value)
+        if not np.isfinite(command_rate_hz) or command_rate_hz <= 0.0:
+            raise ValueError("command_rate_hz must be positive")
+        self.timer = self.create_timer(1.0 / command_rate_hz, self._tick)
+        self.add_on_set_parameters_callback(self._on_parameters)
+        print(f"SO-101 GR00T bridge initialized at {command_rate_hz:g} Hz", flush=True)
 
-    def _load_scenario(self):
+    def _on_parameters(self, params):
+        from rcl_interfaces.msg import SetParametersResult
+
+        updates = {param.name: param.value for param in params}
+        if "task_id" in updates or "instruction" in updates:
+            self._set_task(updates.get("task_id"), updates.get("instruction"))
+        return SetParametersResult(successful=True)
+
+    def _set_task(self, task_id=None, instruction=None):
+        """Switch task/instruction at runtime; the next request starts a new episode."""
+        if task_id is not None:
+            self.scenario = self._load_scenario(task_id)
+        if instruction is not None:
+            self.instruction = instruction
+        self._request_reset("task changed")
+
+    def _request_reset(self, reason):
+        if not self._reset_pending:
+            self.get_logger().info(f"Resetting the policy before the next request: {reason}")
+        self._reset_pending = True
+
+    def _load_scenario(self, task_id=""):
         scenario_file = self.get_parameter("scenario_file").value
-        task_id = self.get_parameter("task_id").value
         if not scenario_file:
             return {}
         path = Path(scenario_file)
@@ -199,11 +288,12 @@ class SO101GrootBridge(Node):
         arr = arr[:, :, :3]
         if msg.encoding in ("bgr8", "bgra8"):
             arr = arr[:, :, ::-1]
-        return self._resize_nearest(arr, self.image_height, self.image_width)
+        return self._resize(np.ascontiguousarray(arr))
 
     def _image_cb(self, msg: Image):
         image = self._decode_image(msg)
         if image is not None:
+            self.latest_image_time = time.monotonic()
             self.latest_image = image
 
     def _wrist_image_cb(self, msg: Image):
@@ -221,7 +311,7 @@ class SO101GrootBridge(Node):
         else:
             self.get_logger().warn(f"Unsupported depth encoding {msg.encoding}; expected 32FC1/16UC1")
             return
-        self.latest_depth = self._resize_nearest(depth, self.image_height, self.image_width).astype(np.float32)
+        self.latest_depth = self._resize(depth, fill=np.nan).astype(np.float32)
 
     def _camera_info_cb(self, msg: CameraInfo):
         self.latest_camera_info = {
@@ -243,16 +333,24 @@ class SO101GrootBridge(Node):
         except (KeyError, ValueError) as exc:
             self.have_joint_state = False
             self.joint_history.clear()
+            self._request_reset("joint feedback became invalid")
             self.get_logger().warning(f"Ignoring invalid SO-101 joint feedback: {exc}")
             return
+        now = time.monotonic()
+        if self._last_joint_time is not None and now - self._last_joint_time > self.episode_reset_gap_s:
+            self.joint_history.clear()
+            self._request_reset(
+                f"joint feedback resumed after {now - self._last_joint_time:.1f} s (new episode)"
+            )
+        self._last_joint_time = now
         self.latest_positions = current
         self.joint_history.append(self.latest_positions.copy())
         self.have_joint_state = True
 
-    def _resize_nearest(self, image: np.ndarray, height: int, width: int) -> np.ndarray:
-        y = np.linspace(0, image.shape[0] - 1, height).astype(np.int32)
-        x = np.linspace(0, image.shape[1] - 1, width).astype(np.int32)
-        return image[y][:, x]
+    def _resize(self, image: np.ndarray, fill=0) -> np.ndarray:
+        if self.image_width <= 0 or self.image_height <= 0:
+            return image
+        return letterbox_nearest(image, self.image_height, self.image_width, fill)
 
     def _joint_history_array(self, horizon=None) -> np.ndarray:
         if not self.joint_history:
@@ -331,7 +429,9 @@ class SO101GrootBridge(Node):
     def _observation(self) -> dict:
         image = self.latest_image
         if image is None:
-            image = np.zeros((self.image_height, self.image_width, 3), dtype=np.uint8)
+            height = self.image_height if self.image_height > 0 else CAMERA_HEIGHT
+            width = self.image_width if self.image_width > 0 else CAMERA_WIDTH
+            image = np.zeros((height, width, 3), dtype=np.uint8)
 
         video = {}
         for key in self.video_keys:
@@ -345,7 +445,7 @@ class SO101GrootBridge(Node):
                         "using the front image for the wrist input"
                     )
                     self._missing_wrist_warned = True
-            frame = key_image.reshape(1, 1, self.image_height, self.image_width, 3)
+            frame = key_image[np.newaxis, np.newaxis]
             video[key] = np.repeat(frame, self.video_horizon, axis=1)
 
         # Safety math runs in float64; GR00T's strict observation check
@@ -370,22 +470,41 @@ class SO101GrootBridge(Node):
             },
         }
         if self.latest_depth is not None and self.depth_key:
-            observation["depth"] = {self.depth_key: self.latest_depth.reshape(1, 1, self.image_height, self.image_width, 1)}
+            observation["depth"] = {self.depth_key: self.latest_depth[np.newaxis, np.newaxis, ..., np.newaxis]}
         return observation
 
     def _scenario_metadata(self):
         if not self.scenario:
             return None
-        return {
+        metadata = {
             "name": self.scenario.get("name"),
             "frame_id": self.scenario.get("frame_id"),
             "selected_task": self.scenario.get("selected_task"),
-            "robot_spawn": self.scenario.get("robot_spawn", {}),
-            "static_assets": self.scenario.get("static_assets", []),
-            "objects": self.scenario.get("objects", []),
         }
+        if self.send_ground_truth:
+            # Privileged simulator state: policies given this are reported as
+            # having used ground truth (see _policy_used_ground_truth).
+            metadata.update({
+                "robot_spawn": self.scenario.get("robot_spawn", {}),
+                "static_assets": self.scenario.get("static_assets", []),
+                "objects": self.scenario.get("objects", []),
+            })
+        return metadata
+
+    @staticmethod
+    def _response_info(response) -> dict:
+        if isinstance(response, (list, tuple)) and len(response) > 1 and isinstance(response[1], dict):
+            return response[1]
+        return {}
+
+    def _policy_used_ground_truth(self, response) -> bool:
+        info = self._response_info(response)
+        return bool(self.send_ground_truth or info.get("policy_used_ground_truth", False))
 
     def _extract_action(self, response, positions) -> np.ndarray:
+        return safe_hardware_target(self._requested_action(response), positions, self.max_joint_step)
+
+    def _requested_action(self, response) -> np.ndarray:
         if isinstance(response, (list, tuple)) and response:
             action = response[0]
         else:
@@ -404,8 +523,23 @@ class SO101GrootBridge(Node):
             raw = action[self.action_key]
         else:
             raw = next(iter(action.values()))
-        target = np.asarray(raw, dtype=np.float64).reshape(-1, len(JOINT_NAMES))[0]
-        return safe_hardware_target(target, positions, self.max_joint_step)
+        return np.asarray(raw, dtype=np.float64).reshape(-1, len(JOINT_NAMES))[0]
+
+    def _publish_stats(self, *, latency_s, image_time, requested, target, ground_truth):
+        if self.stats_pub is None:
+            return
+        now = time.monotonic()
+        stats = {
+            "policy_latency_ms": latency_s * 1000.0,
+            # Age of the camera frame (from receipt at this bridge) when the
+            # command derived from it is published.
+            "observation_age_ms": None if image_time is None else (now - image_time) * 1000.0,
+            "command_saturated": bool(np.any(np.abs(target - requested) > 1e-9)),
+            "policy_used_ground_truth": bool(ground_truth),
+        }
+        msg = String()
+        msg.data = json.dumps(stats)
+        self.stats_pub.publish(msg)
 
     def _tick(self):
         if not self.have_joint_state:
@@ -420,17 +554,37 @@ class SO101GrootBridge(Node):
         try:
             if not self._modality_configured:
                 self._configure_from_policy()
+                self._request_reset("policy (re)configured")
+            if self._reset_pending:
+                # Clear before the call so a reset requested meanwhile is kept.
+                self._reset_pending = False
+                try:
+                    self.client.reset()
+                except Exception:
+                    self._reset_pending = True
+                    raise
+            image_time = self.latest_image_time
             observation = self._observation()
+            started = time.monotonic()
             response = self.client.get_action(observation)
-            if not self.have_joint_state:
-                raise ValueError("Joint feedback became invalid while waiting for the policy")
+            latency_s = time.monotonic() - started
+            if not self.have_joint_state or self._reset_pending:
+                raise ValueError("Joint feedback or episode changed while waiting for the policy")
             # Clamp against where the joints are now, not a pre-request
             # snapshot, so a slow policy round-trip cannot command a step
             # larger than max_joint_step from the arm's actual position.
-            target = self._extract_action(response, self.latest_positions.copy())
+            requested = self._requested_action(response)
+            target = safe_hardware_target(requested, self.latest_positions.copy(), self.max_joint_step)
             msg = Float64MultiArray()
             msg.data = target.astype(float).tolist()
             self.command_pub.publish(msg)
+            self._publish_stats(
+                latency_s=latency_s,
+                image_time=image_time,
+                requested=requested,
+                target=target,
+                ground_truth=self._policy_used_ground_truth(response),
+            )
         except Exception as exc:
             self.get_logger().warn(f"GR00T policy request failed: {exc}")
         finally:

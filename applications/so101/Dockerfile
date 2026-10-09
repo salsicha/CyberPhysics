@@ -56,10 +56,13 @@ RUN apt-get update && apt-get install -q -y --no-install-recommends \
     python3-venv \
     && rm -rf /var/lib/apt/lists/*
 
+# LeRobot is pinned to the release the SmolVLA image uses (v0.6.0); its pi0
+# policy ships in the `pi` extra (there is no `pi0` extra).
+ARG LEROBOT_VERSION=0.6.0
 RUN python3 -m venv /opt/lerobot_venv && \
     /opt/lerobot_venv/bin/pip install --no-cache-dir --upgrade pip && \
     /opt/lerobot_venv/bin/pip install --no-cache-dir \
-    "lerobot[smolvla,pi0,diffusion]" \
+    "lerobot[smolvla,pi,diffusion]==${LEROBOT_VERSION}" \
     gym-pusht \
     "pymunk<7" \
     "imageio[ffmpeg]"

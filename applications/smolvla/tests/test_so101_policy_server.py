@@ -44,6 +44,47 @@ class SO101AdapterTest(unittest.TestCase):
         self.assertEqual(int(_latest_rgb(observation)[0, 0, 2]), 17)
         self.assertEqual(_task_text(observation), "pick the red block")
 
+    def test_joint_mapping_applies_offsets_signs_and_gripper_range(self):
+        mapping = server.load_joint_mapping(None)
+        mapping = {
+            "joints": {name: dict(entry) for name, entry in mapping["joints"].items()},
+            "gripper": {"closed": 95.0, "open": 5.0},
+        }
+        mapping["joints"]["shoulder_lift"] = {"sign": -1.0, "offset_deg": 90.0}
+        # LeRobot reports 0 deg at its calibration mid-range; here that pose is
+        # URDF +90 deg and the joint turns the other way.
+        lerobot = np.array([10.0, 0.0, -20.0, 0.0, 0.0, 95.0], dtype=np.float32)
+        isaac = server.so101_to_isaac_units(lerobot, mapping)
+        np.testing.assert_allclose(isaac[:5], np.deg2rad([10.0, 90.0, -20.0, 0.0, 0.0]), atol=1e-6)
+        self.assertAlmostEqual(float(isaac[5]), 0.0, places=6)  # 95 is "closed"
+        np.testing.assert_allclose(server.isaac_to_so101_units(isaac, mapping), lerobot, atol=1e-4)
+
+    def test_repository_joint_mapping_file_is_valid(self):
+        path = Path(__file__).resolve().parents[3] / "systems/so101/config/lerobot_joint_mapping.json"
+        if not path.is_file():
+            self.skipTest("repository systems/ directory is not mounted")
+        mapping = server.load_joint_mapping(str(path))
+        self.assertEqual(set(mapping["joints"]), set(server.ARM_JOINT_NAMES))
+        self.assertTrue(server.is_identity_mapping(mapping))
+
+    def test_lerobot_range_statistics_are_detected(self):
+        # use_degrees=False data saturates at exactly +/-100 and never exceeds it.
+        self.assertTrue(server.looks_like_lerobot_range_values(
+            [-100.0, -98.2, -100.0, -97.0, -100.0, 0.0], [100.0, 99.1, 87.0, 100.0, 100.0, 100.0]))
+        # Degree data exceeding 100 (e.g. wrist roll) or not saturating is not flagged.
+        self.assertFalse(server.looks_like_lerobot_range_values(
+            [-110.0, -95.0, -90.0, -96.0, -175.0, 0.0], [110.0, 95.0, 90.0, 96.0, 175.0, 100.0]))
+        self.assertFalse(server.looks_like_lerobot_range_values(
+            [-60.0, -45.0, -30.0, -50.0, -20.0, 0.0], [60.0, 45.0, 30.0, 50.0, 20.0, 100.0]))
+
+    def test_checkpoint_state_range_reads_normalizer_stats(self):
+        normalizer = SimpleNamespace(stats={"observation.state": {
+            "min": np.full(6, -100.0), "max": np.full(6, 100.0), "mean": np.zeros(6)}})
+        preprocessor = SimpleNamespace(steps=[SimpleNamespace(), normalizer])
+        low, high = server.checkpoint_state_range(preprocessor)
+        self.assertTrue(server.looks_like_lerobot_range_values(low, high))
+        self.assertIsNone(server.checkpoint_state_range(SimpleNamespace(steps=[normalizer.__class__()])))
+
     def test_invalid_joint_vector_is_rejected(self):
         with self.assertRaises(ValueError):
             isaac_to_so101_units(np.zeros(5, dtype=np.float32))

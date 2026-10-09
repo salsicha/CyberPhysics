@@ -163,6 +163,32 @@ def has_ground_truth_leak(telemetry):
     return False
 
 
+def _non_negative(value):
+    return (isinstance(value, (int, float)) and not isinstance(value, bool)
+            and math.isfinite(value) and value >= 0)
+
+
+def policy_command_metrics(telemetry):
+    """Per-run bridge statistics; None for anything that was not measured."""
+    commands = telemetry.get("policy_commands")
+    if not isinstance(commands, dict) or not _non_negative(commands.get("count")) \
+            or not commands.get("count"):
+        return {"policy_command_count": None, "command_saturation_fraction": None,
+                "policy_latency_ms": None, "observation_age_ms": None}
+    count = commands["count"]
+    saturated = commands.get("saturated")
+    latency = commands.get("max_policy_latency_ms")
+    age = commands.get("max_observation_age_ms")
+    return {
+        "policy_command_count": int(count),
+        "command_saturation_fraction": (
+            float(saturated) / float(count)
+            if _non_negative(saturated) and saturated <= count else None),
+        "policy_latency_ms": float(latency) if _non_negative(latency) else None,
+        "observation_age_ms": float(age) if _non_negative(age) else None,
+    }
+
+
 def recovery_success(telemetry, success, window_s):
     failures = telemetry.get("failed_grasps", [])
     if not failures:
@@ -186,8 +212,15 @@ def score(scenario, telemetry, task_id=""):
     min_approach = min_distance(samples, "end_effector_xyz", "object_xyz")
     lift_height = max_lift(samples, "object_xyz", target_initial[2])
     place_error = final_place_error(samples, "object_xyz", destination_xyz)
-    collision_count = len(telemetry.get("collisions", []))
+    # A simulator that cannot detect contacts reports collisions as None:
+    # unmeasured is not the same as collision-free.
+    collisions = telemetry.get("collisions")
+    collision_count = len(collisions) if isinstance(collisions, list) else None
     max_collisions = int(success_rules.get("max_collision_count", 0))
+    joint_limit_violations = telemetry.get("joint_limit_violations")
+    if not _non_negative(joint_limit_violations) or joint_limit_violations != int(joint_limit_violations):
+        joint_limit_violations = None
+    ground_truth_reported = telemetry.get("policy_used_ground_truth")
     duration = float(telemetry.get("duration_s", samples[-1].get("time", math.inf) if samples else math.inf))
 
     reachability = norm3(target_initial) <= thresholds["workspace_radius_m"] and target_initial[2] >= thresholds["workspace_min_z_m"]
@@ -198,9 +231,7 @@ def score(scenario, telemetry, task_id=""):
     )
     lift_ok = lift_height >= float(success_rules.get("object_lift_height_m", 0.0))
     place_ok = place_error <= float(success_rules.get("place_position_tolerance_m", 0.05))
-    collision_free = collision_count <= max_collisions
     duration_ok = duration <= float(success_rules.get("max_duration_s", math.inf))
-    no_ground_truth = not has_ground_truth_leak(telemetry)
     recovered = recovery_success(telemetry, place_ok, thresholds["recovery_window_s"])
 
     checks = {
@@ -209,13 +240,24 @@ def score(scenario, telemetry, task_id=""):
         "grasp_closure": bool(grasp_closed),
         "lift_stability": bool(lift_ok),
         "place_accuracy": bool(place_ok),
-        "collision_free": bool(collision_free),
         "duration": bool(duration_ok),
         "failed_grasp_recovery": bool(recovered),
-        "no_policy_ground_truth": bool(no_ground_truth),
     }
+    unmeasured = []
+    if collision_count is None:
+        unmeasured.append("collision_free")
+    else:
+        checks["collision_free"] = collision_count <= max_collisions
     if success_rules.get("object_inside_destination", False):
         checks.update(placement_checks(samples, target, destination, thresholds))
+    # The physical outcome, independent of how the policy obtained its inputs.
+    task_completed = all(checks.values())
+    if has_ground_truth_leak(telemetry):
+        checks["no_policy_ground_truth"] = False
+    elif ground_truth_reported is None:
+        unmeasured.append("no_policy_ground_truth")
+    else:
+        checks["no_policy_ground_truth"] = True
     metrics = {
         "task_id": task["id"],
         "target_object": task["target_object"],
@@ -224,9 +266,17 @@ def score(scenario, telemetry, task_id=""):
         "max_lift_height_m": lift_height,
         "final_place_error_m": place_error,
         "collision_count": collision_count,
+        "joint_limit_violations": joint_limit_violations,
+        "policy_used_ground_truth": (
+            True if checks.get("no_policy_ground_truth") is False
+            else ground_truth_reported if isinstance(ground_truth_reported, bool) else None),
+        **policy_command_metrics(telemetry),
         "duration_s": duration,
-        "success": all(checks.values()),
+        "task_completed": task_completed,
+        # A run only counts as a success when every check was measured.
+        "success": all(checks.values()) and not unmeasured,
         "checks": checks,
+        "unmeasured_checks": unmeasured,
     }
     return metrics
 

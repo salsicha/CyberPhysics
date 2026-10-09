@@ -4,7 +4,11 @@ FROM nvidia/cuda:12.8.0-devel-ubuntu22.04 AS build
 SHELL ["/bin/bash", "-c"]
 
 ARG GR00T_REPO=https://github.com/NVIDIA/Isaac-GR00T.git
-ARG GR00T_REF=main
+# Pinned Isaac-GR00T commit (main as of 2026-10-07). The policy server, bridge
+# healthcheck, modality config, open-loop eval and finetune wrappers were
+# checked against this revision's gr00t.policy/data/configs/eval APIs and
+# examples/finetune.sh. Update deliberately; a branch name also works.
+ARG GR00T_REF=d2b7e75b937e3ec9aa5dbc798f08b89692c49734
 
 ENV DEBIAN_FRONTEND=noninteractive \
     NVIDIA_DRIVER_CAPABILITIES=graphics,utility,compute \
@@ -41,7 +45,13 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 
 WORKDIR /opt
 
-RUN GIT_LFS_SKIP_SMUDGE=1 git clone --depth 1 --recurse-submodules --shallow-submodules --branch ${GR00T_REF} ${GR00T_REPO} Isaac-GR00T
+# `git clone --branch` cannot take a commit SHA; fetch the exact ref instead.
+RUN set -euo pipefail && \
+    mkdir Isaac-GR00T && cd Isaac-GR00T && \
+    git init -q && git remote add origin "${GR00T_REPO}" && \
+    GIT_LFS_SKIP_SMUDGE=1 git fetch --depth 1 origin "${GR00T_REF}" && \
+    GIT_LFS_SKIP_SMUDGE=1 git checkout -q FETCH_HEAD && \
+    GIT_LFS_SKIP_SMUDGE=1 git submodule update --init --recursive --depth 1
 
 WORKDIR /opt/Isaac-GR00T
 

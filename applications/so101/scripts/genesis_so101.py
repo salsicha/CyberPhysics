@@ -12,7 +12,18 @@ from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Float64MultiArray
 
-from so101_common import JOINT_NAMES, LOWER_LIMITS, UPPER_LIMITS
+from so101_common import JOINT_NAMES, validated_joint_command
+
+
+def to_numpy(values):
+    """Convert Genesis DOF readings to a host float64 array.
+
+    On the gpu backend Genesis returns CUDA torch tensors, which np.asarray
+    cannot convert, so copy tensors to the host first.
+    """
+    if hasattr(values, "detach"):
+        values = values.detach().cpu().numpy()
+    return np.asarray(values, dtype=np.float64).reshape(-1)
 
 
 class GenesisBridge(Node):
@@ -25,19 +36,17 @@ class GenesisBridge(Node):
         )
 
     def _command(self, msg):
-        if len(msg.data) != len(JOINT_NAMES):
-            self.get_logger().warning("Expected six SO-101 joint commands")
-            return
-        self.target = np.clip(
-            np.asarray(msg.data), LOWER_LIMITS, UPPER_LIMITS
-        ).astype(np.float32)
+        try:
+            self.target = validated_joint_command(msg.data).astype(np.float32)
+        except ValueError as exc:
+            self.get_logger().warning(f"Ignoring SO-101 joint command: {exc}")
 
     def publish_state(self, positions, velocities):
         msg = JointState()
         msg.header.stamp = self.get_clock().now().to_msg()
         msg.name = JOINT_NAMES
-        msg.position = np.asarray(positions).tolist()
-        msg.velocity = np.asarray(velocities).tolist()
+        msg.position = to_numpy(positions).tolist()
+        msg.velocity = to_numpy(velocities).tolist()
         self.publisher.publish(msg)
 
 
@@ -77,7 +86,8 @@ def main():
         pass
     finally:
         bridge.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == "__main__":

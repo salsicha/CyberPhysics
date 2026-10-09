@@ -41,6 +41,7 @@ from so101_common import (
     quantize,
     quaternion_from_euler,
     synthetic_rgbd,
+    validated_joint_command,
 )
 
 
@@ -82,10 +83,11 @@ class MockSO101Sim(Node):
         self.timer = self.create_timer(1.0 / rate_hz, self._tick)
 
     def _command(self, msg):
-        if len(msg.data) != len(JOINT_NAMES):
-            self.get_logger().warning("Expected six SO-101 joint commands")
+        try:
+            target = validated_joint_command(msg.data).astype(np.float32)
+        except ValueError as exc:
+            self.get_logger().warning(f"Ignoring SO-101 joint command: {exc}")
             return
-        target = np.clip(np.asarray(msg.data, dtype=np.float32), LOWER_LIMITS, UPPER_LIMITS)
         due_time = self.get_clock().now().nanoseconds * 1e-9 + self.command_latency_s
         self.command_queue.append((due_time, target))
 

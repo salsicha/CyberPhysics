@@ -134,7 +134,8 @@ def test_bridge_keeps_commanding_at_quantized_joint_limits(limit):
     assert np.any(measured > UPPER_LIMITS) or np.any(measured < LOWER_LIMITS), \
         'quantization no longer rounds past a limit; this test lost its edge case'
     beyond = limits + np.sign(limits) * 1.0
-    client = NS(get_action=MagicMock(return_value=[{'joint_positions': beyond}, {}]))
+    client = NS(get_action=MagicMock(return_value=[{'joint_positions': beyond}, {}]),
+                reset=MagicMock())
     bridge = make_bridge(client)
     bridge._modality_configured = True
 
@@ -177,6 +178,7 @@ def test_bridge_commands_from_mock_server_end_to_end():
     client = NS(
         get_modality_config=lambda: unpack(pack(policy.get_modality_config())),
         get_action=lambda obs: unpack(pack(list(policy._get_action(unpack(pack(obs)))))),
+        reset=lambda: unpack(pack(policy.reset())),
     )
     bridge = make_bridge(client)
     bridge._joint_cb(joint_state(np.zeros(len(JOINT_NAMES))))

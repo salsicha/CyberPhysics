@@ -1,0 +1,19 @@
+{
+  "_comment": [
+    "Maps LeRobot so101_follower joint values recorded with use_degrees=True to this repository's URDF.",
+    "LeRobot's 0 deg is the middle of each joint's calibrated range; the URDF's 0 rad is the arm pointing straight up.",
+    "For each arm joint: urdf_deg = sign * lerobot_deg + offset_deg (sign is +1 or -1).",
+    "offset_deg is the URDF angle of the pose where LeRobot reports 0 deg; sign is -1 when the joint turns the opposite way.",
+    "These identity values are PLACEHOLDERS, not a calibration: measure them on your arm (e.g. pose it at known URDF angles and read LeRobot's degrees).",
+    "gripper.closed/open are LeRobot's 0-100 gripper readings at fully closed and at 0.04 m opening.",
+    "LeRobot's default use_degrees=False (-100..100) data cannot be mapped without the arm's calibration file and is rejected."
+  ],
+  "joints": {
+    "shoulder_pan": {"sign": 1, "offset_deg": 0.0},
+    "shoulder_lift": {"sign": 1, "offset_deg": 0.0},
+    "elbow_flex": {"sign": 1, "offset_deg": 0.0},
+    "wrist_flex": {"sign": 1, "offset_deg": 0.0},
+    "wrist_roll": {"sign": 1, "offset_deg": 0.0}
+  },
+  "gripper": {"closed": 0.0, "open": 100.0}
+}

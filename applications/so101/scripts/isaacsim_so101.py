@@ -4,6 +4,7 @@
 import argparse
 import json
 import os
+import signal
 import subprocess
 import sys
 import time
@@ -15,23 +16,22 @@ from isaacsim import SimulationApp
 
 from so101_common import (
     CAMERA_FRAME_ID,
-    CAMERA_HEIGHT,
     CAMERA_IMU_TOPIC,
-    CAMERA_WIDTH,
     DEPTH_CAMERA_INFO_TOPIC,
     DEPTH_FRAME_ID,
     DEPTH_TOPIC,
     JOINT_NAMES,
     JOINT_QUANTIZATION,
-    LOWER_LIMITS,
+    POLICY_STATS_TOPIC,
     RGB_CAMERA_INFO_TOPIC,
     RGB_TOPIC,
     TASK_STATUS_TOPIC,
-    UPPER_LIMITS,
     camera_info_values,
     quantize,
     quaternion_from_euler,
+    scenario_camera,
     synthetic_rgbd,
+    validated_joint_command,
 )
 
 def env_bool(name, default):
@@ -165,20 +165,14 @@ except ImportError as exc:
 
 
 def load_scenario_camera(path):
-    defaults = {
-        "xyz": [0.17, -0.52, 0.92],
-        "rpy": [1.10, 0.0, 0.0],
-        "resolution": [CAMERA_WIDTH, CAMERA_HEIGHT],
-        "horizontal_fov_deg": 69.0,
-    }
+    """The scenario camera: the one definition rendered, published and in TF."""
     if not path:
-        return defaults
+        return scenario_camera()
     try:
         data = json.loads(Path(path).read_text())
     except (OSError, json.JSONDecodeError):
-        return defaults
-    camera = data.get("camera", {})
-    return {**defaults, **camera}
+        return scenario_camera()
+    return scenario_camera(data)
 
 
 def isaac_orientation_from_rpy(rpy):
@@ -192,20 +186,25 @@ def isaac_orientation_from_rpy(rpy):
 def create_rendered_camera(camera_config):
     if Camera is None:
         return None
-    width, height = camera_config.get("resolution", [CAMERA_WIDTH, CAMERA_HEIGHT])
+    width, height = camera_config["resolution"]
+    # Camera(position, orientation) applies camera_axes="world": the pose is
+    # groot_camera_link's (+X optical axis, +Y left, +Z up), as in the URDF.
     camera = Camera(
         prim_path="/World/groot_camera",
-        position=np.asarray(camera_config.get("xyz"), dtype=np.float64),
-        orientation=isaac_orientation_from_rpy(camera_config.get("rpy")),
+        position=np.asarray(camera_config["xyz"], dtype=np.float64),
+        orientation=isaac_orientation_from_rpy(camera_config["rpy"]),
         frequency=30,
         resolution=(int(width), int(height)),
     )
     camera.initialize()
     if hasattr(camera, "set_horizontal_aperture"):
-        # Keep the camera close to the RealSense D435i/D405 tabletop FOV.
-        fov_deg = float(camera_config.get("horizontal_fov_deg", 69.0))
+        # Square pixels: CameraInfo fx = fy = (width / 2) / tan(hfov / 2).
+        fov_deg = float(camera_config["horizontal_fov_deg"])
         aperture = 2.0 * camera.get_focal_length() * np.tan(np.radians(fov_deg) / 2.0)
         camera.set_horizontal_aperture(float(aperture))
+    if hasattr(camera, "set_clipping_range"):
+        near, far = camera_config["clipping_range_m"]
+        camera.set_clipping_range(near_distance=float(near), far_distance=float(far))
     if hasattr(camera, "add_distance_to_image_plane_to_frame"):
         camera.add_distance_to_image_plane_to_frame()
     elif hasattr(camera, "add_distance_to_camera_to_frame"):
@@ -213,8 +212,33 @@ def create_rendered_camera(camera_config):
     return camera
 
 
+def rendered_rgbd(camera, width, height):
+    """Rendered RGB (uint8 HxWx3) and depth (float32 metres), or None if not ready.
+
+    Isaac Sim 6 names the colour annotator "rgb" (RGBA data) in the camera
+    frame; older releases used "rgba".
+    """
+    frame = camera.get_current_frame()
+    frame = frame if isinstance(frame, dict) else {}
+    rgba = frame.get("rgb")
+    if rgba is None:
+        rgba = frame.get("rgba")
+    rgba = None if rgba is None else np.asarray(rgba)
+    if rgba is None or rgba.ndim != 3 or rgba.shape[:2] != (height, width) or rgba.shape[2] < 3:
+        return None
+    image = np.ascontiguousarray(rgba[:, :, :3]).astype(np.uint8)
+    depth = None
+    for key in ("distance_to_image_plane", "distance_to_camera", "depth"):
+        if frame.get(key) is not None:
+            depth = np.asarray(frame[key], dtype=np.float32)
+            break
+    if depth is None or depth.shape != (height, width):
+        depth = np.full((height, width), np.nan, dtype=np.float32)
+    return image, np.ascontiguousarray(depth)
+
+
 class IsaacBridge(Node):
-    def __init__(self, rendered_camera=None, camera_source="rendered"):
+    def __init__(self, rendered_camera=None, camera_source="rendered", camera_config=None):
         super().__init__("so101_isaacsim_bridge")
         self.target = np.zeros(len(JOINT_NAMES), dtype=np.float32)
         self.command_received = False
@@ -230,19 +254,33 @@ class IsaacBridge(Node):
         self.task_status_pub = self.create_publisher(String, TASK_STATUS_TOPIC, 10)
         self.last_task_status = None
         self.last_task_publish_ns = 0
-        self.camera_width = CAMERA_WIDTH
-        self.camera_height = CAMERA_HEIGHT
+        camera_config = camera_config or scenario_camera()
+        self.camera_width, self.camera_height = (int(value) for value in camera_config["resolution"])
+        self.camera_hfov_deg = float(camera_config["horizontal_fov_deg"])
         self.subscription = self.create_subscription(
             Float64MultiArray, "/so101/joint_commands", self._command, 10
         )
+        self.policy_stats = []
+        self.create_subscription(String, POLICY_STATS_TOPIC, self._policy_stats, 50)
+
+    def _policy_stats(self, msg):
+        try:
+            stats = json.loads(msg.data)
+        except json.JSONDecodeError:
+            return
+        if isinstance(stats, dict):
+            self.policy_stats.append(stats)
+
+    def drain_policy_stats(self):
+        stats, self.policy_stats = self.policy_stats, []
+        return stats
 
     def _command(self, msg):
-        if len(msg.data) != len(JOINT_NAMES):
-            self.get_logger().warning("Expected six SO-101 joint commands")
+        try:
+            self.target = validated_joint_command(msg.data).astype(np.float32)
+        except ValueError as exc:
+            self.get_logger().warning(f"Ignoring SO-101 joint command: {exc}")
             return
-        self.target = np.clip(
-            np.asarray(msg.data), LOWER_LIMITS, UPPER_LIMITS
-        ).astype(np.float32)
         self.command_received = True
 
     def publish_task_status(self, summary):
@@ -271,7 +309,10 @@ class IsaacBridge(Node):
     def publish_camera(self, stamp, positions):
         h = self.camera_height
         w = self.camera_width
-        image, depth = self._camera_frame(positions)
+        frame = self._camera_frame(positions)
+        if frame is None:
+            return
+        image, depth = frame
 
         msg = Image()
         msg.header.stamp = stamp
@@ -299,20 +340,13 @@ class IsaacBridge(Node):
 
     def _camera_frame(self, positions):
         if self.camera_source == "rendered" and self.rendered_camera is not None:
-            frame = self.rendered_camera.get_current_frame()
-            rgba = frame.get("rgba") if isinstance(frame, dict) else None
-            depth = None
-            if isinstance(frame, dict):
-                depth = frame.get("distance_to_image_plane")
-                if depth is None:
-                    depth = frame.get("distance_to_camera")
-                if depth is None:
-                    depth = frame.get("depth")
-            if rgba is not None:
-                image = np.asarray(rgba)[:, :, :3].astype(np.uint8)
-                if depth is None:
-                    depth = np.full(image.shape[:2], np.nan, dtype=np.float32)
-                return image, np.asarray(depth, dtype=np.float32)
+            rendered = rendered_rgbd(self.rendered_camera, self.camera_width, self.camera_height)
+            if rendered is None and not self.warned_camera_fallback:
+                # Skip the frame rather than mixing synthetic images into a
+                # rendered stream (e.g. before the first render completes).
+                self.get_logger().warning("Rendered Isaac camera frame not ready; not publishing camera yet")
+                self.warned_camera_fallback = True
+            return rendered
         if self.camera_source == "rendered" and not self.warned_camera_fallback:
             self.get_logger().warning("Rendered Isaac camera frame unavailable; using synthetic RGB-D fallback")
             self.warned_camera_fallback = True
@@ -330,7 +364,7 @@ class IsaacBridge(Node):
         self.imu_pub.publish(msg)
 
     def camera_info(self, stamp, frame_id):
-        values = camera_info_values(self.camera_width, self.camera_height)
+        values = camera_info_values(self.camera_width, self.camera_height, self.camera_hfov_deg)
         info = CameraInfo()
         info.header.stamp = stamp
         info.header.frame_id = frame_id
@@ -376,6 +410,15 @@ def import_robot(urdf_path, stage_output_path):
     prim_path = "/World/so101"
     add_reference_to_stage(usd_path=imported_usd, prim_path=prim_path)
     return prim_path
+
+
+STOP_REQUESTED = []
+
+
+def _stop_on_sigterm(signum, frame):
+    # Only set a flag: an exception raised here could land inside a Kit
+    # update callback, which Kit logs and swallows.
+    STOP_REQUESTED.append(signum)
 
 
 def main():
@@ -437,12 +480,22 @@ def main():
     indices = np.array([index_by_name[name] for name in JOINT_NAMES])
 
     rclpy.init()
-    bridge = IsaacBridge(rendered_camera=rendered_camera, camera_source=args.camera_source)
+    bridge = IsaacBridge(
+        rendered_camera=rendered_camera,
+        camera_source=args.camera_source,
+        camera_config=camera_config,
+    )
+    # `docker compose down` sends SIGTERM (forwarded by run_isaacsim_so101.sh):
+    # leave the loop through the finally block so the task telemetry and the
+    # metrics of an unfinished run are written.
+    signal.signal(signal.SIGTERM, _stop_on_sigterm)
     step_count = 0
     last_heartbeat = time.monotonic()
     try:
-        while simulation_app.is_running() and rclpy.ok():
+        while simulation_app.is_running() and rclpy.ok() and not STOP_REQUESTED:
             rclpy.spin_once(bridge, timeout_sec=0.0)
+            for stats in bridge.drain_policy_stats():
+                task_scene.record_policy_command(stats)
             robot.apply_action(
                 ArticulationAction(joint_positions=bridge.target, joint_indices=indices)
             )

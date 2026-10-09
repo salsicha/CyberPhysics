@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Deterministic SO-101 tabletop task plan used by the GR00T demo policy.
 
-The controller deliberately consumes only the fixed benchmark specification and
-joint-state observations. It does not consume simulator object poses. Real
-visual-policy evaluation remains available through ``SO101_GROOT_MODE=real``.
+The controller plans from the scenario's object and bin poses (the benchmark
+specification, i.e. simulator ground truth) and joint-state observations; it
+does not perceive the scene. Its runs are therefore reported as using ground
+truth. Real visual-policy evaluation remains available through
+``SO101_GROOT_MODE=real``.
 """
 
 from dataclasses import dataclass
@@ -198,7 +200,10 @@ class ScriptedPickPlaceController:
             state, dtype=np.float32
         ).reshape(-1, 6)[-1]
         if self.plan is None:
-            scenario = observation.get("metadata", {}).get("scenario") or self.scenario
+            # The bridge only forwards object poses when send_ground_truth is
+            # enabled; otherwise plan from the server's own scenario file.
+            metadata_scenario = (observation.get("metadata") or {}).get("scenario") or {}
+            scenario = metadata_scenario if metadata_scenario.get("objects") else self.scenario
             if not scenario:
                 raise ValueError("SO-101 demo policy requires scenario metadata")
             self.plan = build_pick_place_plan(scenario)

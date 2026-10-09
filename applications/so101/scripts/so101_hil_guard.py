@@ -51,9 +51,20 @@ class SO101HILGuard(Node):
         if not all(name in by_name for name in JOINT_NAMES):
             self.get_logger().warning("Ignoring hardware state without all six SO-101 joints")
             return
-        self.latest_positions = np.asarray(
+        # A driver may publish names with a shorter (or empty) position
+        # array; never let one malformed message take the safety gate down.
+        if len(msg.position) != len(msg.name):
+            self.get_logger().warning(
+                "Ignoring hardware state whose position array does not match its joint names"
+            )
+            return
+        positions = np.asarray(
             [msg.position[by_name[name]] for name in JOINT_NAMES], dtype=np.float64
         )
+        if not np.all(np.isfinite(positions)):
+            self.get_logger().warning("Ignoring hardware state with non-finite joint positions")
+            return
+        self.latest_positions = positions
         self.last_state_ns = self.get_clock().now().nanoseconds
         self.warned_stale = False
 

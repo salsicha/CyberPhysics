@@ -96,13 +96,17 @@
     <parent link="gripper_base_link"/><child link="fixed_jaw_link"/>
   </joint>
 
+  <!-- The camera body sits behind the lens so the simulator camera, rendered
+       at this link's origin, does not look out from inside it. -->
   <link name="groot_camera_link">
-    <visual><geometry><box size="0.035 0.025 0.025"/></geometry><material name="so101_black"/></visual>
-    <collision><geometry><box size="0.035 0.025 0.025"/></geometry></collision>
+    <visual><origin xyz="-0.02 0 0"/><geometry><box size="0.035 0.025 0.025"/></geometry><material name="so101_black"/></visual>
+    <collision><origin xyz="-0.02 0 0"/><geometry><box size="0.035 0.025 0.025"/></geometry></collision>
   </link>
+  <!-- Must equal the scenario camera pose (systems/so101/scenarios/picking_table.json
+       "camera") relative to base_link; checked by validate_calibration_and_dataset.py. -->
   <joint name="base_to_groot_camera" type="fixed">
     <parent link="base_link"/><child link="groot_camera_link"/>
-    <origin xyz="0.24 -0.28 0.34" rpy="0.0 0.72 2.36"/>
+    <origin xyz="0.17 -0.52 0.4665" rpy="0.0 0.785 1.449"/>
   </joint>
   <link name="groot_camera_rgb_optical_frame"/>
   <joint name="groot_camera_optical_joint" type="fixed">

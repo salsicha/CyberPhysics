@@ -9,6 +9,7 @@ OUTPUT_DATASET=""
 INPUT_UNITS=""
 GRIPPER_CLOSED=""
 GRIPPER_OPEN=""
+JOINT_MAPPING="/workspace/systems/so101/config/lerobot_joint_mapping.json"
 
 usage() {
     cat <<'EOF'
@@ -28,6 +29,13 @@ Degree input additionally requires:
   --gripper-closed-value VALUE
   --gripper-open-value VALUE
 
+Degree input means LeRobot so101_follower data recorded with use_degrees=True;
+LeRobot's default use_degrees=False (-100..100) data is detected and rejected.
+Optional for degree input:
+  --joint-mapping PATH   per-joint sign/offset from LeRobot degrees to the URDF
+                         (default: systems/so101/config/lerobot_joint_mapping.json,
+                         whose identity values are placeholders to calibrate)
+
 All paths must be below data/groot (or their /workspace/data equivalents).
 EOF
 }
@@ -40,6 +48,7 @@ while (($#)); do
         --input-units) INPUT_UNITS="$2"; shift 2 ;;
         --gripper-closed-value) GRIPPER_CLOSED="$2"; shift 2 ;;
         --gripper-open-value) GRIPPER_OPEN="$2"; shift 2 ;;
+        --joint-mapping) JOINT_MAPPING="$2"; shift 2 ;;
         -h|--help) usage; exit 0 ;;
         *) die "Unknown argument: $1" ;;
     esac
@@ -87,6 +96,7 @@ if [[ "${INPUT_UNITS}" == "degrees" ]]; then
     ARGS+=(
         --gripper-closed-value "${GRIPPER_CLOSED}"
         --gripper-open-value "${GRIPPER_OPEN}"
+        --joint-mapping "${JOINT_MAPPING}"
     )
 fi
 

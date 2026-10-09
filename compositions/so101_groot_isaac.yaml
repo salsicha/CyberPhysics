@@ -1,5 +1,6 @@
 # SO-101 task-solving demo. Select exactly one backend profile:
-#   --profile sim  (Isaac Sim, default policy mode is deterministic demo)
+#   --profile sim  (Isaac Sim; default policy mode is the real GR00T checkpoint,
+#                   set SO101_GROOT_MODE=demo for the deterministic baseline)
 #   --profile hil  (physical driver + RealSense, commands blocked until armed)
 # Add --profile observe to expose ROS topics to Foxglove over rosbridge.
 
@@ -104,8 +105,9 @@ services:
       start_period: 180s
       retries: 3
     entrypoint: []
+    # The launcher forwards SIGTERM so `down` flushes telemetry and metrics.
     command: >
-      ./python.sh /workspace/so101/scripts/isaacsim_so101.py
+      bash /workspace/so101/scripts/run_isaacsim_so101.sh
         --urdf /workspace/systems/so101/urdf/so101.urdf
         --scenario /workspace/systems/so101/scenarios/picking_table.json
         --task-id ${SO101_TASK_ID:-pick_red_block_left_bin}
@@ -133,6 +135,7 @@ services:
       - TORCH_HOME=/workspace/cache/torch
       - HF_TOKEN=${HF_TOKEN:-}
       - SO101_GROOT_MODE=${SO101_GROOT_MODE:-real}
+      - SO101_GROOT_PORT=${SO101_GROOT_PORT:-5555}
       - GR00T_MODEL_PATH=${GR00T_MODEL_PATH:-/workspace/data/models/so101-checkpoint}
       - GR00T_EMBODIMENT_TAG=${GR00T_EMBODIMENT_TAG:-NEW_EMBODIMENT}
       - GR00T_DEVICE=${GR00T_DEVICE:-cuda:0}
@@ -177,12 +180,13 @@ services:
     volumes:
       - ../systems:/workspace/systems:ro
       - ../applications/so101/scripts:/workspace/so101_scripts:ro
-      - ../data/groot/bags:/workspace/data/bags:rw
     command: >
       python3 /workspace/so101_scripts/groot_so101_bridge.py
         --ros-args
         --params-file /workspace/systems/so101/config/groot_demo.yaml
         -p policy_host:=${SO101_GROOT_HOST:-127.0.0.1}
+        -p policy_port:=${SO101_GROOT_PORT:-5555}
+        -p command_rate_hz:=${SO101_GROOT_POLICY_FPS:-5.0}
         -p policy_schema:=auto
         -p task_id:=${SO101_TASK_ID:-pick_red_block_left_bin}
 
@@ -226,6 +230,8 @@ services:
         --ros-args
         --params-file /workspace/systems/so101/config/groot_demo.yaml
         -p task_id:=${SO101_TASK_ID:-pick_red_block_left_bin}
+        -p policy_port:=${SO101_GROOT_PORT:-5555}
+        -p command_rate_hz:=${SO101_GROOT_POLICY_FPS:-5.0}
         -p joint_state_topic:=${SO101_HARDWARE_STATE_TOPIC:-/so101/hardware/joint_states}
         -p command_topic:=/so101/hil/policy_commands
         -p camera_topic:=${SO101_CAMERA_TOPIC:-/so101/depth_camera/color/image_raw}
@@ -237,6 +243,7 @@ services:
     image: salsicha/cyberphysics:so101-${CYBERPHYSICS_TAG:-latest}
     container_name: so101_groot_hil_guard
     network_mode: host
+    restart: unless-stopped
     depends_on:
       - so101_groot_hil_bridge
     environment:

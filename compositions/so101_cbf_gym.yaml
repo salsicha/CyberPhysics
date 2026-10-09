@@ -1,3 +1,9 @@
+# SO-101 joint-limit (CBF) controller.
+#
+# The former so101_gym service ran applications/so101/scripts/run_gym_hil.py,
+# which can never start here: the so101 image has no gymnasium/gym_hil, and
+# gym_hil registers only Franka Panda environments (no SO-101 env id). It was
+# removed rather than left failing on every `up`.
 services:
   so101_cbf:
     image: salsicha/cyberphysics:so101-latest
@@ -8,12 +14,3 @@ services:
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
     command: ros2 run so101_description so101_cbf_control.py
-
-  so101_gym:
-    image: salsicha/cyberphysics:so101-latest
-    container_name: so101_gym
-    network_mode: host
-    ipc: host
-    environment:
-      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
-    command: python3 /workspace/src/so101_description/scripts/run_gym_hil.py

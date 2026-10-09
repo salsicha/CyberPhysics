@@ -31,10 +31,15 @@ OUTPUT="${GROOT_HOST_DATA_ROOT}/bags/${NAME}"
 [[ ! -e "${OUTPUT}" ]] || die "Bag already exists: ${OUTPUT}"
 
 echo "Recording ${OUTPUT}; press Ctrl-C after the successful episode."
+# Mount the bag directory only for recording; ensure_workflow_directories has
+# already created it as the invoking user, so `compose up` never creates a
+# root-owned data/groot/bags on the host.
 docker compose \
     -f "${GROOT_COMPOSE_FILE}" \
     --profile sim \
-    run --rm --no-deps so101_groot_bridge \
+    run --rm --no-deps \
+    --volume "${GROOT_HOST_DATA_ROOT}/bags:/workspace/data/bags:rw" \
+    so101_groot_bridge \
     bash -lc \
     'source "/opt/ros/${ROS_DISTRO}/setup.bash"; source /workspace/install/setup.bash; bash /workspace/so101_scripts/record_groot_demo_bag.sh "$1"' \
     _ \

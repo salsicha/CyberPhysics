@@ -11,7 +11,12 @@ import numpy as np
 from pxr import Gf, UsdGeom, UsdPhysics
 
 from score_picking_task import score
-from so101_common import forward_kinematics
+from so101_common import (
+    JOINT_LIMIT_VIOLATION_TOLERANCE,
+    LOWER_LIMITS,
+    UPPER_LIMITS,
+    forward_kinematics,
+)
 
 
 COLORS = {
@@ -125,6 +130,14 @@ class SO101TaskScene:
         self.last_printed_status = None
         self.reported_success = False
         self.samples = []
+        # Measured here or reported per command by the policy bridge. None
+        # means "not measured", never "zero".
+        self.joint_limit_violations = 0
+        self.policy_command_count = 0
+        self.saturated_command_count = 0
+        self.max_policy_latency_ms = None
+        self.max_observation_age_ms = None
+        self.policy_used_ground_truth = None
         self.telemetry_path = Path(telemetry_path) if telemetry_path else None
         self.telemetry_error_reported = False
         self.metrics_path = (
@@ -162,6 +175,28 @@ class SO101TaskScene:
     def _elapsed(self, now):
         return 0.0 if self.started_at is None else max(0.0, now - self.started_at)
 
+    def record_policy_command(self, stats):
+        """Fold one bridge command report (see groot_so101_bridge) into the metrics."""
+        if not isinstance(stats, dict):
+            return
+
+        def finite(value):
+            return (isinstance(value, (int, float)) and not isinstance(value, bool)
+                    and math.isfinite(value) and value >= 0.0)
+
+        self.policy_command_count += 1
+        if stats.get("command_saturated") is True:
+            self.saturated_command_count += 1
+        latency = stats.get("policy_latency_ms")
+        if finite(latency):
+            self.max_policy_latency_ms = max(self.max_policy_latency_ms or 0.0, float(latency))
+        age = stats.get("observation_age_ms")
+        if finite(age):
+            self.max_observation_age_ms = max(self.max_observation_age_ms or 0.0, float(age))
+        used = stats.get("policy_used_ground_truth")
+        if isinstance(used, bool):
+            self.policy_used_ground_truth = bool(self.policy_used_ground_truth) or used
+
     def update(self, joints, command_received, now=None):
         now = time.monotonic() if now is None else float(now)
         joints = np.asarray(joints, dtype=np.float64)
@@ -171,6 +206,9 @@ class SO101TaskScene:
             self.status = "approaching_target"
 
         if self.started_at is not None:
+            if (np.any(joints < LOWER_LIMITS - JOINT_LIMIT_VIOLATION_TOLERANCE)
+                    or np.any(joints > UPPER_LIMITS + JOINT_LIMIT_VIOLATION_TOLERANCE)):
+                self.joint_limit_violations += 1
             distance = float(np.linalg.norm(end_effector - self.target_position))
             if not self.attached and not self.released and joints[5] <= 0.018 and distance <= 0.045:
                 self.attached = True
@@ -193,12 +231,13 @@ class SO101TaskScene:
                     "object_xyz": self.target_position.tolist(),
                     "gripper_width_m": float(joints[5]),
                     "attached": self.attached,
-                    "policy_used_ground_truth": False,
                 })
                 self.last_sample_at = now
                 if self.released:
                     metrics = score(self.scenario, self.telemetry(now), self.task_id)
-                    self.status = "solved" if metrics["success"] else "target_released"
+                    # "solved" is the physical outcome; whether the run is a
+                    # valid policy evaluation is metrics["success"].
+                    self.status = "solved" if metrics["task_completed"] else "target_released"
 
         if self.status != self.last_printed_status:
             print(f"SO-101 task status: {self.status}", flush=True)
@@ -215,9 +254,19 @@ class SO101TaskScene:
             "status": self.status,
             "duration_s": self._elapsed(now),
             "grasp_closed": self.grasp_closed,
-            "policy_used_ground_truth": False,
-            "collisions": [],
+            # Reported by the policy bridge; None until a command report arrives.
+            "policy_used_ground_truth": self.policy_used_ground_truth,
+            # This scene does not register contact reporting, so collisions are
+            # unmeasured (None), not zero.
+            "collisions": None,
             "failed_grasps": [],
+            "joint_limit_violations": self.joint_limit_violations,
+            "policy_commands": None if not self.policy_command_count else {
+                "count": self.policy_command_count,
+                "saturated": self.saturated_command_count,
+                "max_policy_latency_ms": self.max_policy_latency_ms,
+                "max_observation_age_ms": self.max_observation_age_ms,
+            },
             "samples": self.samples,
         }
 
@@ -234,7 +283,12 @@ class SO101TaskScene:
 
     def close(self):
         if self.started_at is not None:
-            self._flush(time.monotonic())
+            now = time.monotonic()
+            self._flush(now)
+            # Also report runs that never solved the task, so acceptance
+            # statistics are not computed from successful runs only.
+            if self.metrics_path is not None and not self.reported_success:
+                self._write_metrics(self.telemetry(now))
 
     def _flush(self, now):
         if self.telemetry_path is None:
@@ -248,19 +302,26 @@ class SO101TaskScene:
             return
         self.last_flush_at = now
         if self.status == "solved" and self.metrics_path is not None and not self.reported_success:
-            metrics = score(self.scenario, payload, self.task_id)
-            try:
-                self.metrics_path.write_text(json.dumps(metrics, indent=2) + "\n")
-            except OSError as exc:
-                self._disable_telemetry(exc)
+            metrics = self._write_metrics(payload)
+            if metrics is None:
                 return
             self.reported_success = True
             print(
                 f"SO-101 TASK SOLVED: success={metrics['success']} "
                 f"place_error={metrics['final_place_error_m']:.4f}m "
-                f"duration={metrics['duration_s']:.2f}s",
+                f"duration={metrics['duration_s']:.2f}s "
+                f"unmeasured={metrics['unmeasured_checks']}",
                 flush=True,
             )
+
+    def _write_metrics(self, payload):
+        metrics = score(self.scenario, payload, self.task_id)
+        try:
+            self.metrics_path.write_text(json.dumps(metrics, indent=2) + "\n")
+        except OSError as exc:
+            self._disable_telemetry(exc)
+            return None
+        return metrics
 
     def _disable_telemetry(self, exc):
         path = self.telemetry_path

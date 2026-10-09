@@ -160,12 +160,38 @@ SO101_GROOT_MODE=demo \
 docker compose -f compositions/so101_groot_isaac.yaml --profile sim up
 ```
 
-That baseline uses the fixed task specification and measured joint state to
-execute IK-generated pick, lift, transfer, place, and retreat waypoints. It does
-not read live simulator object poses.
+That baseline plans IK pick, lift, transfer, place, and retreat waypoints from
+the scenario's object and bin poses (simulator ground truth, read from the
+server's `--scenario-file`) and the measured joint state. It does not perceive
+the scene, so its runs are reported with `policy_used_ground_truth: true` and
+never count as a policy success. The bridge only forwards object poses to a
+policy when started with `-p send_ground_truth:=true`, which also marks every
+command as ground-truth assisted.
+
+Bridge timing and inputs:
+
+- `command_rate_hz` (default 5, the `convert_rosbags_to_lerobot.py --fps`
+  default) must equal the rate of the policy's training data; chunked policies
+  replay their queued actions at this rate. The SmolVLA stack uses
+  `SMOLVLA_POLICY_FPS` (default 30). `max_joint_step` is per command.
+- Camera frames are sent at native resolution (`image_width`/`image_height`
+  `0`), as the training videos were recorded, so the policy's own processor
+  resizes them. Positive values letterbox (aspect-preserving) instead.
+- The policy server is reset before the first request, after joint feedback
+  resumes from a gap longer than `episode_reset_gap_s` (for example a simulator
+  restart) or becomes invalid, and when `task_id`/`instruction` is changed with
+  `ros2 param set`, so no stale queued actions run in a new episode.
+- Each command's policy latency, observation age, step/limit saturation and
+  ground-truth use are published as JSON on `/so101/policy_stats`; the Isaac
+  task scene folds them into the metrics file.
 
 Isaac now materializes the table, bins, target, distractors, and camera from
-`systems/so101/scenarios/picking_table.json`. For deterministic demo behavior it
+`systems/so101/scenarios/picking_table.json`. Its `camera` block is the single
+camera definition: `xyz`/`rpy` are the pose of `groot_camera_link` in the world
+(+X optical axis, +Y left, +Z up, Isaac's `camera_axes="world"`), CameraInfo
+uses `fx = fy = (width/2)/tan(horizontal_fov_deg/2)` (465.6 px for 69 degrees at
+640 px), and the URDF `base_to_groot_camera` joint must equal that pose relative
+to `base_link`. The calibration validator and tests enforce all three. For deterministic demo behavior it
 uses kinematic grasp attachment at the jaws, publishes JSON task progress on
 `/so101/task_status`, and writes these host files:
 
@@ -220,6 +246,20 @@ bridge locally:
 SO101_GROOT_HOST=192.0.2.10 \
 docker compose -f compositions/so101_groot_isaac.yaml \
   --profile sim up --scale groot_policy=0
+```
+
+### Physical station (`so101_hardware.yaml`)
+
+The `policy` profile of `compositions/so101_hardware.yaml` routes the bridge's
+commands to `/so101/hil/policy_commands`; `so101_hil_guard` forwards them to the
+driver's `${SO101_HARDWARE_COMMAND_TOPIC:-/so101/joint_commands}` only when
+started with `SO101_HIL_ARMED=true` and the driver's
+`${SO101_HARDWARE_STATE_TOPIC:-/joint_states}` is fresher than
+`SO101_HIL_STATE_TIMEOUT_S` (0.5 s). It starts disarmed:
+
+```bash
+docker compose -f compositions/so101_hardware.yaml --profile policy up
+SO101_HIL_ARMED=true docker compose -f compositions/so101_hardware.yaml --profile policy up
 ```
 
 ### Optional Hardware In The Loop
@@ -291,13 +331,21 @@ python3 applications/so101/scripts/score_picking_task.py \
   --task-id pick_red_block_left_bin
 ```
 
-Telemetry JSON should include `duration_s`, optional `collisions`, optional
-`failed_grasps`, and a `samples` array with `time`, `end_effector_xyz`,
-`object_xyz`, and `gripper_width_m`. The scorer fails if the policy uses
-simulator ground truth, if the arm never approaches and closes on the target, if
-the object is not lifted and placed within task tolerance, if collisions exceed
-the scenario limit, or if recovery after a failed grasp does not complete within
-the configured window.
+Telemetry JSON should include `duration_s`, `collisions` (a list, or `null` when
+the simulator cannot detect contacts), `policy_used_ground_truth` (`null` when
+unknown), optional `failed_grasps`, `joint_limit_violations`, `policy_commands`
+(bridge report counts, saturation, maximum latency and observation age), and a
+`samples` array with `time`, `end_effector_xyz`, `object_xyz`, and
+`gripper_width_m`. The scorer fails if the policy uses simulator ground truth, if
+the arm never approaches and closes on the target, if the object is not lifted
+and placed within task tolerance, if collisions exceed the scenario limit, or if
+recovery after a failed grasp does not complete within the configured window.
+Checks that were not measured are listed in `unmeasured_checks` and make
+`success` false; `task_completed` reports the physical outcome alone. The Isaac
+scene does not register contact reporting, so its collisions are always
+unmeasured, and the scripted demo always reports ground-truth use. Metrics are
+also written when a run ends unsolved, including on `docker compose down`
+(`run_isaacsim_so101.sh` forwards SIGTERM past Isaac's `python.sh`).
 
 Generate deterministic domain-randomized scenario variants for nightly
 validation:
@@ -325,7 +373,9 @@ Each acceptance run must include measured `collision_count`,
 `joint_limit_violations`, `command_saturation_fraction`, `policy_latency_ms`, and
 `observation_age_ms`, along with placement error and a boolean
 `failed_grasp_recovery` result (at the top level or under `checks`). The picking
-scorer alone does not collect all of these measurements. Missing or invalid
+scorer reports joint-limit violations measured by the simulator and the bridge's
+latency, observation-age and saturation reports; it reports `collision_count`
+as `null` when collisions were not measured. Missing or invalid
 measurements produce failed checks, `null` aggregate metrics, and explanations
 in `measurement_errors`; they cannot qualify a run for acceptance.
 

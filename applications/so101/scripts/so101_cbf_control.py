@@ -22,8 +22,8 @@ class SO101CBFController(Node):
         self.rate = max(1e-3, float(self.get_parameter("control_rate").value))
         self.margin = float(self.get_parameter("safety_margin").value)
         self.q_des = np.asarray(self.get_parameter("goal").value, dtype=float)
-        if self.q_des.shape != (len(JOINT_NAMES),):
-            raise ValueError("goal must contain six joint positions")
+        if self.q_des.shape != (len(JOINT_NAMES),) or not np.all(np.isfinite(self.q_des)):
+            raise ValueError("goal must contain six finite joint positions")
 
         self.q = np.zeros(len(JOINT_NAMES))
         self.state_received = False
@@ -40,7 +40,14 @@ class SO101CBFController(Node):
         positions = dict(zip(msg.name, msg.position))
         if not all(name in positions for name in JOINT_NAMES):
             return
-        self.q = np.array([positions[name] for name in JOINT_NAMES])
+        q = np.array([positions[name] for name in JOINT_NAMES], dtype=float)
+        if not np.all(np.isfinite(q)):
+            # Hold off commanding until valid feedback returns; np.clip would
+            # otherwise pass NaN straight into the joint command.
+            self.state_received = False
+            self.get_logger().warning("Ignoring non-finite SO-101 joint state")
+            return
+        self.q = q
         self.state_received = True
 
     def _control_step(self):
@@ -56,6 +63,9 @@ class SO101CBFController(Node):
         lower = JOINT_LIMITS[:, 0] + margins
         upper = JOINT_LIMITS[:, 1] - margins
         target = np.clip(target, lower, upper)
+        if not np.all(np.isfinite(target)):
+            self.get_logger().error("Dropping non-finite SO-101 joint command")
+            return
 
         message = Float64MultiArray()
         message.data = target.tolist()

@@ -13,8 +13,9 @@
     "image_topic": "/so101/camera/image_raw",
     "camera_info_topic": "/so101/camera/camera_info",
     "depth_topic": "/so101/camera/depth/image_rect_raw",
+    "pose_frame": "groot_camera_link in world: +X optical axis, +Y left, +Z up (URDF base_to_groot_camera must match)",
     "xyz": [0.17, -0.52, 0.92],
-    "rpy": [1.10, 0.0, 0.0],
+    "rpy": [0.0, 0.785, 1.449],
     "resolution": [640, 480],
     "horizontal_fov_deg": 69.0
   },

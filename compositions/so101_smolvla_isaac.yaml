@@ -102,8 +102,9 @@ services:
       start_period: 180s
       retries: 3
     entrypoint: []
+    # The launcher forwards SIGTERM so `down` flushes telemetry and metrics.
     command: >
-      ./python.sh /workspace/so101/scripts/isaacsim_so101.py
+      bash /workspace/so101/scripts/run_isaacsim_so101.sh
         --urdf /workspace/systems/so101/urdf/so101.urdf
         --scenario /workspace/systems/so101/scenarios/picking_table.json
         --task-id ${SO101_TASK_ID:-pick_red_block_left_bin}
@@ -139,13 +140,18 @@ services:
       - SMOLVLA_MODEL_PATH=${SMOLVLA_MODEL_PATH:-lerobot/smolvla_base}
       - SMOLVLA_DEVICE=${SMOLVLA_DEVICE:-cuda}
       - SMOLVLA_CHECKPOINT_UNITS=${SMOLVLA_CHECKPOINT_UNITS:-so101}
+      - SMOLVLA_JOINT_MAPPING=${SMOLVLA_JOINT_MAPPING:-/workspace/systems/so101/config/lerobot_joint_mapping.json}
+      - SMOLVLA_SKIP_UNIT_CHECK=${SMOLVLA_SKIP_UNIT_CHECK:-false}
       - SMOLVLA_ACTION_HORIZON=${SMOLVLA_ACTION_HORIZON:-8}
       - SMOLVLA_LOCAL_FILES_ONLY=${SMOLVLA_LOCAL_FILES_ONLY:-false}
       - SMOLVLA_PORT=${SMOLVLA_PORT:-5556}
     volumes:
       - ../applications/smolvla/smolvla:/workspace/data
-      - ../cache/smolvla:/workspace/cache
+      # A named volume: a missing ../cache/smolvla bind source would be
+      # created root-owned on the host by Docker.
+      - smolvla_cache:/workspace/cache
       - ../applications/smolvla/scripts:/workspace/smolvla_scripts:ro
+      - ../systems:/workspace/systems:ro
     command: >
       python /workspace/smolvla_scripts/so101_policy_server.py
         --model-path ${SMOLVLA_MODEL_PATH:-lerobot/smolvla_base}
@@ -186,6 +192,7 @@ services:
         -p policy_schema:=auto
         -p task_id:=${SO101_TASK_ID:-pick_red_block_left_bin}
         -p max_joint_step:=${SO101_MAX_JOINT_STEP:-0.08}
+        -p command_rate_hz:=${SMOLVLA_POLICY_FPS:-30.0}
 
   foxglove_bridge:
     profiles: [observe]
@@ -202,3 +209,4 @@ services:
 
 volumes:
   so101_smolvla_isaac_xauth:
+  smolvla_cache:

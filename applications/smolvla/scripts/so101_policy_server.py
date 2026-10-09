@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import traceback
 from pathlib import Path
@@ -16,8 +17,74 @@ import zmq
 
 JOINT_COUNT = 6
 ARM_JOINT_COUNT = 5
+ARM_JOINT_NAMES = ("shoulder_pan", "shoulder_lift", "elbow_flex", "wrist_flex", "wrist_roll")
 ISAAC_GRIPPER_MAX_M = 0.04
 SO101_GRIPPER_MAX = 100.0
+# LeRobot so101_follower with use_degrees=False (its default) reports arm
+# joints as -100..100 of the calibrated range, not degrees.
+LEROBOT_RANGE_LIMIT = 100.0
+
+# Map LeRobot SO-101 degrees (zero = the calibration mid-range pose) to this
+# URDF (zero = arm straight up): urdf_deg = sign * lerobot_deg + offset_deg.
+# The identity default is a placeholder: measure offset_deg/sign on your arm
+# (see systems/so101/config/lerobot_joint_mapping.json).
+IDENTITY_JOINT_MAPPING = {
+    "joints": {name: {"sign": 1.0, "offset_deg": 0.0} for name in ARM_JOINT_NAMES},
+    "gripper": {"closed": 0.0, "open": SO101_GRIPPER_MAX},
+}
+
+
+def load_joint_mapping(path: str | None) -> dict[str, Any]:
+    """Load and validate a LeRobot-degrees to URDF joint mapping file."""
+    if not path:
+        return IDENTITY_JOINT_MAPPING
+    data = json.loads(Path(path).read_text())
+    joints = data.get("joints", {})
+    mapping = {"joints": {}, "gripper": dict(IDENTITY_JOINT_MAPPING["gripper"])}
+    for name in ARM_JOINT_NAMES:
+        entry = joints.get(name, {})
+        sign = float(entry.get("sign", 1.0))
+        offset = float(entry.get("offset_deg", 0.0))
+        if sign not in (-1.0, 1.0) or not np.isfinite(offset):
+            raise ValueError(f"{path}: {name} needs sign +1/-1 and a finite offset_deg")
+        mapping["joints"][name] = {"sign": sign, "offset_deg": offset}
+    gripper = data.get("gripper", {})
+    closed = float(gripper.get("closed", mapping["gripper"]["closed"]))
+    opened = float(gripper.get("open", mapping["gripper"]["open"]))
+    if not np.isfinite(closed) or not np.isfinite(opened) or closed == opened:
+        raise ValueError(f"{path}: gripper closed/open values must be finite and differ")
+    mapping["gripper"] = {"closed": closed, "open": opened}
+    return mapping
+
+
+def is_identity_mapping(mapping: dict[str, Any]) -> bool:
+    return all(
+        entry["sign"] == 1.0 and entry["offset_deg"] == 0.0
+        for entry in mapping["joints"].values()
+    )
+
+
+def _mapping_arrays(mapping: dict[str, Any]) -> tuple[np.ndarray, np.ndarray]:
+    joints = mapping["joints"]
+    signs = np.asarray([joints[name]["sign"] for name in ARM_JOINT_NAMES], dtype=np.float32)
+    offsets = np.asarray([joints[name]["offset_deg"] for name in ARM_JOINT_NAMES], dtype=np.float32)
+    return signs, offsets
+
+
+def looks_like_lerobot_range_values(minimum: Any, maximum: Any) -> bool:
+    """True when arm-joint extremes look like LeRobot -100..100 normalised data.
+
+    Normalised values are clipped to exactly +/-100 at the calibrated limits
+    and never exceed them; degree data rarely saturates at exactly 100.
+    """
+    low = np.asarray(minimum, dtype=np.float64).reshape(-1)[:ARM_JOINT_COUNT]
+    high = np.asarray(maximum, dtype=np.float64).reshape(-1)[:ARM_JOINT_COUNT]
+    if low.size != ARM_JOINT_COUNT or high.size != ARM_JOINT_COUNT:
+        return False
+    extremes = np.concatenate([low, high])
+    if not np.all(np.isfinite(extremes)) or np.any(np.abs(extremes) > LEROBOT_RANGE_LIMIT + 1e-3):
+        return False
+    return bool(np.any(np.abs(np.abs(extremes) - LEROBOT_RANGE_LIMIT) <= 1e-3))
 
 
 def pack(data: Any) -> bytes:
@@ -28,28 +95,45 @@ def unpack(data: bytes) -> Any:
     return msgpack.unpackb(data, object_hook=mnp.decode, raw=False)
 
 
-def isaac_to_so101_units(state: np.ndarray) -> np.ndarray:
-    """Convert Isaac radians/metres to LeRobot SO101 degrees/0-100."""
-    state = _joint_vector(state, "Isaac state").copy()
-    state[:ARM_JOINT_COUNT] = np.rad2deg(state[:ARM_JOINT_COUNT])
-    state[-1] = np.clip(
-        state[-1] / ISAAC_GRIPPER_MAX_M * SO101_GRIPPER_MAX,
-        0.0,
-        SO101_GRIPPER_MAX,
-    )
+def isaac_to_so101_units(state: np.ndarray, mapping: dict[str, Any] = IDENTITY_JOINT_MAPPING) -> np.ndarray:
+    """Convert Isaac radians/metres to LeRobot SO101 degrees (use_degrees=True) and gripper 0-100."""
+    state = _joint_vector(state, "Isaac state").astype(np.float64)
+    signs, offsets = _mapping_arrays(mapping)
+    state[:ARM_JOINT_COUNT] = (np.rad2deg(state[:ARM_JOINT_COUNT]) - offsets) * signs
+    closed, opened = mapping["gripper"]["closed"], mapping["gripper"]["open"]
+    fraction = np.clip(state[-1] / ISAAC_GRIPPER_MAX_M, 0.0, 1.0)
+    state[-1] = closed + fraction * (opened - closed)
     return state.astype(np.float32)
 
 
-def so101_to_isaac_units(action: np.ndarray) -> np.ndarray:
-    """Convert LeRobot SO101 degrees/0-100 to Isaac radians/metres."""
-    action = _joint_vector(action, "SO101 action").copy()
-    action[:ARM_JOINT_COUNT] = np.deg2rad(action[:ARM_JOINT_COUNT])
-    action[-1] = (
-        np.clip(action[-1], 0.0, SO101_GRIPPER_MAX)
-        / SO101_GRIPPER_MAX
-        * ISAAC_GRIPPER_MAX_M
-    )
+def so101_to_isaac_units(action: np.ndarray, mapping: dict[str, Any] = IDENTITY_JOINT_MAPPING) -> np.ndarray:
+    """Convert LeRobot SO101 degrees (use_degrees=True) and gripper 0-100 to Isaac radians/metres."""
+    action = _joint_vector(action, "SO101 action").astype(np.float64)
+    signs, offsets = _mapping_arrays(mapping)
+    action[:ARM_JOINT_COUNT] = np.deg2rad(signs * action[:ARM_JOINT_COUNT] + offsets)
+    closed, opened = mapping["gripper"]["closed"], mapping["gripper"]["open"]
+    fraction = np.clip((action[-1] - closed) / (opened - closed), 0.0, 1.0)
+    action[-1] = fraction * ISAAC_GRIPPER_MAX_M
     return action.astype(np.float32)
+
+
+def checkpoint_state_range(preprocessor: Any) -> tuple[np.ndarray, np.ndarray] | None:
+    """Return the observation.state min/max a LeRobot normaliser was fitted on."""
+    for step in getattr(preprocessor, "steps", None) or []:
+        stats = getattr(step, "stats", None)
+        if not isinstance(stats, dict):
+            continue
+        state = stats.get("observation.state")
+        if not isinstance(state, dict) or "min" not in state or "max" not in state:
+            continue
+        values = []
+        for key in ("min", "max"):
+            value = state[key]
+            if hasattr(value, "detach"):
+                value = value.detach().cpu().numpy()
+            values.append(np.asarray(value, dtype=np.float64))
+        return values[0], values[1]
+    return None
 
 
 def _joint_vector(value: Any, label: str) -> np.ndarray:
@@ -121,6 +205,8 @@ class SmolVLASO101Policy:
         action_horizon: int,
         revision: str | None,
         local_files_only: bool,
+        joint_mapping: dict[str, Any] = IDENTITY_JOINT_MAPPING,
+        skip_unit_check: bool = False,
     ) -> None:
         import torch
         from lerobot.configs import PreTrainedConfig
@@ -131,6 +217,7 @@ class SmolVLASO101Policy:
         self.device = torch.device(device)
         self.model_path = model_path
         self.checkpoint_units = checkpoint_units
+        self.joint_mapping = joint_mapping
 
         if self.device.type == "cuda" and not torch.cuda.is_available():
             raise SystemExit(f"SmolVLA device {device!r} requested, but CUDA is unavailable")
@@ -206,7 +293,31 @@ class SmolVLASO101Policy:
             preprocessor_overrides={"device_processor": {"device": str(self.device)}},
         )
         self.config = config
+        if self.checkpoint_units == "so101":
+            self._check_checkpoint_units(skip_unit_check)
         self.reset()
+
+    def _check_checkpoint_units(self, skip: bool) -> None:
+        state_range = checkpoint_state_range(self.preprocessor)
+        if state_range is None:
+            print(
+                "WARNING: could not read the checkpoint's observation.state statistics; "
+                "assuming LeRobot SO101 degrees (use_degrees=True).",
+                flush=True,
+            )
+            return
+        if looks_like_lerobot_range_values(*state_range):
+            message = (
+                "SmolVLA checkpoint state statistics look like LeRobot -100..100 "
+                "normalised joints (so101_follower use_degrees=False), not degrees: "
+                f"min={np.round(state_range[0], 3).tolist()} max={np.round(state_range[1], 3).tolist()}. "
+                "Converting them as degrees would command wrong joint angles. Re-record or "
+                "fine-tune on use_degrees=True data, or set SMOLVLA_SKIP_UNIT_CHECK=true if "
+                "the data really is in degrees."
+            )
+            if not skip:
+                raise SystemExit(message)
+            print(f"WARNING: {message}", flush=True)
 
     def reset(self) -> dict[str, Any]:
         self.policy.reset()
@@ -230,7 +341,7 @@ class SmolVLASO101Policy:
 
         state = _latest_joint_state(observation)
         if self.checkpoint_units == "so101":
-            policy_state = isaac_to_so101_units(state)
+            policy_state = isaac_to_so101_units(state, self.joint_mapping)
         else:
             policy_state = state
 
@@ -253,7 +364,7 @@ class SmolVLASO101Policy:
 
         target = _joint_vector(action.detach().cpu().numpy(), "SmolVLA action")
         if self.checkpoint_units == "so101":
-            target = so101_to_isaac_units(target)
+            target = so101_to_isaac_units(target, self.joint_mapping)
         return {"joint_positions": target.reshape(1, 1, JOINT_COUNT)}
 
 
@@ -317,9 +428,23 @@ def main() -> None:
     parser.add_argument("--device", default=os.environ.get("SMOLVLA_DEVICE", "cuda"))
     parser.add_argument(
         "--checkpoint-units",
-        choices=["so101", "isaac"],
+        choices=["so101", "so101_range100", "isaac"],
         default=os.environ.get("SMOLVLA_CHECKPOINT_UNITS", "so101"),
-        help="'so101' means arm degrees and gripper 0-100; 'isaac' means radians and metres",
+        help=(
+            "'so101': LeRobot so101_follower recorded with use_degrees=True (arm degrees, "
+            "gripper 0-100); 'so101_range100': LeRobot's default use_degrees=False -100..100 "
+            "range (rejected: needs the arm's calibration); 'isaac': radians and metres"
+        ),
+    )
+    parser.add_argument(
+        "--joint-mapping",
+        default=os.environ.get("SMOLVLA_JOINT_MAPPING", ""),
+        help="JSON sign/offset mapping from LeRobot degrees to the URDF (default: identity)",
+    )
+    parser.add_argument(
+        "--skip-unit-check",
+        action="store_true",
+        default=os.environ.get("SMOLVLA_SKIP_UNIT_CHECK", "false").lower() in ("1", "true", "yes"),
     )
     parser.add_argument(
         "--action-horizon",
@@ -336,6 +461,20 @@ def main() -> None:
     parser.add_argument("--host", default=os.environ.get("SMOLVLA_BIND_HOST", "127.0.0.1"))
     parser.add_argument("--port", type=int, default=int(os.environ.get("SMOLVLA_PORT", "5556")))
     args = parser.parse_args()
+    if args.checkpoint_units == "so101_range100":
+        raise SystemExit(
+            "LeRobot use_degrees=False checkpoints use a -100..100 range of each joint's "
+            "calibrated travel; mapping it to Isaac radians needs that arm's calibration "
+            "file. Record/fine-tune with use_degrees=True and use --checkpoint-units so101."
+        )
+    joint_mapping = load_joint_mapping(args.joint_mapping)
+    if args.checkpoint_units == "so101" and is_identity_mapping(joint_mapping):
+        print(
+            "WARNING: identity joint mapping: assuming LeRobot's calibration zero equals "
+            "the URDF zero for every arm joint. Calibrate SMOLVLA_JOINT_MAPPING "
+            "(systems/so101/config/lerobot_joint_mapping.json) for your arm.",
+            flush=True,
+        )
 
     policy = SmolVLASO101Policy(
         model_path=args.model_path,
@@ -344,6 +483,8 @@ def main() -> None:
         action_horizon=args.action_horizon,
         revision=args.revision,
         local_files_only=args.local_files_only,
+        joint_mapping=joint_mapping,
+        skip_unit_check=args.skip_unit_check,
     )
     PolicyServer(policy, args.host, args.port).run()
 

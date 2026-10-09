@@ -1,4 +1,5 @@
-FROM salsicha/cyberphysics:aerostack2-latest AS build
+ARG TAG=latest
+FROM salsicha/cyberphysics:aerostack2-${TAG} AS build
 
 ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US.UTF-8 \
@@ -12,7 +13,10 @@ SHELL ["/bin/bash", "-c"]
 
 COPY scripts/ /scripts/
 
-RUN python3 -m venv /venv
+# Reuse the aerostack2 base venv: it is created with --system-site-packages.
+# Re-running `python3 -m venv /venv` here rewrote pyvenv.cfg with
+# include-system-site-packages = false, hiding the apt Python packages.
+RUN grep -qx 'include-system-site-packages = true' /venv/pyvenv.cfg
 RUN . /venv/bin/activate && pip3 install 'torch>=2.8,<2.9' --index-url https://download.pytorch.org/whl/cu128
 RUN . /venv/bin/activate && pip3 install genesis-world==1.3.3
 

@@ -31,6 +31,9 @@ JOINT_BACKLASH = np.array([0.003, 0.003, 0.003, 0.0025, 0.0025, 0.0008], dtype=n
 # Measured joints may read up to one encoder step past a limit (quantization
 # of an at-limit position rounds outward); commands are still clamped exactly.
 JOINT_MEASUREMENT_TOLERANCE = JOINT_QUANTIZATION.astype(np.float64)
+# Physics engines enforce joint limits softly; a simulated joint further past
+# its limit than this counts as a joint-limit violation in task metrics.
+JOINT_LIMIT_VIOLATION_TOLERANCE = np.array([0.01, 0.01, 0.01, 0.01, 0.01, 0.001], dtype=np.float64)
 
 RGB_TOPIC = "/so101/camera/image_raw"
 RGB_CAMERA_INFO_TOPIC = "/so101/camera/camera_info"
@@ -44,17 +47,41 @@ BASE_FRAME_ID = "base_link"
 TABLE_FRAME_ID = "table_frame"
 GRIPPER_FRAME_ID = "gripper_base_link"
 TASK_STATUS_TOPIC = "/so101/task_status"
+# Per-command JSON statistics from the policy bridge (latency, observation age,
+# saturation, ground-truth use), consumed by the simulator's task metrics.
+POLICY_STATS_TOPIC = "/so101/policy_stats"
 
+# The scenario's "camera" block (systems/so101/scenarios/*.json) is the single
+# source of truth for the simulated camera: Isaac renders from it, CameraInfo
+# is derived from its resolution and horizontal FOV, and the URDF/TF camera
+# mount must equal its pose relative to base_link (enforced by
+# validate_calibration_and_dataset.py and the tests). These are its defaults.
 CAMERA_WIDTH = 640
 CAMERA_HEIGHT = 480
-CAMERA_FX = 554.0
-CAMERA_FY = 554.0
+CAMERA_HFOV_DEG = 69.0  # RealSense D435i colour; Isaac keeps pixels square
+# Pose of groot_camera_link in the scenario world frame, in ROS body axes
+# (+X optical axis, +Y left, +Z up), i.e. Isaac's Camera camera_axes="world".
+DEFAULT_CAMERA_XYZ = (0.17, -0.52, 0.92)
+DEFAULT_CAMERA_RPY = (0.0, 0.785, 1.449)
+# systems/so101/urdf/so101.urdf.xacro world_to_base: base_link sits this far
+# above the spawn pose of the URDF's root ``world`` link.
+SPAWN_TO_BASE_LINK = (0.0, 0.0, 0.0225)
+
+
+def camera_focal_length_px(width=CAMERA_WIDTH, horizontal_fov_deg=CAMERA_HFOV_DEG):
+    """Pinhole focal length in pixels for a horizontal field of view."""
+    return (float(width) / 2.0) / math.tan(math.radians(float(horizontal_fov_deg)) / 2.0)
+
+
+CAMERA_FX = camera_focal_length_px()
+CAMERA_FY = CAMERA_FX
 CAMERA_CX = CAMERA_WIDTH / 2.0
 CAMERA_CY = CAMERA_HEIGHT / 2.0
 
-# Matches systems/so101/urdf/so101.urdf.xacro base_to_groot_camera.
-BASE_TO_CAMERA_LINK_TRANSLATION = (0.24, -0.28, 0.34)
-BASE_TO_CAMERA_LINK_RPY = (0.0, 0.72, 2.36)
+# base_to_groot_camera in systems/so101/urdf/so101.urdf.xacro; equals
+# base_to_camera_link() of the picking_table scenario camera.
+BASE_TO_CAMERA_LINK_TRANSLATION = (0.17, -0.52, 0.4665)
+BASE_TO_CAMERA_LINK_RPY = DEFAULT_CAMERA_RPY
 CAMERA_LINK_TO_OPTICAL_TRANSLATION = (0.0, 0.0, 0.0)
 CAMERA_LINK_TO_OPTICAL_RPY = (-1.57079632679, 0.0, -1.57079632679)
 CAMERA_TO_DEPTH_TRANSLATION = (0.0, 0.0, 0.0)
@@ -104,11 +131,73 @@ def safe_hardware_target(requested, current, max_joint_step):
     return np.clip(current + np.clip(bounded - current, -step, step), LOWER_LIMITS, UPPER_LIMITS)
 
 
-def camera_info_values(width=CAMERA_WIDTH, height=CAMERA_HEIGHT):
-    sx = float(width) / CAMERA_WIDTH
-    sy = float(height) / CAMERA_HEIGHT
-    fx = CAMERA_FX * sx
-    fy = CAMERA_FY * sy
+def validated_joint_command(values):
+    """Return a six-joint position command clamped to the joint limits.
+
+    Raises ValueError for a wrong-sized or non-finite command: np.clip passes
+    NaN through, so a simulator drive target must be rejected, not clamped.
+    """
+    command = np.asarray(values, dtype=np.float64).reshape(-1)
+    if command.size != len(JOINT_NAMES):
+        raise ValueError(f"expected {len(JOINT_NAMES)} SO-101 joint commands, got {command.size}")
+    if not np.all(np.isfinite(command)):
+        raise ValueError("SO-101 joint command contains a non-finite value")
+    return np.clip(command, LOWER_LIMITS, UPPER_LIMITS)
+
+
+def rpy_to_matrix(rpy):
+    """Rotation matrix for URDF/ROS fixed-axis roll, pitch, yaw."""
+    roll, pitch, yaw = (float(value) for value in rpy)
+    cr, sr = math.cos(roll), math.sin(roll)
+    cp, sp = math.cos(pitch), math.sin(pitch)
+    cy, sy = math.cos(yaw), math.sin(yaw)
+    return np.array([
+        [cy * cp, cy * sp * sr - sy * cr, cy * sp * cr + sy * sr],
+        [sy * cp, sy * sp * sr + cy * cr, sy * sp * cr - cy * sr],
+        [-sp, cp * sr, cp * cr],
+    ])
+
+
+def matrix_to_rpy(matrix):
+    matrix = np.asarray(matrix, dtype=np.float64)
+    pitch = math.asin(max(-1.0, min(1.0, -matrix[2, 0])))
+    roll = math.atan2(matrix[2, 1], matrix[2, 2])
+    yaw = math.atan2(matrix[1, 0], matrix[0, 0])
+    return roll, pitch, yaw
+
+
+def scenario_camera(scenario=None):
+    """The scenario camera block merged over the defaults above."""
+    camera = {
+        "xyz": list(DEFAULT_CAMERA_XYZ),
+        "rpy": list(DEFAULT_CAMERA_RPY),
+        "resolution": [CAMERA_WIDTH, CAMERA_HEIGHT],
+        "horizontal_fov_deg": CAMERA_HFOV_DEG,
+        # USD cameras default to a 1 m near plane, which would clip the
+        # whole tabletop (0.5-0.9 m from the camera).
+        "clipping_range_m": [0.01, 100.0],
+    }
+    camera.update((scenario or {}).get("camera", {}))
+    return camera
+
+
+def base_to_camera_link(scenario=None):
+    """groot_camera_link pose relative to base_link for a scenario camera."""
+    spawn = (scenario or {}).get("robot_spawn", {})
+    spawn_rotation = rpy_to_matrix(spawn.get("rpy", [0.0, 0.0, 0.0]))
+    base_xyz = np.asarray(spawn.get("xyz", [0.0, 0.0, 0.0]), dtype=np.float64) + (
+        spawn_rotation @ np.asarray(SPAWN_TO_BASE_LINK, dtype=np.float64)
+    )
+    camera = scenario_camera(scenario)
+    translation = spawn_rotation.T @ (np.asarray(camera["xyz"], dtype=np.float64) - base_xyz)
+    rotation = spawn_rotation.T @ rpy_to_matrix(camera["rpy"])
+    return tuple(float(value) for value in translation), matrix_to_rpy(rotation)
+
+
+def camera_info_values(width=CAMERA_WIDTH, height=CAMERA_HEIGHT, horizontal_fov_deg=CAMERA_HFOV_DEG):
+    # Square pixels and a centred principal point, as Isaac's Camera renders
+    # (set_horizontal_aperture keeps the vertical aperture in proportion).
+    fx = fy = camera_focal_length_px(width, horizontal_fov_deg)
     cx = float(width) / 2.0
     cy = float(height) / 2.0
     return {

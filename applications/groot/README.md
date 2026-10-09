@@ -99,20 +99,21 @@ Use --min-vram-gib 16 when checking an inference-only machine.
 
 ## 2. Build
 
-The image clones upstream NVIDIA/Isaac-GR00T recursively and installs its locked
-environment. uv selects the Python version required by the selected upstream
-ref.
+The image fetches upstream NVIDIA/Isaac-GR00T at the commit pinned by
+`GR00T_REF` in the Dockerfile (with submodules) and installs its locked
+environment. uv selects the Python version required by that ref.
 
 ~~~bash
 make -C applications build_groot
 make -C applications build_so101
 ~~~
 
-To pin upstream explicitly:
+To build another upstream commit or branch, check that the policy server,
+modality config, open-loop eval and finetune wrappers still match its APIs, then:
 
 ~~~bash
 docker build \
-  --build-arg GR00T_REF=main \
+  --build-arg GR00T_REF=<commit-sha-or-branch> \
   -t salsicha/cyberphysics:groot-latest \
   applications/groot
 ~~~
@@ -219,6 +220,20 @@ wrapper handles the v3-to-v2 conversion.
 Determine the actual raw gripper values at fully closed and at the opening that
 must map to 0.04 m. Do not assume 0 and 100, and do not infer direction from a
 dataset maximum.
+
+`--input-units degrees` means the dataset was recorded by LeRobot's
+`so101_follower` with `use_degrees=True`. LeRobot's default `use_degrees=False`
+stores arm joints as -100..100 of each joint's calibrated travel; the normalizer
+detects such data (values never beyond ±100 and saturating at exactly ±100) and
+refuses it, because converting it needs the arm's calibration.
+
+LeRobot's 0° is the middle of each joint's calibrated range; this URDF's zero is
+the arm pointing straight up. Arm joints are converted with
+`urdf_deg = sign * lerobot_deg + offset_deg` from
+`systems/so101/config/lerobot_joint_mapping.json` (override with
+`--joint-mapping CONTAINER_PATH`). Its identity values are placeholders until
+you measure your arm; converted values outside the URDF joint limits are
+rejected, and the mapping used is recorded in `meta/so101_units.json`.
 
 Example:
 
@@ -388,7 +403,9 @@ docker compose \
 
 Score repeated runs using the task and acceptance tools documented in
 applications/so101/README.md. Report closed-loop success rate, collisions, place
-error, command saturation, joint-limit violations, and policy latency.
+error, command saturation, joint-limit violations, and policy latency. The Isaac
+scene cannot measure collisions (reported as unmeasured), and demo-mode runs are
+reported as using simulator ground truth, so neither passes acceptance.
 
 ## Hardware deployment
 

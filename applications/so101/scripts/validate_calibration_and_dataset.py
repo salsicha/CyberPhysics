@@ -10,9 +10,10 @@ from pathlib import Path
 import numpy as np
 
 from so101_common import (
-    CAMERA_HEIGHT,
-    CAMERA_WIDTH,
+    base_to_camera_link,
     camera_info_values,
+    rpy_to_matrix,
+    scenario_camera,
 )
 
 
@@ -73,7 +74,12 @@ def assert_near(name, actual, expected, tolerance):
     return error
 
 
-def validate_urdf_alignment(urdf_path):
+def rotation_error_rad(rpy_a, rpy_b):
+    relative = rpy_to_matrix(rpy_a).T @ rpy_to_matrix(rpy_b)
+    return float(math.acos(max(-1.0, min(1.0, (np.trace(relative) - 1.0) / 2.0))))
+
+
+def validate_urdf_alignment(urdf_path, scenario_path=None):
     joints, links = urdf_model(urdf_path)
     missing_joints = [name for name in REQUIRED_URDF_JOINTS if name not in joints]
     if missing_joints:
@@ -98,8 +104,17 @@ def validate_urdf_alignment(urdf_path):
         "wrist_to_gripper_xyz": gripper_xyz,
         "moving_jaw_nominal_xyz": moving_jaw_xyz,
     }
-    if not (0.16 <= camera_xyz[0] <= 0.32 and -0.38 <= camera_xyz[1] <= -0.18 and 0.25 <= camera_xyz[2] <= 0.45):
-        raise AssertionError("base_to_groot_camera is outside expected tabletop camera mount bounds")
+    if scenario_path:
+        # The URDF/TF camera mount must be where the simulator renders from.
+        expected_xyz, expected_rpy = base_to_camera_link(load_json(scenario_path))
+        metrics["camera_mount_xyz_error_m"] = assert_near(
+            "base_to_groot_camera translation vs scenario camera", camera_xyz, expected_xyz, 1e-3)
+        rotation_error = rotation_error_rad(camera_rpy, expected_rpy)
+        if rotation_error > 1e-3:
+            raise AssertionError(
+                f"base_to_groot_camera rotation differs from the scenario camera by {rotation_error:.6g} rad"
+            )
+        metrics["camera_mount_rotation_error_rad"] = rotation_error
     if moving_jaw_xyz[0] <= 0.0:
         raise AssertionError("moving gripper jaw must open along positive x from gripper_base_link")
     return metrics
@@ -107,9 +122,10 @@ def validate_urdf_alignment(urdf_path):
 
 def validate_scenario_camera(scenario_path, camera_info_path=None):
     scenario = load_json(scenario_path)
-    camera = scenario.get("camera", {})
-    width, height = camera.get("resolution", [CAMERA_WIDTH, CAMERA_HEIGHT])
-    expected = camera_info_values(width, height)
+    camera = scenario_camera(scenario)
+    width, height = camera["resolution"]
+    # The renderer's intrinsics: its resolution and horizontal field of view.
+    expected = camera_info_values(width, height, camera["horizontal_fov_deg"])
     metrics = {
         "scenario": scenario.get("name"),
         "camera_frame_id": camera.get("frame_id"),
@@ -119,8 +135,10 @@ def validate_scenario_camera(scenario_path, camera_info_path=None):
         raise AssertionError("scenario camera frame_id must be groot_camera_rgb_optical_frame")
     if camera_info_path:
         observed = load_json(camera_info_path)
-        metrics["camera_info_k_error"] = assert_near("camera_info.k", observed["k"], expected["k"], 1e-6)
-        metrics["camera_info_p_error"] = assert_near("camera_info.p", observed["p"], expected["p"], 1e-6)
+        if [observed.get("width"), observed.get("height")] != [expected["width"], expected["height"]]:
+            raise AssertionError("camera_info resolution does not match the scenario camera")
+        metrics["camera_info_k_error"] = assert_near("camera_info.k", observed["k"], expected["k"], 1e-3)
+        metrics["camera_info_p_error"] = assert_near("camera_info.p", observed["p"], expected["p"], 1e-3)
         if observed.get("frame_id") != camera.get("frame_id"):
             raise AssertionError("camera_info frame_id does not match scenario camera frame")
     return metrics
@@ -176,7 +194,7 @@ def main():
     args = parser.parse_args()
 
     results = {
-        "urdf_alignment": validate_urdf_alignment(args.urdf),
+        "urdf_alignment": validate_urdf_alignment(args.urdf, args.scenario),
         "scenario_camera": validate_scenario_camera(args.scenario, args.camera_info_json),
     }
     if args.tf_json:

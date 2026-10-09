@@ -75,7 +75,11 @@ class MockSO101Policy(BasePolicy):
         action = current + np.clip(target - current, -0.08, 0.08)
         action = np.clip(action, JOINT_LIMITS[:, 0], JOINT_LIMITS[:, 1])
         self.step += 1
-        return {"joint_positions": action.reshape(1, 1, 6)}, {"mode": "mock", "step": self.step}
+        return {"joint_positions": action.reshape(1, 1, 6)}, {
+            "mode": "mock",
+            "step": self.step,
+            "policy_used_ground_truth": False,
+        }
 
 
 class DemoSO101Policy(BasePolicy):
@@ -106,9 +110,11 @@ class DemoSO101Policy(BasePolicy):
         if waypoint != self.last_waypoint:
             print(f"SO-101 GR00T waypoint: {waypoint}", flush=True)
             self.last_waypoint = waypoint
+        # The scripted plan is computed from the scenario's object poses, i.e.
+        # simulator ground truth, so it is never a valid policy evaluation.
         return {
             "joint_positions": action.reshape(1, 1, 6)
-        }, {"mode": "demo", "waypoint": waypoint}
+        }, {"mode": "demo", "waypoint": waypoint, "policy_used_ground_truth": True}
 
 
 def build_real_policy(args):
@@ -193,7 +199,7 @@ def load_demo_scenario(path, task_id=""):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", default="0.0.0.0")
-    parser.add_argument("--port", type=int, default=5555)
+    parser.add_argument("--port", type=int, default=int(os.environ.get("SO101_GROOT_PORT", "5555")))
     parser.add_argument(
         "--mode",
         choices=["demo", "mock", "real"],

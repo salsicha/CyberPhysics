@@ -3,8 +3,16 @@
 # The repository currently provides the SO-101 ROS contract, simulated adapters,
 # camera/GROOT bridge, and safety/control helpers. A physical motor driver still
 # needs to run on the host or in another compose file and should:
-#   publish /joint_states
-#   subscribe to /so101/joint_commands
+#   publish ${SO101_HARDWARE_STATE_TOPIC:-/joint_states}
+#   subscribe to ${SO101_HARDWARE_COMMAND_TOPIC:-/so101/joint_commands}
+#
+# The `policy` profile never commands the arm directly: the bridge publishes to
+# /so101/hil/policy_commands and so101_hil_guard forwards to the driver only
+# when started with SO101_HIL_ARMED=true and the driver's joint state is fresh
+# (SO101_HIL_STATE_TIMEOUT_S). It starts DISARMED; arm a new run explicitly
+# after checking the workspace, joint directions, limits and emergency stop:
+#   SO101_HIL_ARMED=true docker compose -f compositions/so101_hardware.yaml \
+#     --profile policy up
 
 services:
   so101_depth_camera:
@@ -42,6 +50,7 @@ services:
       - HF_HOME=/workspace/cache/huggingface
       - TORCH_HOME=/workspace/cache/torch
       - SO101_GROOT_MODE=${SO101_GROOT_MODE:-mock}
+      - SO101_GROOT_PORT=${SO101_GROOT_PORT:-5555}
       - GR00T_MODEL_PATH=${GR00T_MODEL_PATH:-}
       - GR00T_EMBODIMENT_TAG=${GR00T_EMBODIMENT_TAG:-so101}
       - GR00T_DEVICE=${GR00T_DEVICE:-cuda}
@@ -79,9 +88,37 @@ services:
       python3 /workspace/so101_scripts/groot_so101_bridge.py
         --ros-args
         --params-file /workspace/systems/so101/config/groot_demo.yaml
+        -p policy_port:=${SO101_GROOT_PORT:-5555}
+        -p command_rate_hz:=${SO101_GROOT_POLICY_FPS:-5.0}
+        -p joint_state_topic:=${SO101_HARDWARE_STATE_TOPIC:-/joint_states}
+        -p command_topic:=/so101/hil/policy_commands
         -p camera_topic:=${SO101_CAMERA_TOPIC:-/so101/depth_camera/color/image_raw}
-        -p depth_topic:=${SO101_DEPTH_TOPIC:-/so101/depth_camera/depth/image_rect_raw}
+        -p depth_topic:=${SO101_DEPTH_TOPIC:-/so101/depth_camera/aligned_depth_to_color/image_raw}
         -p camera_info_topic:=${SO101_CAMERA_INFO_TOPIC:-/so101/depth_camera/color/camera_info}
+
+  so101_hil_guard:
+    profiles:
+      - policy
+    image: salsicha/cyberphysics:so101-${CYBERPHYSICS_TAG:-latest}
+    container_name: so101_hardware_hil_guard
+    network_mode: host
+    restart: unless-stopped
+    depends_on:
+      - so101_groot_bridge
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+    volumes:
+      - ../applications/so101/scripts:/workspace/so101_scripts:ro
+    command: >
+      python3 /workspace/so101_scripts/so101_hil_guard.py
+        --ros-args
+        -p armed:=${SO101_HIL_ARMED:-false}
+        -p input_command_topic:=/so101/hil/policy_commands
+        -p hardware_state_topic:=${SO101_HARDWARE_STATE_TOPIC:-/joint_states}
+        -p hardware_command_topic:=${SO101_HARDWARE_COMMAND_TOPIC:-/so101/joint_commands}
+        -p state_timeout_s:=${SO101_HIL_STATE_TIMEOUT_S:-0.5}
+        -p max_joint_step:=${SO101_HIL_MAX_JOINT_STEP:-0.04}
 
   so101_foxglove_bridge:
     network_mode: host
