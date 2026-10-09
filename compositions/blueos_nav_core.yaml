@@ -23,11 +23,12 @@ services:
 
   navigation_bridge:
     # Relays the ArduPilot EKF origin to /navigation/origin, the anchor of
-    # every local navigation output. GPS_INPUT_CORRECTIONS=true also sends
-    # accepted DemNav/WildNav fixes to ArduPilot as GPS 2: experimental,
-    # copter only, and it needs systems/aerodrone/config/
-    # arducopter_gps_input.params on the autopilot (see
-    # tools/gps_denied_sitl_test.md).
+    # every local navigation output. By default (GPS_INPUT_CORRECTIONS=true;
+    # the airplane's blueos.env sets false: copter only) it also sends
+    # accepted DemNav/WildNav fixes to ArduPilot as GPS 2, but only once the
+    # autopilot reports systems/aerodrone/config/arducopter_gps_input.params,
+    # which must be loaded on it by hand (systems/aerodrone/README.md); the
+    # bridge never writes EKF source parameters.
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-arm64}
     container_name: ${NAVIGATION_BRIDGE_CONTAINER:-navigation_bridge}
     network_mode: host
@@ -43,7 +44,7 @@ services:
     command: >
       python3 /workspace/applications/aerostack2/scripts/ardupilot_navigation_bridge.py
         --ros-args -p mavros_namespace:=/mavros
-        -p gps_input_enabled:=${GPS_INPUT_CORRECTIONS:-false}
+        -p gps_input_enabled:=${GPS_INPUT_CORRECTIONS:-true}
         -p correction_topic:=${NAVIGATION_TOPIC_PREFIX:-/navigation}/correction_fix
         -p autopilot_corrections_topic:=${NAVIGATION_TOPIC_PREFIX:-/navigation}/autopilot_corrections_active
 

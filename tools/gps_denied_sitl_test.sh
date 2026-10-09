@@ -16,7 +16,9 @@
 #   GPS_DENIED_OUTPUT      telemetry directory (default generated/gps_denied_sitl)
 #   GPS_DENIED_DENY_AFTER_S / GPS_DENIED_DENIED_S / GPS_DENIED_RESTORE_S /
 #   GPS_DENIED_TAKEOFF_ALT_M / GPS_DENIED_LEG_M   mission timing and shape
+#                          (GPS_DENIED_DENIED_S=0: normal flight, GPS never denied)
 #   GPS_DENIED_TIMEOUT_S   overall wall-clock limit (default 1500)
+#   GPS_DENIED_COMPOSE_OVERRIDE  extra compose file layered on the stack
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -32,7 +34,8 @@ project="${GPS_DENIED_PROJECT:-gps_denied_sitl_${SITL_INSTANCE}}"
 mkdir -p "$GPS_DENIED_OUTPUT"
 rm -f "$GPS_DENIED_OUTPUT/telemetry.json"
 
-COMPOSE=(docker compose -p "$project" -f tools/gps_denied_sitl.yaml)
+COMPOSE=(docker compose -p "$project" -f tools/gps_denied_sitl.yaml
+         ${GPS_DENIED_COMPOSE_OVERRIDE:+-f "$GPS_DENIED_COMPOSE_OVERRIDE"})
 cleanup() {
     "${COMPOSE[@]}" logs --no-color > "$GPS_DENIED_OUTPUT/stack.log" 2>&1 || true
     "${COMPOSE[@]}" down --remove-orphans > /dev/null 2>&1 || true

@@ -107,7 +107,8 @@ services:
 
   airplane_navigation_bridge:
     # EKF origin -> /navigation/origin, the anchor of all local navigation
-    # outputs. (GPS_INPUT corrections are copter-only and stay off here.)
+    # outputs. GPS_INPUT corrections are designed and SITL-validated for
+    # ArduCopter only and stay off here (systems/airplane/README.md).
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
     container_name: airplane_sim_navigation_bridge
     network_mode: host
@@ -123,6 +124,7 @@ services:
     command: >
       python3 /workspace/applications/aerostack2/scripts/ardupilot_navigation_bridge.py
         --ros-args -p mavros_namespace:=/mavros
+        -p gps_input_enabled:=false
         -p correction_topic:=/airplane/navigation/correction_fix
         -p autopilot_corrections_topic:=/airplane/navigation/autopilot_corrections_active
 

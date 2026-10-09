@@ -9,6 +9,8 @@ per-push CI.
 ```bash
 tools/gps_denied_sitl_test.sh                               # defaults below
 GPS_INPUT_CORRECTIONS=false tools/gps_denied_sitl_test.sh   # control run
+GPS_DENIED_DENIED_S=0 GPS_DENIED_DENY_AFTER_S=300 \
+    tools/gps_denied_sitl_test.sh                           # normal flight on GPS
 tools/gps_denied_sitl_test.sh --max-fused-rmse-m 20         # scorer options
 ```
 
@@ -22,7 +24,15 @@ the score and all container logs land in `generated/gps_denied_sitl/`.
 Variables: `ROS_DOMAIN_ID`, `SITL_INSTANCE` (MAVLink on 5760 + 10 N),
 `GPS_DENIED_DENY_AFTER_S` (60), `GPS_DENIED_DENIED_S` (300),
 `GPS_DENIED_RESTORE_S` (30), `GPS_DENIED_TAKEOFF_ALT_M` (150),
-`GPS_DENIED_LEG_M` (300), `GPS_DENIED_OUTPUT`, `GPS_DENIED_TIMEOUT_S`.
+`GPS_DENIED_LEG_M` (300), `GPS_DENIED_OUTPUT`, `GPS_DENIED_TIMEOUT_S`,
+`GPS_DENIED_COMPOSE_OVERRIDE` (an extra compose file, for example to layer
+another parameter file on the SITL through `ARDUCOPTER_PARAM_FILE`).
+
+`GPS_DENIED_DENIED_S=0` never disables the GPS: the mission is a normal
+flight of `GPS_DENIED_DENY_AFTER_S + GPS_DENIED_RESTORE_S` and the scorer
+checks that it armed, took off and finished in GUIDED with no pre-arm,
+`GPS 2` or failsafe text from arming on, with the corrections enabled as in
+every stack.
 
 ## Stack (`tools/gps_denied_sitl.yaml`)
 
@@ -80,11 +90,21 @@ navigation fusion and the ArduPilot navigation bridge together:
    and back to 0 on disarm, so pre-arm GPS checks stay enabled. If the bridge
    dies with GPS 2 configured, the next arming is refused until
    `GPS2_TYPE` is reset (fail-safe).
-6. While forwarding is enabled, the fusion node stops applying its own
+6. While forwarding is active, the fusion node stops applying its own
    offsets (the EKF already absorbs the corrections).
+7. **Flight-controller check.** The bridge never writes the EKF source
+   parameters. It reads the values of `arducopter_gps_input.params` through
+   MAVROS (`param/get_parameters`) and arms forwarding (GPS_INPUT, source
+   switching, `GPS2_TYPE` management) only when every one matches;
+   otherwise it logs each wrong parameter as an error and forwards nothing.
+   `run_arducopter_sitl.sh` loads the file, so SITL passes (about 10 s after
+   MAVROS connects, once it has read the parameters); on the aircraft the
+   file must be loaded by hand (`systems/aerodrone/README.md`).
 
-The feature is off by default (`GPS_INPUT_CORRECTIONS=false`) in every
-stack; this test turns it on.
+The feature is on by default in every ArduCopter stack (Gazebo, Genesis,
+Isaac, this test and the BlueOS hardware stacks: `GPS_INPUT_CORRECTIONS`
+defaults to true, `GPS_INPUT_CORRECTIONS=false` turns it off). The airplane
+stacks keep it off: ArduPlane has not been validated.
 
 ## Measured in ArduCopter 4.6.3 SITL (pinned `Plane-4.6.3` tree)
 
@@ -112,6 +132,15 @@ Full stack (`tools/gps_denied_sitl_test.sh`, DemNav corrections at 2 Hz):
 | corrections on, 120 s | 118 s | 14.0 / 27.3 / 30.2 m | 13.9 m | 100 % | 94 % |
 | corrections on, 300 s (defaults), two runs | 298-299 s | 8.2-8.4 / 17.0-17.4 / 20.3-20.6 m | 8.1-8.3 m | 100 %, no failsafe text | 99 % |
 | control (`GPS_INPUT_CORRECTIONS=false`) | 128 s | 51.4 / 83.1 / 86.1 m | 57.2 m | 6 % (EKF failsafe -> LAND after 8 s) | 100 % |
+| on by default with the FC parameter check (forwarding armed 15 s after start) | 299 s | 8.1 / 17.7 / 20.5 m | 8.0 m | 100 %, no failsafe text | 98 % |
+
+Normal flight with the corrections enabled (`GPS_DENIED_DENIED_S=0
+GPS_DENIED_DENY_AFTER_S=300`, plus `ARMING_CHECK=1` layered through
+`GPS_DENIED_COMPOSE_OVERRIDE` so pre-arm checks run as on the aircraft):
+armed at the first attempt with no pre-arm or `GPS 2` text, 324 s in GUIDED
+over the full square, 680 GPS_INPUT messages sent while `GPS2_TYPE` stayed 0
+and the EKF stayed on source set 1 (ArduPilot ignores them), EKF error RMSE
+0.5 m.
 
 WildNav matched rarely in this stack (a handful of fixes with 11-15
 inliers and confidence 0.15-0.30 at 150 m AGL over the synthetic tiles,
@@ -119,20 +148,26 @@ several 100-750 m off and rejected by its jump gate or the fusion
 confidence gate), so DemNav supplied almost every correction; its
 horizontal sigma (up to ~70 m) dominates the error.
 
-## Provisional thresholds
+## Pass criteria
 
-The scorer's defaults (`--max-fused-rmse-m 25`, `--max-fused-p95-m 45`,
-`--max-fused-max-m 60`, `--max-ekf-rmse-m 25`, `--min-correction-coverage
-0.8`, `--min-guided-fraction 1.0`, no EKF failsafe / GPS glitch text,
-`--min-denied-s 240`) are about 1.5-3x what the runs above achieved: tight
-enough to catch the control run and frame/clock regressions, loose enough
-for run-to-run variation. They are proposals, not a validated requirement.
+A run passes with fused navigation error RMSE <= 25 m, p95 <= 45 m and
+max <= 60 m over at least 240 s of GPS denial, 100 % of it armed in GUIDED
+(`--max-fused-rmse-m 25`, `--max-fused-p95-m 45`, `--max-fused-max-m 60`,
+`--min-denied-s 240`, `--min-guided-fraction 1.0`), plus `--max-ekf-rmse-m
+25`, `--min-correction-coverage 0.8` and no EKF failsafe / GPS glitch text.
+These are the agreed pass criteria for the SITL test (about 1.5-3x what the
+runs above achieved: tight enough to catch the control run and frame/clock
+regressions, loose enough for run-to-run variation). They stay scorer
+parameters so a run can be scored against other limits.
 
 ## Limits
 
 - SITL's IMU is near-perfect, so dead reckoning between fixes is far better
   than on a real Navigator; real drift will need more frequent or more
-  accurate fixes. Nothing here has flown on hardware.
+  accurate fixes. Nothing here has flown on hardware: a supervised flight
+  test (systems/aerodrone/README.md) is required before relying on it.
+- The flight-controller check runs once per bridge start; parameters
+  changed on the autopilot after it passed are not re-checked.
 - GPS loss is detected from GPS 1's fix type only; a spoofed or jammed GPS
   that still reports a 3D fix is not handled.
 - In Gazebo/Isaac stacks camera stamps are simulator time and MAVROS stamps

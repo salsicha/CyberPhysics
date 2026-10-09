@@ -69,4 +69,34 @@ def test_copter_sitl_layers_sitl_relaxations_by_default():
         'base_params" "$sitl_params" "$gps_input_params" "$backend_params')]
     assert order
     assert '${config_dir}/arducopter_sitl.params' in script
-    assert 'GPS_INPUT_CORRECTIONS:-false' in script
+    assert 'GPS_INPUT_CORRECTIONS:-true' in script
+
+
+def _env_value(path, key):
+    for line in path.read_text().splitlines():
+        if line.startswith(key + '='):
+            return line.split('=', 1)[1].strip()
+    return None
+
+
+@pytest.mark.parametrize('name', sorted(SIM_MOUNTS) + ['blueos_nav_core.yaml'])
+def test_gps_input_corrections_default_on_for_every_aerodrone_stack(name):
+    """The SITL loads arducopter_gps_input.params and the bridge forwards
+    with the same flag, on unless GPS_INPUT_CORRECTIONS=false."""
+    text = (COMPOSITIONS / name).read_text()
+    assert 'GPS_INPUT_CORRECTIONS:-false' not in text
+    bridge = services(name)['navigation_bridge']['command']
+    assert 'gps_input_enabled:=${GPS_INPUT_CORRECTIONS:-true}' in bridge
+    if name != 'blueos_nav_core.yaml':
+        sitl = services(name)['navigator_sitl']['environment']
+        assert sitl['GPS_INPUT_CORRECTIONS'] == '${GPS_INPUT_CORRECTIONS:-true}'
+    assert _env_value(REPO / 'systems/aerodrone/config/topics.env',
+                      'GPS_INPUT_CORRECTIONS') == 'true'
+
+
+def test_gps_input_corrections_stay_off_for_arduplane():
+    """Designed and validated for ArduCopter only."""
+    bridge = services('airplane_sim.yaml')['airplane_navigation_bridge']['command']
+    assert 'gps_input_enabled:=false' in bridge
+    assert _env_value(REPO / 'systems/airplane/config/blueos.env',
+                      'GPS_INPUT_CORRECTIONS') == 'false'

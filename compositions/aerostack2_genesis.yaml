@@ -95,7 +95,7 @@ services:
     env_file: [../systems/aerodrone/config/topics.env, ../applications/aerostack2/config/mount_tamalpais.env]
     environment:
       SIM_JSON_HOST: 127.0.0.1
-      GPS_INPUT_CORRECTIONS: ${GPS_INPUT_CORRECTIONS:-false}
+      GPS_INPUT_CORRECTIONS: ${GPS_INPUT_CORRECTIONS:-true}
       ARDUCOPTER_PARAM_FILE: /workspace/applications/genesis/config/aerodrone_sitl.params
     volumes:
       - ../applications/ardupilot_sitl/scripts:/workspace/applications/ardupilot_sitl/scripts:ro
@@ -114,9 +114,10 @@ services:
 
   navigation_bridge:
     # Relays the ArduPilot EKF origin to /navigation/origin (the anchor of
-    # every local navigation output). GPS_INPUT_CORRECTIONS=true also sends
-    # accepted DemNav/WildNav fixes to ArduPilot as GPS 2 (experimental; see
-    # tools/gps_denied_sitl_test.md).
+    # every local navigation output) and, by default (GPS_INPUT_CORRECTIONS,
+    # false turns it off), sends accepted DemNav/WildNav fixes to ArduPilot
+    # as GPS 2 once SITL reports arducopter_gps_input.params, which
+    # navigator_sitl loads with the same flag (tools/gps_denied_sitl_test.md).
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
     network_mode: host
     ipc: host
@@ -128,7 +129,7 @@ services:
     command: >
       python3 /workspace/applications/aerostack2/scripts/ardupilot_navigation_bridge.py
         --ros-args -p mavros_namespace:=/mavros
-        -p gps_input_enabled:=${GPS_INPUT_CORRECTIONS:-false}
+        -p gps_input_enabled:=${GPS_INPUT_CORRECTIONS:-true}
 
   demnav:
     image: salsicha/cyberphysics:demnav-${CYBERPHYSICS_TAG:-latest}

@@ -12,8 +12,13 @@ over the GPS-denied phase:
 - how much of the denied phase had an active absolute correction;
 - that the denied phase lasted as long as configured.
 
-Thresholds are parameters: the defaults are provisional numbers measured in
-SITL (see tools/gps_denied_sitl_test.md), not a validated requirement.
+A run with GPS_DENIED_DENIED_S=0 is a normal flight on GPS instead: it must
+arm, take off and finish the mission in GUIDED with no pre-arm, GPS 2 or
+failsafe text, and its fused/EKF errors are scored over the whole flight.
+
+Thresholds are parameters. The defaults are the pass criteria (fused error
+RMSE 25 m, p95 45 m, max 60 m, at least 240 s denied, 100 % GUIDED; see
+tools/gps_denied_sitl_test.md).
 Exit status 0 = pass, 1 = fail, 2 = unusable telemetry.
 """
 import argparse
@@ -26,6 +31,9 @@ EARTH_RADIUS_M = 6378137.0
 FAILSAFE_PATTERN = re.compile(
     r'EKF Failsafe|EKF variance|GPS Glitch|failsafe|Lost GPS|Bad position',
     re.IGNORECASE)
+# Normal flight: GPS_INPUT corrections must not get in the way of arming.
+NORMAL_FLIGHT_PATTERN = re.compile(
+    FAILSAFE_PATTERN.pattern + r'|PreArm|Arm: |GPS 2', re.IGNORECASE)
 
 
 def horizontal_error_m(a, b):
@@ -57,7 +65,53 @@ def error_stats(errors, expected):
     return stats
 
 
+def score_normal_flight(telemetry, thresholds):
+    """GPS never denied: armed in GUIDED for the whole mission, no pre-arm,
+    GPS 2 or failsafe text from arming on (pre-arm texts while the EKF is
+    still initialising are normal), and the fused/EKF errors over the
+    flight."""
+    samples = telemetry.get('samples', [])
+    events = [e.get('event', '') for e in telemetry.get('events', [])]
+    ready_t = next((e['t'] for e in telemetry.get('events', [])
+                    if e.get('event') == 'ready'), 0.0)
+    texts = [t['text'] for t in telemetry.get('status_texts', [])
+             if NORMAL_FLIGHT_PATTERN.search(t.get('text', ''))
+             and t.get('t', 0.0) >= ready_t]
+    fused = error_stats(
+        [horizontal_error_m(s.get('truth'), s.get('fused')) for s in samples],
+        len(samples))
+    ekf = error_stats(
+        [horizontal_error_m(s.get('truth'), s.get('ekf')) for s in samples],
+        len(samples))
+    guided = sum(1 for s in samples if s.get('mode') == 'GUIDED' and s.get('armed'))
+    metrics = {
+        'flight_samples': len(samples),
+        'fused': fused,
+        'ekf': ekf,
+        'guided_fraction': round(guided / len(samples), 3) if samples else 0.0,
+        'waypoints_reached': max((s.get('waypoint', 0) for s in samples), default=0),
+        'flagged_texts': texts,
+        'left_guided': [e for e in events if e.startswith('left_guided')],
+        'completed': bool(telemetry.get('completed')),
+        'error': telemetry.get('error'),
+    }
+    t = thresholds
+    checks = {
+        'completed': metrics['completed'] and not metrics['error'],
+        'took_off': 'at_altitude' in events,
+        'stayed_guided': metrics['guided_fraction'] >= t['min_guided_fraction'],
+        'no_prearm_gps2_or_failsafe_text': len(texts) <= t['max_failsafe_events'],
+        'fused_scored': fused.get('unscored', 1) <= t['max_unscored_samples'],
+        'fused_rmse': fused.get('rmse_m', math.inf) <= t['max_fused_rmse_m'],
+        'ekf_rmse': ekf.get('rmse_m', math.inf) <= t['max_ekf_rmse_m'],
+    }
+    return {'mode': 'normal_flight', 'metrics': metrics, 'thresholds': t,
+            'checks': checks, 'passed': bool(samples) and all(checks.values())}
+
+
 def score(telemetry, thresholds):
+    if (telemetry.get('config') or {}).get('denied_s', 1) == 0:
+        return score_normal_flight(telemetry, thresholds)
     samples = telemetry.get('samples', [])
     denied = [s for s in samples if s.get('phase') == 'denied']
     events = [e.get('event', '') for e in telemetry.get('events', [])]
@@ -109,7 +163,7 @@ def score(telemetry, thresholds):
             'passed': bool(denied) and all(checks.values())}
 
 
-# Provisional thresholds (tools/gps_denied_sitl_test.md explains the numbers).
+# Pass criteria (final; tools/gps_denied_sitl_test.md explains the numbers).
 DEFAULTS = {
     'min_denied_s': 240.0,
     'min_guided_fraction': 1.0,

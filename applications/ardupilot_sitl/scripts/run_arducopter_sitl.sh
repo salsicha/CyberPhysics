@@ -12,12 +12,13 @@ initial_lon="${INITIAL_LON:--122.5967}"
 origin_alt="${ORIGIN_ALT:-781.0}"
 terrain_manifest="${TERRAIN_MANIFEST:-/data/navsim_assets/manifest.json}"
 config_dir=/workspace/systems/aerodrone/config
-# Layering order: hardware baseline -> SITL-only relaxations -> optional
-# GPS-denied corrections -> simulator backend compensation.
+# Layering order: hardware baseline -> SITL-only relaxations -> GPS-denied
+# corrections (GPS_INPUT_CORRECTIONS, default true like every stack's
+# navigation bridge; false skips the file) -> simulator backend compensation.
 base_params="${ARDUCOPTER_BASE_PARAM_FILE:-${config_dir}/arducopter.params}"
 sitl_params="${ARDUCOPTER_SITL_PARAM_FILE:-${config_dir}/arducopter_sitl.params}"
 gps_input_params=""
-if [[ "${GPS_INPUT_CORRECTIONS:-false}" == "true" ]]; then
+if [[ "${GPS_INPUT_CORRECTIONS:-true}" == "true" ]]; then
   gps_input_params="${ARDUCOPTER_GPS_INPUT_PARAM_FILE:-${config_dir}/arducopter_gps_input.params}"
 fi
 backend_params="${ARDUCOPTER_PARAM_FILE:-}"

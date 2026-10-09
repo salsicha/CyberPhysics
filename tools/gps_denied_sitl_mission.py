@@ -8,7 +8,8 @@ tools/gps_denied_sitl.yaml (see tools/gps_denied_sitl_test.sh):
 2. GUIDED, arm, take off, then flies a square of local position setpoints;
 3. after GPS_DENIED_DENY_AFTER_S at altitude disables the simulated GPS
    (SIM_GPS_DISABLE=1) for GPS_DENIED_DENIED_S, then restores it for
-   GPS_DENIED_RESTORE_S;
+   GPS_DENIED_RESTORE_S (GPS_DENIED_DENIED_S=0: never disables it, a normal
+   flight of GPS_DENIED_DENY_AFTER_S + GPS_DENIED_RESTORE_S);
 4. records 1 Hz samples of simulator ground truth, the fused navigation fix,
    ArduPilot's own (EKF) position, the correction source, flight mode and
    autopilot status texts, and writes them as JSON for
@@ -202,7 +203,9 @@ def main():
             rclpy.spin_once(node, timeout_sec=0.05)
             now = time.monotonic()
             elapsed = now - t_alt
-            if phase == 'gps' and elapsed >= deny_after:
+            if phase == 'gps' and elapsed >= deny_after and denied_s <= 0:
+                phase = 'restored'  # normal flight: GPS is never denied
+            elif phase == 'gps' and elapsed >= deny_after:
                 node.set_param('SIM_GPS_DISABLE', 1)
                 phase = 'denied'
                 event('gps_disabled')

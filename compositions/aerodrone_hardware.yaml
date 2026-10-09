@@ -8,3 +8,29 @@ include:
   # Service env_file entries only set container variables after interpolation.
   - path: blueos_aerostack.yaml
     env_file: ../systems/aerodrone/config/topics.env
+
+services:
+  rangefinder:
+    # Benewake TFmini-S/TF-Luna, downward, on a 3.3 V USB-UART adapter
+    # (applications/rangefinder). Publishes sensor_msgs/Range on
+    # RANGEFINDER_TOPIC, DemNav's height-above-ground input. Set
+    # RANGEFINDER_DEVICE (a stable /dev/serial/by-id/ path) and
+    # RANGEFINDER_MODEL (tfmini_s or tf_luna) in the shell; the include
+    # env_file above does not apply to this file's own services.
+    image: salsicha/cyberphysics:rangefinder-${CYBERPHYSICS_TAG:-arm64}
+    container_name: rangefinder
+    network_mode: host
+    ipc: host
+    restart: unless-stopped
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    devices:
+      - ${RANGEFINDER_DEVICE:-/dev/ttyUSB0}:/dev/rangefinder
+    volumes:
+      - /dev/shm:/dev/shm
+    command: >
+      python3 /scripts/rangefinder_node.py --ros-args
+        -p port:=/dev/rangefinder
+        -p model:=${RANGEFINDER_MODEL:-tfmini_s}
+        -p topic:=${RANGEFINDER_TOPIC:-/aerodrone/rangefinder}
+        -p frame_id:=rangefinder_link

@@ -91,3 +91,48 @@ def test_thresholds_are_parameters(tmp_path):
     path.write_text(json.dumps(telemetry(fused_error_m=30.0, ekf_error_m=3.0)))
     assert scorer.main([str(path)]) == 1
     assert scorer.main([str(path), '--max-fused-rmse-m', '35']) == 0
+
+
+def test_default_thresholds_are_the_agreed_pass_criteria():
+    defaults = scorer.DEFAULTS
+    assert (defaults['max_fused_rmse_m'], defaults['max_fused_p95_m'],
+            defaults['max_fused_max_m']) == (25.0, 45.0, 60.0)
+    assert defaults['min_denied_s'] == 240.0
+    assert defaults['min_guided_fraction'] == 1.0
+
+
+def normal_flight(mode='GUIDED', texts=(), completed=True, fused_error_m=1.0):
+    """GPS_DENIED_DENIED_S=0: the mission flies on GPS throughout."""
+    samples = [{'t': 100.0 + t, 'phase': 'gps' if t < 300 else 'restored',
+                'mode': mode, 'armed': True, 'truth': [LAT, LON, 250.0],
+                'fused': [north(fused_error_m), LON, 250.0],
+                'ekf': [north(0.5), LON, 250.0], 'correction_source': '',
+                'waypoint': t // 60} for t in range(330)]
+    return {'config': {'denied_s': 0.0}, 'samples': samples,
+            'events': [{'t': 40.0, 'event': 'ready'}, {'t': 45.0, 'event': 'takeoff'},
+                       {'t': 99.0, 'event': 'at_altitude'}],
+            'status_texts': [{'t': t, 'text': text} for t, text in texts],
+            'completed': completed}
+
+
+def test_normal_flight_passes_without_a_denied_phase():
+    # Pre-arm texts while the EKF initialises (before "ready") are normal.
+    result = run(normal_flight(texts=[(10.0, 'PreArm: Need Position Estimate')]))
+    assert result['mode'] == 'normal_flight'
+    assert result['passed'], result['checks']
+    assert result['metrics']['waypoints_reached'] == 5
+
+
+@pytest.mark.parametrize('change,check', [
+    (dict(texts=[(41.0, 'PreArm: GPS 2: Bad fix')]), 'no_prearm_gps2_or_failsafe_text'),
+    (dict(texts=[(41.0, 'Arm: GPS 2: Bad fix')]), 'no_prearm_gps2_or_failsafe_text'),
+    (dict(texts=[(200.0, 'EKF Failsafe: changed to LAND Mode')]),
+     'no_prearm_gps2_or_failsafe_text'),
+    (dict(mode='LAND'), 'stayed_guided'),
+    (dict(completed=False), 'completed'),
+    (dict(fused_error_m=40.0), 'fused_rmse'),
+])
+def test_normal_flight_failures_are_detected(change, check):
+    result = run(normal_flight(**change))
+    assert not result['checks'][check]
+    assert not result['passed']

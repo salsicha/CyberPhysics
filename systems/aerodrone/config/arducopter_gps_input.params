@@ -1,9 +1,12 @@
-# OPTIONAL, experimental GPS-denied corrections: accepted DemNav/WildNav fixes
-# reach ArduPilot as a second GPS (MAVLink GPS_INPUT via MAVROS) from
-# applications/aerostack2/scripts/ardupilot_navigation_bridge.py
-# (gps_input_enabled:=true). Load after arducopter.params only together with
-# that bridge setting; SITL layers it when GPS_INPUT_CORRECTIONS=true.
-# Measured behaviour and limits: tools/gps_denied_sitl_test.md.
+# GPS-denied corrections: accepted DemNav/WildNav fixes reach ArduPilot as a
+# second GPS (MAVLink GPS_INPUT via MAVROS) from
+# applications/aerostack2/scripts/ardupilot_navigation_bridge.py, enabled by
+# default in every Aerodrone stack (GPS_INPUT_CORRECTIONS=true). Load it after
+# arducopter.params. SITL layers it automatically; on the aircraft load it by
+# hand (../README.md): the bridge reads these values through MAVROS and only
+# forwards corrections when every one matches (GPS2_TYPE may also be 14), and
+# it never writes them. Measured behaviour and limits:
+# tools/gps_denied_sitl_test.md.
 #
 # GPS 2 (type 14 = MAV) stays disabled here: a configured GPS 2 without a fix
 # fails the "GPS 2: Bad fix" pre-arm check, and visual fixes only exist in

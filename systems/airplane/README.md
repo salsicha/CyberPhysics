@@ -47,3 +47,24 @@ Full photorealistic validation should replace the synthetic nadir camera and
 map backends with a terrain simulator that can render georeferenced
 orthophoto/DEM tiles under the same `INITIAL_LAT`, `INITIAL_LON`, and
 `ORIGIN_ALT` values.
+
+## GPS_INPUT corrections (off)
+
+The Aerodrone stacks feed accepted DemNav/WildNav fixes back to ArduCopter as
+GPS 2 (MAVLink GPS_INPUT; `tools/gps_denied_sitl_test.md`). The airplane
+stacks keep that off (`GPS_INPUT_CORRECTIONS=false` in `config/blueos.env`,
+`gps_input_enabled:=false` in `compositions/airplane_sim.yaml`): it was
+designed and SITL-validated on ArduCopter only. Enabling it on ArduPlane
+needs:
+
+- an ArduPlane parameter file layered after `config/ardupilot_plane.params`
+  (in SITL too), with the EKF3 source set 2 / `EK3_SRC_OPTIONS=0` / GPS 1
+  primary values the navigation bridge checks (its `required_fc_params`,
+  mirroring `systems/aerodrone/config/arducopter_gps_input.params`), reviewed
+  for fixed-wing flight: ArduPlane can dead-reckon on airspeed and has no
+  EKF-failsafe landing, so its loss-of-position behaviour differs;
+- a GPS-denied ArduPlane SITL run (`tools/sitl_smoke_test.sh` with
+  `SMOKE_GPS_DENY_AFTER_S`) with and without corrections, showing that fixes
+  arrive less than about 7 s apart at cruise speed and that the EKF accepts
+  them;
+- then the supervised flight test described for the Aerodrone.

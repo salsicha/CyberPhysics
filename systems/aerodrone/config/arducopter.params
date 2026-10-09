@@ -2,9 +2,10 @@
 # on the aircraft. Pre-arm checks and the RC (throttle) and GCS failsafes stay
 # enabled; ArduPilot's default auto-disarm delay applies.
 #
-# Simulators layer it first, then the SITL-only relaxations in
-# arducopter_sitl.params, then optional feature files
-# (arducopter_gps_input.params) and backend physics compensation
+# Load arducopter_gps_input.params after it on the aircraft too (GPS-denied
+# corrections, ../README.md). Simulators layer it first, then the SITL-only
+# relaxations in arducopter_sitl.params, then arducopter_gps_input.params
+# (unless GPS_INPUT_CORRECTIONS=false) and backend physics compensation
 # (applications/{genesis,isaac}/config/aerodrone_sitl.params); see
 # applications/ardupilot_sitl/scripts/run_arducopter_sitl.sh.
 FRAME_CLASS,1
