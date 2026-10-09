@@ -13,6 +13,25 @@ ENV LANG=en_US.UTF-8 \
 # This prevents ROS setup.bash from failing
 SHELL ["/bin/bash","-c"]
 
+# The main ROS 2 Humble repository dropped mavros, mavros-extras and
+# libmavconn in its September 2026 sync (only mavros-msgs 2.15.1 synced).
+# Install the MAVROS 2.14.0 set this stack was validated with from the
+# dated ROS snapshot, pinned to exact versions; everything else still comes
+# from the main repository.
+ARG ROS_SNAPSHOT=2026-08-07
+ARG MAVROS_VERSION=2.14.0-1jammy.20260804.200257
+ARG MAVROS_EXTRAS_VERSION=2.14.0-1jammy.20260804.203703
+ARG MAVROS_MSGS_VERSION=2.14.0-1jammy.20260718.015830
+ARG LIBMAVCONN_VERSION=2.14.0-1jammy.20260609.121524
+ARG MAVLINK_VERSION=2026.6.6-1jammy.20260609.120925
+COPY ros-snapshots.asc /tmp/ros-snapshots.asc
+RUN gpg --show-keys --with-colons /tmp/ros-snapshots.asc \
+      | grep -q '^fpr:::::::::4B63CF8FDE49746E98FA01DDAD19BAB3CBF125EA:' && \
+    gpg --dearmor -o /usr/share/keyrings/ros-snapshots.gpg /tmp/ros-snapshots.asc && \
+    echo "deb [signed-by=/usr/share/keyrings/ros-snapshots.gpg] http://snapshots.ros.org/humble/${ROS_SNAPSHOT}/ubuntu jammy main" \
+      > /etc/apt/sources.list.d/ros-snapshots.list && \
+    rm /tmp/ros-snapshots.asc
+
 RUN apt update && apt install -q -y --no-install-recommends \
     python3-pip python3-venv python3-setuptools libgl1-mesa-dri \
     ros-${ROS_DISTRO}-as2-core ros-${ROS_DISTRO}-as2-msgs \
@@ -25,7 +44,11 @@ RUN apt update && apt install -q -y --no-install-recommends \
     ros-${ROS_DISTRO}-as2-platform-gazebo \
     ros-${ROS_DISTRO}-as2-gazebo-assets \
     ros-${ROS_DISTRO}-ros-gz \
-    ros-${ROS_DISTRO}-mavros ros-${ROS_DISTRO}-mavros-extras \
+    ros-${ROS_DISTRO}-mavros=${MAVROS_VERSION} \
+    ros-${ROS_DISTRO}-mavros-extras=${MAVROS_EXTRAS_VERSION} \
+    ros-${ROS_DISTRO}-mavros-msgs=${MAVROS_MSGS_VERSION} \
+    ros-${ROS_DISTRO}-libmavconn=${LIBMAVCONN_VERSION} \
+    ros-${ROS_DISTRO}-mavlink=${MAVLINK_VERSION} \
     ros-${ROS_DISTRO}-rosbridge-suite \
     geographiclib-tools python3-colcon-common-extensions && \
     rm -rf /var/lib/apt/lists/*
@@ -34,6 +57,12 @@ RUN /opt/ros/${ROS_DISTRO}/lib/mavros/install_geographiclib_datasets.sh
 
 COPY requirements.txt /requirements.txt
 RUN python3 -m venv --system-site-packages /venv
+# Ubuntu 22.04's pip lets the build-isolation environment see the system's
+# setuptools 59 (through --system-site-packages), which ignores pyproject
+# [project] metadata and installs local packages as "UNKNOWN" without their
+# modules or console scripts. A current pip isolates the build properly; the
+# venv keeps the system setuptools that colcon needs.
+RUN . /venv/bin/activate && pip3 install --upgrade pip==25.2
 RUN . /venv/bin/activate && pip3 install -r /requirements.txt
 
 # Shared libraries, importable in this image and every image derived from
@@ -43,7 +72,9 @@ COPY synthetic_world /workspace/synthetic_world
 COPY mavros_mirror /workspace/mavros_mirror
 RUN . /venv/bin/activate && \
     pip3 install /workspace/synthetic_world && \
-    pip3 install /workspace/mavros_mirror
+    pip3 install /workspace/mavros_mirror && \
+    cd / && python3 -c "from synthetic_world import METERS_PER_DEG_LAT" && \
+    test -x /venv/bin/mavros_mirror
 
 COPY src /workspace/src
 RUN . /opt/ros/${ROS_DISTRO}/setup.bash && \
