@@ -78,4 +78,4 @@ services:
       - /dev/shm:/dev/shm
     command: >
       stdbuf -o L
-      ros2 launch rosbridge_server rosbridge_websocket_launch.xml
+      ros2 launch foxglove_bridge foxglove_bridge_launch.xml

@@ -5,15 +5,16 @@ This folder contains configuration for the MIT RACECAR Neo hardware/simulation s
 ## Contents
 
 - `config/bridge.yaml`: ROS parameters for the official Unity simulator bridge.
-- `config/cmd_vel_to_ackermann.yaml`: conversion from Nav2 velocity commands to normalized Ackermann commands.
+- `config/cmd_vel_to_ackermann.yaml`: conversion from Nav2 velocity commands to Ackermann commands in SI units (m/s, rad).
 - `config/depthanything.yaml`: metric Depth Anything topic/model settings.
 - `config/nav2.yaml`: Nav2 planner, controller, behavior, and nvblox costmap-layer settings.
 - `config/nvblox.yaml`: nvblox TSDF/ESDF mapper overrides for the RACECAR camera setup.
 - `config/slam_toolbox.yaml`: online SLAM Toolbox settings for `map -> odom`.
 - `config/topics.yaml`: canonical topics and frames for this system.
 - `config/sensor_models.yaml`: hardware-to-simulation sensor, actuator, safety, and noise-model contract.
-- `calibration/camera.yaml`: simulator camera calibration placeholder.
-- `urdf/racecarneo.urdf.xacro`: lightweight frame model for ROS visualization.
+- `calibration/camera.yaml`: simulator camera intrinsics (replace for hardware).
+- `urdf/racecarneo.urdf.xacro`: frame model and the single source of sensor extrinsics for simulator and hardware. Frame names match `config/topics.yaml`.
+- `launch/racecarneo_description.launch.py`: runs `robot_state_publisher` on the URDF; pass `camera_optical_frames:=false` when the RealSense driver publishes the optical frames.
 - `scenarios/campus_closed_course.json`: tracked source-of-truth contract for the realistic outdoor/indoor closed-course environment, semantic labels, collision geometry, dynamic actors, spawn poses, and scenario variants.
 - `missions/nav2_waypoints.json`: Nav2 waypoint missions for loop, slalom, lane-change, obstacle-avoidance, recovery, and multi-lap validation.
 - `validation/sensor_behavior_tests.json`: sensor-driven behavior test manifest for nominal, degraded-camera, lidar-dropout, IMU-bias, and odometry-slip runs.
@@ -34,10 +35,11 @@ Unity simulator -> racecarneo_bridge -> /camera/color/image_raw
 /camera/color/image_raw -> Depth Anything -> /depth_anything/depth/image
 /depth_anything/depth/image + /camera/color/camera_info -> nvblox -> map slices
 nvblox map slices + SLAM map frame -> Nav2 -> /cmd_vel
-/cmd_vel -> cmd_vel_to_ackermann -> /ackermann_cmd -> simulator
+/cmd_vel -> cmd_vel_to_ackermann -> /ackermann_cmd (m/s, rad) -> simulator bridge
+URDF -> robot_state_publisher -> base_link -> racecarneo/* sensor frames
 ```
 
-The NiceGUI frontend observes odometry, camera, and depth status and sends Nav2 waypoints through `NavigateToPose`. The closed-course scenario contract in `systems/racecarneo/scenarios/campus_closed_course.json` defines the environment geometry that Unity/Gazebo/Isaac assets should instantiate for validation.
+The NiceGUI frontend shows the `map -> base_link` pose, camera, and pipeline status and sends Nav2 waypoints in the `map` frame through `NavigateToPose`. The closed-course scenario contract in `systems/racecarneo/scenarios/campus_closed_course.json` defines the environment geometry that Unity/Gazebo/Isaac assets should instantiate for validation.
 
 ## Asset Policy
 

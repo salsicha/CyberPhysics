@@ -1,5 +1,28 @@
 <?xml version="1.0"?>
+<!--
+  RACECAR Neo frame model and the single source of sensor extrinsics for
+  both the simulator and the hardware stack: robot_state_publisher publishes
+  it in compositions/racecarneo.yaml and racecarneo_hardware.yaml. Frame
+  names match systems/racecarneo/config/topics.yaml.
+
+  The hardware offsets are the simulator bridge's long-standing values, not
+  measurements of a physical car; measure and update them for hardware.
+  sim_geometry:=true selects the mounts of the RacecarSim v2.8.3 car, which
+  is smaller (0.225 m wheelbase): read from its Racecar prefab
+  (sharedassets2.assets), Lidar at (0, 1.25, 0) and ColorCamera/DepthCamera at
+  (0, 1.45, 1.0) Unity units, where 1 unit = 0.1 m (the simulator scales
+  lidar and depth distances by 10 to report centimetres).
+-->
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="racecarneo">
+  <!--
+    The simulator has no camera driver, so the URDF publishes the optical
+    frames too. On hardware the RealSense driver (tf_prefix racecarneo/)
+    publishes racecarneo/camera_link -> optical frames from its factory
+    calibration, so run xacro with camera_optical_frames:=false there.
+  -->
+  <xacro:arg name="camera_optical_frames" default="true"/>
+  <xacro:arg name="sim_geometry" default="false"/>
+
   <link name="base_link">
     <visual>
       <origin xyz="0 0 0.05" rpy="0 0 0"/>
@@ -17,31 +40,55 @@
     </inertial>
   </link>
 
-  <link name="lidar_link"/>
-  <joint name="lidar_joint" type="fixed">
-    <parent link="base_link"/>
-    <child link="lidar_link"/>
-    <origin xyz="0.02 0 0.16" rpy="0 0 0"/>
-  </joint>
+  <link name="racecarneo/lidar_link"/>
+  <!-- Camera body, x forward / y left / z up (RealSense camera_link). -->
+  <link name="racecarneo/camera_link"/>
+  <xacro:unless value="$(arg sim_geometry)">
+    <joint name="lidar_joint" type="fixed">
+      <parent link="base_link"/>
+      <child link="racecarneo/lidar_link"/>
+      <origin xyz="0.08 0 0.18" rpy="0 0 0"/>
+    </joint>
+    <joint name="camera_joint" type="fixed">
+      <parent link="base_link"/>
+      <child link="racecarneo/camera_link"/>
+      <origin xyz="0.18 0 0.22" rpy="0 0 0"/>
+    </joint>
+  </xacro:unless>
+  <xacro:if value="$(arg sim_geometry)">
+    <joint name="lidar_joint" type="fixed">
+      <parent link="base_link"/>
+      <child link="racecarneo/lidar_link"/>
+      <origin xyz="0 0 0.125" rpy="0 0 0"/>
+    </joint>
+    <joint name="camera_joint" type="fixed">
+      <parent link="base_link"/>
+      <child link="racecarneo/camera_link"/>
+      <origin xyz="0.10 0 0.145" rpy="0 0 0"/>
+    </joint>
+  </xacro:if>
 
-  <link name="camera_color_optical_frame"/>
-  <joint name="camera_color_joint" type="fixed">
-    <parent link="base_link"/>
-    <child link="camera_color_optical_frame"/>
-    <origin xyz="0.16 0 0.13" rpy="-1.57079632679 0 -1.57079632679"/>
-  </joint>
+  <!-- Optical frames: z forward, x right, y down (REP-103). -->
+  <xacro:if value="$(arg camera_optical_frames)">
+    <link name="racecarneo/camera_color_optical_frame"/>
+    <joint name="camera_color_optical_joint" type="fixed">
+      <parent link="racecarneo/camera_link"/>
+      <child link="racecarneo/camera_color_optical_frame"/>
+      <origin xyz="0 0 0" rpy="-1.57079632679 0 -1.57079632679"/>
+    </joint>
 
-  <link name="camera_depth_optical_frame"/>
-  <joint name="camera_depth_joint" type="fixed">
-    <parent link="camera_color_optical_frame"/>
-    <child link="camera_depth_optical_frame"/>
-    <origin xyz="0 0 0" rpy="0 0 0"/>
-  </joint>
+    <link name="racecarneo/camera_depth_optical_frame"/>
+    <joint name="camera_depth_optical_joint" type="fixed">
+      <parent link="racecarneo/camera_link"/>
+      <child link="racecarneo/camera_depth_optical_frame"/>
+      <origin xyz="0 0 0" rpy="-1.57079632679 0 -1.57079632679"/>
+    </joint>
+  </xacro:if>
 
-  <link name="imu_link"/>
+  <link name="racecarneo/imu_link"/>
   <joint name="imu_joint" type="fixed">
     <parent link="base_link"/>
-    <child link="imu_link"/>
+    <child link="racecarneo/imu_link"/>
     <origin xyz="0 0 0.08" rpy="0 0 0"/>
   </joint>
 </robot>

@@ -1,5 +1,12 @@
-FROM salsicha/cyberphysics:ros2-latest AS build
+ARG TAG=latest
+# RacecarSim v2.8.3 (UDP protocol 1) and the library commit that speaks it,
+# pinned together. v2.9+ moved to protocol 2, REP-103 IMU axes and 1080
+# lidar samples, which racecarneo_ros_bridge.py does not expect.
+ARG RACECAR_SIM_VERSION=v2.8.3
 
+FROM salsicha/cyberphysics:ros2-${TAG} AS build
+
+ARG RACECAR_SIM_VERSION
 ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US.UTF-8 \
     TERM=xterm \
@@ -8,7 +15,7 @@ ENV LANG=en_US.UTF-8 \
     ROS_DISTRO=jazzy \
     ROS2_DISTRO=jazzy \
     RACECAR_HOME=/opt/racecarneo \
-    RACECAR_SIM_DIR=/opt/racecarneo/RacecarNeo-Simulator/RacecarSim_Linux_v2.8.3 \
+    RACECAR_SIM_DIR=/opt/racecarneo/RacecarNeo-Simulator/RacecarSim_Linux_${RACECAR_SIM_VERSION} \
     RACECAR_LIBRARY_DIR=/opt/racecarneo/racecar-neo-library/library \
     RACECAR_SIM_IP=127.0.0.1 \
     PATH="/venv/bin:$PATH" \
@@ -16,8 +23,9 @@ ENV LANG=en_US.UTF-8 \
 
 SHELL ["/bin/bash", "-c"]
 
-ARG RACECAR_SIM_REF=linux
-ARG RACECAR_LIBRARY_REF=main
+# RacecarSim v2.8.3 on the linux branch, and library main as of 2026-05-13.
+ARG RACECAR_SIM_COMMIT=250f72d0c19f57161d53edaf325abf743da41a15
+ARG RACECAR_LIBRARY_COMMIT=494d16e821394fc8e41a1c41a88e742e407d24ce
 ARG RACECAR_SIM_REPO=https://github.com/MITRacecarNeo/RacecarNeo-Simulator.git
 ARG RACECAR_LIBRARY_REPO=https://github.com/MITRacecarNeo/racecar-neo-library.git
 
@@ -70,10 +78,12 @@ RUN python3 -m venv /venv && \
       scipy==1.14.1 \
       rich==14.0.0
 
-RUN mkdir -p ${RACECAR_HOME} && \
-    git clone --depth 1 --branch ${RACECAR_SIM_REF} ${RACECAR_SIM_REPO} ${RACECAR_HOME}/RacecarNeo-Simulator && \
-    git clone --depth 1 --branch ${RACECAR_LIBRARY_REF} ${RACECAR_LIBRARY_REPO} ${RACECAR_HOME}/racecar-neo-library && \
-    chmod +x ${RACECAR_SIM_DIR}/RacecarSim_Linux_v2.8.3.x86_64
+# Neither repository uses Git LFS (no .gitattributes at these commits).
+RUN fetch_commit() { git init -q "$3" && git -C "$3" fetch -q --depth 1 "$1" "$2" && git -C "$3" checkout -q FETCH_HEAD; } && \
+    mkdir -p ${RACECAR_HOME} && \
+    fetch_commit ${RACECAR_SIM_REPO} ${RACECAR_SIM_COMMIT} ${RACECAR_HOME}/RacecarNeo-Simulator && \
+    fetch_commit ${RACECAR_LIBRARY_REPO} ${RACECAR_LIBRARY_COMMIT} ${RACECAR_HOME}/racecar-neo-library && \
+    chmod +x "${RACECAR_SIM_DIR}/RacecarSim_Linux_${RACECAR_SIM_VERSION}.x86_64"
 
 COPY scripts/racecarneo_ros_bridge.py /workspace/racecarneo_ros_bridge.py
 COPY scripts/cmd_vel_to_ackermann.py /workspace/cmd_vel_to_ackermann.py
@@ -87,6 +97,7 @@ RUN chmod +x /entrypoint.sh /workspace/racecarneo_ros_bridge.py /workspace/cmd_v
 
 FROM scratch
 
+ARG RACECAR_SIM_VERSION
 ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US.UTF-8 \
     TERM=xterm \
@@ -95,7 +106,7 @@ ENV LANG=en_US.UTF-8 \
     ROS_DISTRO=jazzy \
     ROS2_DISTRO=jazzy \
     RACECAR_HOME=/opt/racecarneo \
-    RACECAR_SIM_DIR=/opt/racecarneo/RacecarNeo-Simulator/RacecarSim_Linux_v2.8.3 \
+    RACECAR_SIM_DIR=/opt/racecarneo/RacecarNeo-Simulator/RacecarSim_Linux_${RACECAR_SIM_VERSION} \
     RACECAR_LIBRARY_DIR=/opt/racecarneo/racecar-neo-library/library \
     RACECAR_SIM_IP=127.0.0.1 \
     PATH="/venv/bin:$PATH" \

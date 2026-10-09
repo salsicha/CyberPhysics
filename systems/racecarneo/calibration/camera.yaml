@@ -1,9 +1,17 @@
 camera:
   width: 640
   height: 480
-  fov_degrees: 60.0
+  # RacecarSim v2.8 renders 640x480 with Unity's vertical field of view of
+  # 42.5 deg, so the horizontal field of view is ~54.8 deg (square pixels).
+  vertical_fov_degrees: 42.5
+  fx: 617.1
+  fy: 617.1
+  cx: 320.0
+  cy: 240.0
   distortion_model: plumb_bob
   distortion_coefficients: [0.0, 0.0, 0.0, 0.0, 0.0]
 notes: >
-  Placeholder intrinsics for the official RACECAR Neo simulator bridge. Replace with
-  calibrated physical camera intrinsics for a hardware-specific deployment.
+  Ideal pinhole intrinsics of the official RACECAR Neo simulator camera, as the
+  simulator bridge publishes them. Replace with calibrated physical camera
+  intrinsics for a hardware-specific deployment (the RealSense driver publishes
+  its factory calibration on /camera/color/camera_info).

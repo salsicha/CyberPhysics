@@ -1,3 +1,5 @@
+# Publishes ackermann_msgs in SI units (m/s, rad, positive left), clamped
+# to these vehicle limits; consumers convert to their own actuator units.
 racecarneo_cmd_vel_to_ackermann:
   ros__parameters:
     wheelbase: 0.33

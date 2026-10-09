@@ -22,17 +22,27 @@ class CmdVelToAckermann(Node):
         self.create_subscription(Twist, self.get_parameter('cmd_vel_topic').value, self._cmd_vel, 10)
 
     def _cmd_vel(self, msg: Twist):
-        speed = max(-self.max_speed, min(self.max_speed, float(msg.linear.x)))
-        if abs(speed) < 1e-6:
+        linear = float(msg.linear.x)
+        angular = float(msg.angular.z)
+        # min/max would turn NaN into a full-scale command; publish nothing
+        # so the downstream command watchdog stops the car.
+        if not (math.isfinite(linear) and math.isfinite(angular)):
+            self.get_logger().warn('Ignoring non-finite cmd_vel', throttle_duration_sec=1.0)
+            return
+        # Curvature comes from the requested twist so that limiting the
+        # speed slows the car along the same path instead of tightening it.
+        if abs(linear) < 1e-6:
             steering = 0.0
         else:
-            steering = math.atan(float(msg.angular.z) * self.wheelbase / speed)
+            steering = math.atan(angular * self.wheelbase / linear)
+        speed = max(-self.max_speed, min(self.max_speed, linear))
         steering = max(-self.max_steering_angle, min(self.max_steering_angle, steering))
 
+        # ackermann_msgs units: m/s and rad (positive left).
         out = AckermannDriveStamped()
         out.header.stamp = self.get_clock().now().to_msg()
-        out.drive.speed = speed / self.max_speed if self.max_speed > 0.0 else 0.0
-        out.drive.steering_angle = steering / self.max_steering_angle if self.max_steering_angle > 0.0 else 0.0
+        out.drive.speed = speed
+        out.drive.steering_angle = steering
         self.pub.publish(out)
 
 

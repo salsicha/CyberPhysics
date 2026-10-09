@@ -19,10 +19,13 @@ The nvblox image is large because NVIDIA's Debian packages pull CUDA, TensorRT, 
 
 `racecarneo_nvblox.launch.py` starts `nvblox::NvbloxNode` in a component container and remaps RACECAR topics into the camera names expected by nvblox:
 
-- `camera_0/depth/image` -> `/depth_anything/depth/image`
-- `camera_0/depth/camera_info` -> `/camera/color/camera_info`
-- `camera_0/color/image` -> `/camera/color/image_raw`
-- `camera_0/color/camera_info` -> `/camera/color/camera_info`
+- `camera_0/depth/image` -> `/depth_anything/depth/image` (`depth_image_topic`)
+- `camera_0/depth/camera_info` -> `/camera/color/camera_info` (`depth_camera_info_topic`)
+- `camera_0/color/image` -> `/camera/color/image_raw` (`color_image_topic`)
+- `camera_0/color/camera_info` -> `/camera/color/camera_info` (`color_camera_info_topic`)
+
+Each topic is a launch argument; `compositions/racecarneo_hardware.yaml` sets
+them from `RACECAR_COLOR_IMAGE_TOPIC` and `RACECAR_CAMERA_INFO_TOPIC`.
 
 The RACECAR-specific mapper parameters live in `systems/racecarneo/config/nvblox.yaml`.
 
@@ -46,4 +49,4 @@ Run against a RealSense camera:
 docker compose -f compositions/nvblox.yaml up realsense nvblox
 ```
 
-Both examples launch without RViz. Use Foxglove or a separate RViz container for visualization.
+Both examples launch without RViz. Use Foxglove (`foxglove_bridge` at `ws://localhost:8765`) or a separate RViz container for visualization.

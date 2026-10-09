@@ -20,6 +20,37 @@ from std_msgs.msg import Bool, Float32, Header
 from tf2_ros import TransformBroadcaster
 
 
+GRAVITY_MPS2 = 9.81
+
+
+def sim_imu_to_ros(accel, gyro):
+    """Convert RacecarSim v2.8 (protocol 1) IMU vectors to ROS FLU.
+
+    The simulator reports body vectors on Unity axes: x right, y up,
+    z forward (racecar library physics.py). Angular velocity is the negated
+    Unity (left-handed) rigidbody rate, i.e. right-hand-rule rates about
+    those axes: a left turn is +y. ROS FLU is x forward, y left, z up, so
+    (x, y, z)_ros = (z, -x, y)_sim for both vectors.
+
+    The simulator adds gravity as Vector3.down * 9.81 (a car at rest reads
+    -9.81 along up), the opposite sign of a real accelerometer, which reads
+    the +9.81 reaction force (REP-145). The sim does not report attitude,
+    so the correction assumes a level car: add 2 g along body up. The sim
+    differentiates body-frame velocity, so centripetal acceleration is
+    missing from its lateral axis.
+
+    v2.8 also takes roll/pitch rates from world rather than body axes, so
+    only the yaw rate is exact once the car turns away from its spawn
+    heading. RacecarSim v2.9+ reports REP-103 axes directly; drop this
+    conversion if the image is moved to that simulator.
+    """
+    ax, ay, az = (float(v) for v in accel)
+    gx, gy, gz = (float(v) for v in gyro)
+    accel_ros = np.array([az, -ax, ay + 2.0 * GRAVITY_MPS2])
+    gyro_ros = np.array([gz, -gx, gy])
+    return accel_ros, gyro_ros
+
+
 class RacecarNeoBridge(Node):
     def __init__(self) -> None:
         super().__init__('racecarneo_bridge')
@@ -29,7 +60,8 @@ class RacecarNeoBridge(Node):
         self.declare_parameter('publish_depth', True)
         self.declare_parameter('publish_lidar', True)
         self.declare_parameter('publish_imu', True)
-        self.declare_parameter('camera_fov_degrees', 60.0)
+        # Unity's Camera.fieldOfView is vertical; RacecarSim sets 42.5 deg.
+        self.declare_parameter('camera_vertical_fov_degrees', 42.5)
         self.declare_parameter('auto_start_user_program', True)
         self.declare_parameter('auto_start_duration_sec', 20.0)
         self.declare_parameter('publish_odom', True)
@@ -37,8 +69,9 @@ class RacecarNeoBridge(Node):
         self.declare_parameter('base_frame', 'base_link')
         self.declare_parameter('odom_frame', 'odom')
         self.declare_parameter('map_frame', 'map')
-        self.declare_parameter('wheelbase', 0.33)
-        self.declare_parameter('max_steering_angle', 0.42)
+        self.declare_parameter('wheelbase', 0.225)
+        # RacecarSim v2.8 steers the front wheels angle * 20 deg.
+        self.declare_parameter('max_steering_angle', 0.349)
         self.declare_parameter('sensor_random_seed', 101)
         self.declare_parameter('camera_dropout_probability', 0.0)
         self.declare_parameter('camera_motion_blur_pixels', 0)
@@ -67,7 +100,7 @@ class RacecarNeoBridge(Node):
         self.publish_depth = bool(self.get_parameter('publish_depth').value)
         self.publish_lidar = bool(self.get_parameter('publish_lidar').value)
         self.publish_imu = bool(self.get_parameter('publish_imu').value)
-        self.camera_fov_degrees = float(self.get_parameter('camera_fov_degrees').value)
+        self.camera_vertical_fov_degrees = float(self.get_parameter('camera_vertical_fov_degrees').value)
         self.auto_start_user_program = bool(self.get_parameter('auto_start_user_program').value)
         self.auto_start_duration_sec = float(self.get_parameter('auto_start_duration_sec').value)
         self.publish_odom = bool(self.get_parameter('publish_odom').value)
@@ -106,6 +139,8 @@ class RacecarNeoBridge(Node):
         self._x = 0.0
         self._y = 0.0
         self._yaw = 0.0
+        # Travel not yet reported as a whole encoder tick.
+        self._encoder_residual_m = 0.0
         self._last_update_time = None
         self._last_speed_mps = 0.0
         self._last_yaw_rate = 0.0
@@ -135,6 +170,8 @@ class RacecarNeoBridge(Node):
         self.create_subscription(AckermannDriveStamped, 'ackermann_cmd', self._cmd_callback, 10)
 
     def _cmd_callback(self, msg: AckermannDriveStamped) -> None:
+        # ackermann_cmd is SI (m/s, rad, positive left); the simulator takes
+        # ratios of its own limits.
         speed = float(msg.drive.speed)
         steering = float(msg.drive.steering_angle)
         # min/max would turn NaN into a full-scale command; drop it and let
@@ -142,6 +179,8 @@ class RacecarNeoBridge(Node):
         if not (math.isfinite(speed) and math.isfinite(steering)):
             self.get_logger().warn('Ignoring non-finite ackermann_cmd', throttle_duration_sec=1.0)
             return
+        speed = speed / self.max_speed if self.max_speed > 0.0 else 0.0
+        steering = steering / self.max_steering_angle if self.max_steering_angle > 0.0 else 0.0
         speed = max(-1.0, min(1.0, speed))
         steering = max(-1.0, min(1.0, steering))
         with self._cmd_lock:
@@ -162,6 +201,12 @@ class RacecarNeoBridge(Node):
         return SetParametersResult(successful=True)
 
     def start(self) -> None:
+        # The library's constructor installs a SIGINT handler, which Python
+        # only allows on the main thread, so only go() runs in the background.
+        sys.argv = [sys.argv[0], '-s', '-h']
+        import racecar_core
+        self._rc = racecar_core.create_racecar(isSimulation=True)
+        self._rc.set_start_update(self._on_start, self._on_update, self._on_update_slow)
         self._sim_thread = threading.Thread(target=self._run_racecar, daemon=True)
         self._sim_thread.start()
 
@@ -174,17 +219,13 @@ class RacecarNeoBridge(Node):
                 pass
 
     def _run_racecar(self) -> None:
-        sys.argv = [sys.argv[0], '-s', '-h']
         try:
-            import racecar_core
-            self._rc = racecar_core.create_racecar(isSimulation=True)
-            self._rc.set_start_update(self._on_start, self._on_update, self._on_update_slow)
             if self.auto_start_user_program:
                 self._auto_start_thread = threading.Thread(target=self._pulse_user_program_start, daemon=True)
                 self._auto_start_thread.start()
             self._rc.go()
         except Exception as exc:
-            self.get_logger().exception(f'RACECAR Neo simulator bridge stopped: {exc}')
+            self.get_logger().error(f'RACECAR Neo simulator bridge stopped: {exc!r}')
             rclpy.shutdown()
 
     def _pulse_user_program_start(self) -> None:
@@ -282,19 +323,35 @@ class RacecarNeoBridge(Node):
         self._actual_speed_cmd += (target_speed - self._actual_speed_cmd) * throttle_alpha
         self._actual_steering_cmd += (target_steering - self._actual_steering_cmd) * steering_alpha
 
+        # Open-loop model: RacecarSim v2.8 turns the speed ratio into motor
+        # torque and reports no wheel speed, so odometry assumes a full
+        # command reaches max_speed. It is not measured simulator motion.
         speed = float(self._actual_speed_cmd) * self.max_speed
         speed *= 1.0 + float(self.rng.normal(0.0, self.wheel_slip_std))
         steering_angle = float(self._actual_steering_cmd) * self.max_steering_angle
-        yaw_rate = speed * math.tan(steering_angle) / self.wheelbase if abs(self.wheelbase) > 1e-6 else 0.0
-        self._yaw = math.atan2(math.sin(self._yaw + yaw_rate * dt), math.cos(self._yaw + yaw_rate * dt))
-        self._x += speed * math.cos(self._yaw) * dt
-        self._y += speed * math.sin(self._yaw) * dt
-        if self.encoder_quantization_m > 0.0:
-            self._x = round(self._x / self.encoder_quantization_m) * self.encoder_quantization_m
-            self._y = round(self._y / self.encoder_quantization_m) * self.encoder_quantization_m
+        curvature = math.tan(steering_angle) / self.wheelbase if abs(self.wheelbase) > 1e-6 else 0.0
+        distance = self._encoder_distance(speed * dt)
+        yaw = self._yaw + distance * curvature
+        self._yaw = math.atan2(math.sin(yaw), math.cos(yaw))
+        self._x += distance * math.cos(self._yaw)
+        self._y += distance * math.sin(self._yaw)
         self._last_speed_mps = speed
-        self._last_yaw_rate = yaw_rate
+        self._last_yaw_rate = speed * curvature
         return self._actual_speed_cmd, self._actual_steering_cmd
+
+    def _encoder_distance(self, distance: float) -> float:
+        """Report travel in whole encoder ticks and carry the remainder.
+
+        Rounding the integrated pose instead discards every sub-tick step,
+        so the car never moves at low speed and drifts short at any speed.
+        """
+        if self.encoder_quantization_m <= 0.0:
+            return distance
+        self._encoder_residual_m += distance
+        ticks = math.trunc(self._encoder_residual_m / self.encoder_quantization_m)
+        measured = ticks * self.encoder_quantization_m
+        self._encoder_residual_m -= measured
+        return measured
 
     def _yaw_quaternion(self):
         half = 0.5 * self._yaw
@@ -323,9 +380,10 @@ class RacecarNeoBridge(Node):
         self.odom_pub.publish(msg)
 
     def _publish_tf(self, stamp) -> None:
+        # Sensor extrinsics (base_link -> racecarneo/*) come from
+        # robot_state_publisher and systems/racecarneo/urdf, shared with the
+        # hardware stack; the bridge only owns odom -> base_link.
         qx, qy, qz, qw = self._yaw_quaternion()
-        transforms = []
-
         odom_to_base = TransformStamped()
         odom_to_base.header.stamp = stamp
         odom_to_base.header.frame_id = self.odom_frame
@@ -337,32 +395,7 @@ class RacecarNeoBridge(Node):
         odom_to_base.transform.rotation.y = qy
         odom_to_base.transform.rotation.z = qz
         odom_to_base.transform.rotation.w = qw
-        transforms.append(odom_to_base)
-
-        sensor_frames = [
-            ('camera_color_optical_frame', 0.18, 0.0, 0.22, -math.pi / 2.0, 0.0, -math.pi / 2.0),
-            ('camera_depth_optical_frame', 0.18, 0.0, 0.22, -math.pi / 2.0, 0.0, -math.pi / 2.0),
-            ('lidar_link', 0.08, 0.0, 0.18, 0.0, 0.0, 0.0),
-            ('imu_link', 0.0, 0.0, 0.08, 0.0, 0.0, 0.0),
-        ]
-        for child, x, y, z, roll, pitch, yaw in sensor_frames:
-            tf = TransformStamped()
-            tf.header.stamp = stamp
-            tf.header.frame_id = self.base_frame
-            tf.child_frame_id = self._frame(child)
-            tf.transform.translation.x = x
-            tf.transform.translation.y = y
-            tf.transform.translation.z = z
-            cr, sr = math.cos(roll / 2.0), math.sin(roll / 2.0)
-            cp, sp = math.cos(pitch / 2.0), math.sin(pitch / 2.0)
-            cy, sy = math.cos(yaw / 2.0), math.sin(yaw / 2.0)
-            tf.transform.rotation.x = sr * cp * cy - cr * sp * sy
-            tf.transform.rotation.y = cr * sp * cy + sr * cp * sy
-            tf.transform.rotation.z = cr * cp * sy - sr * sp * cy
-            tf.transform.rotation.w = cr * cp * cy + sr * sp * sy
-            transforms.append(tf)
-
-        self.tf_broadcaster.sendTransform(transforms)
+        self.tf_broadcaster.sendTransform(odom_to_base)
 
     def _drop(self, probability: float) -> bool:
         return probability > 0.0 and float(self.rng.random()) < probability
@@ -418,8 +451,8 @@ class RacecarNeoBridge(Node):
     def _publish_camera_info(self, stamp) -> None:
         width = int(self._rc.camera.get_width())
         height = int(self._rc.camera.get_height())
-        fx = (width / 2.0) / math.tan(math.radians(self.camera_fov_degrees) / 2.0)
-        fy = fx
+        fy = (height / 2.0) / math.tan(math.radians(self.camera_vertical_fov_degrees) / 2.0)
+        fx = fy  # square pixels; Unity derives the horizontal FOV from the aspect
         cx = width / 2.0
         cy = height / 2.0
         msg = CameraInfo()
@@ -468,8 +501,9 @@ class RacecarNeoBridge(Node):
     def _publish_imu(self, stamp) -> None:
         msg = Imu()
         msg.header = self._header(stamp, 'imu_link')
-        accel = np.asarray(self._rc.physics.get_linear_acceleration(), dtype=np.float32)
-        gyro = np.asarray(self._rc.physics.get_angular_velocity(), dtype=np.float32)
+        accel, gyro = sim_imu_to_ros(self._rc.physics.get_linear_acceleration(),
+                                     self._rc.physics.get_angular_velocity())
+        # Bias and noise are specified on the ROS (FLU) axes.
         accel = accel + self.imu_accel_bias + self.rng.normal(0.0, self.imu_accel_noise_std, size=3)
         gyro = gyro + self.imu_gyro_bias + self.rng.normal(0.0, self.imu_gyro_noise_std, size=3)
         msg.linear_acceleration.x = float(accel[0])
@@ -488,8 +522,9 @@ class RacecarNeoBridge(Node):
             msg = AckermannDriveStamped()
             msg.header.stamp = stamp
             msg.header.frame_id = self.base_frame
-            msg.drive.speed = float(speed_cmd)
-            msg.drive.steering_angle = float(steering_cmd)
+            # SI like ackermann_cmd: the actuator state, not the raw ratio.
+            msg.drive.speed = float(speed_cmd) * self.max_speed
+            msg.drive.steering_angle = float(steering_cmd) * self.max_steering_angle
             self.ackermann_feedback_pub.publish(msg)
         manual = Bool()
         manual.data = bool(self.manual_override)

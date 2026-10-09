@@ -11,6 +11,26 @@ services:
     command: >
       /workspace/run_headless_sim.sh
 
+  # Sensor frames (base_link -> racecarneo/*) from the URDF, the same
+  # source the hardware stack uses; the bridge publishes only odom -> base_link.
+  racecarneo_robot_state_publisher:
+    network_mode: host
+    pull_policy: if_not_present
+    image: salsicha/cyberphysics:racecarneo-${CYBERPHYSICS_TAG:-latest}
+    container_name: racecarneo_robot_state_publisher
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+      # The ros2 base image's setup.bash drops the vendor-package library
+      # paths that robot_state_publisher's sdformat URDF plugin needs.
+      - LD_LIBRARY_PATH=/opt/ros/jazzy/opt/sdformat_vendor/lib:/opt/ros/jazzy/opt/gz_math_vendor/lib:/opt/ros/jazzy/opt/gz_utils_vendor/lib
+    volumes:
+      - ../systems/racecarneo:/workspace/racecarneo:ro
+    command: >
+      ros2 launch /workspace/racecarneo/launch/racecarneo_description.launch.py
+        camera_optical_frames:=true
+        sim_geometry:=true
+
   racecarneo_bridge:
     network_mode: host
     pull_policy: if_not_present
@@ -18,6 +38,7 @@ services:
     container_name: racecarneo_bridge
     depends_on:
       - racecarneo_sim
+      - racecarneo_robot_state_publisher
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
       - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
@@ -41,10 +62,15 @@ services:
       - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
     volumes:
       - ../systems/racecarneo/config:/workspace/config:ro
+    # The simulated car is smaller than the hardware one this config describes:
+    # use its wheelbase and 20 deg steering lock (bridge.yaml) so Nav2's
+    # curvature reaches the simulator unchanged.
     command: >
       python3 /workspace/cmd_vel_to_ackermann.py
         --ros-args
         --params-file /workspace/config/cmd_vel_to_ackermann.yaml
+        -p wheelbase:=0.225
+        -p max_steering_angle:=0.349
 
 
   racecarneo_depthanything:
@@ -200,6 +226,7 @@ services:
     command: >
       python3 /workspace/scripts/main.py
 
+  # Foxglove WebSocket server: connect Foxglove to ws://localhost:8765.
   foxglove_bridge:
     network_mode: host
     image: salsicha/cyberphysics:ros2-${CYBERPHYSICS_TAG:-latest}
@@ -210,4 +237,4 @@ services:
       - /dev/shm:/dev/shm
     command: >
       stdbuf -o L
-      ros2 launch rosbridge_server rosbridge_websocket_launch.xml
+      ros2 launch foxglove_bridge foxglove_bridge_launch.xml

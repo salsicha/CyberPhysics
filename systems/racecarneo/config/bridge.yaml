@@ -6,7 +6,9 @@ racecarneo_bridge:
     publish_depth: true
     publish_lidar: true
     publish_imu: true
-    camera_fov_degrees: 60.0
+    # Unity Camera.fieldOfView is vertical; RacecarSim v2.8 uses 42.5 deg
+    # (fx = fy = 617.1 px at 640x480, ~54.8 deg horizontal).
+    camera_vertical_fov_degrees: 42.5
     auto_start_user_program: true
     auto_start_duration_sec: 20.0
     publish_odom: true
@@ -14,8 +16,14 @@ racecarneo_bridge:
     base_frame: base_link
     odom_frame: odom
     map_frame: map
-    wheelbase: 0.33
-    max_steering_angle: 0.42
+    # The RacecarSim v2.8.3 car's wheel colliders sit at +-1.125 Unity units
+    # (1 unit = 0.1 m), so its wheelbase is 0.225 m, not the hardware 0.33 m.
+    # Odometry integrates yaw rate with it.
+    wheelbase: 0.225
+    # /ackermann_cmd is SI; these convert it to simulator ratios. RacecarSim
+    # v2.8 steers the front wheels angle * 20 deg (0.349 rad) and applies
+    # motor torque, not a speed, so max_speed is an open-loop estimate.
+    max_steering_angle: 0.349
     sensor_random_seed: 101
     camera_dropout_probability: 0.0
     camera_motion_blur_pixels: 0

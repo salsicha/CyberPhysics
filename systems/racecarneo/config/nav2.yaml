@@ -160,7 +160,8 @@ planner_server:
       # the turning radius. Forward-only (DUBIN) because RPP does not reverse.
       plugin: nav2_smac_planner::SmacPlannerHybrid
       motion_model_for_search: DUBIN
-      # wheelbase / tan(max_steering_angle) = 0.33 / tan(0.42) ~= 0.74 m
+      # Tightest turn: hardware 0.33 / tan(0.42) ~= 0.74 m; the smaller
+      # simulated car 0.225 / tan(0.349) ~= 0.62 m. Both can follow 0.75 m.
       minimum_turning_radius: 0.75
       tolerance: 0.5
       allow_unknown: true

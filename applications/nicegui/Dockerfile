@@ -1,4 +1,4 @@
-ARG TAG=amd64
+ARG TAG=latest
 
 FROM salsicha/cyberphysics:ros2-${TAG} AS build
 
@@ -23,9 +23,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 SHELL ["/bin/bash", "-c"]
 WORKDIR /workspace
 
+# scripts/main.py sets the internal nicegui.ui_run.APP_IMPORT_STRING, so
+# nicegui stays pinned to the version it was verified against.
 RUN python3 -m venv --system-site-packages /venv && \
     . /venv/bin/activate && \
-    pip3 install --no-cache-dir "numpy<2" nicegui
+    pip3 install --no-cache-dir "numpy<2" nicegui==3.13.0
 
 COPY scripts /workspace/scripts
 COPY entrypoint.sh /

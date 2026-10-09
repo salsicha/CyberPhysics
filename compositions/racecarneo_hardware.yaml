@@ -2,11 +2,22 @@
 #
 # This stack replaces the simulator bridge with real sensor/actuator contracts.
 # Hardware drivers outside this file should publish:
-#   /scan
-#   /imu/data_raw
-#   wheel odometry or an odom source consumed by SLAM/Nav2
+#   /scan          frame_id racecarneo/lidar_link
+#   /imu/data_raw  frame_id racecarneo/imu_link
+#   wheel odometry or an odom source consumed by SLAM/Nav2 (odom -> base_link)
 # A motor bridge should subscribe to:
-#   /ackermann_cmd
+#   /ackermann_cmd ackermann_msgs in SI units: speed in m/s, steering_angle in
+#                  rad, positive left. The RACECAR Neo's own /drive topic takes
+#                  ratios of the car's limits, so the motor bridge must divide
+#                  by those limits and clamp.
+#
+# The RealSense publishes /camera/color/* and racecarneo/camera_* frames to
+# match systems/racecarneo/config/topics.yaml; robot_state_publisher adds
+# base_link -> racecarneo/{camera_link,lidar_link,imu_link} from the URDF.
+#
+# arm64/Jetson: not supported as is. The nvblox image installs x86_64 Isaac
+# ROS packages, the Nav2 LD_LIBRARY_PATH below is x86_64-specific, and the
+# depthanything image installs CPU-only PyTorch on arm64.
 
 services:
   racecarneo_camera:
@@ -25,6 +36,9 @@ services:
     command: >
       stdbuf -o L
       ros2 launch realsense2_camera rs_launch.py
+        camera_namespace:=/
+        camera_name:=camera
+        tf_prefix:=racecarneo/
         enable_color:=true
         enable_depth:=true
         align_depth.enable:=true
@@ -32,6 +46,25 @@ services:
         enable_gyro:=true
         enable_accel:=true
         unite_imu_method:=2
+
+  racecarneo_robot_state_publisher:
+    network_mode: host
+    pull_policy: if_not_present
+    image: salsicha/cyberphysics:racecarneo-${CYBERPHYSICS_TAG:-latest}
+    container_name: racecarneo_robot_state_publisher
+    restart: unless-stopped
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+      # The ros2 base image's setup.bash drops the vendor-package library
+      # paths that robot_state_publisher's sdformat URDF plugin needs.
+      - LD_LIBRARY_PATH=/opt/ros/jazzy/opt/sdformat_vendor/lib:/opt/ros/jazzy/opt/gz_math_vendor/lib:/opt/ros/jazzy/opt/gz_utils_vendor/lib
+    volumes:
+      - ../systems/racecarneo:/workspace/racecarneo:ro
+    # The RealSense driver publishes camera_link -> optical frames itself.
+    command: >
+      ros2 launch /workspace/racecarneo/launch/racecarneo_description.launch.py
+        camera_optical_frames:=false
 
   racecarneo_cmd_vel_to_ackermann:
     network_mode: host
@@ -101,6 +134,9 @@ services:
     command: >
       ros2 launch /workspace/racecarneo_nvblox.launch.py
         config_file:=/workspace/config/nvblox.yaml
+        color_image_topic:=${RACECAR_COLOR_IMAGE_TOPIC:-/camera/color/image_raw}
+        color_camera_info_topic:=${RACECAR_CAMERA_INFO_TOPIC:-/camera/color/camera_info}
+        depth_camera_info_topic:=${RACECAR_CAMERA_INFO_TOPIC:-/camera/color/camera_info}
     deploy:
       resources:
         reservations:
@@ -164,6 +200,7 @@ services:
     command: >
       python3 /workspace/scripts/main.py
 
+  # Foxglove WebSocket server: connect Foxglove to ws://<car>:8765.
   racecarneo_foxglove_bridge:
     network_mode: host
     image: salsicha/cyberphysics:ros2-${CYBERPHYSICS_TAG:-latest}
@@ -175,4 +212,4 @@ services:
       - /dev/shm:/dev/shm
     command: >
       stdbuf -o L
-      ros2 launch rosbridge_server rosbridge_websocket_launch.xml
+      ros2 launch foxglove_bridge foxglove_bridge_launch.xml

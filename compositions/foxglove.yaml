@@ -2,9 +2,9 @@
 # Foxglove example:
 # Foxglove is installed on the host through snap, which should already be done by install.sh
 # "sudo snap install foxglove-studio"
-# The ros bridge needs to be run to connect to it
+# foxglove_bridge serves the ROS graph to it: "Open connection" ->
+# "Foxglove WebSocket" -> ws://localhost:8765
 
-version: "3.9"
 services:
   foxglove_bridge:
     network_mode: "host"
@@ -16,7 +16,7 @@ services:
       - /dev/shm:/dev/shm
     command: >
       stdbuf -o L
-      ros2 launch rosbridge_server rosbridge_websocket_launch.xml
+      ros2 launch foxglove_bridge foxglove_bridge_launch.xml
   ## Example: play bag...
   # rosbag:
   #   network_mode: "host"

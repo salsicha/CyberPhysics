@@ -1,5 +1,6 @@
+ARG TAG=latest
 
-FROM salsicha/cyberphysics:ros2-latest AS build
+FROM salsicha/cyberphysics:ros2-${TAG} AS build
 
 ENV LANGUAGE=en_US.UTF-8 \
     TERM=xterm \

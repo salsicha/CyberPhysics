@@ -15,7 +15,9 @@ from nav_msgs.msg import Odometry
 from rclpy.action import ActionClient
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
+from rclpy.time import Time
 from sensor_msgs.msg import Image
+from tf2_ros import Buffer, TransformException, TransformListener
 
 from nicegui import app, ui, ui_run
 
@@ -28,11 +30,19 @@ def quaternion_from_yaw(yaw: float) -> tuple[float, float]:
     return math.sin(yaw / 2.0), math.cos(yaw / 2.0)
 
 
+# Nav2 goals are expressed in the map frame, so the pose shown next to the
+# waypoint inputs is map -> base_link too. /odom drifts from map as SLAM
+# corrects it, so showing it would offset goals typed from the display.
+MAP_FRAME = 'map'
+BASE_FRAME = 'base_link'
+
+
 @dataclass
 class VehicleState:
     x: float = 0.0
     y: float = 0.0
     yaw: float = 0.0
+    pose_time: float = 0.0
     odom_time: float = 0.0
     camera_time: float = 0.0
     depth_time: float = 0.0
@@ -48,15 +58,27 @@ class RacecarNeoGuiNode(Node):
         self.frame_lock = threading.Lock()
         self.latest_frame = None
         self.nav_client = ActionClient(self, NavigateToPose, 'navigate_to_pose')
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
+        self.create_timer(0.1, self.update_map_pose)
         self.create_subscription(Odometry, '/odom', self.handle_odom, 10)
         self.create_subscription(Image, '/camera/color/image_raw', self.handle_camera, 5)
         self.create_subscription(Image, '/depth_anything/depth/image', self.handle_depth, 5)
 
+    def update_map_pose(self) -> None:
+        try:
+            transform = self.tf_buffer.lookup_transform(MAP_FRAME, BASE_FRAME, Time())
+        except TransformException:
+            return
+        translation = transform.transform.translation
+        rotation = transform.transform.rotation
+        self.state.x = translation.x
+        self.state.y = translation.y
+        self.state.yaw = yaw_from_quaternion(rotation.z, rotation.w)
+        self.state.pose_time = time.monotonic()
+
     def handle_odom(self, msg: Odometry) -> None:
-        pose = msg.pose.pose
-        self.state.x = pose.position.x
-        self.state.y = pose.position.y
-        self.state.yaw = yaw_from_quaternion(pose.orientation.z, pose.orientation.w)
+        # Pipeline health only; the displayed pose comes from map -> base_link.
         self.state.odom_time = time.monotonic()
 
     def handle_camera(self, msg: Image) -> None:
@@ -92,7 +114,7 @@ class RacecarNeoGuiNode(Node):
         z, w = quaternion_from_yaw(yaw)
         goal = NavigateToPose.Goal()
         goal.pose = PoseStamped()
-        goal.pose.header.frame_id = 'map'
+        goal.pose.header.frame_id = MAP_FRAME
         goal.pose.header.stamp = self.get_clock().now().to_msg()
         goal.pose.pose.position.x = float(x)
         goal.pose.pose.position.y = float(y)
@@ -154,7 +176,7 @@ def index() -> None:
         with ui.column().classes('flex-1 p-4 gap-4'):
             camera = ui.image('').classes('w-full max-w-[960px] aspect-video bg-slate-900 object-contain')
             with ui.scene(960, 420).classes('w-full max-w-[960px] bg-slate-900') as scene:
-                scene.axes_helper(size=1.0)
+                scene.axes_helper(length=1.0)
                 with scene.group() as robot_3d:
                     body = [[-0.28, -0.16], [0.22, -0.16], [0.32, 0.0], [0.22, 0.16], [-0.28, 0.16]]
                     scene.extrusion(body, 0.08).material('#38bdf8')
@@ -165,7 +187,10 @@ def index() -> None:
         if node is not None:
             node.encode_latest_frame()
         nav_status.text = state.nav_status
-        pose_label.text = f'Pose: x={state.x:.2f}, y={state.y:.2f}, yaw={state.yaw:.2f}'
+        if now - state.pose_time < 1.0:
+            pose_label.text = f'Pose ({MAP_FRAME}): x={state.x:.2f}, y={state.y:.2f}, yaw={state.yaw:.2f}'
+        else:
+            pose_label.text = f'Pose ({MAP_FRAME}): waiting for {MAP_FRAME} -> {BASE_FRAME}'
         odom_ok = now - state.odom_time < 1.0
         camera_ok = now - state.camera_time < 1.0
         depth_ok = now - state.depth_time < 1.0
