@@ -3,7 +3,7 @@ services:
     network_mode: host
     pull_policy: if_not_present
     privileged: true
-    image: cyberphysics/realsense:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:realsense-${CYBERPHYSICS_TAG:-latest}
     container_name: realsense
     devices:
       - /dev:/dev
@@ -18,7 +18,7 @@ services:
   nvblox:
     network_mode: host
     pull_policy: if_not_present
-    image: cyberphysics/nvblox:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:nvblox-${CYBERPHYSICS_TAG:-latest}
     container_name: nvblox
     ipc: host
     privileged: true
@@ -43,7 +43,7 @@ services:
   nvblox_quickstart:
     network_mode: host
     pull_policy: if_not_present
-    image: cyberphysics/nvblox:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:nvblox-${CYBERPHYSICS_TAG:-latest}
     container_name: nvblox_quickstart
     ipc: host
     privileged: true
@@ -70,7 +70,7 @@ services:
 
   foxglove_bridge:
     network_mode: host
-    image: cyberphysics/ros2:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:ros2-${CYBERPHYSICS_TAG:-latest}
     container_name: foxglove_bridge
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}

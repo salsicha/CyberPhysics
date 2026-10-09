@@ -1,7 +1,7 @@
 
 ## BlueOS Navigator controller boundary
 
-The `cyberphysics/navigator` image inherits the pinned ArduPilot SITL firmware
+The `salsicha/cyberphysics:navigator-latest` image inherits the pinned ArduPilot SITL firmware
 image and is the controller used by the drone, boat, and submarine simulation
 compositions. It builds ArduCopter, ArduRover, and ArduSub at the same pinned
 revision so each simulated vehicle crosses the same MAVLink/MAVROS boundary as

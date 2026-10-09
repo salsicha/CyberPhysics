@@ -6,7 +6,7 @@
 services:
   isaacsim_xauth_init:
     profiles: [sim]
-    image: cyberphysics/isaac:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:isaac-${CYBERPHYSICS_TAG:-latest}
     user: "0:0"
     network_mode: none
     volumes:
@@ -26,7 +26,7 @@ services:
 
   isaacsim_cache_init:
     profiles: [sim]
-    image: cyberphysics/isaac:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:isaac-${CYBERPHYSICS_TAG:-latest}
     user: "0:0"
     network_mode: none
     volumes:
@@ -51,7 +51,7 @@ services:
 
   isaacsim:
     profiles: [sim]
-    image: cyberphysics/isaac:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:isaac-${CYBERPHYSICS_TAG:-latest}
     container_name: so101_groot_isaacsim
     depends_on:
       isaacsim_cache_init:
@@ -121,7 +121,7 @@ services:
 
   groot_policy:
     profiles: [sim, hil]
-    image: cyberphysics/groot:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:groot-${CYBERPHYSICS_TAG:-latest}
     container_name: so101_groot_policy
     network_mode: host
     ipc: host
@@ -164,7 +164,7 @@ services:
 
   so101_groot_bridge:
     profiles: [sim]
-    image: cyberphysics/so101:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:so101-${CYBERPHYSICS_TAG:-latest}
     container_name: so101_groot_bridge
     network_mode: host
     depends_on:
@@ -188,7 +188,7 @@ services:
 
   so101_depth_camera:
     profiles: [hil]
-    image: cyberphysics/realsense:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:realsense-${CYBERPHYSICS_TAG:-latest}
     container_name: so101_groot_hil_camera
     network_mode: host
     privileged: true
@@ -209,7 +209,7 @@ services:
 
   so101_groot_hil_bridge:
     profiles: [hil]
-    image: cyberphysics/so101:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:so101-${CYBERPHYSICS_TAG:-latest}
     container_name: so101_groot_hil_bridge
     network_mode: host
     depends_on:
@@ -234,7 +234,7 @@ services:
 
   so101_hil_guard:
     profiles: [hil]
-    image: cyberphysics/so101:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:so101-${CYBERPHYSICS_TAG:-latest}
     container_name: so101_groot_hil_guard
     network_mode: host
     depends_on:
@@ -256,7 +256,7 @@ services:
 
   foxglove_bridge:
     profiles: [observe]
-    image: cyberphysics/ros2:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:ros2-${CYBERPHYSICS_TAG:-latest}
     container_name: so101_groot_foxglove_bridge
     network_mode: host
     environment:

@@ -2,7 +2,7 @@
 
 services:
   boat_mavros:
-    image: cyberphysics/boat:${CYBERPHYSICS_TAG:-arm64}
+    image: salsicha/cyberphysics:boat-${CYBERPHYSICS_TAG:-arm64}
     container_name: boat_mavros
     network_mode: host
     ipc: host
@@ -14,7 +14,7 @@ services:
         fcu_url:=${BLUEOS_FCU_URL:-udp://0.0.0.0:14550@}
 
   boat_bridge:
-    image: cyberphysics/boat:${CYBERPHYSICS_TAG:-arm64}
+    image: salsicha/cyberphysics:boat-${CYBERPHYSICS_TAG:-arm64}
     container_name: boat_bridge
     network_mode: host
     ipc: host
@@ -33,7 +33,7 @@ services:
         -p namespace:=${BOAT_NAMESPACE:-boat0}
 
   boat_rosbridge:
-    image: cyberphysics/boat:${CYBERPHYSICS_TAG:-arm64}
+    image: salsicha/cyberphysics:boat-${CYBERPHYSICS_TAG:-arm64}
     container_name: boat_rosbridge
     network_mode: host
     restart: unless-stopped

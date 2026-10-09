@@ -1,6 +1,6 @@
 services:
   so101_cbf:
-    image: cyberphysics/so101:latest
+    image: salsicha/cyberphysics:so101-latest
     container_name: so101_cbf
     network_mode: host
     ipc: host
@@ -10,7 +10,7 @@ services:
     command: ros2 run so101_description so101_cbf_control.py
 
   so101_gym:
-    image: cyberphysics/so101:latest
+    image: salsicha/cyberphysics:so101-latest
     container_name: so101_gym
     network_mode: host
     ipc: host

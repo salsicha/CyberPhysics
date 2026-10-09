@@ -1,6 +1,6 @@
 services:
   demnav_assets:
-    image: cyberphysics/demnav:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:demnav-${CYBERPHYSICS_TAG:-latest}
     network_mode: host
     env_file: [../systems/aerodrone/config/topics.env, ../applications/aerostack2/config/mount_tamalpais.env]
     volumes: [demnav_isaac_cache:/data/demnav_cache]
@@ -12,7 +12,7 @@ services:
     restart: "no"
 
   wildnav_assets:
-    image: cyberphysics/wildnav:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:wildnav-${CYBERPHYSICS_TAG:-latest}
     network_mode: host
     env_file: [../systems/aerodrone/config/topics.env, ../applications/aerostack2/config/mount_tamalpais.env]
     environment:
@@ -29,7 +29,7 @@ services:
     restart: "no"
 
   terrain_assets:
-    image: cyberphysics/demnav:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:demnav-${CYBERPHYSICS_TAG:-latest}
     network_mode: none
     depends_on:
       demnav_assets: {condition: service_completed_successfully}
@@ -51,7 +51,7 @@ services:
     restart: "no"
 
   isaacsim_cache_init:
-    image: cyberphysics/isaac:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:isaac-${CYBERPHYSICS_TAG:-latest}
     user: "0:0"
     network_mode: none
     volumes:
@@ -72,7 +72,7 @@ services:
     restart: "no"
 
   isaacsim:
-    image: cyberphysics/isaac:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:isaac-${CYBERPHYSICS_TAG:-latest}
     network_mode: host
     ipc: host
     runtime: nvidia
@@ -126,7 +126,7 @@ services:
       start_period: 5s
 
   navigator_sitl:
-    image: cyberphysics/navigator:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:navigator-${CYBERPHYSICS_TAG:-latest}
     network_mode: host
     depends_on:
       isaacsim: {condition: service_healthy}
@@ -142,7 +142,7 @@ services:
     command: /workspace/applications/ardupilot_sitl/scripts/run_arducopter_sitl.sh
 
   mavros:
-    image: cyberphysics/aerostack2:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
     network_mode: host
     ipc: host
     depends_on: [navigator_sitl]
@@ -150,7 +150,7 @@ services:
     command: ros2 launch mavros apm.launch fcu_url:=tcp://127.0.0.1:5760
 
   demnav:
-    image: cyberphysics/demnav:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:demnav-${CYBERPHYSICS_TAG:-latest}
     network_mode: host
     ipc: host
     depends_on: [isaacsim, mavros]
@@ -169,7 +169,7 @@ services:
         min_correlation:=${MIN_CORRELATION:-0.35} cache_dir:=/data/demnav_cache
 
   wildnav:
-    image: cyberphysics/wildnav:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:wildnav-${CYBERPHYSICS_TAG:-latest}
     network_mode: host
     ipc: host
     depends_on: [isaacsim, demnav]
@@ -193,7 +193,7 @@ services:
         min_inlier_ratio:=${WILDNAV_MIN_INLIER_RATIO:-0.25} cache_dir:=/data/wildnav_cache
 
   aerostack2_autonomy:
-    image: cyberphysics/aerostack2:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
     network_mode: host
     ipc: host
     depends_on: [mavros, wildnav]
@@ -204,7 +204,7 @@ services:
         navigation_odom_topic:=/navigation/odometry takeoff_altitude:=35.0
 
   flight_ready:
-    image: cyberphysics/aerostack2:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
     network_mode: host
     ipc: host
     depends_on: [mavros, aerostack2_autonomy]
@@ -217,7 +217,7 @@ services:
     restart: "no"
 
   wilderness_mission:
-    image: cyberphysics/aerostack2:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
     network_mode: host
     ipc: host
     depends_on:

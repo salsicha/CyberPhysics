@@ -11,7 +11,7 @@ from nav_msgs.msg import Odometry
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import CameraInfo, Image, NavSatFix
-# Installed in /venv of the cyberphysics/aerostack2 image this script runs
+# Installed in /venv of the salsicha/cyberphysics:aerostack2-latest image this script runs
 # in; renders the same world demnav's DEM and wildnav's tiles are built from.
 from synthetic_world import latlon_to_local, satellite_rgb, terrain_height
 

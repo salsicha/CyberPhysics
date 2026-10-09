@@ -32,7 +32,7 @@ Required host components:
 - Docker Engine with Docker Compose v2.
 - NVIDIA Container Toolkit.
 - An NVIDIA driver compatible with CUDA 12.8.
-- The existing `cyberphysics/isaac` and `cyberphysics/so101` images.
+- The existing `salsicha/cyberphysics:isaac-latest` and `salsicha/cyberphysics:so101-latest` images.
 - Enough VRAM to run Isaac Sim and SmolVLA together. Headless Isaac reduces
   graphics overhead.
 
@@ -49,7 +49,7 @@ Or build directly:
 ```bash
 docker build \
   --build-arg LEROBOT_REF=v0.6.0 \
-  -t cyberphysics/smolvla:latest \
+  -t salsicha/cyberphysics:smolvla-latest \
   applications/smolvla
 ```
 
@@ -57,7 +57,7 @@ The image installs the `smolvla`, training, and PEFT extras from the pinned
 LeRobot source tree. Confirm the image without downloading a checkpoint:
 
 ```bash
-docker run --rm cyberphysics/smolvla:latest \
+docker run --rm salsicha/cyberphysics:smolvla-latest \
   python /workspace/smolvla_scripts/smoke_test.py
 ```
 
@@ -263,7 +263,7 @@ Run the adapter tests inside the image:
 docker run --rm \
   -v "$PWD/applications/smolvla:/workspace/smolvla:ro" \
   -e PYTHONPATH=/workspace/smolvla/scripts \
-  cyberphysics/smolvla:latest \
+  salsicha/cyberphysics:smolvla-latest \
   python -m unittest discover -s /workspace/smolvla/tests -v
 ```
 

@@ -8,7 +8,7 @@ services:
     network_mode: "host"
     privileged: true
     pull_policy: if_not_present
-    image: cyberphysics/nvblox
+    image: salsicha/cyberphysics:nvblox-latest
     container_name: nvblox
     devices:
       - /dev:/dev
@@ -33,7 +33,7 @@ services:
               capabilities: [gpu, compute, utility]
   foxglove_bridge:
     network_mode: "host"
-    image: cyberphysics/ros2
+    image: salsicha/cyberphysics:ros2-latest
     container_name: foxglove_bridge
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}

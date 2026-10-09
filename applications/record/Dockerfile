@@ -1,7 +1,7 @@
 # Cross platform support
 
-# FROM --platform=$TARGETPLATFORM cyberphysics/ros2 AS build
-FROM cyberphysics/ros2 AS build
+# FROM --platform=$TARGETPLATFORM salsicha/cyberphysics:ros2-latest AS build
+FROM salsicha/cyberphysics:ros2-latest AS build
 
 ARG TAG
 

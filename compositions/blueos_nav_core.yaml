@@ -9,7 +9,7 @@
 
 services:
   mavros:
-    image: cyberphysics/aerostack2:${CYBERPHYSICS_TAG:-arm64}
+    image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-arm64}
     container_name: ${MAVROS_CONTAINER:-mavros}
     network_mode: host
     ipc: host
@@ -21,7 +21,7 @@ services:
         fcu_url:=${BLUEOS_FCU_URL:-udp://0.0.0.0:14550@}
 
   oak1:
-    image: cyberphysics/oak1:${CYBERPHYSICS_TAG:-arm64}
+    image: salsicha/cyberphysics:oak1-${CYBERPHYSICS_TAG:-arm64}
     container_name: ${OAK1_CONTAINER:-oak1}
     network_mode: host
     ipc: host
@@ -47,7 +47,7 @@ services:
         -p frame_id:=${CAMERA_FRAME_ID:-oak1_optical_frame}
 
   demnav:
-    image: cyberphysics/demnav:${CYBERPHYSICS_TAG:-arm64}
+    image: salsicha/cyberphysics:demnav-${CYBERPHYSICS_TAG:-arm64}
     container_name: ${DEMNAV_CONTAINER:-demnav}
     network_mode: host
     ipc: host
@@ -74,7 +74,7 @@ services:
         min_correlation:=${MIN_CORRELATION:-0.35}
 
   wildnav:
-    image: cyberphysics/wildnav:${CYBERPHYSICS_TAG:-arm64}
+    image: salsicha/cyberphysics:wildnav-${CYBERPHYSICS_TAG:-arm64}
     container_name: ${WILDNAV_CONTAINER:-wildnav}
     network_mode: host
     ipc: host
@@ -114,7 +114,7 @@ services:
         minimum_wildnav_confidence:=${WILDNAV_FUSION_CONFIDENCE:-0.20}
 
   rosbridge:
-    image: cyberphysics/aerostack2:${CYBERPHYSICS_TAG:-arm64}
+    image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-arm64}
     container_name: ${ROSBRIDGE_CONTAINER:-rosbridge}
     network_mode: host
     restart: unless-stopped

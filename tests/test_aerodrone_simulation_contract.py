@@ -88,7 +88,7 @@ class ComposeContractTest(unittest.TestCase):
             with self.subTest(filename=filename):
                 self.assertIn(simulator, text)
                 self.assertIn("navigator_sitl:", text)
-                self.assertIn("cyberphysics/navigator:", text)
+                self.assertIn("salsicha/cyberphysics:navigator-", text)
                 self.assertIn("as2_platform_blueos", text)
                 self.assertIn("flight_ready:", text)
                 self.assertIn("wilderness_mission.xml", text)
@@ -98,10 +98,10 @@ class ComposeContractTest(unittest.TestCase):
     def test_boat_and_submarine_use_real_ardupilot_firmware(self):
         boat = (ROOT / "compositions/boat_sim.yaml").read_text(encoding="utf-8")
         sub = (ROOT / "compositions/submarine_sim.yaml").read_text(encoding="utf-8")
-        self.assertIn("cyberphysics/navigator:", boat)
+        self.assertIn("salsicha/cyberphysics:navigator-", boat)
         self.assertIn("ArduRover", boat)
         self.assertNotIn("blueboat_sim.py", boat)
-        self.assertIn("cyberphysics/navigator:", sub)
+        self.assertIn("salsicha/cyberphysics:navigator-", sub)
         self.assertIn("ArduSub", sub)
         self.assertNotIn("bluerov2_sim.py", sub)
 
@@ -129,7 +129,7 @@ class ComposeContractTest(unittest.TestCase):
                 encoding="utf-8")
             with self.subTest(filename=filename):
                 self.assertIn(
-                    "image: cyberphysics/isaac:${CYBERPHYSICS_TAG:-latest}",
+                    "image: salsicha/cyberphysics:isaac-${CYBERPHYSICS_TAG:-latest}",
                     compose)
                 self.assertNotIn("image: nvcr.io/nvidia/isaac-sim", compose)
 

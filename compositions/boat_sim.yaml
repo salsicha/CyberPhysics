@@ -2,7 +2,7 @@
 # ArduPilot control layer that BlueOS runs against Navigator hardware.
 services:
   navigator_sitl:
-    image: cyberphysics/navigator:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:navigator-${CYBERPHYSICS_TAG:-latest}
     network_mode: host
     environment:
       ARDUPILOT_VEHICLE: Rover
@@ -17,7 +17,7 @@ services:
     command: /workspace/applications/ardupilot_sitl/scripts/run_vehicle_sitl.sh
 
   mavros:
-    image: cyberphysics/aerostack2:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
     network_mode: host
     ipc: host
     depends_on: [navigator_sitl]
@@ -25,7 +25,7 @@ services:
     command: ros2 launch mavros apm.launch fcu_url:=tcp://127.0.0.1:5760
 
   boat_bridge:
-    image: cyberphysics/boat:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:boat-${CYBERPHYSICS_TAG:-latest}
     network_mode: host
     ipc: host
     depends_on: [mavros]
@@ -34,7 +34,7 @@ services:
     command: mavros_mirror --ros-args --params-file /workspace/config/bridge_sim.yaml
 
   navigator_arm:
-    image: cyberphysics/aerostack2:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
     network_mode: host
     depends_on: [boat_bridge]
     environment: {ROS_DOMAIN_ID: "${ROS_DOMAIN_ID:-0}"}
@@ -43,7 +43,7 @@ services:
     restart: "no"
 
   harbor_waypoint_nav:
-    image: cyberphysics/boat:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:boat-${CYBERPHYSICS_TAG:-latest}
     network_mode: host
     ipc: host
     depends_on:
@@ -55,7 +55,7 @@ services:
         --params-file /workspace/config/harbor_survey.yaml
 
   boat_rosbridge:
-    image: cyberphysics/boat:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:boat-${CYBERPHYSICS_TAG:-latest}
     network_mode: host
     environment: {ROS_DOMAIN_ID: "${ROS_DOMAIN_ID:-0}"}
     command: ros2 launch rosbridge_server rosbridge_websocket_launch.xml

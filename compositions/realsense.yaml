@@ -4,7 +4,7 @@ services:
     network_mode: "host"
     pull_policy: if_not_present
     privileged: true
-    image: cyberphysics/realsense
+    image: salsicha/cyberphysics:realsense-latest
     container_name: realsense
     volumes:
       - /dev/shm:/dev/shm
@@ -13,7 +13,7 @@ services:
       ros2 launch realsense2_camera rs_launch.py
   foxglove_bridge:
     network_mode: "host"
-    image: cyberphysics/ros2
+    image: salsicha/cyberphysics:ros2-latest
     container_name: foxglove_bridge
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}

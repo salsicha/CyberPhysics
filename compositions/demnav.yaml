@@ -2,7 +2,7 @@ services:
   demnav:
     network_mode: "host"
     pull_policy: if_not_present
-    image: cyberphysics/demnav
+    image: salsicha/cyberphysics:demnav-latest
     container_name: demnav
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}

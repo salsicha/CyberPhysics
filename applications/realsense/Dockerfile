@@ -1,5 +1,5 @@
 
-FROM cyberphysics/ros2:latest AS build
+FROM salsicha/cyberphysics:ros2-latest AS build
 
 ENV LANGUAGE=en_US.UTF-8 \
     TERM=xterm \

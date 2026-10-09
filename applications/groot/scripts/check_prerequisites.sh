@@ -14,7 +14,7 @@ Check host GPU, Docker/Compose, disk, repository mounts, and the GR00T image.
 
 Options:
   --min-vram-gib N   Required GPU memory for this check (default: 40)
-  --skip-image       Do not require or smoke-test cyberphysics/groot:latest
+  --skip-image       Do not require or smoke-test salsicha/cyberphysics:groot-latest
 EOF
 }
 
@@ -49,8 +49,8 @@ docker run --rm --gpus all nvidia/cuda:12.8.0-base-ubuntu22.04 nvidia-smi >/dev/
 df -h "${CYBERPHYSICS_ROOT}"
 
 if [[ "${SKIP_IMAGE}" == false ]]; then
-    docker image inspect cyberphysics/groot:latest >/dev/null ||
-        die "cyberphysics/groot:latest is not built"
+    docker image inspect salsicha/cyberphysics:groot-latest >/dev/null ||
+        die "salsicha/cyberphysics:groot-latest is not built"
     groot_run python -c \
         'import sys, torch, gr00t; print(f"python={sys.version.split()[0]} cuda={torch.cuda.is_available()}")'
 fi

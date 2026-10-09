@@ -13,7 +13,7 @@ services:
     network_mode: host
     pull_policy: if_not_present
     privileged: true
-    image: cyberphysics/realsense:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:realsense-${CYBERPHYSICS_TAG:-latest}
     container_name: racecarneo_camera
     restart: unless-stopped
     environment:
@@ -36,7 +36,7 @@ services:
   racecarneo_cmd_vel_to_ackermann:
     network_mode: host
     pull_policy: if_not_present
-    image: cyberphysics/racecarneo:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:racecarneo-${CYBERPHYSICS_TAG:-latest}
     container_name: racecarneo_cmd_vel_to_ackermann
     restart: unless-stopped
     environment:
@@ -52,7 +52,7 @@ services:
   racecarneo_depthanything:
     network_mode: host
     pull_policy: if_not_present
-    image: cyberphysics/depthanything:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:depthanything-${CYBERPHYSICS_TAG:-latest}
     container_name: racecarneo_depthanything
     restart: unless-stopped
     depends_on:
@@ -84,7 +84,7 @@ services:
   racecarneo_nvblox:
     network_mode: host
     pull_policy: if_not_present
-    image: cyberphysics/nvblox:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:nvblox-${CYBERPHYSICS_TAG:-latest}
     container_name: racecarneo_nvblox
     restart: unless-stopped
     depends_on:
@@ -112,7 +112,7 @@ services:
   racecarneo_slam:
     network_mode: host
     pull_policy: if_not_present
-    image: cyberphysics/racecarneo:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:racecarneo-${CYBERPHYSICS_TAG:-latest}
     container_name: racecarneo_slam
     restart: unless-stopped
     environment:
@@ -129,7 +129,7 @@ services:
     network_mode: host
     pull_policy: if_not_present
     # The nvblox image ships nvblox_nav2 (NvbloxCostmapLayer) alongside Nav2.
-    image: cyberphysics/nvblox:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:nvblox-${CYBERPHYSICS_TAG:-latest}
     container_name: racecarneo_nav2
     restart: unless-stopped
     depends_on:
@@ -153,7 +153,7 @@ services:
   racecarneo_nicegui:
     network_mode: host
     pull_policy: if_not_present
-    image: cyberphysics/nicegui:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:nicegui-${CYBERPHYSICS_TAG:-latest}
     container_name: racecarneo_nicegui
     restart: unless-stopped
     depends_on:
@@ -166,7 +166,7 @@ services:
 
   racecarneo_foxglove_bridge:
     network_mode: host
-    image: cyberphysics/ros2:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:ros2-${CYBERPHYSICS_TAG:-latest}
     container_name: racecarneo_foxglove_bridge
     restart: unless-stopped
     environment:

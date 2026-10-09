@@ -8,7 +8,7 @@ version: "3.9"
 services:
   foxglove_bridge:
     network_mode: "host"
-    image: cyberphysics/ros2
+    image: salsicha/cyberphysics:ros2-latest
     container_name: foxglove_bridge
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
@@ -20,7 +20,7 @@ services:
   ## Example: play bag...
   # rosbag:
   #   network_mode: "host"
-  #   image: cyberphysics/ros2
+  #   image: salsicha/cyberphysics:ros2-latest
   #   container_name: rosbag
   #   environment:
   #     - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}

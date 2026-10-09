@@ -1,7 +1,7 @@
 
 ## Unreal Engine
 
-FROM cyberphysics/ros2:latest AS build
+FROM salsicha/cyberphysics:ros2-latest AS build
 
 ## Disable interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive

@@ -1,6 +1,6 @@
 # MATLAB/ROS Noetic
 
-FROM cyberphysics/ros2:latest
+FROM salsicha/cyberphysics:ros2-latest
 
 # setup environment
 ENV LANG=C.UTF-8 \

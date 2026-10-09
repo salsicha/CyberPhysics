@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Input args
-[ -z "$NAMESPACE" ] && echo "NAMESPACE is not defined, exitting!" && exit 1
+[ -z "$REPOSITORY" ] && echo "REPOSITORY is not defined, exitting!" && exit 1
 [ -z "$APP" ] && echo "APP is not defined, exitting!" && exit 1
 
 set -e  # exit on error
@@ -15,13 +15,13 @@ tag="latest"
 # Full image target
 if [ ! -z "$TARGET" ]; then
     # User specified target
-    target="${NAMESPACE}/${TARGET}:${tag}"
+    target="${REPOSITORY}:${TARGET}-${tag}"
 else
     if [ "${PLATFORM:-amd64}" = "arm64" ]; then
         tag=arm64
     fi
 
-    target="${NAMESPACE}/${APP}:${tag}"
+    target="${REPOSITORY}:${APP}-${tag}"
 fi
 
 echo $DOCKERFILE

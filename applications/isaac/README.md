@@ -1,6 +1,6 @@
 # Isaac Sim
 
-The `cyberphysics/isaac` image is built from NVIDIA Isaac Sim 6.0.1 and is the single Isaac runtime used by compositions in this repository. It bakes the shared configuration and simulator integration scripts from this directory into `/workspace/applications/isaac`.
+The `salsicha/cyberphysics:isaac-latest` image is built from NVIDIA Isaac Sim 6.0.1 and is the single Isaac runtime used by compositions in this repository. It bakes the shared configuration and simulator integration scripts from this directory into `/workspace/applications/isaac`.
 
 Build it after authenticating Docker with NVIDIA NGC:
 

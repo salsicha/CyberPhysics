@@ -2,7 +2,7 @@
 
 services:
   airplane_sitl:
-    image: cyberphysics/ardupilot_sitl:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:ardupilot_sitl-${CYBERPHYSICS_TAG:-latest}
     container_name: airplane_sitl
     network_mode: host
     restart: unless-stopped
@@ -19,7 +19,7 @@ services:
         --add-param-file=/workspace/systems/airplane/config/ardupilot_plane.params
 
   airplane_mavros:
-    image: cyberphysics/aerostack2:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
     container_name: airplane_sim_mavros
     network_mode: host
     ipc: host
@@ -41,7 +41,7 @@ services:
       start_period: 120s
 
   airplane_bridge:
-    image: cyberphysics/aerostack2:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
     container_name: airplane_sim_bridge
     network_mode: host
     ipc: host
@@ -62,7 +62,7 @@ services:
         -p namespace:=${AIRPLANE_NAMESPACE:-plane0}
 
   airplane_satellite_camera:
-    image: cyberphysics/aerostack2:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
     container_name: airplane_satellite_camera
     network_mode: host
     ipc: host
@@ -88,7 +88,7 @@ services:
         -p groundspeed_mps:=${AIRPLANE_SIM_GROUNDSPEED_MPS:-24.0}
 
   airplane_demnav:
-    image: cyberphysics/demnav:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:demnav-${CYBERPHYSICS_TAG:-latest}
     container_name: airplane_sim_demnav
     network_mode: host
     ipc: host
@@ -120,7 +120,7 @@ services:
         synthetic_terrain:=${DEMNAV_SYNTHETIC_TERRAIN:-true}
 
   airplane_wildnav:
-    image: cyberphysics/wildnav:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:wildnav-${CYBERPHYSICS_TAG:-latest}
     container_name: airplane_sim_wildnav
     network_mode: host
     ipc: host
@@ -162,7 +162,7 @@ services:
         minimum_wildnav_confidence:=${WILDNAV_FUSION_CONFIDENCE:-0.10}
 
   airplane_evaluator:
-    image: cyberphysics/wildnav:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:wildnav-${CYBERPHYSICS_TAG:-latest}
     container_name: airplane_sim_evaluator
     network_mode: host
     ipc: host
@@ -190,7 +190,7 @@ services:
         -p min_fixes:=${NAV_EVAL_MIN_FIXES:-3}
 
   airplane_rosbridge:
-    image: cyberphysics/aerostack2:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
     container_name: airplane_sim_rosbridge
     network_mode: host
     restart: unless-stopped

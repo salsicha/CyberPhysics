@@ -10,7 +10,7 @@ include:
 
 services:
   aerostack:
-    image: cyberphysics/aerostack2:${CYBERPHYSICS_TAG:-arm64}
+    image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-arm64}
     container_name: aerostack
     network_mode: host
     ipc: host
@@ -29,7 +29,7 @@ services:
         takeoff_altitude:=${TAKEOFF_ALTITUDE:-2.0}
 
   behavior_tree:
-    image: cyberphysics/aerostack2:${CYBERPHYSICS_TAG:-arm64}
+    image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-arm64}
     container_name: aerostack_behavior_tree
     network_mode: host
     ipc: host
@@ -47,7 +47,7 @@ services:
         use_sim_time:=false
 
   aerostack_gui:
-    image: cyberphysics/aerostack2:${CYBERPHYSICS_TAG:-arm64}
+    image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-arm64}
     container_name: aerostack_gui
     network_mode: host
     restart: unless-stopped

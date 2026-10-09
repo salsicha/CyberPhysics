@@ -2,7 +2,7 @@ services:
   racecarneo_sim:
     network_mode: host
     pull_policy: if_not_present
-    image: cyberphysics/racecarneo:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:racecarneo-${CYBERPHYSICS_TAG:-latest}
     container_name: racecarneo_sim
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
@@ -14,7 +14,7 @@ services:
   racecarneo_bridge:
     network_mode: host
     pull_policy: if_not_present
-    image: cyberphysics/racecarneo:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:racecarneo-${CYBERPHYSICS_TAG:-latest}
     container_name: racecarneo_bridge
     depends_on:
       - racecarneo_sim
@@ -32,7 +32,7 @@ services:
   racecarneo_cmd_vel_to_ackermann:
     network_mode: host
     pull_policy: if_not_present
-    image: cyberphysics/racecarneo:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:racecarneo-${CYBERPHYSICS_TAG:-latest}
     container_name: racecarneo_cmd_vel_to_ackermann
     depends_on:
       - racecarneo_bridge
@@ -50,7 +50,7 @@ services:
   racecarneo_depthanything:
     network_mode: host
     pull_policy: if_not_present
-    image: cyberphysics/depthanything:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:depthanything-${CYBERPHYSICS_TAG:-latest}
     container_name: racecarneo_depthanything
     depends_on:
       - racecarneo_bridge
@@ -83,7 +83,7 @@ services:
   racecarneo_nvblox:
     network_mode: host
     pull_policy: if_not_present
-    image: cyberphysics/nvblox:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:nvblox-${CYBERPHYSICS_TAG:-latest}
     container_name: racecarneo_nvblox
     depends_on:
       - racecarneo_bridge
@@ -110,7 +110,7 @@ services:
   racecarneo_slam:
     network_mode: host
     pull_policy: if_not_present
-    image: cyberphysics/racecarneo:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:racecarneo-${CYBERPHYSICS_TAG:-latest}
     container_name: racecarneo_slam
     depends_on:
       - racecarneo_bridge
@@ -128,7 +128,7 @@ services:
     network_mode: host
     pull_policy: if_not_present
     # The nvblox image ships nvblox_nav2 (NvbloxCostmapLayer) alongside Nav2.
-    image: cyberphysics/nvblox:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:nvblox-${CYBERPHYSICS_TAG:-latest}
     container_name: racecarneo_nav2
     depends_on:
       - racecarneo_bridge
@@ -154,7 +154,7 @@ services:
     profiles: ["validation"]
     network_mode: host
     pull_policy: if_not_present
-    image: cyberphysics/racecarneo:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:racecarneo-${CYBERPHYSICS_TAG:-latest}
     container_name: racecarneo_stack_validator
     depends_on:
       - racecarneo_nav2
@@ -172,7 +172,7 @@ services:
     profiles: ["missions"]
     network_mode: host
     pull_policy: if_not_present
-    image: cyberphysics/racecarneo:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:racecarneo-${CYBERPHYSICS_TAG:-latest}
     container_name: racecarneo_mission_runner
     depends_on:
       - racecarneo_nav2
@@ -190,7 +190,7 @@ services:
   racecarneo_nicegui:
     network_mode: host
     pull_policy: if_not_present
-    image: cyberphysics/nicegui:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:nicegui-${CYBERPHYSICS_TAG:-latest}
     container_name: racecarneo_nicegui
     depends_on:
       - racecarneo_nav2
@@ -202,7 +202,7 @@ services:
 
   foxglove_bridge:
     network_mode: host
-    image: cyberphysics/ros2:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:ros2-${CYBERPHYSICS_TAG:-latest}
     container_name: racecarneo_foxglove_bridge
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}

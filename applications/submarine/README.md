@@ -3,7 +3,7 @@
 This application provides a lightweight ROS 2 bridge for a BlueROV2-class
 submarine running BlueOS, ArduSub, Navigator, and MAVROS.
 
-The image inherits from `cyberphysics/aerostack2` so it can run MAVROS and the
+The image inherits from `salsicha/cyberphysics:aerostack2-latest` so it can run MAVROS and the
 bridge from one ARM64-capable container image on a Raspberry Pi/BlueOS host.
 
 ## Build

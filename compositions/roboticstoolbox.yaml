@@ -4,7 +4,7 @@
 services:
   roboticstoolbox:
     network_mode: "host"
-    image: cyberphysics/roboticstoolbox
+    image: salsicha/cyberphysics:roboticstoolbox-latest
     container_name: roboticstoolbox
     environment:
       - "DISPLAY=${DISPLAY}"

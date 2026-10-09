@@ -1,6 +1,6 @@
 services:
   isaacsim_cache_init:
-    image: cyberphysics/isaac:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:isaac-${CYBERPHYSICS_TAG:-latest}
     user: "0:0"
     network_mode: none
     volumes:
@@ -22,7 +22,7 @@ services:
     restart: "no"
 
   isaacsim:
-    image: cyberphysics/isaac:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:isaac-${CYBERPHYSICS_TAG:-latest}
     container_name: so101_isaacsim
     depends_on:
       isaacsim_cache_init:
@@ -59,7 +59,7 @@ services:
               capabilities: [gpu]
 
   controller:
-    image: cyberphysics/so101
+    image: salsicha/cyberphysics:so101-latest
     container_name: so101_controller
     network_mode: host
     environment:

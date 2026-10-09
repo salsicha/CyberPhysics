@@ -3,7 +3,8 @@
 # Environmental variables
 .EXPORT_ALL_VARIABLES:
 SHELL := /bin/bash
-NAMESPACE := cyberphysics
+# Docker Hub repository; each app is a tag: <app>-latest (amd64) or <app>-arm64
+REPOSITORY := salsicha/cyberphysics
 DOCKER_BUILDKIT := 1
 PLATFORM := amd64
 
@@ -119,4 +120,4 @@ run_ros2:
 	--network=host \
 	--volume=/tmp/.X11-unix:/tmp/.X11-unix \
 	--env="DISPLAY=$(DISPLAY)" \
-	$(NAMESPACE)/ros2:latest rviz2
+	$(REPOSITORY):ros2-latest rviz2

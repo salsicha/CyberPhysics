@@ -4,7 +4,7 @@
 services:
   spaceros:
     network_mode: "host"
-    image: cyberphysics/spaceros
+    image: salsicha/cyberphysics:spaceros-latest
     container_name: spaceros
     environment:
       - "DISPLAY=${DISPLAY}"

@@ -25,7 +25,7 @@ Default publications:
 ## Launch
 
 ```bash
-docker run --rm --network=host cyberphysics/depthanything:latest
+docker run --rm --network=host salsicha/cyberphysics:depthanything-latest
 ```
 
 Or as part of the RACECAR Neo stack:

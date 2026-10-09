@@ -41,6 +41,6 @@ The NiceGUI frontend observes odometry, camera, and depth status and sends Nav2 
 
 ## Asset Policy
 
-The official MIT Unity simulator and Python library are downloaded into the `cyberphysics/racecarneo` image during build. Generated maps, bags, logs, and simulator assets should not be committed here.
+The official MIT Unity simulator and Python library are downloaded into the `salsicha/cyberphysics:racecarneo-latest` image during build. Generated maps, bags, logs, and simulator assets should not be committed here.
 
 A more detailed Gazebo or Isaac model can be added here later by extending the URDF with wheel joints, Ackermann steering controllers, sensors, and simulator-specific tags.

@@ -5,7 +5,7 @@
 services:
   isaacsim_xauth_init:
     profiles: [sim]
-    image: cyberphysics/isaac:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:isaac-${CYBERPHYSICS_TAG:-latest}
     user: "0:0"
     network_mode: none
     volumes:
@@ -25,7 +25,7 @@ services:
 
   isaacsim_cache_init:
     profiles: [sim]
-    image: cyberphysics/isaac:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:isaac-${CYBERPHYSICS_TAG:-latest}
     user: "0:0"
     network_mode: none
     volumes:
@@ -50,7 +50,7 @@ services:
 
   isaacsim:
     profiles: [sim]
-    image: cyberphysics/isaac:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:isaac-${CYBERPHYSICS_TAG:-latest}
     container_name: so101_smolvla_isaacsim
     depends_on:
       isaacsim_cache_init:
@@ -119,7 +119,7 @@ services:
 
   smolvla_policy:
     profiles: [sim]
-    image: cyberphysics/smolvla:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:smolvla-${CYBERPHYSICS_TAG:-latest}
     build:
       context: ../applications/smolvla
       args:
@@ -162,7 +162,7 @@ services:
 
   so101_smolvla_bridge:
     profiles: [sim]
-    image: cyberphysics/so101:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:so101-${CYBERPHYSICS_TAG:-latest}
     container_name: so101_smolvla_bridge
     network_mode: host
     depends_on:
@@ -189,7 +189,7 @@ services:
 
   foxglove_bridge:
     profiles: [observe]
-    image: cyberphysics/ros2:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:ros2-${CYBERPHYSICS_TAG:-latest}
     container_name: so101_smolvla_foxglove_bridge
     network_mode: host
     environment:

@@ -1,4 +1,4 @@
-FROM cyberphysics/pantiltros:latest
+FROM salsicha/cyberphysics:pantiltros-latest
 
 COPY scripts/ /opt/turret_sim/scripts/
 COPY scenarios/ /opt/turret_sim/scenarios/

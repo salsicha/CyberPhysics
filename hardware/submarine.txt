@@ -48,7 +48,7 @@ Software stack
 
 - BlueOS on the onboard Raspberry Pi.
 - ArduSub on the Navigator.
-- MAVROS inside `cyberphysics/submarine`.
+- MAVROS inside `salsicha/cyberphysics:submarine-latest`.
 - CyberPhysics `bluerov2_bridge.py` for ROS 2 telemetry topics.
 - Cockpit or QGroundControl for vehicle setup, manual operation, video, and
   missions.

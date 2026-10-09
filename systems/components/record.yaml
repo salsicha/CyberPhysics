@@ -2,7 +2,7 @@ services:
   record:
     restart: always
     pull_policy: never
-    image: cyberphysics/record
+    image: salsicha/cyberphysics:record-latest
     network_mode: host
     ipc: host
     privileged: true

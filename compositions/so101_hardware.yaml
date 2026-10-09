@@ -11,7 +11,7 @@ services:
     network_mode: host
     pull_policy: if_not_present
     privileged: true
-    image: cyberphysics/realsense:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:realsense-${CYBERPHYSICS_TAG:-latest}
     container_name: so101_depth_camera
     restart: unless-stopped
     environment:
@@ -33,7 +33,7 @@ services:
   groot_policy:
     profiles:
       - policy
-    image: cyberphysics/groot:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:groot-${CYBERPHYSICS_TAG:-latest}
     container_name: so101_hardware_groot_policy
     network_mode: host
     ipc: host
@@ -62,7 +62,7 @@ services:
   so101_groot_bridge:
     profiles:
       - policy
-    image: cyberphysics/so101:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:so101-${CYBERPHYSICS_TAG:-latest}
     container_name: so101_hardware_groot_bridge
     network_mode: host
     restart: unless-stopped
@@ -85,7 +85,7 @@ services:
 
   so101_foxglove_bridge:
     network_mode: host
-    image: cyberphysics/ros2:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:ros2-${CYBERPHYSICS_TAG:-latest}
     container_name: so101_foxglove_bridge
     restart: unless-stopped
     environment:

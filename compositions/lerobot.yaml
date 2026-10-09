@@ -1,7 +1,7 @@
 services:
   lerobot:
     network_mode: "host"
-    image: cyberphysics/lerobot:latest
+    image: salsicha/cyberphysics:lerobot-latest
     volumes:
       - "/tmp/.X11-unix:/tmp/.X11-unix"
     environment:

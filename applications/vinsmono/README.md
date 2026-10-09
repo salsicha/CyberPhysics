@@ -37,7 +37,7 @@ docker run --rm --network host --ipc host \
   -e ROS_DOMAIN_ID=0 \
   -v "$PWD/systems/vinsmono/calibration/vins_mono.yaml:/etc/vinsmono/calibration.yaml:ro" \
   -v "$PWD/generated/vinsmono:/data/vinsmono" \
-  cyberphysics/vinsmono:latest
+  salsicha/cyberphysics:vinsmono-latest
 ```
 
 Launch arguments can select a tracker-only process or enable loop closure:
@@ -64,7 +64,7 @@ The checks include SIGINT and SIGTERM for the optional pose graph with loop
 closure both enabled and disabled, including an open stdin pipe with no input.
 
 ```bash
-docker run --rm --network none -v "$PWD:/repo:ro" cyberphysics/vinsmono:latest \
+docker run --rm --network none -v "$PWD:/repo:ro" salsicha/cyberphysics:vinsmono-latest \
   python3 /repo/applications/vinsmono/scripts/runtime_smoke_test.py \
   --config /repo/systems/vinsmono/calibration/vins_mono.yaml
 ```

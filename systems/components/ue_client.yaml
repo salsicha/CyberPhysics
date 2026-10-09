@@ -2,7 +2,7 @@
 services:
   airsim_client:
     network_mode: "host"
-    image: cyberphysics/unrealengine
+    image: salsicha/cyberphysics:unrealengine-latest
     volumes:
       - ../../applications/unrealengine/client:/scripts
       - "/tmp/.X11-unix:/tmp/.X11-unix"

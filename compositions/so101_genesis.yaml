@@ -1,6 +1,6 @@
 services:
   genesis:
-    image: cyberphysics/genesis
+    image: salsicha/cyberphysics:genesis-latest
     container_name: so101_genesis
     network_mode: host
     ipc: host
@@ -25,7 +25,7 @@ services:
               capabilities: [gpu]
 
   controller:
-    image: cyberphysics/so101
+    image: salsicha/cyberphysics:so101-latest
     container_name: so101_controller
     network_mode: host
     environment:

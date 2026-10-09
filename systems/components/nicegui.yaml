@@ -2,7 +2,7 @@ services:
   nicegui:
     restart: always
     pull_policy: never
-    image: cyberphysics/nicegui
+    image: salsicha/cyberphysics:nicegui-latest
     init: true
     network_mode: host
     ipc: host

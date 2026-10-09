@@ -5,7 +5,7 @@ services:
   # Device must be unplugged and replugged after flashing is complete before the agent can connect
   arduino:
     network_mode: "host"
-    image: cyberphysics/arduino
+    image: salsicha/cyberphysics:arduino-latest
     depends_on:
       - uros
     privileged: true
@@ -18,7 +18,7 @@ services:
     restart: "no"
   uros:
     network_mode: "host"
-    image: cyberphysics/ros2
+    image: salsicha/cyberphysics:ros2-latest
     privileged: true
     devices:
       - /dev:/dev
@@ -30,7 +30,7 @@ services:
     #   ros2 run micro_ros_agent micro_ros_agent udp4 --port 8888 -v6
   ros_sub:
     network_mode: "host"
-    image: cyberphysics/ros2
+    image: salsicha/cyberphysics:ros2-latest
     volumes:
       - /dev/shm:/dev/shm
     command: >

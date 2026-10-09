@@ -1,6 +1,6 @@
 ## QGroundControl
 
-FROM cyberphysics/ros2:latest AS build
+FROM salsicha/cyberphysics:ros2-latest AS build
 
 ARG QT_VERSION=5.15.2
 

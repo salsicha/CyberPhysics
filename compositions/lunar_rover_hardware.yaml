@@ -7,7 +7,7 @@
 
 services:
   lunar_rover_spaceros:
-    image: cyberphysics/spaceros:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:spaceros-${CYBERPHYSICS_TAG:-latest}
     container_name: lunar_rover_spaceros
     network_mode: host
     ipc: host

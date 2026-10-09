@@ -2,7 +2,7 @@
 
 services:
   submarine_mavros:
-    image: cyberphysics/submarine:${CYBERPHYSICS_TAG:-arm64}
+    image: salsicha/cyberphysics:submarine-${CYBERPHYSICS_TAG:-arm64}
     container_name: submarine_mavros
     network_mode: host
     ipc: host
@@ -14,7 +14,7 @@ services:
         fcu_url:=${BLUEOS_FCU_URL:-udp://0.0.0.0:14550@}
 
   submarine_bridge:
-    image: cyberphysics/submarine:${CYBERPHYSICS_TAG:-arm64}
+    image: salsicha/cyberphysics:submarine-${CYBERPHYSICS_TAG:-arm64}
     container_name: submarine_bridge
     network_mode: host
     ipc: host
@@ -33,7 +33,7 @@ services:
         -p namespace:=${SUBMARINE_NAMESPACE:-sub0}
 
   submarine_rosbridge:
-    image: cyberphysics/submarine:${CYBERPHYSICS_TAG:-arm64}
+    image: salsicha/cyberphysics:submarine-${CYBERPHYSICS_TAG:-arm64}
     container_name: submarine_rosbridge
     network_mode: host
     restart: unless-stopped

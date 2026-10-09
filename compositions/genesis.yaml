@@ -2,7 +2,7 @@
 services:
   genesis:
     network_mode: "host"
-    image: cyberphysics/genesis:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:genesis-${CYBERPHYSICS_TAG:-latest}
     container_name: genesis
     ipc: host
     environment:

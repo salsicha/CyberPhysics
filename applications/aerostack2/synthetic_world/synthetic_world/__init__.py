@@ -15,7 +15,7 @@ anchored at a fixed origin, via ``METERS_PER_DEG_LAT`` and the
 renderers and the reference generators evaluate identical fields, which is
 why these definitions must not be copied or reimplemented elsewhere.
 
-The package is installed into /venv in the cyberphysics/aerostack2 base
+The package is installed into /venv in the salsicha/cyberphysics:aerostack2-latest base
 image, so it is importable in every image derived from it (demnav, wildnav)
 and by scripts run directly in the base image.
 """

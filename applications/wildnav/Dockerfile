@@ -1,6 +1,6 @@
 ARG TAG=amd64
 
-FROM cyberphysics/aerostack2:${TAG} AS build
+FROM salsicha/cyberphysics:aerostack2-${TAG} AS build
 
 ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US.UTF-8 \

@@ -113,7 +113,7 @@ To pin upstream explicitly:
 ~~~bash
 docker build \
   --build-arg GR00T_REF=main \
-  -t cyberphysics/groot:latest \
+  -t salsicha/cyberphysics:groot-latest \
   applications/groot
 ~~~
 

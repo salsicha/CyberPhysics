@@ -11,7 +11,7 @@ include:
 
 services:
   airplane_bridge:
-    image: cyberphysics/aerostack2:${CYBERPHYSICS_TAG:-arm64}
+    image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-arm64}
     container_name: airplane_bridge
     network_mode: host
     ipc: host

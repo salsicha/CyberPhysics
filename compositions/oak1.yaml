@@ -1,6 +1,6 @@
 services:
   oak1_driver:
-    image: cyberphysics/oak1
+    image: salsicha/cyberphysics:oak1-latest
     restart: unless-stopped
     network_mode: "host"
     environment:

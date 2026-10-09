@@ -4,7 +4,7 @@
 services:
   rai:
     network_mode: "host"
-    image: cyberphysics/rai
+    image: salsicha/cyberphysics:rai-latest
     container_name: rai
     environment:
       - "DISPLAY=${DISPLAY}"

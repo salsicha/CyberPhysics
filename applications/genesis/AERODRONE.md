@@ -12,5 +12,5 @@ docker compose -f compositions/aerostack2_genesis.yaml up
 ```
 
 The normal `GENESIS_BACKEND=gpu` path requires NVIDIA Container Toolkit and the
-locally built `cyberphysics/genesis` image. CPU mode is intended only for
+locally built `salsicha/cyberphysics:genesis-latest` image. CPU mode is intended only for
 diagnostics.

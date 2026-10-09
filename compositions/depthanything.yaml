@@ -2,7 +2,7 @@ services:
   depthanything:
     network_mode: "host"
     pull_policy: if_not_present
-    image: cyberphysics/depthanything
+    image: salsicha/cyberphysics:depthanything-latest
     container_name: depthanything
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}

@@ -4,7 +4,7 @@
 
 services:
   pantilt_yolo:
-    image: cyberphysics/pantiltros:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:pantiltros-${CYBERPHYSICS_TAG:-latest}
     pull_policy: build
     build:
       context: ../applications/pantiltros

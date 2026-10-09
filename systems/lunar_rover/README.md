@@ -10,7 +10,7 @@ does not claim flight qualification.
 
 ## Expected Space ROS Setup
 
-- `cyberphysics/spaceros` built from `applications/spaceros`.
+- `salsicha/cyberphysics:spaceros-latest` built from `applications/spaceros`.
 - ROS 2 Humble and Space ROS sourced by the container entrypoint.
 - Optional use of the upstream Space ROS Curiosity rover demo for baseline
   rover behavior.

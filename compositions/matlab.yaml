@@ -5,7 +5,7 @@ services:
   matlab:
     tty: true
     network_mode: "host"
-    image: cyberphysics/matlab
+    image: salsicha/cyberphysics:matlab-latest
     container_name: matlab
     shm_size: '512m'
     volumes:

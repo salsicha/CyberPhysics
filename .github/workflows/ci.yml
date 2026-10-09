@@ -51,12 +51,12 @@ jobs:
         with:
           lfs: true
       - name: Build VINS-Mono
-        run: docker build -t cyberphysics/vinsmono:ci applications/vinsmono
+        run: docker build -t salsicha/cyberphysics:vinsmono-ci applications/vinsmono
       - name: Check sensor flow and normal shutdown
         run: >
           docker run --rm --network none
           -v "$PWD:/repo:ro"
-          cyberphysics/vinsmono:ci
+          salsicha/cyberphysics:vinsmono-ci
           python3 /repo/applications/vinsmono/scripts/runtime_smoke_test.py
           --config /repo/systems/vinsmono/calibration/vins_mono.yaml
 

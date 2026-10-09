@@ -2,7 +2,7 @@
 # used by turret_sim.yaml; the peers here are a real ROS camera and Arduino.
 
 x-pantiltros-image: &pantiltros-image
-  image: cyberphysics/pantiltros:${CYBERPHYSICS_TAG:-latest}
+  image: salsicha/cyberphysics:pantiltros-${CYBERPHYSICS_TAG:-latest}
   pull_policy: build
   build:
     context: ../applications/pantiltros
@@ -71,7 +71,7 @@ services:
   # docker compose -f compositions/turret_hardware.yaml --profile realsense up
   turret_realsense:
     profiles: ["realsense"]
-    image: cyberphysics/realsense:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:realsense-${CYBERPHYSICS_TAG:-latest}
     pull_policy: build
     build:
       context: ../applications/realsense
@@ -90,7 +90,7 @@ services:
 
   turret_arduino:
     profiles: ["arduino"]
-    image: cyberphysics/arduino:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:arduino-${CYBERPHYSICS_TAG:-latest}
     pull_policy: build
     build:
       context: ../applications/arduino

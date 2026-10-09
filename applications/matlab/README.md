@@ -9,7 +9,7 @@
     * Running Matlab in docker:
         (Be sure to "export" the environment variables!)
         ```
-        docker run -it --rm --net host -v /tmp/.X11-unix:/tmp/.X11-unix -e DISPLAY -e XAUTHORITY -e MLM_LICENSE_FILE=/network.lic -v /home/${whoami}/repos/CyberPhysics/applications/client/scripts/simulink:/home/matlab/simulink --shm-size=512M cyberphysics/matlab matlab
+        docker run -it --rm --net host -v /tmp/.X11-unix:/tmp/.X11-unix -e DISPLAY -e XAUTHORITY -e MLM_LICENSE_FILE=/network.lic -v /home/${whoami}/repos/CyberPhysics/applications/client/scripts/simulink:/home/matlab/simulink --shm-size=512M salsicha/cyberphysics:matlab-latest matlab
         ```
 
     * Example compose file

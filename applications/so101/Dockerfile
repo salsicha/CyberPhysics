@@ -42,9 +42,9 @@ RUN chmod +x /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["ros2", "launch", "so101_description", "gazebo.launch.py"]
 
-# Policy evaluation image (cyberphysics/lerobot), selected with
+# Policy evaluation image (salsicha/cyberphysics:lerobot-latest), selected with
 # --target lerobot (BUILD_STAGE=lerobot via _build_it.sh). Not part of
-# the default build, so cyberphysics/so101 stays lean.
+# the default build, so salsicha/cyberphysics:so101-latest stays lean.
 FROM build AS lerobot
 
 # Install the policy stack in an isolated venv so pip does not collide with

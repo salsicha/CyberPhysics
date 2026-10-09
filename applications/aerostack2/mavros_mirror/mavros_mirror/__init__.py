@@ -11,7 +11,7 @@ platform autonomy stacks subscribe to, with optional extras:
 One implementation replaces the previous per-platform copies
 (blueboat_bridge.py, bluerov2_bridge.py, airplane_mavros_bridge.py), so a
 QoS or topic fix lands on every platform at once. Installed into /venv of
-the cyberphysics/aerostack2 base image; run as ``mavros_mirror`` with a
+the salsicha/cyberphysics:aerostack2-latest base image; run as ``mavros_mirror`` with a
 ``--params-file`` keyed ``/**:`` so the shared node name matches.
 """
 from __future__ import annotations

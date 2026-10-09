@@ -1,6 +1,6 @@
 services:
   marimo:
-    image: cyberphysics/marimo:${CYBERPHYSICS_TAG:-latest}
+    image: salsicha/cyberphysics:marimo-${CYBERPHYSICS_TAG:-latest}
     container_name: marimo
     network_mode: host
     volumes:

@@ -1,6 +1,6 @@
 services:
   simstudio:
-    image: cyberphysics/simstudio
+    image: salsicha/cyberphysics:simstudio-latest
     ports:
       - "3000:3000"
     environment:

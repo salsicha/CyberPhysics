@@ -41,12 +41,12 @@ build_<app_name>: cleanup build_ros2
 	APP=<app_name> ./_build_it.sh
 ```
 
-Use the closest existing Dockerfile as the template. ROS 2 Jazzy apps should normally inherit from `cyberphysics/ros2:${TAG}` unless they need a specialized base image.
+Use the closest existing Dockerfile as the template. ROS 2 Jazzy apps should normally inherit from `salsicha/cyberphysics:ros2-${TAG}` unless they need a specialized base image.
 
 ## Run A Container Directly
 
 ```bash
-docker run -it --rm cyberphysics/ros2:latest /bin/bash
+docker run -it --rm salsicha/cyberphysics:ros2-latest /bin/bash
 ```
 
 ## Run With Compose

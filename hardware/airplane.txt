@@ -61,7 +61,7 @@ Software stack
 
 - BlueOS on the onboard Raspberry Pi.
 - ArduPlane on the Navigator.
-- MAVROS in the `cyberphysics/aerostack2` image.
+- MAVROS in the `salsicha/cyberphysics:aerostack2-latest` image.
 - CyberPhysics `airplane_mavros_bridge.py` to mirror MAVROS telemetry into the
   `/plane0/sensor_measurements/*` contract.
 - OAK-1 MegaDepth for `/airplane/downward/image_raw`,

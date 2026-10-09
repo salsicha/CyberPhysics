@@ -4,7 +4,7 @@
 services:
   pysimcoder:
     network_mode: "host"
-    image: cyberphysics/pysimcoder
+    image: salsicha/cyberphysics:pysimcoder-latest
     container_name: pysimcoder
     environment:
       - "DISPLAY=${DISPLAY}"

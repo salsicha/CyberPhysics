@@ -1,6 +1,6 @@
 services:
   wildnav:
-    image: cyberphysics/wildnav:${CYBERPHYSICS_TAG:-arm64}
+    image: salsicha/cyberphysics:wildnav-${CYBERPHYSICS_TAG:-arm64}
     container_name: wildnav
     network_mode: host
     ipc: host
