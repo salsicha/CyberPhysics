@@ -16,3 +16,9 @@ log/
 CMakeFiles/
 
 graphify-out/
+
+# Python packaging artifacts (pip regenerates these on install)
+*.egg-info/
+
+# Runtime caches written by tools (e.g. depthai crash dumps under .cache/depthai)
+.cache/

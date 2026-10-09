@@ -39,6 +39,13 @@ RUN python3 -m venv /venv
 RUN pip3 uninstall -y em
 RUN pip3 install rosdep colcon-common-extensions pytest-rerunfailures numpy lark empy==3.3.4 pymongo psutil pillow tornado
 
+# colcon --merge-install into /opt/ros replaces ROS's own setup scripts with
+# ones that only know the packages built here, which drops the environment
+# hooks of the apt packages (e.g. rviz_ogre_vendor's library path, so rviz2
+# fails with "libOgreMain.so... not found"). Keep the originals to restore.
+RUN mkdir -p /opt/ros_setup_orig && \
+    cp -a /opt/ros/$ROS2_DISTRO/*setup.* /opt/ros/$ROS2_DISTRO/_local_setup_util.py /opt/ros_setup_orig/
+
 WORKDIR /workspace
 RUN mkdir -p /workspace/src
 COPY custom_msgs/flir_camera_msgs /workspace/src/flir_camera_msgs
@@ -58,6 +65,10 @@ RUN . /venv/bin/activate && . /opt/ros/$ROS2_DISTRO/setup.bash && \
     ros2 run micro_ros_setup create_agent_ws.sh && \
     rosdep update && rosdep install --from-paths src --ignore-src -y && \
     colcon build --merge-install --install-base /opt/ros/$ROS2_DISTRO
+
+# Restore ROS's setup scripts; they also pick up the packages built above
+# through the ament index
+RUN cp -a /opt/ros_setup_orig/. /opt/ros/$ROS2_DISTRO/ && rm -rf /opt/ros_setup_orig
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

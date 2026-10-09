@@ -3,26 +3,34 @@ services:
     image: salsicha/cyberphysics:simstudio-latest
     ports:
       - "3000:3000"
+      - "3002:3002"
     environment:
       - NODE_ENV=development
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/simstudio
       - POSTGRES_URL=postgresql://postgres:postgres@db:5432/simstudio
       - BETTER_AUTH_URL=http://localhost:3000
       - NEXT_PUBLIC_APP_URL=http://localhost:3000
-      - BETTER_AUTH_SECRET=your_auth_secret_here
-      - ENCRYPTION_KEY=your_encryption_key_here
+      # Development defaults (Sim requires >= 32 characters); override for real use
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:-dev-secret-at-least-32-characters-long}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-dev-encryption-key-at-least-32-chars}
+      - INTERNAL_API_SECRET=${INTERNAL_API_SECRET:-dev-internal-api-secret-min-32-chars}
+      # Ollama from the local-gpu / local-cpu profiles below (published on the host)
+      - OLLAMA_URL=${OLLAMA_URL:-http://host.docker.internal:11434}
       - GOOGLE_CLIENT_ID=placeholder
       - GOOGLE_CLIENT_SECRET=placeholder
       - GITHUB_CLIENT_ID=placeholder
       - GITHUB_CLIENT_SECRET=placeholder
       - RESEND_API_KEY=placeholder
       - WEBCONTAINER_CLIENT_ID=placeholder
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       db:
         condition: service_healthy
 
   db:
-    image: postgres:16
+    # Sim's migrations need the pgvector extension
+    image: pgvector/pgvector:pg16
     restart: always
     ports:
       - "127.0.0.1:5432:5432"

@@ -19,12 +19,16 @@ make -C applications build_depthanything
 make -C applications build_nicegui
 ```
 
-For ARM64 targets:
+`make -C applications help` lists every build target. Each target builds its base image first (for example `build_nicegui` builds `ros2`). Every app is a tag of the Docker Hub repository `salsicha/cyberphysics`: amd64 builds are tagged `<app>-latest` (e.g. `salsicha/cyberphysics:ros2-latest`).
+
+For ARM64 targets (images are tagged `<app>-arm64`):
 
 ```bash
 cd applications
 make target_arm64 build_ros2
 ```
+
+Builds do not modify the working tree: `.gitattributes` keeps scripts and Dockerfiles at LF line endings in every checkout. `make -C applications cleanup` strips Windows line endings from sources under `applications/` if a copy bypassed git.
 
 ## Add An Application
 
@@ -37,11 +41,16 @@ make target_arm64 build_ros2
 A minimal Makefile target looks like this:
 
 ```make
-build_<app_name>: cleanup build_ros2
+build_<app_name>: build_ros2
 	APP=<app_name> ./_build_it.sh
 ```
 
-Use the closest existing Dockerfile as the template. ROS 2 Jazzy apps should normally inherit from `salsicha/cyberphysics:ros2-${TAG}` unless they need a specialized base image.
+Use the closest existing Dockerfile as the template. ROS 2 Jazzy apps should normally inherit from `salsicha/cyberphysics:ros2-${TAG}` unless they need a specialized base image. The build script passes `TAG` (`latest` or `arm64`), so declare it before `FROM` with a default that matches locally built images:
+
+```dockerfile
+ARG TAG=latest
+FROM salsicha/cyberphysics:ros2-${TAG} AS build
+```
 
 ## Run A Container Directly
 
@@ -55,6 +64,7 @@ Compose files live in `compositions/`:
 
 ```bash
 docker compose -f compositions/racecarneo.yaml up
+./start.sh racecarneo    # same thing, from the repository root
 ```
 
 Use `down --remove-orphans` when changing service sets:

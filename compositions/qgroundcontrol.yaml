@@ -1,6 +1,5 @@
 # This deployment targets native Ubuntu host
 
-version: "3.9"
 services:
   qgroundcontrol:
     network_mode: "host"
@@ -10,7 +9,6 @@ services:
       - "/tmp/.X11-unix:/tmp/.X11-unix"
     environment:
       - "DISPLAY=${DISPLAY}"
-    command: >
-      stdbuf -o L
-      bash -c "./staging/QGroundControl"
+    # QGroundControl runs as the image's uid 1000 user (it refuses to run as root)
+    command: QGroundControl
 

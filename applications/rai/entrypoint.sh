@@ -1,5 +1,9 @@
 #!/bin/bash
 set -e
-source /venv/bin/activate
-source /rai/setup_shell.sh
+source /opt/ros/humble/setup.bash
+# RAI's own environment script (activates /rai/.venv, sources the colcon
+# workspace and extends PYTHONPATH); it uses paths relative to /rai
+pushd /rai > /dev/null
+SHELL=/bin/bash source ./setup_shell.sh > /dev/null
+popd > /dev/null
 exec "$@"

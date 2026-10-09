@@ -1,6 +1,5 @@
 # Unreal Engine Kubernetes container example
 
-version: "3.9"
 services:
   ue_server:
     network_mode: "host"

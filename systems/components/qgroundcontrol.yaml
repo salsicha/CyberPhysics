@@ -8,6 +8,4 @@ services:
       - "/tmp/.X11-unix:/tmp/.X11-unix"
     environment:
       - "DISPLAY=${DISPLAY}"
-    command: >
-      stdbuf -o L
-      bash -c "./staging/QGroundControl"
+    command: QGroundControl

@@ -6,7 +6,7 @@
 #
 # Usage: tools/doctor.sh          (after docker compose ... up)
 set -uo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.." || exit 1
 
 NS="${AIRPLANE_NAMESPACE:-plane0}"
 pass=0

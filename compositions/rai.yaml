@@ -13,6 +13,4 @@ services:
       - "/tmp/.X11-unix:/tmp/.X11-unix"
       - /dev/shm:/dev/shm
       - ${XAUTHORITY:-/tmp/.Xauthority}:/tmp/.XAuthority:ro
-    # command: >
-    #   stdbuf -o L
-      
+    # Default command: the RAI configurator web UI on http://localhost:8501

@@ -1,7 +1,9 @@
 
 ## Unreal Engine
 
-FROM salsicha/cyberphysics:ros2-latest AS build
+ARG TAG=latest
+
+FROM salsicha/cyberphysics:ros2-${TAG} AS build
 
 ## Disable interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
@@ -43,11 +45,12 @@ COPY server /server
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-## Create the non-root user
+## Create the non-root user (replacing Ubuntu 24.04's default uid 1000 "ubuntu" user)
 ARG USERNAME=unrealuser
 ARG USER_UID=1000
 ARG USER_GID=$USER_UID
-RUN groupadd --gid $USER_GID $USERNAME \
+RUN (userdel -r ubuntu 2>/dev/null || true) \
+    && groupadd --gid $USER_GID $USERNAME \
     && useradd --uid $USER_UID --gid $USER_GID -m $USERNAME \
     && apt-get update \
     && apt-get install -y sudo \

@@ -9,7 +9,7 @@ Files that belong here describe the vehicle or device itself:
 - URDF/Xacro geometry and static transforms
 - stable topic, frame, and hardware-interface contracts
 
-Simulator runtimes, worlds, physics adapters, generated terrain, missions, and validation programs belong under `applications/`. Container orchestration belongs under `compositions/`.
+Data that is specific to one vehicle may also live with its system: `racecarneo/`, `so101/`, and `airplane/` keep their missions, scenarios, worlds, and validation thresholds here. Simulator runtimes, physics adapters, generated terrain, and the programs that run or score missions belong under `applications/`. Container orchestration belongs under `compositions/`.
 
 ## Current systems
 
@@ -21,7 +21,8 @@ Simulator runtimes, worlds, physics adapters, generated terrain, missions, and v
 - `racecarneo/`: MIT RACECAR Neo configuration and calibration.
 - `so101/`: SO-101 arm description and controller configuration.
 - `realsense/` and `blackfly/`: physical camera configuration.
-- `components/`: reusable composition fragments retained for compatibility.
+- `vinsmono/`: camera/IMU calibration for the VINS-Mono stack.
+- `components/`: compose fragments and opt-in overrides, layered onto a stack with an extra `-f` (for example `./start.sh blackfly -f systems/components/record-host-shutdown.yaml`); runnable stacks live in `compositions/`.
 
 ## Ownership rule
 

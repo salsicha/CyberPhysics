@@ -1,4 +1,13 @@
 
+* Build
+
+    The image is based on MathWorks' `mathworks/matlab-deps:r2022b-ubuntu22.04`
+    (Python 3.10 for the R2022b engine, `matlabengine==9.13.7`; its glibc 2.35
+    no longer needs the patched Ubuntu 20.04 glibc packages). `mpm` installs the
+    toolboxes listed in the `MATLAB_PRODUCTS` build argument; a license
+    (`MLM_LICENSE_FILE`, see below) is only needed to run MATLAB:
+    `make -C applications build_matlab`.
+
 * Install Matlab
 
     * Install Matlab, currently this must be done manually

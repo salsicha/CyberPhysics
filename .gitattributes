@@ -1,4 +1,10 @@
 * text=auto
+# Scripts and Dockerfiles run inside Linux containers: always check them out
+# with LF endings (builds no longer strip CRLF with "make cleanup")
+*.sh text eol=lf
+*.bash text eol=lf
+*.py text eol=lf
+Dockerfile* text eol=lf
 *.zip filter=lfs diff=lfs merge=lfs -text
 *.tar.gz filter=lfs diff=lfs merge=lfs -text
 *.gz filter=lfs diff=lfs merge=lfs -text

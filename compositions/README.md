@@ -8,6 +8,14 @@
 docker compose -f compositions/<stack>.yaml up
 ```
 
+or, from the repository root, `./start.sh <stack> [--profile <name>]... [-f <override.yaml>]... [up args...]`, which runs the same command (profiles and extra compose files go before `up`, other arguments after it). Run `./start.sh` without arguments to list the stacks:
+
+```bash
+./start.sh racecarneo
+./start.sh turret_sim --profile validation
+./start.sh vinsmono --build
+```
+
 Stop and clean up orphaned services after changing a stack:
 
 ```bash
@@ -39,9 +47,6 @@ docker compose -f compositions/vinsmono.yaml up --build
 
 ```bash
 docker compose -f compositions/racecarneo.yaml up
-docker compose -f compositions/turret_sim.yaml --profile validation up
-docker compose -f compositions/so101_groot_isaac.yaml --profile sim up
-docker compose -f compositions/so101_smolvla_isaac.yaml --profile sim up
 ```
 
 NiceGUI is served on `http://localhost:8080`.

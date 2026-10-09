@@ -20,12 +20,12 @@ Keep large generated assets out of git. Docker images may download model weights
 ## Install
 
 ```bash
-./install.sh
+./install.sh            # add --with-k3s to also install k3s
 ```
 
 ## Build Images
 
-Build from the `applications/` directory with `make build_<app_name>`:
+Build from the `applications/` directory with `make build_<app_name>`. Images are tags of the Docker Hub repository `salsicha/cyberphysics`, named `<app>-latest` (amd64) or `<app>-arm64`, e.g. `salsicha/cyberphysics:ros2-latest`; compose stacks select the variant with `CYBERPHYSICS_TAG` (default `latest`).
 
 ```bash
 make -C applications build_ros2
@@ -44,6 +44,7 @@ make target_arm64 build_ros2
 
 ```bash
 docker compose -f compositions/marimo.yaml up
+./start.sh marimo       # same thing; ./start.sh with no arguments lists stacks
 ```
 
 The RACECAR Neo simulation and navigation stack is a representative full pipeline:

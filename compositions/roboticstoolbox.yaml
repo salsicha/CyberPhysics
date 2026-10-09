@@ -13,7 +13,10 @@ services:
       - "/tmp/.X11-unix:/tmp/.X11-unix"
       - /dev/shm:/dev/shm
       - ${XAUTHORITY:-/tmp/.Xauthority}:/tmp/.XAuthority:ro
-    command: >
-      stdbuf -o L
-      bash -c "/venv/lib/python3.12/site-packages/roboticstoolbox/examples/robots.py"
+    # rtbtool is an interactive shell; run it in the foreground with
+    #   docker compose -f compositions/roboticstoolbox.yaml run --rm roboticstoolbox
+    # or "docker attach roboticstoolbox" after "up -d"
+    stdin_open: true
+    tty: true
+    command: rtbtool
 

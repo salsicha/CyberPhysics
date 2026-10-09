@@ -32,6 +32,34 @@ jobs:
       - name: Check compose fallbacks match env files
         run: python tools/check_compose_env_defaults.py
 
+  lint:
+    runs-on: ubuntu-latest
+    env:
+      # Vendored third-party code is not linted
+      VENDORED: applications/whereami/whereami,applications/blackfly/src,applications/vinsmono/vins_mono_ros2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install linters
+        run: pip install ruff==0.16.10 shellcheck-py==0.11.0.1
+      # Error-class rules only: syntax errors and undefined names. The depthai
+      # Script-node example gets `node`/`Buffer` injected by the device runtime.
+      - name: Ruff
+        run: >
+          ruff check --no-cache --output-format github
+          --select E9,F63,F7,F82
+          --extend-exclude "$VENDORED"
+          --config 'lint.per-file-ignores = {"applications/oak1/scripts/references/custom_script.py" = ["F821"]}'
+          .
+      # install_deps.sh is luxonis' depthai installer, vendored as-is
+      - name: ShellCheck
+        run: |
+          git ls-files -z '*.sh' \
+            | grep -zvE "^($(echo "$VENDORED" | tr ',' '|'))/|^applications/oak1/scripts/install_deps\.sh$" \
+            | xargs -0 shellcheck --severity=error
+
   compose-config:
     runs-on: ubuntu-latest
     steps:
@@ -43,13 +71,33 @@ jobs:
             echo "== $f"
             docker compose -f "$f" config --quiet
           done
+      - name: Validate systems/components fragments render
+        env:
+          # record.yaml requires the directory holding a system env.list
+          RECORD_ENV_DIR: ${{ github.workspace }}/systems/realsense
+        run: |
+          set -e
+          for f in systems/components/*.yaml; do
+            echo "== $f"
+            case "$f" in
+              # opt-in override, checked on top of the stack that documents it
+              systems/components/record-host-shutdown.yaml)
+                docker compose -f compositions/blackfly.yaml -f "$f" config --quiet ;;
+              *)
+                docker compose -f "$f" config --quiet ;;
+            esac
+          done
 
   vinsmono-runtime:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          lfs: true
+      # Only the VINS sources' LFS objects (BRIEF vocabulary, masks), not the
+      # whole repository's LFS store
+      - name: Fetch VINS-Mono LFS objects
+        run: |
+          git lfs install --local
+          git lfs pull --include="applications/vinsmono/**"
       - name: Build VINS-Mono
         run: docker build -t salsicha/cyberphysics:vinsmono-ci applications/vinsmono
       - name: Check sensor flow and normal shutdown
