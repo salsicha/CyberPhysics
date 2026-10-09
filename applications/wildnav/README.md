@@ -25,9 +25,15 @@ Inputs:
 
 - `/oak1/image_highres`
 - `/oak1/image_highres/camera_info`
-- `/navigation/odometry` as the visual-search position prediction
+- `/navigation/fix` as the visual-search prior (fresh within
+  `prior_timeout_s`), falling back to a fresh `/drone0/sensor_measurements/gps`
+  fix; the search radius widens with the prior's horizontal sigma
+  (`search_radius_sigma_scale`, up to `max_search_radius_m`) and so does
+  the `max_position_jump_m` gate
+- `/navigation/origin` (EKF origin, transient-local): `/wildnav/odometry`
+  is relative to it and waits for it; `/wildnav/fix` does not
+- `/navigation/odometry` for attitude gating and the odometry template
 - `/drone0/sensor_measurements/odom` as the fusion dead-reckoning input
-- `/drone0/sensor_measurements/gps`
 - `/demnav/odometry`, `/demnav/confidence`, `/demnav/valid`
 
 Outputs:

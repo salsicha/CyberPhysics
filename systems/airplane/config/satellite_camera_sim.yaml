@@ -19,4 +19,5 @@ satellite_camera_sim:
     altitude_agl_m: 180.0
     groundspeed_mps: 24.0
     horizontal_fov_deg: 69.0
+    camera_mount_yaw_deg: 0.0
     fallback_route_radius_m: 650.0

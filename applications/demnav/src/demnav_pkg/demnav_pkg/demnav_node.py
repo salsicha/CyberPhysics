@@ -1,11 +1,17 @@
 #!/usr/bin/env python3
 import math
 import threading
+import time
 import numpy as np
-import cv2
 import rclpy
 from rclpy.node import Node
-from rclpy.qos import qos_profile_sensor_data
+from rclpy.qos import (
+    DurabilityPolicy,
+    QoSProfile,
+    ReliabilityPolicy,
+    qos_profile_sensor_data,
+)
+from geographic_msgs.msg import GeoPointStamped
 from geometry_msgs.msg import PoseWithCovarianceStamped
 from sensor_msgs.msg import (
     CameraInfo,
@@ -14,14 +20,21 @@ from sensor_msgs.msg import (
     NavSatStatus,
     PointCloud2,
     PointField,
+    Range,
 )
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Bool, Float32
 from cv_bridge import CvBridge
 
-from synthetic_world import METERS_PER_DEG_LAT
+from synthetic_world import latlon_to_local
 
+from .geoid import GeoidGrid
 from .heightmap import HeightMapCache
+from .terrain_match import correlate, derotation_angle_deg, north_up_template
+
+# Unexplained-variance floor of the peak uniqueness test: two fits both
+# better than NCC ~0.995 are a tie, not a win for resampling noise.
+PEAK_RESIDUAL_FLOOR = 0.01
 
 
 def _yaw_from_quaternion(q) -> float:
@@ -34,6 +47,44 @@ def _roll_pitch_from_quaternion(q) -> tuple[float, float]:
                       1.0 - 2.0 * (q.x * q.x + q.y * q.y))
     sin_pitch = max(-1.0, min(1.0, 2.0 * (q.w * q.y - q.z * q.x)))
     return roll, math.asin(sin_pitch)
+
+
+def fix_is_usable(fix, received, now, timeout_s) -> bool:
+    return (fix is not None and now - received <= timeout_s and
+            fix.status.status >= NavSatStatus.STATUS_FIX and
+            math.isfinite(fix.latitude) and math.isfinite(fix.longitude))
+
+
+def select_prior(prior, prior_received, gps, gps_received, now, timeout_s):
+    """Search centre: the fused navigation fix while fresh, else a fresh
+    raw GPS fix, else None (skip the frame)."""
+    if fix_is_usable(prior, prior_received, now, timeout_s):
+        return prior
+    if fix_is_usable(gps, gps_received, now, timeout_s):
+        return gps
+    return None
+
+
+def search_radius(fix, base_m, sigma_scale, maximum_m) -> float:
+    """clamp(base + k * sigma, base, maximum) with sigma the larger
+    horizontal standard deviation of the fix; an unknown or invalid
+    covariance adds nothing."""
+    sigma = 0.0
+    if fix.position_covariance_type != NavSatFix.COVARIANCE_TYPE_UNKNOWN:
+        variance = max(fix.position_covariance[0], fix.position_covariance[4])
+        if math.isfinite(variance) and variance > 0.0:
+            sigma = math.sqrt(variance)
+    return min(max(base_m + sigma_scale * sigma, base_m),
+               max(maximum_m, base_m))
+
+
+def peak_uniqueness(best: float, second: float) -> float:
+    """1 - (unexplained variance of the best fit) / (that of the runner-up
+    outside the peak neighbourhood): 0 when a look-alike fits as well,
+    near 1 when the best fit is much better."""
+    best_residual = 1.0 - best * best + PEAK_RESIDUAL_FLOOR
+    second_residual = 1.0 - second * second + PEAK_RESIDUAL_FLOOR
+    return float(np.clip(1.0 - best_residual / second_residual, 0.0, 1.0))
 
 
 class DemNavNode(Node):
@@ -52,14 +103,25 @@ class DemNavNode(Node):
         self.declare_parameter('confidence_topic', '/demnav/confidence')
         self.declare_parameter('scale_topic', '/demnav/depth_scale')
         self.declare_parameter('valid_topic', '/demnav/valid')
+        self.declare_parameter('origin_topic',     '/navigation/origin')
+        self.declare_parameter('prior_fix_topic',  '/navigation/fix')
+        self.declare_parameter('prior_timeout_s',  2.0)
+        self.declare_parameter('rangefinder_topic', '/aerodrone/rangefinder')
+        self.declare_parameter('rangefinder_timeout_s', 0.5)
         self.declare_parameter('initial_lat',      0.0)
         self.declare_parameter('initial_lon',      0.0)
-        self.declare_parameter('origin_alt',       0.0)
         self.declare_parameter('area_km',          10.0)
         self.declare_parameter('search_radius_m',  200.0)
+        self.declare_parameter('search_radius_sigma_scale', 3.0)
+        self.declare_parameter('max_search_radius_m', 600.0)
         self.declare_parameter('fov_deg',          90.0)
+        self.declare_parameter('camera_mount_yaw_deg', 0.0)
+        self.declare_parameter('gps_altitude_datum', 'ellipsoid')
+        self.declare_parameter(
+            'geoid_file', '/usr/share/GeographicLib/geoids/egm96-5.pgm')
         self.declare_parameter('dem_resolution_m', 30.0)
         self.declare_parameter('min_correlation',  0.3)
+        self.declare_parameter('min_peak_uniqueness', 0.5)
         self.declare_parameter('cache_dir',        '/data/demnav_cache')
         self.declare_parameter('synthetic_terrain', False)
         self.declare_parameter('pointcloud_stride', 4)
@@ -78,10 +140,29 @@ class DemNavNode(Node):
 
         self.fov_deg          = self.get_parameter('fov_deg').value
         self.search_radius_m  = self.get_parameter('search_radius_m').value
+        self.search_radius_sigma_scale = float(
+            self.get_parameter('search_radius_sigma_scale').value)
+        self.max_search_radius_m = max(
+            float(self.get_parameter('max_search_radius_m').value),
+            float(self.search_radius_m))
+        self.prior_timeout_s = float(
+            self.get_parameter('prior_timeout_s').value)
+        self.rangefinder_timeout_s = float(
+            self.get_parameter('rangefinder_timeout_s').value)
+        self.camera_mount_yaw_rad = math.radians(
+            float(self.get_parameter('camera_mount_yaw_deg').value))
         self.min_correlation  = self.get_parameter('min_correlation').value
-        self.origin_lat       = initial_lat
-        self.origin_lon       = initial_lon
-        self.origin_alt       = self.get_parameter('origin_alt').value
+        self.min_peak_uniqueness = float(
+            self.get_parameter('min_peak_uniqueness').value)
+        # Local outputs are anchored at the autopilot's EKF origin, received
+        # on origin_topic; nothing local is published before it arrives.
+        self.origin = None
+        # initial_lat/initial_lon only pre-load the map area; they are also
+        # the fixed anchor of the synthetic world (the simulator renders it
+        # about the same point), which falls back to the EKF origin.
+        initial_set = initial_lat != 0.0 or initial_lon != 0.0
+        self.synthetic_anchor = (
+            (initial_lat, initial_lon) if initial_set else None)
         self.pointcloud_stride = max(
             1, int(self.get_parameter('pointcloud_stride').value))
         self.min_dem_footprint_pixels = max(
@@ -96,8 +177,31 @@ class DemNavNode(Node):
             if isinstance(synthetic_terrain, bool)
             else str(synthetic_terrain).lower() in ('1', 'true', 'yes', 'on'))
 
+        self.geoid = None
+        datum = str(self.get_parameter('gps_altitude_datum').value).lower()
+        if datum not in ('ellipsoid', 'msl'):
+            raise ValueError(
+                f"gps_altitude_datum must be 'ellipsoid' or 'msl', not {datum!r}")
+        if datum == 'ellipsoid':
+            geoid_file = self.get_parameter('geoid_file').value
+            try:
+                self.geoid = GeoidGrid(geoid_file)
+            except (OSError, ValueError) as e:
+                # SRTM heights are EGM96 MSL, so without the geoid every
+                # height above ground is off by the local geoid height
+                # (about -32 m at Mount Tamalpais, within +-110 m worldwide).
+                self.get_logger().warn(
+                    f'No geoid model ({e}); treating ellipsoid altitudes as '
+                    'MSL — height above ground will be off by the local '
+                    'geoid height (about 30 m in California)')
+
         self.bridge       = CvBridge()
-        self.latest_fix   = None
+        self.latest_gps   = None
+        self.latest_gps_received = 0.0
+        self.latest_prior = None
+        self.latest_prior_received = 0.0
+        self.latest_range = None
+        self.latest_range_received = 0.0
         self.latest_odom  = None
         self.camera_info  = None
         self.yaw_rad      = 0.0
@@ -106,14 +210,34 @@ class DemNavNode(Node):
         self.heightmap    = None
         self._heightmap_thread = None
 
-        if initial_lat != 0.0 or initial_lon != 0.0:
+        if 500.0 * float(self.get_parameter('area_km').value) < (
+                1.2 * self.max_search_radius_m):
+            self.get_logger().warn(
+                'area_km is too small to hold max_search_radius_m searches; '
+                'wide searches will leave the map and be rejected')
+        if initial_set:
             self._load_heightmap(initial_lat, initial_lon)
         else:
             self.get_logger().warn(
-                'initial_lat/initial_lon not set — height map loads on first GPS fix')
+                'initial_lat/initial_lon not set — height map loads around '
+                'the first search prior')
 
         self.create_subscription(
             NavSatFix, gps_topic, self._on_fix, qos_profile_sensor_data)
+        self.create_subscription(
+            NavSatFix, self.get_parameter('prior_fix_topic').value,
+            self._on_prior, qos_profile_sensor_data)
+        self.create_subscription(
+            GeoPointStamped, self.get_parameter('origin_topic').value,
+            self._on_origin,
+            QoSProfile(depth=1,
+                       reliability=ReliabilityPolicy.RELIABLE,
+                       durability=DurabilityPolicy.TRANSIENT_LOCAL))
+        rangefinder_topic = self.get_parameter('rangefinder_topic').value
+        if rangefinder_topic:
+            self.create_subscription(
+                Range, rangefinder_topic, self._on_range,
+                qos_profile_sensor_data)
         self.create_subscription(
             Image, depth_topic, self._on_depth, qos_profile_sensor_data)
         self.create_subscription(
@@ -145,6 +269,10 @@ class DemNavNode(Node):
         if (self._heightmap_thread is not None and
                 self._heightmap_thread.is_alive()):
             return
+        if self.synthetic_terrain and self.synthetic_anchor is None:
+            # The synthetic world must be built about the same fixed point
+            # the simulator renders it about; wait for the EKF origin.
+            return
         self.get_logger().info(
             f'Loading height map at ({lat:.5f}, {lon:.5f}) in the background ...')
         self._heightmap_thread = threading.Thread(
@@ -152,6 +280,7 @@ class DemNavNode(Node):
         self._heightmap_thread.start()
 
     def _build_heightmap(self, lat: float, lon: float):
+        anchor_lat, anchor_lon = self.synthetic_anchor or (lat, lon)
         try:
             heightmap = HeightMapCache(
                 lat, lon,
@@ -159,24 +288,51 @@ class DemNavNode(Node):
                 self.get_parameter('dem_resolution_m').value,
                 self.get_parameter('cache_dir').value,
                 self.synthetic_terrain,
-                origin_lat=self.origin_lat,
-                origin_lon=self.origin_lon)
+                origin_lat=anchor_lat,
+                origin_lon=anchor_lon)
         except Exception as e:
             self.get_logger().error(f'Failed to load height map: {e}')
             return
         self.heightmap = heightmap
         self.get_logger().info('Height map ready.')
 
-    def _on_fix(self, msg: NavSatFix):
-        if msg.status.status < NavSatStatus.STATUS_FIX:
+    def _maybe_recentre_heightmap(self, heightmap, lat: float, lon: float,
+                                  footprint_m: float):
+        """Reload the map about the prior before the widest search window
+        would cross its edge. Requiring a real move from the map centre
+        keeps an undersized map from reloading every frame."""
+        if heightmap.edge_distance_m(lat, lon) >= (
+                self.max_search_radius_m + footprint_m):
             return
-        self.latest_fix = msg
-        if self.origin_lat == 0.0 and self.origin_lon == 0.0:
-            self.origin_lat = msg.latitude
-            self.origin_lon = msg.longitude
-            self.origin_alt = msg.altitude
-        if self.heightmap is None:
-            self._load_heightmap(msg.latitude, msg.longitude)
+        east, north = heightmap.latlon_to_local(lat, lon)
+        if math.hypot(east, north) < 0.25 * heightmap.half_extent_m:
+            return
+        self._load_heightmap(lat, lon)
+
+    def _on_origin(self, msg: GeoPointStamped):
+        origin = (msg.position.latitude, msg.position.longitude,
+                  msg.position.altitude)
+        if not all(math.isfinite(value) for value in origin):
+            return
+        if origin != self.origin:
+            self.get_logger().info(
+                f'EKF origin: {origin[0]:.7f}, {origin[1]:.7f}, '
+                f'{origin[2]:.2f} m')
+        self.origin = origin
+        if self.synthetic_terrain and self.synthetic_anchor is None:
+            self.synthetic_anchor = origin[:2]
+
+    def _on_fix(self, msg: NavSatFix):
+        self.latest_gps = msg
+        self.latest_gps_received = time.monotonic()
+
+    def _on_prior(self, msg: NavSatFix):
+        self.latest_prior = msg
+        self.latest_prior_received = time.monotonic()
+
+    def _on_range(self, msg: Range):
+        self.latest_range = msg
+        self.latest_range_received = time.monotonic()
 
     def _on_odom(self, msg: Odometry):
         self.latest_odom = msg
@@ -188,7 +344,16 @@ class DemNavNode(Node):
         self.camera_info = msg
 
     def _on_depth(self, msg: Image):
-        if self.latest_fix is None or self.heightmap is None:
+        now = time.monotonic()
+        prior = select_prior(
+            self.latest_prior, self.latest_prior_received,
+            self.latest_gps, self.latest_gps_received,
+            now, self.prior_timeout_s)
+        if prior is None:
+            self._publish_valid(False)
+            return
+        if self.heightmap is None:
+            self._load_heightmap(prior.latitude, prior.longitude)
             self._publish_valid(False)
             return
         try:
@@ -197,14 +362,48 @@ class DemNavNode(Node):
             self.get_logger().error(f'Depth conversion failed: {e}')
             self._publish_valid(False)
             return
-        self._run_matching(depth, msg)
+        self._run_matching(depth, msg, prior, now)
 
-    def _run_matching(self, depth: np.ndarray, source_msg: Image):
-        lat = self.latest_fix.latitude
-        lon = self.latest_fix.longitude
-        alt = self.latest_fix.altitude
+    def _intrinsics(self, width: int, height: int):
+        """(fx, fy, cx, cy) for a frame of this size: CameraInfo scaled to
+        it, else a centred pinhole with fov_deg across the width."""
+        info = self.camera_info
+        if (info is not None and info.k[0] > 0.0 and info.k[4] > 0.0 and
+                info.width > 0 and info.height > 0):
+            sx = width / float(info.width)
+            sy = height / float(info.height)
+            return (info.k[0] * sx, info.k[4] * sy,
+                    (info.k[2] + 0.5) * sx - 0.5,
+                    (info.k[5] + 0.5) * sy - 0.5)
+        fx = width / (2.0 * math.tan(math.radians(self.fov_deg / 2.0)))
+        return fx, fx, width / 2.0, height / 2.0
 
-        if alt <= 0.0:
+    def _altitude_msl(self, lat: float, lon: float, altitude: float) -> float:
+        if self.geoid is None:
+            return altitude
+        return altitude - self.geoid.height(lat, lon)
+
+    def _rangefinder_agl(self, now: float):
+        """Height above ground from a fresh, in-range rangefinder reading,
+        else None. The beam follows the body z axis."""
+        msg = self.latest_range
+        if (msg is None or
+                now - self.latest_range_received > self.rangefinder_timeout_s):
+            return None
+        reading = float(msg.range)
+        if not (math.isfinite(reading) and
+                msg.min_range <= reading <= msg.max_range):
+            return None
+        return reading * math.cos(self.roll_rad) * math.cos(self.pitch_rad)
+
+    def _run_matching(self, depth: np.ndarray, source_msg: Image,
+                      prior: NavSatFix, now: float):
+        lat = prior.latitude
+        lon = prior.longitude
+        alt = prior.altitude
+        heightmap = self.heightmap
+
+        if not math.isfinite(alt):
             self._publish_valid(False)
             return
 
@@ -225,62 +424,56 @@ class DemNavNode(Node):
             self._publish_valid(False)
             return
 
-        # Rotate depth image to align north using vehicle yaw
-        angle_deg = math.degrees(self.yaw_rad)
-        M = cv2.getRotationMatrix2D((img_w / 2.0, img_h / 2.0), -angle_deg, 1.0)
-        fill_value = float(np.nanmedian(raw_depth[finite]))
-        depth_aligned = cv2.warpAffine(
-            np.where(finite, raw_depth, fill_value),
-            M, (img_w, img_h),
-            borderMode=cv2.BORDER_CONSTANT,
-            borderValue=fill_value)
-        valid_aligned = cv2.warpAffine(
-            finite.astype(np.float32),
-            M, (img_w, img_h),
-            borderMode=cv2.BORDER_CONSTANT,
-            borderValue=0.0)
-
-        # Normalise (zero mean, unit variance)
-        d = depth_aligned
-        std = d.std()
-        if std < 1e-6:
+        # Height above ground sets the template scale: a fresh rangefinder
+        # reading, else the altitude above the DEM (SRTM heights are MSL).
+        ground_elevation = heightmap.elevation_at(lat, lon)
+        if not math.isfinite(ground_elevation):
+            self._maybe_recentre_heightmap(heightmap, lat, lon, 0.0)
             self._publish_valid(False)
             return
-        d = (d - d.mean()) / std
+        alt_msl = self._altitude_msl(lat, lon, alt)
+        agl = self._rangefinder_agl(now)
+        if agl is None:
+            agl = max(alt_msl - ground_elevation, 1.0)
 
-        # Get DEM search patch
-        search_m = self.search_radius_m * 2.0
-        dem_patch, dem_res, (center_row, center_col) = self.heightmap.get_patch(
-            lat, lon, search_m, search_m)
-        if dem_patch.size == 0:
-            self._publish_valid(False)
-            return
-
-        # Ground sampling distance → resample depth to DEM pixel scale
-        ground_elevation = float(dem_patch[center_row, center_col])
-        agl = max(alt - ground_elevation, 1.0)
-        ground_width_m = 2.0 * agl * math.tan(math.radians(self.fov_deg / 2.0))
-        gsd = ground_width_m / img_w
-        scale = gsd / self.heightmap.resolution_m
-        new_w = max(3, int(img_w * scale))
-        new_h = max(3, int(img_h * scale))
-        if (new_w < self.min_dem_footprint_pixels or
-                new_h < self.min_dem_footprint_pixels):
+        # Ground sampling distance from the calibrated focal length.
+        fx, fy, cx, cy = self._intrinsics(img_w, img_h)
+        cell_m = heightmap.col_spacing_m
+        footprint_cells = (img_w * agl / fx / cell_m, img_h * agl / fy / cell_m)
+        if min(footprint_cells) < self.min_dem_footprint_pixels:
             self.get_logger().debug(
                 'Camera footprint is too small at the configured DEM resolution')
             self._publish_valid(False)
             return
-        depth_tmpl = cv2.resize(d, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
-        relative_tmpl = cv2.resize(
-            depth_aligned, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
-        valid_tmpl = cv2.resize(
-            valid_aligned, (new_w, new_h),
-            interpolation=cv2.INTER_LINEAR) > 0.99
+        footprint_m = max(footprint_cells) * cell_m
+        self._maybe_recentre_heightmap(heightmap, lat, lon, footprint_m)
 
-        if (dem_patch.shape[0] < depth_tmpl.shape[0] + 2 or
-                dem_patch.shape[1] < depth_tmpl.shape[1] + 2):
-            self.get_logger().warn(
-                'DEM patch too small for matching — increase area_km or reduce search_radius_m')
+        # De-rotate the body-fixed frame north-up onto the DEM grid.
+        relative_tmpl, valid_tmpl, anchor = north_up_template(
+            raw_depth, finite,
+            derotation_angle_deg(self.yaw_rad, self.camera_mount_yaw_rad),
+            (cx, cy), (agl / fx, agl / fy), cell_m)
+        if valid_tmpl.sum() < 9:
+            self._publish_valid(False)
+            return
+
+        # Normalise (zero mean, unit variance)
+        std = float(relative_tmpl[valid_tmpl].std())
+        if std < 1e-6:
+            self._publish_valid(False)
+            return
+        depth_tmpl = (relative_tmpl - relative_tmpl[valid_tmpl].mean()) / std
+
+        # DEM window: every anchor position within the search radius,
+        # plus the template around it. Windows off the map are rejected.
+        radius_m = search_radius(
+            prior, self.search_radius_m, self.search_radius_sigma_scale,
+            self.max_search_radius_m)
+        window_m = 2.0 * (radius_m + max(depth_tmpl.shape) * cell_m)
+        dem_patch, dem_res, (center_row, center_col) = heightmap.get_patch(
+            lat, lon, window_m, window_m)
+        if dem_patch.size == 0:
+            self.get_logger().debug('Search window leaves the height map')
             self._publish_valid(False)
             return
 
@@ -291,40 +484,42 @@ class DemNavNode(Node):
             return
         dem = (dem - dem.mean()) / dem_std
 
-        # Relative-depth models may encode either depth or inverse depth.
-        positive = cv2.matchTemplate(dem, depth_tmpl, cv2.TM_CCOEFF_NORMED)
-        negative = cv2.matchTemplate(dem, -depth_tmpl, cv2.TM_CCOEFF_NORMED)
-        _, positive_score, _, positive_loc = cv2.minMaxLoc(positive)
-        _, negative_score, _, negative_loc = cv2.minMaxLoc(negative)
-        if positive_score >= negative_score:
-            max_val, max_loc = positive_score, positive_loc
-        else:
-            max_val, max_loc = negative_score, negative_loc
-
+        # Relative-depth models may encode either depth or inverse depth;
+        # correlate() scores both polarities and also finds the best
+        # look-alike outside the peak's neighbourhood (a footprint radius).
+        match = correlate(
+            dem, depth_tmpl.astype(np.float32), valid_tmpl, anchor,
+            (center_row, center_col), radius_m / dem_res,
+            0.5 * max(footprint_cells))
+        if match is None:
+            self._publish_valid(False)
+            return
+        max_val = match['score']
         if max_val < self.min_correlation:
             self.get_logger().debug(f'Low correlation {max_val:.2f} — skipping')
             self._publish_valid(False)
             return
+        uniqueness = peak_uniqueness(max_val, match['second'])
+        if uniqueness < self.min_peak_uniqueness:
+            self.get_logger().debug(
+                f'Ambiguous terrain match: peak {max_val:.3f}, look-alike '
+                f'{match["second"]:.3f} — skipping')
+            self._publish_valid(False)
+            return
 
-        # Centre of the best-match window relative to DEM patch centre
-        match_col = max_loc[0] + depth_tmpl.shape[1] // 2
-        match_row = max_loc[1] + depth_tmpl.shape[0] // 2
-        offset_col = match_col - center_col
-        offset_row = match_row - center_row
+        # Map the matched nadir (sub-cell) back through the grid geometry.
+        prior_row, prior_col = heightmap.latlon_to_pixel(lat, lon)
+        corrected_lat, corrected_lon = heightmap.pixel_to_latlon(
+            prior_row + match['position'][0] - center_row,
+            prior_col + match['position'][1] - center_col)
+        offset_east_m, offset_north_m = latlon_to_local(
+            corrected_lat, corrected_lon, lat, lon)
 
-        offset_east_m  =  offset_col * dem_res
-        offset_north_m = -offset_row * dem_res  # rows increase southward
-
-        m_per_deg_lon = METERS_PER_DEG_LAT * math.cos(math.radians(lat))
-        delta_lat = offset_north_m / METERS_PER_DEG_LAT
-        delta_lon = offset_east_m  / m_per_deg_lon
-        corrected_lat = lat + delta_lat
-        corrected_lon = lon + delta_lon
-
+        match_row, match_col = match['loc']
         matched_dem = dem_patch[
-            max_loc[1]:max_loc[1] + depth_tmpl.shape[0],
-            max_loc[0]:max_loc[0] + depth_tmpl.shape[1]]
-        target_range = alt - matched_dem
+            match_row:match_row + depth_tmpl.shape[0],
+            match_col:match_col + depth_tmpl.shape[1]]
+        target_range = alt_msl - matched_dem
         fit_mask = (
             valid_tmpl &
             np.isfinite(target_range) &
@@ -348,7 +543,8 @@ class DemNavNode(Node):
         if target_variance > 1e-6:
             fit_score = max(
                 0.0, 1.0 - float(np.var(residual)) / target_variance)
-        confidence = float(np.clip(0.7 * max_val + 0.3 * fit_score, 0.0, 1.0))
+        confidence = float(np.clip(
+            (0.7 * max_val + 0.3 * fit_score) * uniqueness, 0.0, 1.0))
 
         metric_depth = raw_depth * depth_scale + depth_offset
         metric_depth[
@@ -362,6 +558,8 @@ class DemNavNode(Node):
         horizontal_variance = horizontal_sigma ** 2
         vertical_variance = vertical_sigma ** 2
 
+        # The fix keeps the prior's altitude (and datum); it does not
+        # depend on the EKF origin, so it is published regardless.
         fix = NavSatFix()
         fix.header.stamp      = source_msg.header.stamp
         fix.header.frame_id   = 'map'
@@ -377,17 +575,33 @@ class DemNavNode(Node):
         fix.position_covariance_type = NavSatFix.COVARIANCE_TYPE_DIAGONAL_KNOWN
         self.fix_publisher.publish(fix)
 
-        east = (
-            (corrected_lon - self.origin_lon) * METERS_PER_DEG_LAT *
-            math.cos(math.radians(self.origin_lat)))
-        north = (corrected_lat - self.origin_lat) * METERS_PER_DEG_LAT
+        metric_msg = self.bridge.cv2_to_imgmsg(metric_depth, encoding='32FC1')
+        metric_msg.header = source_msg.header
+        self.confidence_publisher.publish(Float32(data=confidence))
+        self.scale_publisher.publish(Float32(data=depth_scale))
+        self.metric_depth_publisher.publish(metric_msg)
+        self.pointcloud_publisher.publish(
+            self._make_pointcloud(metric_depth, source_msg.header))
+
+        self.get_logger().debug(
+            f'confidence={confidence:.2f} uniqueness={uniqueness:.2f} '
+            f'scale={depth_scale:.3f} '
+            f'offset=({offset_east_m:.1f}m E, {offset_north_m:.1f}m N)')
+
+        if self.origin is None:
+            # Local corrections need the EKF origin.
+            self._publish_valid(False)
+            return
+        origin_lat, origin_lon, origin_alt = self.origin
+        east, north = latlon_to_local(
+            corrected_lat, corrected_lon, origin_lat, origin_lon)
         odom = Odometry()
         odom.header = fix.header
         odom.header.frame_id = 'odom'
         odom.child_frame_id = 'base_link'
         odom.pose.pose.position.x = east
         odom.pose.pose.position.y = north
-        odom.pose.pose.position.z = alt - self.origin_alt
+        odom.pose.pose.position.z = alt - origin_alt
         if self.latest_odom is not None:
             odom.pose.pose.orientation = self.latest_odom.pose.pose.orientation
             odom.twist = self.latest_odom.twist
@@ -403,33 +617,13 @@ class DemNavNode(Node):
         pose.header = odom.header
         pose.pose = odom.pose
 
-        metric_msg = self.bridge.cv2_to_imgmsg(metric_depth, encoding='32FC1')
-        metric_msg.header = source_msg.header
-        self.confidence_publisher.publish(Float32(data=confidence))
-        self.scale_publisher.publish(Float32(data=depth_scale))
         self._publish_valid(True)
         self.odom_publisher.publish(odom)
         self.pose_publisher.publish(pose)
-        self.metric_depth_publisher.publish(metric_msg)
-        self.pointcloud_publisher.publish(
-            self._make_pointcloud(metric_depth, source_msg.header))
-
-        self.get_logger().debug(
-            f'confidence={confidence:.2f} scale={depth_scale:.3f} '
-            f'offset=({offset_east_m:.1f}m E, {offset_north_m:.1f}m N)')
 
     def _make_pointcloud(self, metric_depth, header):
         height, width = metric_depth.shape
-        if self.camera_info is not None and self.camera_info.k[0] > 0.0:
-            fx = self.camera_info.k[0]
-            fy = self.camera_info.k[4]
-            cx = self.camera_info.k[2]
-            cy = self.camera_info.k[5]
-        else:
-            fx = width / (2.0 * math.tan(math.radians(self.fov_deg / 2.0)))
-            fy = fx
-            cx = width / 2.0
-            cy = height / 2.0
+        fx, fy, cx, cy = self._intrinsics(width, height)
 
         rows, cols = np.mgrid[
             0:height:self.pointcloud_stride,

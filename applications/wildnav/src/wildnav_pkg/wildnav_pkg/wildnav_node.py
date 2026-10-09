@@ -9,12 +9,18 @@ import numpy as np
 import rclpy
 from cv_bridge import CvBridge
 from nav_msgs.msg import Odometry
+from geographic_msgs.msg import GeoPointStamped
 from rclpy.node import Node
-from rclpy.qos import qos_profile_sensor_data
+from rclpy.qos import (
+    DurabilityPolicy,
+    QoSProfile,
+    ReliabilityPolicy,
+    qos_profile_sensor_data,
+)
 from sensor_msgs.msg import CameraInfo, Image, NavSatFix, NavSatStatus
 from std_msgs.msg import Bool, Float32, Int32
 
-from synthetic_world import METERS_PER_DEG_LAT, local_to_latlon
+from synthetic_world import METERS_PER_DEG_LAT, latlon_to_local
 
 from .satellite_cache import SatelliteTileCache
 from .satellite_cache import ground_resolution_m, tile_pixel_to_latlon
@@ -34,6 +40,35 @@ def horizontal_distance_m(lat_a, lon_a, lat_b, lon_b):
     return math.hypot(east, north)
 
 
+def fix_is_usable(fix, received, now, timeout_s):
+    return (fix is not None and now - received <= timeout_s and
+            fix.status.status >= NavSatStatus.STATUS_FIX and
+            math.isfinite(fix.latitude) and math.isfinite(fix.longitude))
+
+
+def select_prior(prior, prior_received, gps, gps_received, now, timeout_s):
+    """Search centre: the fused navigation fix while fresh, else a fresh
+    raw GPS fix, else None (skip the frame)."""
+    if fix_is_usable(prior, prior_received, now, timeout_s):
+        return prior
+    if fix_is_usable(gps, gps_received, now, timeout_s):
+        return gps
+    return None
+
+
+def search_radius(fix, base_m, sigma_scale, maximum_m):
+    """clamp(base + k * sigma, base, maximum) with sigma the larger
+    horizontal standard deviation of the fix; an unknown or invalid
+    covariance adds nothing."""
+    sigma = 0.0
+    if fix.position_covariance_type != NavSatFix.COVARIANCE_TYPE_UNKNOWN:
+        variance = max(fix.position_covariance[0], fix.position_covariance[4])
+        if math.isfinite(variance) and variance > 0.0:
+            sigma = math.sqrt(variance)
+    return min(max(base_m + sigma_scale * sigma, base_m),
+               max(maximum_m, base_m))
+
+
 class WildNavNode(Node):
     def __init__(self):
         super().__init__('wildnav_node')
@@ -43,6 +78,8 @@ class WildNavNode(Node):
             'camera_info_topic': '/oak1/image_highres/camera_info',
             'odom_topic': '/navigation/odometry',
             'gps_topic': '/drone0/sensor_measurements/gps',
+            'prior_fix_topic': '/navigation/fix',
+            'origin_topic': '/navigation/origin',
             'fix_topic': '/wildnav/fix',
             'odometry_topic': '/wildnav/odometry',
             'confidence_topic': '/wildnav/confidence',
@@ -50,13 +87,15 @@ class WildNavNode(Node):
             'valid_topic': '/wildnav/valid',
             'initial_lat': 0.0,
             'initial_lon': 0.0,
-            'origin_alt': 0.0,
             'cache_dir': '/data/wildnav_cache',
             'tile_url_template': (
                 'https://server.arcgisonline.com/ArcGIS/rest/services/'
                 'World_Imagery/MapServer/tile/{z}/{y}/{x}'),
             'zoom': 18,
             'search_radius_m': 250.0,
+            'search_radius_sigma_scale': 3.0,
+            'max_search_radius_m': 750.0,
+            'prior_timeout_s': 2.0,
             'max_tiles': 49,
             'max_tile_downloads_per_cycle': 8,
             'match_rate_hz': 0.2,
@@ -75,15 +114,28 @@ class WildNavNode(Node):
         for name, value in defaults.items():
             self.declare_parameter(name, value)
 
-        self.origin_lat = float(self.get_parameter('initial_lat').value)
-        self.origin_lon = float(self.get_parameter('initial_lon').value)
-        self.origin_alt = float(self.get_parameter('origin_alt').value)
+        # Local outputs are anchored at the autopilot's EKF origin, received
+        # on origin_topic; nothing local is published before it arrives.
+        self.origin = None
+        # initial_lat/initial_lon are only the fixed anchor of the synthetic
+        # world (the simulator renders it about the same point), which
+        # falls back to the EKF origin when unset.
+        initial_lat = float(self.get_parameter('initial_lat').value)
+        initial_lon = float(self.get_parameter('initial_lon').value)
+        self.synthetic_anchor = (
+            (initial_lat, initial_lon)
+            if initial_lat != 0.0 or initial_lon != 0.0 else None)
         self.bridge = CvBridge()
         self.camera_info = None
         self.latest_odom = None
+        self.latest_gps = None
+        self.latest_gps_received = 0.0
+        self.latest_prior = None
+        self.latest_prior_received = 0.0
         self.latest_image = None
         self.latest_image_header = None
         self.latest_image_odom = None
+        self.latest_image_prior = None
         self.latest_image_received = 0.0
         self.busy = threading.Lock()
 
@@ -94,8 +146,8 @@ class WildNavNode(Node):
             self.get_parameter('feature_backend').value,
             int(self.get_parameter('max_features').value),
             float(self.get_parameter('request_timeout_s').value),
-            self.origin_lat,
-            self.origin_lon)
+            initial_lat,
+            initial_lon)
 
         self.create_subscription(
             Image, self.get_parameter('image_topic').value,
@@ -109,6 +161,15 @@ class WildNavNode(Node):
         self.create_subscription(
             NavSatFix, self.get_parameter('gps_topic').value,
             self._on_gps, qos_profile_sensor_data)
+        self.create_subscription(
+            NavSatFix, self.get_parameter('prior_fix_topic').value,
+            self._on_prior, qos_profile_sensor_data)
+        self.create_subscription(
+            GeoPointStamped, self.get_parameter('origin_topic').value,
+            self._on_origin,
+            QoSProfile(depth=1,
+                       reliability=ReliabilityPolicy.RELIABLE,
+                       durability=DurabilityPolicy.TRANSIENT_LOCAL))
 
         self.fix_pub = self.create_publisher(
             NavSatFix, self.get_parameter('fix_topic').value, 10)
@@ -133,7 +194,14 @@ class WildNavNode(Node):
                 msg, desired_encoding='bgr8')
             self.latest_image_header = msg.header
             self.latest_image_odom = self.latest_odom
-            self.latest_image_received = time.monotonic()
+            # The search prior is taken when the image is, not when the
+            # slow matcher gets to it.
+            now = time.monotonic()
+            self.latest_image_prior = select_prior(
+                self.latest_prior, self.latest_prior_received,
+                self.latest_gps, self.latest_gps_received, now,
+                float(self.get_parameter('prior_timeout_s').value))
+            self.latest_image_received = now
         except Exception as exc:
             self.get_logger().warning(f'RGB conversion failed: {exc}')
 
@@ -144,16 +212,26 @@ class WildNavNode(Node):
         self.latest_odom = msg
 
     def _on_gps(self, msg):
-        if msg.status.status < NavSatStatus.STATUS_FIX:
+        self.latest_gps = msg
+        self.latest_gps_received = time.monotonic()
+
+    def _on_prior(self, msg):
+        self.latest_prior = msg
+        self.latest_prior_received = time.monotonic()
+
+    def _on_origin(self, msg):
+        origin = (msg.position.latitude, msg.position.longitude,
+                  msg.position.altitude)
+        if not all(math.isfinite(value) for value in origin):
             return
-        if self.origin_lat == 0.0 and self.origin_lon == 0.0:
-            self.origin_lat = msg.latitude
-            self.origin_lon = msg.longitude
-            self.origin_alt = msg.altitude
-            self.cache.set_origin(self.origin_lat, self.origin_lon)
+        if origin != self.origin:
             self.get_logger().info(
-                f'WildNav origin set from GPS: '
-                f'{self.origin_lat:.7f}, {self.origin_lon:.7f}')
+                f'EKF origin: {origin[0]:.7f}, {origin[1]:.7f}, '
+                f'{origin[2]:.2f} m')
+        self.origin = origin
+        if self.synthetic_anchor is None:
+            self.synthetic_anchor = origin[:2]
+            self.cache.set_origin(*self.synthetic_anchor)
 
     def _match_latest(self):
         if not self.busy.acquire(blocking=False):
@@ -161,7 +239,8 @@ class WildNavNode(Node):
         started = False
         try:
             if (self.latest_image is None or self.latest_image_odom is None or
-                    (self.origin_lat == 0.0 and self.origin_lon == 0.0)):
+                    self.latest_image_prior is None or
+                    (self.cache.synthetic and self.synthetic_anchor is None)):
                 self._publish_invalid(0, 0.0)
                 return
             if time.monotonic() - self.latest_image_received > float(
@@ -171,7 +250,8 @@ class WildNavNode(Node):
             worker = threading.Thread(
                 target=self._match_worker,
                 args=(self.latest_image.copy(), self.latest_image_header,
-                      self.latest_image_odom, self.camera_info),
+                      self.latest_image_odom, self.latest_image_prior,
+                      self.camera_info),
                 daemon=True)
             worker.start()
             started = True
@@ -179,16 +259,16 @@ class WildNavNode(Node):
             if not started:
                 self.busy.release()
 
-    def _match_worker(self, image, header, image_odom, camera_info):
+    def _match_worker(self, image, header, image_odom, prior, camera_info):
         try:
-            self._run_match(image, header, image_odom, camera_info)
+            self._run_match(image, header, image_odom, prior, camera_info)
         except Exception as exc:
             self.get_logger().warning(f'WildNav match failed: {exc}')
             self._publish_invalid(0, 0.0)
         finally:
             self.busy.release()
 
-    def _run_match(self, image, header, image_odom, camera_info):
+    def _run_match(self, image, header, image_odom, prior, camera_info):
         # A banked or pitched camera no longer looks at the nadir footprint
         # the tile match assumes; skip those frames (0 disables).
         max_attitude = math.radians(
@@ -219,13 +299,15 @@ class WildNavNode(Node):
             self._publish_invalid(0, 0.0)
             return
 
-        east = image_odom.pose.pose.position.x
-        north = image_odom.pose.pose.position.y
-        predicted_lat, predicted_lon = local_to_latlon(
-            east, north, self.origin_lat, self.origin_lon)
+        # Search about the prior, widened by its uncertainty.
+        predicted_lat, predicted_lon = prior.latitude, prior.longitude
+        base_radius = float(self.get_parameter('search_radius_m').value)
+        radius = search_radius(
+            prior, base_radius,
+            float(self.get_parameter('search_radius_sigma_scale').value),
+            float(self.get_parameter('max_search_radius_m').value))
         candidates = self.cache.candidate_tiles(
-            predicted_lat, predicted_lon,
-            float(self.get_parameter('search_radius_m').value),
+            predicted_lat, predicted_lon, radius,
             int(self.get_parameter('max_tiles').value))
 
         matcher = self.cache.matcher()
@@ -306,10 +388,13 @@ class WildNavNode(Node):
         matched_lat, matched_lon = tile_pixel_to_latlon(
             best['tile_x'], best['tile_y'],
             best['pixel'][0], best['pixel'][1], self.cache.zoom)
+        # The jump gate is measured from the same prior the search used and
+        # widens with it.
         displacement = horizontal_distance_m(
             predicted_lat, predicted_lon, matched_lat, matched_lon)
         if displacement > float(
-                self.get_parameter('max_position_jump_m').value):
+                self.get_parameter('max_position_jump_m').value) + (
+                    radius - base_radius):
             self.get_logger().warning(
                 f'Rejected WildNav jump of {displacement:.1f} m')
             self._publish_invalid(best['inliers'], best['confidence'])
@@ -318,6 +403,12 @@ class WildNavNode(Node):
         resolution = ground_resolution_m(matched_lat, self.cache.zoom)
         sigma = max(3.0, best['reprojection'] * resolution)
         variance = sigma * sigma
+        vertical_variance = prior.position_covariance[8]
+        if (prior.position_covariance_type ==
+                NavSatFix.COVARIANCE_TYPE_UNKNOWN or
+                not math.isfinite(vertical_variance) or
+                vertical_variance <= 0.0):
+            vertical_variance = image_odom.pose.covariance[14]
         confidence = float(np.clip(best['confidence'], 0.0, 1.0))
 
         fix = NavSatFix()
@@ -327,18 +418,29 @@ class WildNavNode(Node):
         fix.status.service = NavSatStatus.SERVICE_GPS
         fix.latitude = matched_lat
         fix.longitude = matched_lon
-        fix.altitude = self.origin_alt + image_odom.pose.pose.position.z
+        # The fix keeps the prior's altitude (and datum); it does not depend
+        # on the EKF origin, so it is published regardless.
+        fix.altitude = prior.altitude
         fix.position_covariance = [
             variance, 0.0, 0.0,
             0.0, variance, 0.0,
-            0.0, 0.0, image_odom.pose.covariance[14],
+            0.0, 0.0, vertical_variance,
         ]
         fix.position_covariance_type = NavSatFix.COVARIANCE_TYPE_DIAGONAL_KNOWN
 
-        metres_per_deg_lon = (
-            METERS_PER_DEG_LAT * math.cos(math.radians(self.origin_lat)))
-        matched_east = (matched_lon - self.origin_lon) * metres_per_deg_lon
-        matched_north = (matched_lat - self.origin_lat) * METERS_PER_DEG_LAT
+        self.confidence_pub.publish(Float32(data=confidence))
+        self.match_count_pub.publish(Int32(data=best['inliers']))
+        self.fix_pub.publish(fix)
+        self.get_logger().info(
+            f'WildNav fix {displacement:.1f} m from prediction, '
+            f'{best["inliers"]} inliers, confidence={confidence:.2f}')
+        if self.origin is None:
+            # Local corrections need the EKF origin.
+            self.valid_pub.publish(Bool(data=False))
+            return
+
+        matched_east, matched_north = latlon_to_local(
+            matched_lat, matched_lon, self.origin[0], self.origin[1])
         odom = Odometry()
         odom.header = copy.deepcopy(header)
         odom.header.frame_id = 'odom'
@@ -351,13 +453,7 @@ class WildNavNode(Node):
         odom.pose.covariance[7] = variance
 
         self.valid_pub.publish(Bool(data=True))
-        self.confidence_pub.publish(Float32(data=confidence))
-        self.match_count_pub.publish(Int32(data=best['inliers']))
-        self.fix_pub.publish(fix)
         self.odom_pub.publish(odom)
-        self.get_logger().info(
-            f'WildNav fix {displacement:.1f} m from prediction, '
-            f'{best["inliers"]} inliers, confidence={confidence:.2f}')
 
     def _publish_invalid(self, matches, confidence):
         self.valid_pub.publish(Bool(data=False))

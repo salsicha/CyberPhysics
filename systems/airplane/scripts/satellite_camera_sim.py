@@ -49,6 +49,9 @@ class SatelliteCameraSim(Node):
         self.declare_parameter("altitude_agl_m", 180.0)
         self.declare_parameter("groundspeed_mps", 24.0)
         self.declare_parameter("horizontal_fov_deg", 69.0)
+        # Heading of the image top relative to the nose, counter-clockwise
+        # seen from above (0 = image top toward the nose).
+        self.declare_parameter("camera_mount_yaw_deg", 0.0)
         self.declare_parameter("fallback_route_radius_m", 650.0)
 
         self.width = int(self.get_parameter("width").value)
@@ -61,6 +64,8 @@ class SatelliteCameraSim(Node):
         self.altitude_agl = float(self.get_parameter("altitude_agl_m").value)
         self.groundspeed = float(self.get_parameter("groundspeed_mps").value)
         self.fov = math.radians(float(self.get_parameter("horizontal_fov_deg").value))
+        self.camera_mount_yaw = math.radians(
+            float(self.get_parameter("camera_mount_yaw_deg").value))
         self.route_radius = float(self.get_parameter("fallback_route_radius_m").value)
         self.east_m = 0.0
         self.north_m = 0.0
@@ -133,7 +138,10 @@ class SatelliteCameraSim(Node):
         self.last_external_update = time.monotonic()
 
     def _camera_altitude(self) -> float:
-        """Camera altitude in the same datum as the GPS fix DemNav uses."""
+        """Camera altitude in the same datum as the GPS fix DemNav uses.
+        The synthetic world has no geoid: its terrain heights are in the
+        raw GPS altitude datum, so DemNav runs with gps_altitude_datum
+        msl against this sim."""
         if self.altitude_amsl is not None:
             return self.altitude_amsl
         terrain = float(terrain_height(self.east_m, self.north_m))
@@ -168,9 +176,12 @@ class SatelliteCameraSim(Node):
 
     def _ground_grid(self, width: int, height: int, view_height: float):
         """East/north metres seen by each pixel of the body-fixed nadir
-        camera (image up = vehicle forward). DemNav de-rotates frames by
-        -yaw before DEM correlation, so the rendered frame must be yawed
-        the same way the aerodrone sensor sim yaws its crops.
+        camera. The vehicle's ENU yaw (counter-clockwise from east) plus
+        the mount yaw is the ground heading of the image top; looking
+        straight down, image right is 90 deg clockwise of that (starboard
+        for a zero mount), so the frame is an unmirrored, rotated map view
+        and a vehicle heading north renders north-up. Pixel (width/2,
+        height/2) — the principal point in _camera_info — images the nadir.
 
         Only yaw is modelled: the camera is assumed roll/pitch-stabilised
         at nadir. The matchers gate on max_attitude_deg, so banked-turn
@@ -180,10 +191,12 @@ class SatelliteCameraSim(Node):
         dx = np.arange(width, dtype=np.float64) - width * 0.5
         dy = np.arange(height, dtype=np.float64) - height * 0.5
         dx_grid, dy_grid = np.meshgrid(dx, dy)
-        cos_yaw = math.cos(self.yaw_rad)
-        sin_yaw = math.sin(self.yaw_rad)
-        east = self.east_m + (cos_yaw * dx_grid - sin_yaw * dy_grid) * gsd
-        north = self.north_m - (sin_yaw * dx_grid + cos_yaw * dy_grid) * gsd
+        heading = self.yaw_rad + self.camera_mount_yaw
+        up_east, up_north = math.cos(heading), math.sin(heading)
+        right_east, right_north = up_north, -up_east
+        # Rows grow downward, i.e. away from the image top.
+        east = self.east_m + (right_east * dx_grid - up_east * dy_grid) * gsd
+        north = self.north_m + (right_north * dx_grid - up_north * dy_grid) * gsd
         return east, north
 
     def _make_image(self, width: int, height: int,

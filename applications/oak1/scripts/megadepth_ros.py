@@ -11,6 +11,25 @@ from cv_bridge import CvBridge
 from rclpy.node import Node
 from sensor_msgs.msg import CameraInfo, Image
 
+# OAK-1 (IMX378): 69 deg HFOV across the full 4056 px wide sensor. The
+# THE_1080_P stream is the central 3840x2160 binned by 2, and the preview
+# and still outputs keep their own aspect ratio by centre-cropping it.
+SENSOR_HFOV_DEG = 69.0
+SENSOR_WIDTH_PX = 4056
+
+
+def approximate_intrinsics(width, height):
+    """Uncalibrated pinhole K for a width x height preview/still of the
+    1080P stream. The 256x192 MegaDepth preview is a 4:3 crop, ~52 deg
+    wide, not the sensor's 69 deg."""
+    focal_1080 = (0.5 * SENSOR_WIDTH_PX /
+                  math.tan(math.radians(SENSOR_HFOV_DEG) / 2.0) *
+                  1920.0 / 3840.0)
+    focal = focal_1080 * max(width / 1920.0, height / 1080.0)
+    return [focal, 0.0, width / 2.0,
+            0.0, focal, height / 2.0,
+            0.0, 0.0, 1.0]
+
 
 class MegaDepthNode(Node):
     """Run MegaDepth on the OAK-1 Myriad X and publish relative depth."""
@@ -129,6 +148,7 @@ class MegaDepthNode(Node):
             socket = getattr(dai.CameraBoardSocket, 'CAM_A', None)
             if socket is None:
                 socket = dai.CameraBoardSocket.RGB
+            # keepAspectRatio (default) crops like the preview does.
             intrinsic = calibration.getCameraIntrinsics(
                 socket, width, height)
             distortion = calibration.getDistortionCoefficients(socket)
@@ -140,13 +160,7 @@ class MegaDepthNode(Node):
             info.d = list(distortion)
             info.distortion_model = 'plumb_bob'
         except Exception as exc:
-            horizontal_fov = math.radians(69.0)
-            focal = width / (2.0 * math.tan(horizontal_fov / 2.0))
-            info.k = [
-                focal, 0.0, width / 2.0,
-                0.0, focal, height / 2.0,
-                0.0, 0.0, 1.0,
-            ]
+            info.k = approximate_intrinsics(width, height)
             self.get_logger().warning(
                 f'Using approximate OAK-1 intrinsics: {exc}')
         return info

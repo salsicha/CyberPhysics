@@ -20,6 +20,46 @@ matched DEM window. It publishes:
 Metric output is rejected when terrain correlation or affine-fit support is
 insufficient. ArduPilot GPS/EKF remains the fallback localization source.
 
+## Frames, search prior and gating
+
+- **Origin.** `/demnav/odometry` and `/demnav/pose` are local ENU positions
+  about the autopilot's EKF origin, received on `origin_topic`
+  (`/navigation/origin`, `geographic_msgs/GeoPointStamped`, reliable +
+  transient-local). Until it arrives no local output is published and
+  `/demnav/valid` stays false; `/demnav/fix` (lat/lon) is published
+  regardless. `initial_lat`/`initial_lon` only pre-load the map (and anchor
+  the synthetic world).
+- **Search prior.** Each frame is searched about the fused fix on
+  `prior_fix_topic` (`/navigation/fix`) while it is newer than
+  `prior_timeout_s`, else a fresh raw GPS fix (`status >= STATUS_FIX`),
+  else the frame is skipped. The radius is
+  `clamp(search_radius_m + search_radius_sigma_scale * sigma,
+  search_radius_m, max_search_radius_m)`, sigma being the prior's larger
+  horizontal standard deviation.
+- **Camera.** The depth camera is body-fixed and looks straight down; with
+  `camera_mount_yaw_deg: 0` the top of the image points at the nose
+  (positive values turn it counter-clockwise seen from above). Frames are
+  de-rotated north-up from the odometry's ENU yaw. The ground sampling
+  distance comes from `camera_info` (scaled to the depth size); `fov_deg`
+  is only the fallback when no calibration is received.
+- **Height above ground.** A fresh, in-range downward rangefinder reading
+  (`rangefinder_topic`, `sensor_msgs/Range`) is preferred. Otherwise SRTM
+  heights are EGM96 mean sea level, so altitudes are converted first:
+  `gps_altitude_datum: ellipsoid` (MAVROS `global_position/global`)
+  subtracts the geoid height read from `geoid_file` (GeographicLib
+  `egm96-5.pgm`); `msl` uses the altitude as is. Without the geoid file the
+  node warns once and the height above ground is off by the local geoid
+  height (about -32 m at Mount Tamalpais).
+- **Ambiguity.** Besides `min_correlation`, a fix needs
+  `min_peak_uniqueness`: the best terrain look-alike more than a footprint
+  radius from the peak must leave clearly more depth variance unexplained
+  than the peak does. Repetitive or featureless terrain is rejected rather
+  than producing a confident fix hundreds of metres off.
+- **Map edge.** Search windows that leave the height map are rejected, and
+  the map is reloaded around the prior before the widest search window
+  would cross its edge (`area_km` should comfortably exceed
+  `max_search_radius_m`).
+
 The cache currently uses SRTM-class elevation data. DemNav rejects matches when
 the camera footprint spans fewer than `min_dem_footprint_pixels` DEM cells. At
 low altitude this generally requires a higher-resolution terrain source;

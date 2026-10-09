@@ -1,4 +1,4 @@
-ARG TAG=amd64
+ARG TAG=latest
 
 FROM salsicha/cyberphysics:aerostack2-${TAG} AS build
 
