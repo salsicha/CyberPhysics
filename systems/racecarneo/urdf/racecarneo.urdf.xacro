@@ -5,8 +5,11 @@
   it in compositions/racecarneo.yaml and racecarneo_hardware.yaml. Frame
   names match systems/racecarneo/config/topics.yaml.
 
-  The hardware offsets are the simulator bridge's long-standing values, not
-  measurements of a physical car; measure and update them for hardware.
+  The hardware offsets are nominal values for the build in
+  hardware/racecarneo.txt (1/10 Traxxas Slash 4x4-class chassis, base_link on
+  the ground under the chassis centre): RealSense on the front of the top deck
+  0.18 m forward and 0.22 m up, 2D lidar 0.08 m forward and 0.18 m up, IMU on
+  the compute deck 0.08 m up. Measure your build and update them.
   sim_geometry:=true selects the mounts of the RacecarSim v2.8.3 car, which
   is smaller (0.225 m wheelbase): read from its Racecar prefab
   (sharedassets2.assets), Lidar at (0, 1.25, 0) and ColorCamera/DepthCamera at

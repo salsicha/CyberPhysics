@@ -147,9 +147,11 @@ repository's URDF zero is the arm pointing straight up. The server maps
 `urdf_deg = sign * lerobot_deg + offset_deg` per joint and the gripper's
 `closed`/`open` readings to 0–0.04 m using
 `systems/so101/config/lerobot_joint_mapping.json` (`SMOLVLA_JOINT_MAPPING`). Its
-identity values are placeholders, not a calibration: measure the offsets and
-signs on your arm (pose it at known URDF angles and read LeRobot's degrees).
-The server warns while the mapping is the identity. A typical full fine-tune on a Hub dataset is:
+values are a nominal calibration derived from TheRobotStudio's
+`so101_new_calib.urdf` (whose zero is LeRobot's calibrated mid-range), not a
+measurement of your arm: verify the offsets and signs (pose it at known URDF
+angles and read LeRobot's degrees). The server warns if the mapping is the
+identity. A typical full fine-tune on a Hub dataset is:
 
 ```bash
 docker compose \

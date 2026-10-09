@@ -231,9 +231,11 @@ LeRobot's 0° is the middle of each joint's calibrated range; this URDF's zero i
 the arm pointing straight up. Arm joints are converted with
 `urdf_deg = sign * lerobot_deg + offset_deg` from
 `systems/so101/config/lerobot_joint_mapping.json` (override with
-`--joint-mapping CONTAINER_PATH`). Its identity values are placeholders until
-you measure your arm; converted values outside the URDF joint limits are
-rejected, and the mapping used is recorded in `meta/so101_units.json`.
+`--joint-mapping CONTAINER_PATH`). Its values are a nominal calibration derived
+from TheRobotStudio's `so101_new_calib.urdf` (whose zero is LeRobot's calibrated
+mid-range), not a measurement of your arm, so verify them; converted values
+outside the URDF joint limits are rejected, and the mapping used is recorded in
+`meta/so101_units.json`.
 
 Example:
 

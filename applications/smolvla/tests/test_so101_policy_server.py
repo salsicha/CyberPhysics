@@ -65,7 +65,10 @@ class SO101AdapterTest(unittest.TestCase):
             self.skipTest("repository systems/ directory is not mounted")
         mapping = server.load_joint_mapping(str(path))
         self.assertEqual(set(mapping["joints"]), set(server.ARM_JOINT_NAMES))
-        self.assertTrue(server.is_identity_mapping(mapping))
+        # Nominal calibration derived from so101_new_calib.urdf, not the identity placeholder.
+        self.assertFalse(server.is_identity_mapping(mapping))
+        self.assertEqual(mapping["joints"]["shoulder_pan"]["sign"], -1.0)
+        self.assertEqual(mapping["joints"]["elbow_flex"]["offset_deg"], 73.9)
 
     def test_lerobot_range_statistics_are_detected(self):
         # use_degrees=False data saturates at exactly +/-100 and never exceeds it.

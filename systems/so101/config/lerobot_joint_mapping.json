@@ -4,16 +4,23 @@
     "LeRobot's 0 deg is the middle of each joint's calibrated range; the URDF's 0 rad is the arm pointing straight up.",
     "For each arm joint: urdf_deg = sign * lerobot_deg + offset_deg (sign is +1 or -1).",
     "offset_deg is the URDF angle of the pose where LeRobot reports 0 deg; sign is -1 when the joint turns the opposite way.",
-    "These identity values are PLACEHOLDERS, not a calibration: measure them on your arm (e.g. pose it at known URDF angles and read LeRobot's degrees).",
+    "NOMINAL values, not a measurement of a specific arm. They come from TheRobotStudio's",
+    "Simulation/SO101/so101_new_calib.urdf, whose zero pose is LeRobot's calibrated mid-range: there the upper arm",
+    "leans 14.0 deg forward of vertical, the forearm points 87.9 deg from vertical and the wrist 90.0 deg, giving",
+    "pitch offsets 14.0, 73.9 and 2.1 deg in this URDF's straight-up convention. shoulder_pan (-Z vs +Z) and",
+    "wrist_roll (axis reversed) turn the opposite way. wrist_roll's zero cannot be derived because this URDF",
+    "models the gripper as a sliding jaw, so its offset is assumed 0.",
+    "Verify on your arm (pose it at known URDF angles and read LeRobot's degrees). Mapped values outside this",
+    "URDF's joint limits are rejected by normalize_so101_dataset.py.",
     "gripper.closed/open are LeRobot's 0-100 gripper readings at fully closed and at 0.04 m opening.",
     "LeRobot's default use_degrees=False (-100..100) data cannot be mapped without the arm's calibration file and is rejected."
   ],
   "joints": {
-    "shoulder_pan": {"sign": 1, "offset_deg": 0.0},
-    "shoulder_lift": {"sign": 1, "offset_deg": 0.0},
-    "elbow_flex": {"sign": 1, "offset_deg": 0.0},
-    "wrist_flex": {"sign": 1, "offset_deg": 0.0},
-    "wrist_roll": {"sign": 1, "offset_deg": 0.0}
+    "shoulder_pan": {"sign": -1, "offset_deg": 0.0},
+    "shoulder_lift": {"sign": 1, "offset_deg": 14.0},
+    "elbow_flex": {"sign": 1, "offset_deg": 73.9},
+    "wrist_flex": {"sign": 1, "offset_deg": 2.1},
+    "wrist_roll": {"sign": -1, "offset_deg": 0.0}
   },
   "gripper": {"closed": 0.0, "open": 100.0}
 }

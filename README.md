@@ -109,3 +109,7 @@ Restore the host when finished:
 ```bash
 cset shield --reset
 ```
+
+## License
+
+This repository's own code is MIT licensed (`LICENSE`). Third-party code and binaries committed here keep their own licenses, including GPL-3.0 (VINS-Mono) and AGPL-3.0 (whereami); see `THIRD_PARTY_NOTICES.md`.

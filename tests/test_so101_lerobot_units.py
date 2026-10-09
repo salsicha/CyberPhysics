@@ -70,11 +70,20 @@ def test_mapped_values_outside_urdf_limits_are_rejected():
                                    gripper_open_value=100.0, joint_mapping=mapping)
 
 
-def test_repository_mapping_file_loads_as_documented_identity():
+def test_repository_mapping_file_is_the_nominal_calibration():
+    """Offsets from so101_new_calib.urdf (zero = LeRobot mid-range); see the file's comment."""
     mapping = normalize.load_joint_mapping(MAPPING_FILE)
-    assert normalize.is_identity_mapping(mapping)
+    assert not normalize.is_identity_mapping(mapping)
     data = json.loads(MAPPING_FILE.read_text())
     assert set(data['joints']) == set(normalize.JOINT_NAMES[:5])
+    expected = {'shoulder_pan': (-1.0, 0.0), 'shoulder_lift': (1.0, 14.0),
+                'elbow_flex': (1.0, 73.9), 'wrist_flex': (1.0, 2.1), 'wrist_roll': (-1.0, 0.0)}
+    assert {name: (entry['sign'], entry['offset_deg']) for name, entry in mapping.items()} == expected
+    # LeRobot's calibration pose (all zeros, gripper closed) maps inside the URDF limits.
+    zero = np.hstack([np.zeros((1, 5)), gripper_column(1)])
+    output = normalize.transform_matrix(zero, input_units='degrees', gripper_closed_value=0.0,
+                                        gripper_open_value=100.0, joint_mapping=mapping)
+    np.testing.assert_allclose(output[0, :5], np.deg2rad([0.0, 14.0, 73.9, 2.1, 0.0]), atol=1e-6)
     bad = MAPPING_FILE.parent / 'does_not_exist.json'
     with pytest.raises(FileNotFoundError):
         normalize.load_joint_mapping(bad)

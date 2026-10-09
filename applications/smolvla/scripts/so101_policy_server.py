@@ -26,8 +26,8 @@ LEROBOT_RANGE_LIMIT = 100.0
 
 # Map LeRobot SO-101 degrees (zero = the calibration mid-range pose) to this
 # URDF (zero = arm straight up): urdf_deg = sign * lerobot_deg + offset_deg.
-# The identity default is a placeholder: measure offset_deg/sign on your arm
-# (see systems/so101/config/lerobot_joint_mapping.json).
+# Without a mapping file the identity is used; the nominal calibration lives in
+# systems/so101/config/lerobot_joint_mapping.json (verify it on your arm).
 IDENTITY_JOINT_MAPPING = {
     "joints": {name: {"sign": 1.0, "offset_deg": 0.0} for name in ARM_JOINT_NAMES},
     "gripper": {"closed": 0.0, "open": SO101_GRIPPER_MAX},

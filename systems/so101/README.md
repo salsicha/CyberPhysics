@@ -22,12 +22,15 @@ applications/so101/scripts/regenerate_urdf.sh
 ## GR00T Demo Camera
 
 The SO-101 URDF includes a fixed `groot_camera_link` and
-`groot_camera_rgb_optical_frame` mounted above and in front of the arm base. The
-Isaac demo publishes a synthetic RGB stream on `/so101/camera/image_raw` with
-`frame_id=groot_camera_rgb_optical_frame`, plus `/so101/camera/camera_info`, so
-the GR00T bridge can exercise the same ROS image path that a rendered or physical
-camera would use.
+`groot_camera_rgb_optical_frame`. The scenario's `camera` block
+(`scenarios/picking_table.json`) is the single source of the camera model: Isaac
+renders from it, `/so101/camera/camera_info` publishes its intrinsics (69° HFOV,
+640x480) and the URDF joint `base_to_groot_camera` must equal its pose
+(`validate_calibration_and_dataset.py` checks this).
 
-For production visual policy evaluation, replace the synthetic image publisher
-in the Isaac adapter with an Isaac camera render product using the same optical
-frame and topics.
+The same pose is the nominal mount for the physical rig: the camera sits
+0.17 m forward, 0.52 m to the right of and 0.47 m above `base_link`, pitched 45°
+down and yawed 83° to look across the table at the arm (xyz `0.17 -0.52 0.4665`,
+rpy `0 0.785 1.449`). It is a nominal value, not a measurement of a particular
+rig: after mounting a RealSense, measure its pose (e.g. with an AprilTag on the
+base) and update both the scenario and the URDF.
