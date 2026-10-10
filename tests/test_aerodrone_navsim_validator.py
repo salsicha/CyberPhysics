@@ -383,6 +383,25 @@ def test_healthy_stack_passes_and_stopping_demnav_is_named(monkeypatch):
     assert any('/demnav/valid' in line for line in validator.report(12.5))
 
 
+def test_demnav_confidence_is_required_only_with_demnav_matches(monkeypatch):
+    # DemNav publishes a confidence only for an accepted terrain match.
+    monkeypatch.setenv('INITIAL_LAT', '37.9234')
+    monkeypatch.setenv('INITIAL_LON', '-122.5967')
+    for argv, problems in (
+            ((), []),
+            (('--require-valid', 'demnav'),
+             ['DemNav confidence [/demnav/confidence]: missing: no message received'])):
+        _, validator = build(['--rangefinder-topic', '', *argv])
+        feed = Feed(validator)
+        feed.silent.add('/demnav/confidence')
+        for now in (0.0, 1.0):
+            feed.tick(now)
+        assert validator.problems(1.0) == problems
+        assert by_label(validator)['WildNav confidence'].required
+        validator.observe(by_label(validator)['DemNav confidence'], scalar(1.5), 1.0)
+        assert 'outside [0, 1]' in validator.problems(1.0)[0]
+
+
 def test_missing_topics_say_whether_anything_publishes_them():
     _, validator = build(['--depth-topic', '/typo'])
     problems = validator.problems(1.0, publishers=lambda topic: 0 if topic == '/typo' else 1)

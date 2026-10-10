@@ -241,9 +241,10 @@ services:
     #   docker compose -f compositions/aerostack2_genesis.yaml --profile validation up
     # Raw MAVROS GPS/odometry/IMU, downward camera and depth, the latched
     # /navigation/origin, fused odometry/fix, DemNav/WildNav streams and the
-    # Aerostack2 + MAVROS TF. DemNav first matches during the mission's climb
-    # (its footprint needs about 40 m AGL), hence the long timeout. No
-    # simulated rangefinder in this stack.
+    # Aerostack2 + MAVROS TF. A DemNav match is required only with
+    # NAVSIM_REQUIRE_VALID=demnav: at this mission's 35-75 m AGL the depth
+    # footprint is too small for a unique DEM match. No simulated
+    # rangefinder in this stack.
     profiles: ["validation"]
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
     network_mode: host

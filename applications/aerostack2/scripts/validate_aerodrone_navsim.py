@@ -618,9 +618,11 @@ def build_validator(args):
             ('demnav', 'DemNav', args.demnav_prefix, fresh),
             ('wildnav', 'WildNav', args.wildnav_prefix, wildnav_fresh)):
         valid = add(f'{label} valid', f'{prefix}/valid', 'bool', None, freshness)
-        # DemNav publishes confidence only for a terrain correlation.
+        # DemNav publishes confidence only for an accepted terrain match, so
+        # it is required only when DemNav matches are (--require-valid).
         add(f'{label} confidence', f'{prefix}/confidence', 'float32',
-            check_confidence, freshness=None)
+            check_confidence, freshness=None,
+            required=name != 'demnav' or name in args.require_valid)
         add(f'{label} fix', f'{prefix}/fix', 'navsatfix',
             partial(check_navsatfix, require_covariance=True),
             freshness=None, required=False)
