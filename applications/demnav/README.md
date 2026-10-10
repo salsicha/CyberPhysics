@@ -36,12 +36,32 @@ insufficient. ArduPilot GPS/EKF remains the fallback localization source.
   `clamp(search_radius_m + search_radius_sigma_scale * sigma,
   search_radius_m, max_search_radius_m)`, sigma being the prior's larger
   horizontal standard deviation.
-- **Camera.** The depth camera is body-fixed and looks straight down; with
-  `camera_mount_yaw_deg: 0` the top of the image points at the nose
-  (positive values turn it counter-clockwise seen from above). Frames are
-  de-rotated north-up from the odometry's ENU yaw. The ground sampling
-  distance comes from `camera_info` (scaled to the depth size); `fov_deg`
-  is only the fallback when no calibration is received.
+- **Camera and fix point.** The depth camera looks down the body -z axis;
+  with `camera_mount_yaw_deg: 0` the top of the image points at the nose
+  (positive values turn it counter-clockwise seen from above). It is
+  body-fixed, so banked or pitched it looks h * tan(tilt) away from the
+  vehicle; `camera_stabilized: true` declares a roll/pitch-stabilised
+  camera that only turns with the heading (the Genesis and
+  `satellite_camera_sim` cameras). Each frame is projected north-up onto
+  the DEM grid through its ray geometry on flat ground (`terrain_match.py`,
+  `camera_geometry.py`), using the full odometry attitude interpolated to
+  the frame stamp (simulator-time stamps are mapped onto MAVROS wall time
+  through `/clock`; a frame without odometry within
+  `max_attitude_offset_s` is skipped). The template's anchor is the point
+  below the vehicle, so the fix is the vehicle's horizontal position, not
+  where the optical axis meets the ground. With `depth_is_metric: true`
+  (simulator depth cameras) the range along the tilted view is first
+  turned into height below the camera; relative depth (the OAK-1 network
+  output) is matched as is, so tilt adds a false slope to it and
+  `max_attitude_deg` still bounds the attitude matched. The ground
+  sampling distance comes from `camera_info` (scaled to the depth size);
+  `fov_deg` is only the fallback when no calibration is received.
+- **Covariance.** The horizontal standard deviation combines the matching
+  term `max(dem_resolution_m, search_radius_m * (1 - confidence))`, the
+  attitude uncertainty `attitude_sigma_deg` (EKF and camera mount) times
+  the height above ground, and the attitude and position change over the
+  stamp uncertainty `stamp_sigma_s` (and over the gap to the odometry
+  sample used, when it could not be interpolated).
 - **Height above ground.** A fresh, in-range downward rangefinder reading
   (`rangefinder_topic`, `sensor_msgs/Range`) is preferred. Otherwise SRTM
   heights are EGM96 mean sea level, so altitudes are converted first:
@@ -63,8 +83,9 @@ insufficient. ArduPilot GPS/EKF remains the fallback localization source.
 The cache currently uses SRTM-class elevation data. DemNav rejects matches when
 the camera footprint spans fewer than `min_dem_footprint_pixels` DEM cells. At
 low altitude this generally requires a higher-resolution terrain source;
-changing `dem_resolution_m` cannot create source detail. The current projection
-also assumes a near-nadir camera and modest roll/pitch.
+changing `dem_resolution_m` cannot create source detail. The projection treats
+the footprint as flat ground at the height above ground below the vehicle, so
+steep relief across an oblique footprint still blurs the template.
 
 ## Build-time cache seeding
 

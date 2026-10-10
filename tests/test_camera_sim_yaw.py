@@ -115,9 +115,9 @@ def test_footprint_scales_with_view_height():
 
 
 def test_attitude_helpers_match_euler_convention():
-    """Quaternion helpers in the matcher nodes recover ZYX Euler angles."""
-    from demnav_pkg import demnav_node
-    from wildnav_pkg import wildnav_node
+    """Quaternion helpers of the matcher nodes recover ZYX Euler angles."""
+    from demnav_pkg import camera_geometry as demnav_geometry
+    from wildnav_pkg import camera_geometry as wildnav_geometry
 
     roll, pitch, yaw = math.radians(20.0), math.radians(-10.0), \
         math.radians(30.0)
@@ -131,9 +131,10 @@ def test_attitude_helpers_match_euler_convention():
     q.y = cr * sp * cy + sr * cp * sy
     q.z = cr * cp * sy - sr * sp * cy
 
-    for module in (demnav_node, wildnav_node):
-        got_roll, got_pitch = module._roll_pitch_from_quaternion(q)
+    for module in (demnav_geometry, wildnav_geometry):
+        quaternion = (q.x, q.y, q.z, q.w)
+        got_roll, got_pitch = module.roll_pitch_rad(quaternion)
         assert got_roll == pytest.approx(roll, abs=1e-9)
         assert got_pitch == pytest.approx(pitch, abs=1e-9)
-    assert demnav_node._yaw_from_quaternion(q) == pytest.approx(
-        yaw, abs=1e-9)
+        assert module.heading_rad(module.quaternion_matrix(
+            *quaternion)) == pytest.approx(yaw, abs=1e-9)

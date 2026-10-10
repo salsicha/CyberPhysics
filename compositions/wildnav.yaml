@@ -39,3 +39,4 @@ services:
         min_matches:=${WILDNAV_MIN_MATCHES:-16}
         min_inliers:=${WILDNAV_MIN_INLIERS:-10}
         min_inlier_ratio:=${WILDNAV_MIN_INLIER_RATIO:-0.25}
+        camera_mount_yaw_deg:=${CAMERA_MOUNT_YAW_DEG:-0.0}

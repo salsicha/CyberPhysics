@@ -8,11 +8,18 @@ import math
 import cv2
 import numpy as np
 
+from .camera_geometry import ground_projection
+
+# Largest template side (DEM cells): a camera looking near the horizon
+# would need an unbounded canvas.
+MAX_TEMPLATE_CELLS = 4096
+
 
 def derotation_angle_deg(yaw_rad: float, camera_mount_yaw_rad: float = 0.0
                          ) -> float:
     """cv2 rotation angle (degrees, counter-clockwise positive) that turns a
-    body-fixed nadir frame north-up.
+    body-fixed nadir frame north-up in level flight (ground_template's
+    projection reduces to this rotation when roll and pitch are zero).
 
     Looking straight down, the image top points along the ground heading
     yaw + mount (ENU, counter-clockwise from east) and image right 90 deg
@@ -22,46 +29,75 @@ def derotation_angle_deg(yaw_rad: float, camera_mount_yaw_rad: float = 0.0
     return math.degrees(yaw_rad + camera_mount_yaw_rad) - 90.0
 
 
-def north_up_template(depth: np.ndarray, valid: np.ndarray,
-                      angle_deg: float, principal_point: tuple[float, float],
-                      metres_per_px: tuple[float, float], cell_m: float):
+def height_below_camera(depth: np.ndarray, rotation: np.ndarray,
+                        intrinsics: tuple[float, float, float, float]
+                        ) -> np.ndarray:
+    """Metric depth along the optical axis (z-depth) to height below the
+    camera, with the world <- optical rotation at the frame time. A tilted
+    camera's z-depth of flat ground ramps across the frame; this height
+    does not. Level, it equals the depth."""
+    fx, fy, cx, cy = intrinsics
+    img_h, img_w = depth.shape
+    cols = (np.arange(img_w, dtype=np.float64) - cx) / fx
+    rows = (np.arange(img_h, dtype=np.float64) - cy) / fy
+    # -z (down) component of each pixel's ray, scaled to unit z-depth.
+    down = -(rotation[2, 0] * cols[None, :] + rotation[2, 1] * rows[:, None] +
+             rotation[2, 2])
+    return (depth * down).astype(np.float32)
+
+
+def ground_template(depth: np.ndarray, valid: np.ndarray,
+                    rotation: np.ndarray,
+                    intrinsics: tuple[float, float, float, float],
+                    height_m: float, cell_m: float):
     """Resample a depth frame onto the north-up DEM grid.
 
-    One affine takes each depth pixel to metres from the principal point
-    (the nadir of a nadir camera; per-axis focal lengths), rotates by
-    angle_deg and scales to DEM cells. The canvas holds the whole rotated
-    footprint so no depth is cut off; the returned mask marks cells that
-    came from valid pixels, which keeps the fill out of the correlation.
+    Each depth pixel goes where its ray meets flat ground height_m below
+    the camera (camera_geometry.ground_projection with the world <- optical
+    rotation at the frame time), in DEM cells east and north of the point
+    below the camera. A banked or pitched camera therefore keeps its true
+    footprint, and the anchor is the point below the vehicle, not where the
+    optical axis meets the ground. The canvas holds the whole footprint so
+    no depth is cut off; the returned mask marks cells that came from valid
+    pixels, which keeps the fill out of the correlation.
 
     Returns (template, mask, anchor) with anchor the (row, col) template
-    coordinate of the principal point. Coordinates are pixel centres, as
-    in cv2 and ROS CameraInfo."""
+    coordinate of the point below the camera, or None when the footprint
+    is unbounded (a corner at or above the horizon). Coordinates are pixel
+    centres, as in cv2 and ROS CameraInfo."""
     img_h, img_w = depth.shape
-    theta = math.radians(angle_deg)
-    # cv2 convention: counter-clockwise as displayed, rows growing down.
-    rotation = np.array([[math.cos(theta), math.sin(theta)],
-                         [-math.sin(theta), math.cos(theta)]])
-    linear = rotation @ np.diag(metres_per_px) / cell_m
-    principal = np.asarray(principal_point, dtype=np.float64)
-    corners = np.array([[-0.5, -0.5], [img_w - 0.5, -0.5],
-                        [-0.5, img_h - 0.5], [img_w - 0.5, img_h - 0.5]])
-    mapped = (corners - principal) @ linear.T
-    lower = mapped.min(axis=0)
-    size = np.maximum(3, np.ceil(mapped.max(axis=0) - lower)).astype(int)
+    fx, fy = intrinsics[0], intrinsics[1]
+    projection = ground_projection(rotation, intrinsics, height_m)
+    corners = np.array([[-0.5, img_w - 0.5, -0.5, img_w - 0.5],
+                        [-0.5, -0.5, img_h - 0.5, img_h - 0.5],
+                        [1.0, 1.0, 1.0, 1.0]])
+    mapped = projection @ corners
+    if np.any(mapped[2] <= 1e-9):
+        return None
+    # Template columns grow east, rows south (north-up).
+    cells = np.vstack((mapped[0] / mapped[2], -mapped[1] / mapped[2])) / cell_m
+    lower = cells.min(axis=1)
+    size = np.maximum(3, np.ceil(cells.max(axis=1) - lower)).astype(int)
+    if size.max() > MAX_TEMPLATE_CELLS:
+        return None
     offset = -0.5 - lower
-    matrix = np.hstack((linear, (offset - linear @ principal)[:, None]))
+    to_cells = np.array([[1.0 / cell_m, 0.0, offset[0]],
+                         [0.0, -1.0 / cell_m, offset[1]],
+                         [0.0, 0.0, 1.0]])
+    matrix = to_cells @ projection
 
     fill_value = float(np.median(depth[valid])) if valid.any() else 0.0
     source = np.where(valid, depth, fill_value).astype(np.float32)
-    # Anti-alias before sampling every few pixels.
-    sigma = 0.5 * cell_m / min(metres_per_px)
+    # Anti-alias before sampling every few pixels (ground sampling below
+    # the camera; it only coarsens away from it).
+    sigma = 0.5 * cell_m * max(fx, fy) / height_m
     if sigma > 0.5:
         source = cv2.GaussianBlur(source, (0, 0), sigma)
     size = (int(size[0]), int(size[1]))
-    template = cv2.warpAffine(
+    template = cv2.warpPerspective(
         source, matrix, size, flags=cv2.INTER_LINEAR,
         borderMode=cv2.BORDER_CONSTANT, borderValue=fill_value)
-    mask = cv2.warpAffine(
+    mask = cv2.warpPerspective(
         valid.astype(np.float32), matrix, size, flags=cv2.INTER_LINEAR,
         borderMode=cv2.BORDER_CONSTANT, borderValue=0.0) > 0.99
     return template, mask, (float(offset[1]), float(offset[0]))

@@ -17,20 +17,67 @@ from rclpy.qos import (
     ReliabilityPolicy,
     qos_profile_sensor_data,
 )
+from rosgraph_msgs.msg import Clock
 from sensor_msgs.msg import CameraInfo, Image, NavSatFix, NavSatStatus
 from std_msgs.msg import Bool, Float32, Int32
 
 from synthetic_world import METERS_PER_DEG_LAT, latlon_to_local
 
+from .camera_geometry import (
+    AttitudeHistory,
+    camera_rotation,
+    horizontal_sigma,
+    nadir_pixel,
+    roll_pitch_rad,
+    stamp_ns,
+)
 from .satellite_cache import SatelliteTileCache
 from .satellite_cache import ground_resolution_m, tile_pixel_to_latlon
 
 
-def _roll_pitch_from_quaternion(q):
-    roll = math.atan2(2.0 * (q.w * q.x + q.y * q.z),
-                      1.0 - 2.0 * (q.x * q.x + q.y * q.y))
-    sin_pitch = max(-1.0, min(1.0, 2.0 * (q.w * q.y - q.z * q.x)))
-    return roll, math.asin(sin_pitch)
+def _flag(value):
+    """A boolean parameter that launch files may pass as a string."""
+    if isinstance(value, bool):
+        return value
+    return str(value).lower() in ('1', 'true', 'yes', 'on')
+
+
+def gray_intrinsics(camera_info, width, height, scale, fov_deg):
+    """(fx, fy, cx, cy) of the matched (undistorted, scaled) image: the
+    calibration scaled to it, else a centred pinhole with fov_deg across
+    the width."""
+    if (camera_info is not None and camera_info.k[0] > 0.0 and
+            camera_info.k[4] > 0.0):
+        k = camera_info.k
+        sx = sy = scale
+        if camera_info.width > 0 and camera_info.height > 0:
+            sx = width / float(camera_info.width)
+            sy = height / float(camera_info.height)
+        return (k[0] * sx, k[4] * sy, (k[2] + 0.5) * sx - 0.5,
+                (k[5] + 0.5) * sy - 0.5)
+    focal = width / (2.0 * math.tan(math.radians(fov_deg) / 2.0))
+    return focal, focal, width / 2.0, height / 2.0
+
+
+def height_above_ground(homography, pixel, rotation, intrinsics,
+                        metres_per_tile_px):
+    """Height of the camera above the ground point at pixel (the point
+    below the vehicle), from the matched image-to-tile scale there: a
+    vertical ray at h metres samples h * cos(a)^1.5 / f metres per pixel
+    (geometric mean), a being the ray's angle off the optical axis."""
+    u, v = pixel
+    h = homography
+    w = h[2, 0] * u + h[2, 1] * v + h[2, 2]
+    x = (h[0, 0] * u + h[0, 1] * v + h[0, 2]) / w
+    y = (h[1, 0] * u + h[1, 1] * v + h[1, 2]) / w
+    jacobian = np.array([
+        [h[0, 0] - x * h[2, 0], h[0, 1] - x * h[2, 1]],
+        [h[1, 0] - y * h[2, 0], h[1, 1] - y * h[2, 1]]]) / w
+    metres_per_px = math.sqrt(abs(np.linalg.det(jacobian))) * (
+        metres_per_tile_px)
+    cos_off_axis = float((rotation.T @ np.array([0.0, 0.0, -1.0]))[2])
+    focal = math.sqrt(intrinsics[0] * intrinsics[1])
+    return focal * metres_per_px / max(cos_off_axis, 1e-3) ** 1.5
 
 
 def horizontal_distance_m(lat_a, lon_a, lat_b, lon_b):
@@ -110,6 +157,19 @@ class WildNavNode(Node):
             'max_image_age_s': 10.0,
             'request_timeout_s': 5.0,
             'max_attitude_deg': 20.0,
+            # Camera extrinsics (camera_geometry.py): image-top heading from
+            # the nose (counter-clockwise, degrees) and whether the camera is
+            # roll/pitch-stabilised instead of body-fixed.
+            'camera_mount_yaw_deg': 0.0,
+            'camera_stabilized': False,
+            # Horizontal field of view when no camera_info is received.
+            'fov_deg': 69.0,
+            # Fix covariance: attitude (EKF and camera mount) and camera
+            # stamp uncertainty.
+            'attitude_sigma_deg': 1.0,
+            'stamp_sigma_s': 0.05,
+            'max_attitude_offset_s': 0.25,
+            'sim_clock_topic': '/clock',
         }
         for name, value in defaults.items():
             self.declare_parameter(name, value)
@@ -128,6 +188,13 @@ class WildNavNode(Node):
         self.bridge = CvBridge()
         self.camera_info = None
         self.latest_odom = None
+        # Vehicle attitude by odometry stamp, looked up at each image stamp.
+        self.attitude = AttitudeHistory(max_offset_s=float(
+            self.get_parameter('max_attitude_offset_s').value))
+        self.camera_mount_yaw_rad = math.radians(
+            float(self.get_parameter('camera_mount_yaw_deg').value))
+        self.camera_stabilized = _flag(
+            self.get_parameter('camera_stabilized').value)
         self.latest_gps = None
         self.latest_gps_received = 0.0
         self.latest_prior = None
@@ -158,6 +225,10 @@ class WildNavNode(Node):
         self.create_subscription(
             Odometry, self.get_parameter('odom_topic').value,
             self._on_odom, qos_profile_sensor_data)
+        clock_topic = str(self.get_parameter('sim_clock_topic').value or '')
+        if clock_topic:
+            self.create_subscription(
+                Clock, clock_topic, self._on_clock, qos_profile_sensor_data)
         self.create_subscription(
             NavSatFix, self.get_parameter('gps_topic').value,
             self._on_gps, qos_profile_sensor_data)
@@ -210,6 +281,17 @@ class WildNavNode(Node):
 
     def _on_odom(self, msg):
         self.latest_odom = msg
+        q = msg.pose.pose.orientation
+        angular, linear = msg.twist.twist.angular, msg.twist.twist.linear
+        self.attitude.add(
+            stamp_ns(msg.header.stamp), (q.x, q.y, q.z, q.w),
+            math.sqrt(angular.x ** 2 + angular.y ** 2 + angular.z ** 2),
+            math.sqrt(linear.x ** 2 + linear.y ** 2 + linear.z ** 2))
+
+    def _on_clock(self, msg):
+        # Simulators stamp camera frames in simulator time, MAVROS odometry
+        # in wall time.
+        self.attitude.add_clock(stamp_ns(msg.clock), time.time_ns())
 
     def _on_gps(self, msg):
         self.latest_gps = msg
@@ -269,13 +351,20 @@ class WildNavNode(Node):
             self.busy.release()
 
     def _run_match(self, image, header, image_odom, prior, camera_info):
-        # A banked or pitched camera no longer looks at the nadir footprint
-        # the tile match assumes; skip those frames (0 disables).
+        # The camera pose at the image's own timestamp.
+        attitude = self.attitude.at(stamp_ns(header.stamp))
+        if attitude is None:
+            self.get_logger().warning(
+                'No odometry attitude at the image time — skipping',
+                throttle_duration_sec=10.0)
+            self._publish_invalid(0, 0.0)
+            return
+        # A steeply banked or pitched view is too oblique for the tile
+        # match; skip those frames (0 disables).
         max_attitude = math.radians(
             float(self.get_parameter('max_attitude_deg').value))
         if max_attitude > 0.0:
-            roll, pitch = _roll_pitch_from_quaternion(
-                image_odom.pose.pose.orientation)
+            roll, pitch = roll_pitch_rad(attitude.quaternion)
             if abs(roll) > max_attitude or abs(pitch) > max_attitude:
                 self.get_logger().debug(
                     'Attitude beyond max_attitude_deg — '
@@ -288,11 +377,25 @@ class WildNavNode(Node):
             image = cv2.undistort(image, matrix, distortion)
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         max_dimension = max(gray.shape)
+        scale = 1.0
         if max_dimension > 800:
             scale = 800.0 / max_dimension
             gray = cv2.resize(
                 gray, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
         gray = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8)).apply(gray)
+
+        # The pixel looking straight down: the homography takes it to the
+        # point below the vehicle (yaw and height are not needed for that).
+        intrinsics = gray_intrinsics(
+            camera_info, gray.shape[1], gray.shape[0], scale,
+            float(self.get_parameter('fov_deg').value))
+        rotation = camera_rotation(
+            attitude.quaternion, self.camera_mount_yaw_rad,
+            self.camera_stabilized)
+        nadir = nadir_pixel(rotation, intrinsics)
+        if nadir is None:
+            self._publish_invalid(0, 0.0)
+            return
 
         query_points, query_descriptors = self.cache.describe(gray)
         if query_descriptors is None:
@@ -378,16 +481,25 @@ class WildNavNode(Node):
                     'reprojection': reprojection,
                     'tile_x': tile_x,
                     'tile_y': tile_y,
-                    'pixel': tile_center,
+                    'homography': homography,
                 }
 
         if best is None:
             self._publish_invalid(0, 0.0)
             return
 
+        # The vehicle's position: where the matched geometry puts the
+        # nadir pixel (not the image centre, which a tilted camera points
+        # away from the vehicle).
+        vehicle_pixel = cv2.perspectiveTransform(
+            np.asarray([[nadir]], dtype=np.float64),
+            best['homography'])[0, 0]
+        if not np.all(np.isfinite(vehicle_pixel)):
+            self._publish_invalid(best['inliers'], best['confidence'])
+            return
         matched_lat, matched_lon = tile_pixel_to_latlon(
             best['tile_x'], best['tile_y'],
-            best['pixel'][0], best['pixel'][1], self.cache.zoom)
+            vehicle_pixel[0], vehicle_pixel[1], self.cache.zoom)
         # The jump gate is measured from the same prior the search used and
         # widens with it.
         displacement = horizontal_distance_m(
@@ -400,8 +512,21 @@ class WildNavNode(Node):
             self._publish_invalid(best['inliers'], best['confidence'])
             return
 
+        # Matching error, plus the attitude and timing errors, which move
+        # the nadir pixel by about height x angle.
         resolution = ground_resolution_m(matched_lat, self.cache.zoom)
-        sigma = max(3.0, best['reprojection'] * resolution)
+        height = height_above_ground(
+            best['homography'], nadir, rotation, intrinsics, resolution)
+        if not (math.isfinite(height) and height > 0.0):
+            self._publish_invalid(best['inliers'], best['confidence'])
+            return
+        sigma = horizontal_sigma(
+            max(3.0, best['reprojection'] * resolution), height,
+            math.radians(float(
+                self.get_parameter('attitude_sigma_deg').value)),
+            attitude.rate, attitude.speed,
+            float(self.get_parameter('stamp_sigma_s').value),
+            attitude.offset_s)
         variance = sigma * sigma
         vertical_variance = prior.position_covariance[8]
         if (prior.position_covariance_type ==

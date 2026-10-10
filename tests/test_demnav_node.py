@@ -1,8 +1,10 @@
 """DemNav node behaviour on the synthetic world, driven through its real
 __init__ and callbacks with ROS stubbed out.
 
-Depth frames are rendered with the airplane camera sim's body-fixed nadir
-camera model (pinned against the physical model in test_camera_sim_yaw).
+Level depth frames are rendered with the airplane camera sim's nadir
+camera model (pinned against the physical model in test_camera_sim_yaw);
+banked and pitched ones by ray casting the synthetic terrain from a
+body-fixed camera.
 """
 import importlib
 import math
@@ -20,6 +22,8 @@ from conftest import REPO, ROS_MODULES, install_ros_stubs, load_script
 ORIGIN = (37.9234, -122.5967)
 FOV_DEG = 69.0
 WIDTH, HEIGHT = 160, 120
+# Frame and odometry stamp (MAVROS and camera both on wall time).
+STAMP = NS(sec=1_791_600_000, nanosec=0)
 
 
 class FakeNode:
@@ -139,10 +143,21 @@ def camera_info(width=WIDTH, height=HEIGHT, fov_deg=FOV_DEG):
               k=[focal, 0, width / 2, 0, focal, height / 2, 0, 0, 1])
 
 
-def odometry(yaw):
-    return NS(pose=NS(pose=NS(orientation=NS(
-        x=0.0, y=0.0, z=math.sin(yaw / 2), w=math.cos(yaw / 2)))),
-        twist=NS())
+def euler_quaternion(roll, pitch, yaw):
+    """(x, y, z, w) of ZYX Euler angles in radians."""
+    cr, sr = math.cos(roll / 2), math.sin(roll / 2)
+    cp, sp = math.cos(pitch / 2), math.sin(pitch / 2)
+    cy, sy = math.cos(yaw / 2), math.sin(yaw / 2)
+    return (sr * cp * cy - cr * sp * sy, cr * sp * cy + sr * cp * sy,
+            cr * cp * sy - sr * sp * cy, cr * cp * cy + sr * sp * sy)
+
+
+def odometry(yaw, roll=0.0, pitch=0.0, stamp=STAMP):
+    x, y, z, w = euler_quaternion(roll, pitch, yaw)
+    zero = NS(x=0.0, y=0.0, z=0.0)
+    return NS(header=NS(stamp=stamp),
+              pose=NS(pose=NS(orientation=NS(x=x, y=y, z=z, w=w))),
+              twist=NS(twist=NS(linear=zero, angular=zero)))
 
 
 def fix_at(east, north, altitude, **kwargs):
@@ -150,12 +165,14 @@ def fix_at(east, north, altitude, **kwargs):
                      **kwargs)
 
 
-def frame(node, depth, yaw, prior=None, gps=None, info=True):
+def frame(node, depth, yaw, prior=None, gps=None, info=True, roll=0.0,
+          pitch=0.0, odom=True):
     """Feed one depth frame; return what the node published for it."""
     for publisher in node.pubs.values():
         publisher.reset_mock()
     node.bridge.reset_mock()
-    node.subs['/odom'](odometry(yaw))
+    if odom:
+        node.subs['/odom'](odometry(yaw, roll, pitch))
     if info:
         node.subs['/oak1/camera_info'](camera_info())
     if prior is not None:
@@ -163,16 +180,18 @@ def frame(node, depth, yaw, prior=None, gps=None, info=True):
     if gps is not None:
         node.subs['/fix'](gps)
     node.bridge.imgmsg_to_cv2.return_value = depth
-    node.subs['/oak1/relative_depth'](NS(header=NS(stamp=1)))
+    node.subs['/oak1/relative_depth'](NS(header=NS(stamp=STAMP)))
 
     def sent(topic):
         return [c.args[0] for c in node.pubs[topic].publish.call_args_list]
     valid = sent('/demnav/valid')
     fixes = sent('/demnav/fix')
     metric = node.bridge.cv2_to_imgmsg.call_args_list
+    confidence = sent('/demnav/confidence')
     return NS(valid=valid[-1].data if valid else None,
               fix=fixes[-1] if fixes else None,
               odometry=sent('/demnav/odometry'),
+              confidence=confidence[-1].data if confidence else None,
               metric_depth=metric[0].args[0] if metric else None)
 
 
@@ -331,10 +350,10 @@ def test_search_follows_the_fused_prior_and_skips_stale_inputs(
     # Stale fused prior and stale GPS: no search at all.
     node.latest_prior_received = time.monotonic() - 10.0
     node.latest_gps_received = time.monotonic() - 10.0
-    node.subs['/oak1/relative_depth'](NS(header=NS(stamp=1)))
+    node.subs['/oak1/relative_depth'](NS(header=NS(stamp=STAMP)))
     assert node.pubs['/demnav/valid'].publish.call_args.args[0].data is False
     node.pubs['/demnav/fix'].publish.reset_mock()
-    node.subs['/oak1/relative_depth'](NS(header=NS(stamp=1)))
+    node.subs['/oak1/relative_depth'](NS(header=NS(stamp=STAMP)))
     node.pubs['/demnav/fix'].publish.assert_not_called()
 
 
@@ -375,15 +394,15 @@ def test_window_crossing_the_edge_is_rejected_without_reload(
 
 @pytest.fixture
 def scale_spy(dn, monkeypatch):
-    """Records the metres-per-pixel the template was built with."""
+    """Records the metres-per-pixel below the camera the template was built
+    with (height above ground over the focal lengths)."""
     calls = []
-    original = dn.north_up_template
+    original = dn.ground_template
 
-    def spy(depth, valid, angle_deg, principal_point, metres_per_px, cell_m):
-        calls.append(metres_per_px)
-        return original(depth, valid, angle_deg, principal_point,
-                        metres_per_px, cell_m)
-    monkeypatch.setattr(dn, 'north_up_template', spy)
+    def spy(depth, valid, rotation, intrinsics, height_m, cell_m):
+        calls.append((height_m / intrinsics[0], height_m / intrinsics[1]))
+        return original(depth, valid, rotation, intrinsics, height_m, cell_m)
+    monkeypatch.setattr(dn, 'ground_template', spy)
     return calls
 
 
@@ -494,3 +513,129 @@ def test_widest_search_never_below_base_radius(make_node):
     # for map-edge planning too.
     node = make_node(search_radius_m=900.0, max_search_radius_m=600.0)
     assert node.max_search_radius_m == 900.0
+
+
+def shifted(stamp, seconds):
+    total = stamp.sec * 1_000_000_000 + stamp.nanosec + int(seconds * 1e9)
+    return NS(sec=total // 1_000_000_000, nanosec=total % 1_000_000_000)
+
+
+def render_tilted(east, north, roll, pitch, yaw, mount_deg=0.0, agl=180.0):
+    """Metric z-depth seen by a body-fixed camera at this attitude (ray cast
+    over the synthetic terrain), the camera's MSL altitude, and where the
+    optical axis meets the ground."""
+    from demnav_pkg.camera_geometry import camera_rotation
+    rotation = camera_rotation(euler_quaternion(roll, pitch, yaw),
+                               math.radians(mount_deg))
+    k = camera_info().k
+    u, v = np.meshgrid(np.arange(WIDTH, dtype=float),
+                       np.arange(HEIGHT, dtype=float))
+    rays = np.stack(((u - k[2]) / k[0], (v - k[5]) / k[4], np.ones_like(u)),
+                    axis=-1) @ rotation.T
+    altitude = float(sw.terrain_height(east, north)) + agl
+    depth = np.full(u.shape, agl)
+    for _ in range(60):
+        ground = sw.terrain_height(east + depth * rays[..., 0],
+                                   north + depth * rays[..., 1])
+        gap = altitude + depth * rays[..., 2] - ground
+        depth = depth + 0.7 * gap / np.maximum(-rays[..., 2], 1e-3)
+    row, col = int(k[5]), int(k[2])
+    centre = (east + depth[row, col] * rays[row, col, 0],
+              north + depth[row, col] * rays[row, col, 1])
+    return depth.astype(np.float32), altitude, centre
+
+
+@pytest.mark.parametrize('roll_deg,pitch_deg,yaw_deg,mount_deg', [
+    (0.0, 12.0, 30.0, 0.0), (-10.0, 0.0, -100.0, 90.0),
+    (8.0, -8.0, 160.0, 90.0), (14.0, 6.0, 45.0, 0.0)])
+def test_tilted_camera_fixes_the_vehicle_not_the_image_centre(
+        make_node, roll_deg, pitch_deg, yaw_deg, mount_deg):
+    """A banked or pitched body-fixed camera looks h * tan(tilt) away from
+    the vehicle; the fix must still be the point below the vehicle."""
+    node = make_node(camera_mount_yaw_deg=mount_deg, depth_is_metric=True)
+    set_origin(node)
+    east, north = 500.0, 200.0
+    roll, pitch, yaw = (math.radians(v) for v in (roll_deg, pitch_deg,
+                                                    yaw_deg))
+    depth, altitude, centre = render_tilted(east, north, roll, pitch, yaw,
+                                            mount_deg)
+    result = frame(node, depth, yaw, roll=roll, pitch=pitch,
+                   prior=fix_at(east + 60.0, north - 45.0, altitude))
+    assert result.valid is True
+    assert math.hypot(*error_m(result, east, north)) < 8.0
+    # The old answer, where the optical axis meets the ground, is far off.
+    assert math.hypot(centre[0] - east, centre[1] - north) > 25.0
+
+
+def test_stabilized_camera_ignores_vehicle_tilt(make_node, camera_sim):
+    """Genesis and satellite_camera_sim hold the camera level: their frames
+    must not be shifted by the vehicle's roll and pitch."""
+    east, north, yaw = 500.0, 200.0, 0.9
+    depth, altitude = render(camera_sim, east, north, yaw)
+    tilt = {'roll': math.radians(10.0), 'pitch': math.radians(-12.0)}
+    stabilised = frame(make_node(camera_stabilized=True), depth, yaw,
+                       prior=fix_at(east, north, altitude), **tilt)
+    assert math.hypot(*error_m(stabilised, east, north)) < 8.0
+    # Treated as body-fixed, the same frame lands ~h * tan(tilt) away.
+    body_fixed = frame(make_node(), depth, yaw,
+                       prior=fix_at(east, north, altitude), **tilt)
+    assert (body_fixed.fix is None or
+            math.hypot(*error_m(body_fixed, east, north)) > 25.0)
+
+
+def test_the_attitude_at_the_frame_stamp_is_used(make_node):
+    east, north = 500.0, 200.0
+    roll, pitch, yaw = 0.0, math.radians(12.0), math.radians(-60.0)
+    depth, altitude, _ = render_tilted(east, north, roll, pitch, yaw)
+    prior = fix_at(east, north, altitude)
+
+    # Odometry brackets the frame with its attitude; the latest sample,
+    # seconds later, is level.
+    node = make_node(depth_is_metric=True)
+    for offset, attitude in ((-0.1, (roll, pitch)), (0.1, (roll, pitch)),
+                             (3.0, (0.0, 0.0))):
+        node.subs['/odom'](odometry(yaw, *attitude,
+                                    stamp=shifted(STAMP, offset)))
+    result = frame(node, depth, yaw, prior=prior, odom=False)
+    assert math.hypot(*error_m(result, east, north)) < 8.0
+
+    # No odometry within max_attitude_offset_s of the frame: no fix.
+    node = make_node(depth_is_metric=True)
+    node.subs['/odom'](odometry(yaw, roll, pitch, stamp=shifted(STAMP, -1.0)))
+    result = frame(node, depth, yaw, prior=prior, odom=False)
+    assert result.fix is None and result.valid is False
+
+
+def test_fix_covariance_adds_attitude_error_times_height(make_node,
+                                                        camera_sim):
+    node = make_node(search_radius_m=50.0, attitude_sigma_deg=5.0)
+    east, north, yaw = 100.0, -50.0, 0.3
+    depth, altitude = render(camera_sim, east, north, yaw, agl=180.0)
+    result = frame(node, depth, yaw, prior=fix_at(east, north, altitude))
+    match = max(10.0, 50.0 * (1.0 - result.confidence))
+    expected = match ** 2 + (180.0 * math.radians(5.0)) ** 2
+    assert result.fix.position_covariance[0] == pytest.approx(expected,
+                                                              rel=0.03)
+    assert result.fix.position_covariance[4] == \
+        result.fix.position_covariance[0]
+
+
+def test_tilted_range_becomes_height_below_the_camera():
+    """Metric z-depth of flat ground from a tilted camera ramps across the
+    frame (a false terrain slope); as height below the camera it is flat,
+    and level frames are unchanged."""
+    from demnav_pkg.camera_geometry import camera_rotation
+    from demnav_pkg.terrain_match import height_below_camera
+    k = camera_info().k
+    intrinsics = (k[0], k[4], k[2], k[5])
+    u, v = np.meshgrid(np.arange(WIDTH, dtype=float),
+                       np.arange(HEIGHT, dtype=float))
+    for roll, pitch, expect_flat in ((0.0, 0.0, True), (9.0, -13.0, True)):
+        rotation = camera_rotation(euler_quaternion(
+            math.radians(roll), math.radians(pitch), 0.7), 0.0)
+        rays = np.stack(((u - k[2]) / k[0], (v - k[5]) / k[4],
+                         np.ones_like(u)), axis=-1) @ rotation.T
+        z_depth = (150.0 / -rays[..., 2]).astype(np.float32)
+        height = height_below_camera(z_depth, rotation, intrinsics)
+        assert np.allclose(height, 150.0, atol=1e-3)
+        assert (np.ptp(z_depth) < 1e-3) == (roll == 0.0 and pitch == 0.0)

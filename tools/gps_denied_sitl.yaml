@@ -135,7 +135,8 @@ services:
         search_radius_m:=300.0 search_radius_sigma_scale:=3.0 max_search_radius_m:=900.0
         fov_deg:=69.0 min_correlation:=0.35
         origin_topic:=/navigation/origin prior_fix_topic:=/navigation/fix prior_timeout_s:=2.0
-        camera_mount_yaw_deg:=0.0 gps_altitude_datum:=ellipsoid
+        camera_mount_yaw_deg:=0.0 camera_stabilized:=true depth_is_metric:=true
+        gps_altitude_datum:=ellipsoid
         geoid_file:=/usr/share/GeographicLib/geoids/egm96-5.pgm
         "rangefinder_topic:=''" cache_dir:=/tmp/demnav_cache
 
@@ -162,6 +163,7 @@ services:
         zoom:=17 search_radius_m:=250.0 search_radius_sigma_scale:=3.0 max_search_radius_m:=750.0
         max_tiles:=49 max_tile_downloads_per_cycle:=8 match_rate_hz:=${GPS_DENIED_WILDNAV_HZ:-0.5}
         feature_backend:=SIFT min_matches:=16 min_inliers:=10 min_inlier_ratio:=0.25
+        camera_mount_yaw_deg:=0.0 camera_stabilized:=true
         cache_dir:=/tmp/wildnav_cache
 
   mission:

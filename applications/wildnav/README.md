@@ -32,7 +32,9 @@ Inputs:
   the `max_position_jump_m` gate
 - `/navigation/origin` (EKF origin, transient-local): `/wildnav/odometry`
   is relative to it and waits for it; `/wildnav/fix` does not
-- `/navigation/odometry` for attitude gating and the odometry template
+- `/navigation/odometry` for the camera attitude (interpolated to each
+  image stamp; `/clock` maps simulator-time image stamps onto MAVROS wall
+  time) and the odometry template
 - `/drone0/sensor_measurements/odom` as the fusion dead-reckoning input
 - `/demnav/odometry`, `/demnav/confidence`, `/demnav/valid`
 
@@ -47,6 +49,24 @@ Outputs:
 - `/navigation/fix`
 - `/navigation/correction_source`
 - `/navigation/correction_confidence`
+
+## Fix point and covariance
+
+The fix is the vehicle's horizontal position, not the image centre's: the
+camera looks down the body -z axis (`camera_mount_yaw_deg`: image top
+heading from the nose, counter-clockwise; `camera_stabilized: true` for a
+roll/pitch-stabilised camera), so the node finds the pixel looking straight
+down from the full attitude at the image stamp and maps it through the
+matched image-to-tile homography (`camera_geometry.py`). For a planar
+ground patch this is exact without the yaw or the height. The
+`max_position_jump_m` gate therefore compares vehicle positions.
+
+The horizontal standard deviation combines the matching error
+(`max(3 m, median reprojection error * tile resolution)`), the attitude
+uncertainty `attitude_sigma_deg` (EKF and camera mount) times the height
+above ground, which the matched scale at the nadir pixel gives, and the
+attitude and position change over the stamp uncertainty `stamp_sigma_s`.
+`fov_deg` is the fallback field of view without `camera_info`.
 
 ## Map cache
 

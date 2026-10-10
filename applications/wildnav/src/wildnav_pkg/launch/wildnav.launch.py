@@ -33,6 +33,11 @@ def generate_launch_description():
         ('max_reprojection_error_px', '8.0'),
         ('max_position_jump_m', '250.0'),
         ('max_attitude_deg', '20.0'),
+        ('camera_mount_yaw_deg', '0.0'),
+        ('camera_stabilized', 'false'),
+        ('fov_deg', '69.0'),
+        ('attitude_sigma_deg', '1.0'),
+        ('stamp_sigma_s', '0.05'),
         ('navigation_output_topic', '/navigation/odometry'),
         ('minimum_demnav_confidence', '0.35'),
         ('minimum_wildnav_confidence', '0.20'),
@@ -88,6 +93,11 @@ def generate_launch_description():
                 values['max_reprojection_error_px'],
             'max_position_jump_m': values['max_position_jump_m'],
             'max_attitude_deg': values['max_attitude_deg'],
+            'camera_mount_yaw_deg': values['camera_mount_yaw_deg'],
+            'camera_stabilized': values['camera_stabilized'],
+            'fov_deg': values['fov_deg'],
+            'attitude_sigma_deg': values['attitude_sigma_deg'],
+            'stamp_sigma_s': values['stamp_sigma_s'],
         }],
     )
     fusion = Node(

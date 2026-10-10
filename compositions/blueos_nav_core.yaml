@@ -153,6 +153,7 @@ services:
         min_inliers:=${WILDNAV_MIN_INLIERS:-10}
         min_inlier_ratio:=${WILDNAV_MIN_INLIER_RATIO:-0.25}
         max_position_jump_m:=${WILDNAV_MAX_JUMP_M:-250.0}
+        camera_mount_yaw_deg:=${CAMERA_MOUNT_YAW_DEG:-0.0}
         minimum_demnav_confidence:=${DEMNAV_FUSION_CONFIDENCE:-0.35}
         minimum_wildnav_confidence:=${WILDNAV_FUSION_CONFIDENCE:-0.20}
 

@@ -23,30 +23,27 @@ from sensor_msgs.msg import (
     Range,
 )
 from nav_msgs.msg import Odometry
+from rosgraph_msgs.msg import Clock
 from std_msgs.msg import Bool, Float32
 from cv_bridge import CvBridge
 
 from synthetic_world import latlon_to_local
 
+from .camera_geometry import (
+    AttitudeHistory,
+    camera_rotation,
+    horizontal_sigma,
+    quaternion_matrix,
+    roll_pitch_rad,
+    stamp_ns,
+)
 from .geoid import GeoidGrid
 from .heightmap import HeightMapCache
-from .terrain_match import correlate, derotation_angle_deg, north_up_template
+from .terrain_match import correlate, ground_template, height_below_camera
 
 # Unexplained-variance floor of the peak uniqueness test: two fits both
 # better than NCC ~0.995 are a tie, not a win for resampling noise.
 PEAK_RESIDUAL_FLOOR = 0.01
-
-
-def _yaw_from_quaternion(q) -> float:
-    return math.atan2(2.0 * (q.w * q.z + q.x * q.y),
-                      1.0 - 2.0 * (q.y * q.y + q.z * q.z))
-
-
-def _roll_pitch_from_quaternion(q) -> tuple[float, float]:
-    roll = math.atan2(2.0 * (q.w * q.x + q.y * q.z),
-                      1.0 - 2.0 * (q.x * q.x + q.y * q.y))
-    sin_pitch = max(-1.0, min(1.0, 2.0 * (q.w * q.y - q.z * q.x)))
-    return roll, math.asin(sin_pitch)
 
 
 def fix_is_usable(fix, received, now, timeout_s) -> bool:
@@ -76,6 +73,13 @@ def search_radius(fix, base_m, sigma_scale, maximum_m) -> float:
             sigma = math.sqrt(variance)
     return min(max(base_m + sigma_scale * sigma, base_m),
                max(maximum_m, base_m))
+
+
+def _flag(value) -> bool:
+    """A boolean parameter that launch files may pass as a string."""
+    if isinstance(value, bool):
+        return value
+    return str(value).lower() in ('1', 'true', 'yes', 'on')
 
 
 def peak_uniqueness(best: float, second: float) -> float:
@@ -116,6 +120,12 @@ class DemNavNode(Node):
         self.declare_parameter('max_search_radius_m', 600.0)
         self.declare_parameter('fov_deg',          90.0)
         self.declare_parameter('camera_mount_yaw_deg', 0.0)
+        self.declare_parameter('camera_stabilized', False)
+        self.declare_parameter('depth_is_metric', False)
+        self.declare_parameter('attitude_sigma_deg', 1.0)
+        self.declare_parameter('stamp_sigma_s', 0.05)
+        self.declare_parameter('max_attitude_offset_s', 0.25)
+        self.declare_parameter('sim_clock_topic', '/clock')
         self.declare_parameter('gps_altitude_datum', 'ellipsoid')
         self.declare_parameter(
             'geoid_file', '/usr/share/GeographicLib/geoids/egm96-5.pgm')
@@ -151,6 +161,13 @@ class DemNavNode(Node):
             self.get_parameter('rangefinder_timeout_s').value)
         self.camera_mount_yaw_rad = math.radians(
             float(self.get_parameter('camera_mount_yaw_deg').value))
+        self.camera_stabilized = _flag(
+            self.get_parameter('camera_stabilized').value)
+        self.depth_is_metric = _flag(
+            self.get_parameter('depth_is_metric').value)
+        self.attitude_sigma_rad = math.radians(
+            float(self.get_parameter('attitude_sigma_deg').value))
+        self.stamp_sigma_s = float(self.get_parameter('stamp_sigma_s').value)
         self.min_correlation  = self.get_parameter('min_correlation').value
         self.min_peak_uniqueness = float(
             self.get_parameter('min_peak_uniqueness').value)
@@ -171,11 +188,8 @@ class DemNavNode(Node):
         self.max_metric_depth = self.get_parameter('max_metric_depth_m').value
         self.max_attitude_rad = math.radians(
             float(self.get_parameter('max_attitude_deg').value))
-        synthetic_terrain = self.get_parameter('synthetic_terrain').value
-        self.synthetic_terrain = (
-            synthetic_terrain
-            if isinstance(synthetic_terrain, bool)
-            else str(synthetic_terrain).lower() in ('1', 'true', 'yes', 'on'))
+        self.synthetic_terrain = _flag(
+            self.get_parameter('synthetic_terrain').value)
 
         self.geoid = None
         datum = str(self.get_parameter('gps_altitude_datum').value).lower()
@@ -204,9 +218,10 @@ class DemNavNode(Node):
         self.latest_range_received = 0.0
         self.latest_odom  = None
         self.camera_info  = None
-        self.yaw_rad      = 0.0
-        self.roll_rad     = 0.0
-        self.pitch_rad    = 0.0
+        # Vehicle attitude by odometry stamp: each depth frame is projected
+        # with the attitude at its own timestamp.
+        self.attitude = AttitudeHistory(max_offset_s=float(
+            self.get_parameter('max_attitude_offset_s').value))
         self.heightmap    = None
         self._heightmap_thread = None
 
@@ -242,6 +257,10 @@ class DemNavNode(Node):
             Image, depth_topic, self._on_depth, qos_profile_sensor_data)
         self.create_subscription(
             Odometry, odom_topic, self._on_odom, qos_profile_sensor_data)
+        clock_topic = str(self.get_parameter('sim_clock_topic').value or '')
+        if clock_topic:
+            self.create_subscription(
+                Clock, clock_topic, self._on_clock, qos_profile_sensor_data)
         self.create_subscription(
             CameraInfo, camera_info_topic, self._on_camera_info,
             qos_profile_sensor_data)
@@ -336,9 +355,17 @@ class DemNavNode(Node):
 
     def _on_odom(self, msg: Odometry):
         self.latest_odom = msg
-        self.yaw_rad = _yaw_from_quaternion(msg.pose.pose.orientation)
-        self.roll_rad, self.pitch_rad = _roll_pitch_from_quaternion(
-            msg.pose.pose.orientation)
+        q = msg.pose.pose.orientation
+        angular, linear = msg.twist.twist.angular, msg.twist.twist.linear
+        self.attitude.add(
+            stamp_ns(msg.header.stamp), (q.x, q.y, q.z, q.w),
+            math.sqrt(angular.x ** 2 + angular.y ** 2 + angular.z ** 2),
+            math.sqrt(linear.x ** 2 + linear.y ** 2 + linear.z ** 2))
+
+    def _on_clock(self, msg: Clock):
+        # Simulators stamp camera frames in simulator time, MAVROS odometry
+        # in wall time.
+        self.attitude.add_clock(stamp_ns(msg.clock), time.time_ns())
 
     def _on_camera_info(self, msg: CameraInfo):
         self.camera_info = msg
@@ -356,13 +383,20 @@ class DemNavNode(Node):
             self._load_heightmap(prior.latitude, prior.longitude)
             self._publish_valid(False)
             return
+        attitude = self.attitude.at(stamp_ns(msg.header.stamp))
+        if attitude is None:
+            self.get_logger().warn(
+                'No odometry attitude at the depth frame time — skipping',
+                throttle_duration_sec=10.0)
+            self._publish_valid(False)
+            return
         try:
             depth = self.bridge.imgmsg_to_cv2(msg, desired_encoding='32FC1')
         except Exception as e:
             self.get_logger().error(f'Depth conversion failed: {e}')
             self._publish_valid(False)
             return
-        self._run_matching(depth, msg, prior, now)
+        self._run_matching(depth, msg, prior, now, attitude)
 
     def _intrinsics(self, width: int, height: int):
         """(fx, fy, cx, cy) for a frame of this size: CameraInfo scaled to
@@ -383,7 +417,7 @@ class DemNavNode(Node):
             return altitude
         return altitude - self.geoid.height(lat, lon)
 
-    def _rangefinder_agl(self, now: float):
+    def _rangefinder_agl(self, now: float, attitude):
         """Height above ground from a fresh, in-range rangefinder reading,
         else None. The beam follows the body z axis."""
         msg = self.latest_range
@@ -394,10 +428,11 @@ class DemNavNode(Node):
         if not (math.isfinite(reading) and
                 msg.min_range <= reading <= msg.max_range):
             return None
-        return reading * math.cos(self.roll_rad) * math.cos(self.pitch_rad)
+        # Vertical component of the body z axis: cos(roll) * cos(pitch).
+        return reading * quaternion_matrix(*attitude.quaternion)[2, 2]
 
     def _run_matching(self, depth: np.ndarray, source_msg: Image,
-                      prior: NavSatFix, now: float):
+                      prior: NavSatFix, now: float, attitude):
         lat = prior.latitude
         lon = prior.longitude
         alt = prior.altitude
@@ -407,11 +442,13 @@ class DemNavNode(Node):
             self._publish_valid(False)
             return
 
-        # A banked or pitched-up camera no longer looks at the nadir patch
-        # the DEM correlation assumes; skip those frames (0 disables).
+        # Steep banks and pitches put a ramp into the depth (range along a
+        # tilted view, not height) that swamps the terrain relief the DEM
+        # correlation looks for; skip those frames (0 disables).
+        roll, pitch = roll_pitch_rad(attitude.quaternion)
         if self.max_attitude_rad > 0.0 and (
-                abs(self.roll_rad) > self.max_attitude_rad or
-                abs(self.pitch_rad) > self.max_attitude_rad):
+                abs(roll) > self.max_attitude_rad or
+                abs(pitch) > self.max_attitude_rad):
             self.get_logger().debug(
                 'Attitude beyond max_attitude_deg — skipping off-nadir frame')
             self._publish_valid(False)
@@ -432,7 +469,7 @@ class DemNavNode(Node):
             self._publish_valid(False)
             return
         alt_msl = self._altitude_msl(lat, lon, alt)
-        agl = self._rangefinder_agl(now)
+        agl = self._rangefinder_agl(now, attitude)
         if agl is None:
             agl = max(alt_msl - ground_elevation, 1.0)
 
@@ -448,11 +485,26 @@ class DemNavNode(Node):
         footprint_m = max(footprint_cells) * cell_m
         self._maybe_recentre_heightmap(heightmap, lat, lon, footprint_m)
 
-        # De-rotate the body-fixed frame north-up onto the DEM grid.
-        relative_tmpl, valid_tmpl, anchor = north_up_template(
-            raw_depth, finite,
-            derotation_angle_deg(self.yaw_rad, self.camera_mount_yaw_rad),
-            (cx, cy), (agl / fx, agl / fy), cell_m)
+        # Project the frame north-up onto the DEM grid with the camera's
+        # attitude at the frame time: the template anchor is the point
+        # below the vehicle, so the match is the vehicle's position.
+        rotation = camera_rotation(
+            attitude.quaternion, self.camera_mount_yaw_rad,
+            self.camera_stabilized)
+        # Metric depth (simulator depth cameras) is range along a tilted
+        # view; as height below the camera it shows only the terrain.
+        # Relative depth (the OAK-1 network output) has no known scale or
+        # form and is matched as is.
+        template_depth = raw_depth
+        if self.depth_is_metric:
+            template_depth = height_below_camera(
+                raw_depth, rotation, (fx, fy, cx, cy))
+        projected = ground_template(
+            template_depth, finite, rotation, (fx, fy, cx, cy), agl, cell_m)
+        if projected is None:
+            self._publish_valid(False)
+            return
+        relative_tmpl, valid_tmpl, anchor = projected
         if valid_tmpl.sum() < 9:
             self._publish_valid(False)
             return
@@ -507,7 +559,8 @@ class DemNavNode(Node):
             self._publish_valid(False)
             return
 
-        # Map the matched nadir (sub-cell) back through the grid geometry.
+        # Map the matched point below the vehicle (sub-cell) back through
+        # the grid geometry.
         prior_row, prior_col = heightmap.latlon_to_pixel(lat, lon)
         corrected_lat, corrected_lon = heightmap.pixel_to_latlon(
             prior_row + match['position'][0] - center_row,
@@ -552,10 +605,14 @@ class DemNavNode(Node):
             (metric_depth < self.min_metric_depth) |
             (metric_depth > self.max_metric_depth)] = np.nan
 
-        horizontal_sigma = max(
-            dem_res, self.search_radius_m * (1.0 - confidence))
+        # Matching error, plus the attitude and timing errors of the
+        # projection (they move the point below the vehicle by about
+        # height x angle).
+        match_sigma = max(dem_res, self.search_radius_m * (1.0 - confidence))
+        horizontal_variance = horizontal_sigma(
+            match_sigma, agl, self.attitude_sigma_rad, attitude.rate,
+            attitude.speed, self.stamp_sigma_s, attitude.offset_s) ** 2
         vertical_sigma = max(dem_res, float(np.std(residual)))
-        horizontal_variance = horizontal_sigma ** 2
         vertical_variance = vertical_sigma ** 2
 
         # The fix keeps the prior's altitude (and datum); it does not
