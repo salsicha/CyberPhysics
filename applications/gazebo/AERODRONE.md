@@ -23,3 +23,25 @@ waits for ArduPilot GPS/EKF initialization before starting the generated
 
 Gazebo models and launch configuration live here. The shared scenario, mission, robustness contracts, and scoring tools live under `applications/aerostack2/`. `config/world_gazebo.yaml` is a small development fixture; the
 normal composition uses the generated `/data/navsim_assets/world_gazebo.yaml`.
+
+The `gazebo`, `gazebo_bridges` and `gazebo_ardupilot_backend` services run the
+aerostack2 image, which installs Gazebo Fortress (`ros_gz`) and Aerostack2's
+`as2_gazebo_assets` 1.1.3, pinned from the ROS snapshot like MAVROS
+(`applications/aerostack2/Dockerfile`). The composition runs its
+`launch_simulation.py` and bind-mounts `models/*.sdf.jinja` and
+`scripts/drone_bridges_isolated.py` over the package's `quadrotor_base`,
+`hd_camera` and `rgbd_camera` templates and `launch/drone_bridges.py`; the image
+build fails if any of those files is missing.
+
+Nothing rendered may hang below the downward cameras: Gazebo's depth camera
+reports geometry inside its near clip as `-inf`, so a visual under the lenses
+blanks every depth frame (the landing gear is collision only).
+
+Rendering is software (Mesa llvmpipe, EGL surfaceless), so no GPU is needed.
+On a 20-core workstation, with the whole stack running, Gazebo keeps a real-time
+factor of about 0.98 and renders both cameras at about 4.9 of their 5 Hz, more than
+DemNav (every depth frame) and WildNav (`WILDNAV_RATE_HZ`, 0.2 Hz) use.
+
+SITL loads only the shared ArduCopter parameters (`systems/aerodrone/config`):
+in flight Gazebo's quadrotor learns a hover throttle of 0.67, the hardware
+`MOT_THST_HOVER`, so unlike Genesis and Isaac it needs no backend compensation.

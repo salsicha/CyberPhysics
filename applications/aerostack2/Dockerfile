@@ -16,14 +16,20 @@ SHELL ["/bin/bash","-c"]
 # The main ROS 2 Humble repository dropped mavros, mavros-extras and
 # libmavconn in its September 2026 sync (only mavros-msgs 2.15.1 synced).
 # Install the MAVROS 2.14.0 set this stack was validated with from the
-# dated ROS snapshot, pinned to exact versions; everything else still comes
-# from the main repository.
+# dated ROS snapshot, pinned to exact versions; everything else but the
+# Gazebo assets below still comes from the main repository.
 ARG ROS_SNAPSHOT=2026-08-07
 ARG MAVROS_VERSION=2.14.0-1jammy.20260804.200257
 ARG MAVROS_EXTRAS_VERSION=2.14.0-1jammy.20260804.203703
 ARG MAVROS_MSGS_VERSION=2.14.0-1jammy.20260718.015830
 ARG LIBMAVCONN_VERSION=2.14.0-1jammy.20260609.121524
 ARG MAVLINK_VERSION=2026.6.6-1jammy.20260609.120925
+# Aerostack2's Gazebo assets, pinned the same way to the Aerostack2 release of
+# the other as2 packages (1.1.3): compositions/aerostack2_sim.yaml runs their
+# launch_simulation.py and bind-mounts its own drone_bridges.py and
+# quadrotor_base, hd_camera and rgbd_camera templates over this layout
+# (asserted below).
+ARG AS2_GAZEBO_ASSETS_VERSION=1.1.3-1jammy.20260804.200738
 COPY ros-snapshots.asc /tmp/ros-snapshots.asc
 RUN gpg --show-keys --with-colons /tmp/ros-snapshots.asc \
       | grep -q '^fpr:::::::::4B63CF8FDE49746E98FA01DDAD19BAB3CBF125EA:' && \
@@ -42,7 +48,7 @@ RUN apt update && apt install -q -y --no-install-recommends \
     ros-${ROS_DISTRO}-as2-behaviors-perception \
     ros-${ROS_DISTRO}-as2-behavior-tree \
     ros-${ROS_DISTRO}-as2-platform-gazebo \
-    ros-${ROS_DISTRO}-as2-gazebo-assets \
+    ros-${ROS_DISTRO}-as2-gazebo-assets=${AS2_GAZEBO_ASSETS_VERSION} \
     ros-${ROS_DISTRO}-ros-gz \
     ros-${ROS_DISTRO}-mavros=${MAVROS_VERSION} \
     ros-${ROS_DISTRO}-mavros-extras=${MAVROS_EXTRAS_VERSION} \
@@ -52,6 +58,18 @@ RUN apt update && apt install -q -y --no-install-recommends \
     ros-${ROS_DISTRO}-rosbridge-suite \
     geographiclib-tools python3-colcon-common-extensions && \
     rm -rf /var/lib/apt/lists/*
+
+# The Gazebo stack's launch files resolve and every bind-mount target exists.
+RUN . /opt/ros/${ROS_DISTRO}/setup.bash && \
+    share="$(ros2 pkg prefix as2_gazebo_assets)/share/as2_gazebo_assets" && \
+    for file in launch/launch_simulation.py launch/drone_bridges.py \
+        models/quadrotor_base/quadrotor_base.sdf.jinja \
+        models/hd_camera/hd_camera.sdf.jinja \
+        models/rgbd_camera/rgbd_camera.sdf.jinja; do \
+      test -f "${share}/${file}" || { echo "missing ${share}/${file}"; exit 1; }; \
+    done && \
+    ros2 launch as2_gazebo_assets launch_simulation.py --show-args > /dev/null && \
+    ros2 launch as2_gazebo_assets drone_bridges.py --show-args > /dev/null
 
 RUN /opt/ros/${ROS_DISTRO}/lib/mavros/install_geographiclib_datasets.sh
 
