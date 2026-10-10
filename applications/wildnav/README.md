@@ -9,8 +9,23 @@ optional complement to DemNav:
 - `navigation_fusion_node` applies accepted corrections to high-rate MAVROS
   odometry and publishes `/navigation/odometry` for Aerostack.
 
-Fusion rejects non-finite odometry and corrections, invalid covariance, and
-confidence values outside 0–1. An invalid correction cannot update the fused
+Fusion weights accepted corrections by their inverse variance (confidence
+only decides acceptance). On every accepted fix it hands the autopilot
+(`/navigation/correction_fix`) the inverse-variance combination of each
+source's latest fix, propagated to the present with the odometry velocity:
+ArduPilot's EKF3 gives every GPS_INPUT sample the largest accuracy of the
+last few seconds and fuses each as independent, so it cannot weight
+interleaved sources itself, and it needs the dense stream (position-only
+aiding every few seconds lets its tilt drift). Each sample's variance is
+multiplied by the number sent in the last `correction_correlation_s` (60
+s): the fixes' errors are biases lasting tens of seconds, and a faster EKF
+response closes a loop through its own attitude, which the camera fixes
+use. Sources whose fixes disagree by more than
+`correction_consistency_sigma` (5) combined sigma are not combined: the one
+farther from the fused position is left out, since a false match diluted
+by the combination and sent with that variance would pass the EKF's
+innovation gate. Fusion rejects non-finite odometry and corrections,
+invalid covariance, and confidence values outside 0–1. An invalid correction cannot update the fused
 offset. If an existing offset becomes non-finite, the next valid raw sample
 resets it and allows valid corrections to resume without restarting the node.
 
@@ -62,11 +77,14 @@ ground patch this is exact without the yaw or the height. The
 `max_position_jump_m` gate therefore compares vehicle positions.
 
 The horizontal standard deviation combines the matching error
-(`max(3 m, median reprojection error * tile resolution)`), the attitude
+(`max(match_sigma_floor_m, median reprojection error * tile resolution)`;
+the 3 m default floor is for real imagery, georeferenced to a few metres,
+and simulators that render the tiles themselves set 1 m), the attitude
 uncertainty `attitude_sigma_deg` (EKF and camera mount) times the height
 above ground, which the matched scale at the nadir pixel gives, and the
-attitude and position change over the stamp uncertainty `stamp_sigma_s`.
-`fov_deg` is the fallback field of view without `camera_info`.
+attitude and position change over the stamp uncertainty `stamp_sigma_s`
+(a `camera_stabilized` camera stays level, so the body's rates do not
+count). `fov_deg` is the fallback field of view without `camera_info`.
 
 ## Map cache
 

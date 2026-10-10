@@ -64,13 +64,47 @@ once its source has reported it valid with enough confidence; a later
 report cannot withdraw a fix that is waiting for raw odometry to reach its
 stamp.
 
-``<prefix>/correction_fix``: each accepted absolute fix exactly once,
+Accepted corrections are combined with inverse-variance weights: the
+sources' variances are their fixes' covariances, and confidence only
+decides whether a fix is accepted.
+
+``<prefix>/correction_fix``: published once per accepted fix, the
+inverse-variance combination of every source's latest accepted absolute fix
+(still within ``correction_timeout_s`` and ``max_fix_age_s``), each
 propagated from its camera time to the latest raw sample with the raw
 odometry *velocity* (position jumps the autopilot makes in between do not
-leak into it) and stamped with that sample's time. This is what the
-autopilot bridge forwards to ArduPilot as GPS_INPUT. It is never the fused
-estimate: that is the autopilot's own odometry plus an offset, and feeding it
-back would make the EKF chase its own offset forever.
+leak into it), its variance growing by ``propagation_velocity_sigma_mps``
+over that time; stamped with that sample's time. Fixes that disagree by
+more than ``correction_consistency_sigma`` (5) of their combined sigma are
+not combined: the one farther from the fused position is left out (a false
+match, diluted by the combination and sent with the inflated variance
+below, would pass the EKF's innovation gate). The variance sent is that
+of the combination times the number of corrections sent within
+``correction_correlation_s`` (60 s): the fixes' errors are biases that
+persist for tens of seconds (the same terrain or map mismatch while the
+footprints overlap, the autopilot's own attitude error), while the EKF
+fuses every sample as independent, so a stream conveys about one sample's
+worth of information per correlation time whatever its rate. That also
+keeps the EKF's response to the corrections slow (about 10 s): the camera
+fixes move with the EKF's own attitude error (height x tilt), and a faster
+response closes that loop. This is what the autopilot
+bridge forwards to ArduPilot as GPS_INPUT. It is never the fused estimate:
+that is the autopilot's own odometry plus an offset, and feeding it back
+would make the EKF chase its own offset forever.
+
+The sources are combined here because ArduPilot's EKF3 cannot weight them:
+it applies one GPS accuracy to every GPS_INPUT sample, the largest reported
+in the last few seconds (a decaying peak hold, AP_NavEKF3_Measurements.cpp
+readGpsData), and fuses each as independent, so interleaved fixes all get
+the worse source's accuracy and the denser source (DemNav, several fixes a
+second) outvotes the more accurate one (WildNav, one every few seconds).
+Sending only the more accurate source instead starves the EKF: with
+position-only aiding every few seconds its tilt and velocity drift (3 deg
+of tilt error in Gazebo), which moves every camera fix by height x tilt.
+Sent densely at their own variance, the corrections make the EKF jump at
+every sample, the position controller answers with tens of degrees of
+tilt, and the camera fixes degrade with the EKF attitude (in Gazebo the
+autopilot error grew to 20-70 m).
 
 When the bridge reports on ``<prefix>/autopilot_corrections_active`` (Bool,
 transient_local) that ArduPilot is receiving the corrections, the EKF itself
@@ -177,6 +211,11 @@ class Correction:
     pending_valid: bool = False
     pending_confidence: float = 0.0
     processed_stamp_ns: int = -1
+    # The accepted fix itself: local ENU about the origin, and its stamp on
+    # the raw odometry clock.
+    fix_east: float = 0.0
+    fix_north: float = 0.0
+    fix_stamp_ns: int = 0
 
 
 class NavigationFusionNode(Node):
@@ -202,6 +241,8 @@ class NavigationFusionNode(Node):
             'minimum_demnav_confidence': 0.35,
             'minimum_wildnav_confidence': 0.20,
             'correction_timeout_s': 30.0,
+            'correction_correlation_s': 60.0,
+            'correction_consistency_sigma': 5.0,
             'correction_time_constant_s': 2.0,
             'maximum_correction_m': 300.0,
             'raw_history_s': 20.0,
@@ -230,6 +271,7 @@ class NavigationFusionNode(Node):
         self.last_correction_time = None
         self.sim_now_ns = None
         self.last_correction_variance = None
+        self.correction_fix_times = []
         self.autopilot_absorbs = False
 
         output_topic = self.get_parameter('output_topic').value
@@ -567,8 +609,9 @@ class NavigationFusionNode(Node):
         state.received_at = self._now()
         self.last_correction_time = self._now()
         self.last_correction_variance = state.variance
-        self._publish_correction_fix(
-            msg, fix_east, fix_north, message_stamp, state.variance)
+        state.fix_east, state.fix_north = fix_east, fix_north
+        state.fix_stamp_ns = message_stamp
+        self._publish_correction_fix()
 
     def _raw_at(self, target_ns):
         """Raw (east, north) at target_ns, interpolated between bracketing
@@ -594,9 +637,28 @@ class NavigationFusionNode(Node):
             return None
         return self.raw_history[nearest][1], self.raw_history[nearest][2]
 
+    def _flight_clock(self):
+        """Seconds of flight at a raw odometry (wall clock) stamp: on the
+        simulator clock while one runs, which MAVROS velocities are per
+        (Isaac runs at a fifth of real time), else wall time."""
+        history = list(self.clock_history)
+        if len(history) < 2 or history[-1][1] <= history[0][1]:
+            return lambda wall_ns: wall_ns / 1e9
+        walls = [item[1] for item in history]
+
+        def flight_s(wall_ns):
+            index = min(max(bisect.bisect_left(walls, wall_ns), 1),
+                        len(history) - 1)
+            (s0, w0), (s1, w1) = history[index - 1], history[index]
+            if w1 <= w0:
+                (s0, w0), (s1, w1) = history[0], history[-1]
+            return (s0 + (s1 - s0) * (wall_ns - w0) / (w1 - w0)) / 1e9
+        return flight_s
+
     def _propagate(self, from_ns):
         """Horizontal displacement from from_ns to the latest raw sample by
-        integrating raw ENU velocity (trapezoidal)."""
+        integrating raw ENU velocity (trapezoidal) over the time flown."""
+        flight_s = self._flight_clock()
         east = north = 0.0
         previous = None
         for sample in self.raw_history:
@@ -606,23 +668,49 @@ class NavigationFusionNode(Node):
             if previous is None:
                 previous = (from_ns,) + sample[1:]
             start = max(previous[0], from_ns)
-            dt = (sample[0] - start) / 1e9
+            dt = flight_s(sample[0]) - flight_s(start)
             if dt > 0:
                 east += 0.5 * (previous[3] + sample[3]) * dt
                 north += 0.5 * (previous[4] + sample[4]) * dt
             previous = sample
         return east, north
 
-    def _publish_correction_fix(self, source_msg, fix_east, fix_north,
-                                fix_stamp_ns, variance):
+    def _publish_correction_fix(self):
+        """Publish the inverse-variance combination of the sources' latest
+        accepted fixes, each propagated to the latest raw sample."""
         latest_ns = self.raw_history[-1][0]
-        delta_east, delta_north = self._propagate(fix_stamp_ns)
-        latency_s = max(0.0, (latest_ns - fix_stamp_ns) / 1e9)
         sigma_v = float(self.get_parameter('propagation_velocity_sigma_mps').value)
-        variance = variance + (sigma_v * latency_s) ** 2
+        timeout_s = float(self.get_parameter('correction_timeout_s').value)
+        max_age_ns = float(self.get_parameter('max_fix_age_s').value) * 1e9
+        flight_s = self._flight_clock()
+        candidates = []
+        for name in SOURCES:
+            state = self._state(name)
+            if (state.received_ns <= 0 or state.received_at is None
+                    or self._elapsed_s(state.received_at) > timeout_s
+                    or latest_ns - state.fix_stamp_ns > max_age_ns):
+                continue
+            delta_east, delta_north = self._propagate(state.fix_stamp_ns)
+            latency_s = max(0.0, flight_s(latest_ns) - flight_s(state.fix_stamp_ns))
+            candidates.append((state.fix_east + delta_east,
+                               state.fix_north + delta_north,
+                               state.variance + (sigma_v * latency_s) ** 2))
+        east = north = total = 0.0
+        for fix_east, fix_north, variance in self._consistent(candidates):
+            weight = 1.0 / variance
+            east += weight * fix_east
+            north += weight * fix_north
+            total += weight
+        if not total > 0.0:
+            return
+        correlation_s = float(
+            self.get_parameter('correction_correlation_s').value)
+        self.correction_fix_times = [
+            sent for sent in self.correction_fix_times
+            if self._elapsed_s(sent) < correlation_s] + [self._now()]
+        variance = len(self.correction_fix_times) / total
         lat, lon = local_to_latlon(
-            fix_east + delta_east, fix_north + delta_north,
-            self.origin[0], self.origin[1])
+            east / total, north / total, self.origin[0], self.origin[1])
         fix = NavSatFix()
         fix.header = copy.deepcopy(self.latest_raw.header)
         fix.header.stamp = stamp_from_ns(self.latest_raw.header.stamp, latest_ns)
@@ -640,6 +728,23 @@ class NavigationFusionNode(Node):
         fix.position_covariance_type = NavSatFix.COVARIANCE_TYPE_DIAGONAL_KNOWN
         self.correction_pub.publish(fix)
 
+    def _consistent(self, candidates):
+        """The (east, north, variance) fixes that agree: while two differ by
+        more than correction_consistency_sigma of their combined sigma, the
+        one farther from the fused position is dropped. Diluted by the
+        combination and sent with the stream's inflated variance, a false
+        match would pass the EKF's innovation gate."""
+        gate = float(self.get_parameter('correction_consistency_sigma').value)
+        raw = self.raw_history[-1]
+        here = (raw[1] + self.offset_east, raw[2] + self.offset_north)
+        candidates = list(candidates)
+        while len(candidates) > 1 and any(
+                math.hypot(a[0] - b[0], a[1] - b[1]) > gate * math.sqrt(a[2] + b[2])
+                for i, a in enumerate(candidates) for b in candidates[i + 1:]):
+            candidates.remove(max(candidates, key=lambda c: math.hypot(
+                c[0] - here[0], c[1] - here[1])))
+        return candidates
+
     def _target_offset(self):
         timeout_s = float(self.get_parameter('correction_timeout_s').value)
         active = []
@@ -655,7 +760,7 @@ class NavigationFusionNode(Node):
                     state.variance > 0 and
                     state.received_ns > 0 and state.received_at is not None and
                     self._elapsed_s(state.received_at) <= timeout_s):
-                weight = confidence * confidence / state.variance
+                weight = 1.0 / state.variance
                 if math.isfinite(weight) and weight > 0:
                     active.append((name, state, weight))
         if not active:

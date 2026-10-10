@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 from conftest import REPO
 from demnav_pkg import camera_geometry as cg
-from demnav_pkg.terrain_match import ground_template
+from demnav_pkg.terrain_match import ground_template, terrain_template
 
 FOCAL, CX, CY = 554.7, 319.5, 239.5
 K = (FOCAL, FOCAL, CX, CY)
@@ -177,6 +177,86 @@ def test_ground_template_refuses_a_view_of_the_horizon():
     depth = np.ones((120, 160), np.float32)
     assert ground_template(depth, depth > 0, rotation,
                            (115.0, 115.0, 80.0, 60.0), 200.0, 10.0) is None
+
+
+K_HALF = (FOCAL / 2.0, FOCAL / 2.0, 159.5, 119.5)  # 320 x 240
+CAMERA_ALTITUDE = 200.0
+
+
+def hill_on_a_slope(east, north):
+    """Terrain height (m) east/north of the point below the camera: a
+    40 m hill 70 m from it on a 1:5 slope."""
+    return (0.2 * east - 0.1 * north +
+            40.0 * np.exp(-((east - 60.0) ** 2 + (north + 40.0) ** 2) /
+                          (2.0 * 30.0 ** 2)))
+
+
+def ray_cast(rotation):
+    """Metric z-depth of every pixel of a 320 x 240 camera at
+    CAMERA_ALTITUDE over hill_on_a_slope."""
+    fx, fy, cx, cy = K_HALF
+    u, v = np.meshgrid(np.arange(320.0), np.arange(240.0))
+    rays = np.stack(((u - cx) / fx, (v - cy) / fy, np.ones_like(u)),
+                    axis=-1) @ rotation.T
+    depth = np.full(u.shape, CAMERA_ALTITUDE)
+    for _ in range(100):
+        gap = CAMERA_ALTITUDE + depth * rays[..., 2] - hill_on_a_slope(
+            depth * rays[..., 0], depth * rays[..., 1])
+        depth += 0.7 * gap / np.maximum(-rays[..., 2], 1e-3)
+    return depth.astype(np.float32), rays
+
+
+def template_error(template, mask, anchor, cell=10.0):
+    """Template value minus the true height below the camera at the centre
+    of every cell in the mask."""
+    rows, cols = np.nonzero(mask)
+    east, north = (cols - anchor[1]) * cell, -(rows - anchor[0]) * cell
+    return template[mask] - (CAMERA_ALTITUDE - hill_on_a_slope(east, north))
+
+
+@pytest.mark.parametrize('roll,pitch,yaw,mount', [
+    (0.0, 0.0, 0.0, 0.0), (12.0, -5.0, 30.0, 90.0), (-8.0, 15.0, -120.0, 0.0)])
+def test_terrain_template_puts_each_pixel_on_its_ground_point(
+        roll, pitch, yaw, mount):
+    """Metric depth places every pixel where it meets the terrain: each
+    cell holds the height below the camera at that cell, east/north of the
+    template anchor (the point below the camera), whatever the attitude.
+    Projected onto flat ground instead, the hill and the slope are
+    displaced by metres (relief displacement)."""
+    rotation = cg.camera_rotation(quaternion(roll, pitch, yaw),
+                                  math.radians(mount))
+    depth, rays = ray_cast(rotation)
+    template, mask, anchor = terrain_template(
+        depth, np.ones(depth.shape, bool), rotation, K_HALF, 10.0)
+    assert anchor == (round(anchor[0]), round(anchor[1]))
+    assert mask.sum() > 300
+    assert np.abs(template_error(template, mask, anchor)).max() < 0.5
+
+    # The flat-ground projection of the same heights below the camera.
+    flat = ground_template(depth * -rays[..., 2], np.ones(depth.shape, bool),
+                           rotation, K_HALF,
+                           CAMERA_ALTITUDE - hill_on_a_slope(0.0, 0.0), 10.0)
+    assert np.abs(template_error(*flat)).max() > 5.0
+
+
+def test_terrain_template_masks_cells_it_does_not_cover_all_around():
+    """Cells at the footprint edge or beside missing depth are partly
+    covered: they are masked rather than averaged off centre."""
+    rotation = cg.camera_rotation(quaternion(9.0, 4.0, 60.0), 0.0)
+    depth, _ = ray_cast(rotation)
+    valid = np.ones(depth.shape, bool)
+    whole = terrain_template(depth, valid, rotation, K_HALF, 10.0)
+    valid[90:150, 120:200] = False  # e.g. no depth return
+    holed = terrain_template(depth, valid, rotation, K_HALF, 10.0)
+    assert holed[2] == whole[2]
+    assert whole[1].sum() - holed[1].sum() > 15
+    assert np.abs(template_error(*holed)).max() < 0.5
+    # The outer ring of the footprint is never in the mask.
+    covered = np.zeros(whole[1].shape, bool)
+    covered[whole[1]] = True
+    assert not covered[[0, -1], :].any() and not covered[:, [0, -1]].any()
+    assert terrain_template(depth, np.zeros(depth.shape, bool), rotation,
+                            K_HALF, 10.0) is None
 
 
 def test_roll_pitch_and_heading_follow_zyx_euler():

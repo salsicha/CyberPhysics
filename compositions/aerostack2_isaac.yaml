@@ -190,6 +190,9 @@ services:
       ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
       FASTRTPS_DEFAULT_PROFILES_FILE: *fastdds-profile
     volumes: [/dev/shm:/dev/shm, *fastdds-mount, demnav_isaac_cache:/data/demnav_cache:ro]
+    # attitude_sigma_deg: this EKF's attitude error against truth (tilt 0.1 deg
+    # RMS on GPS, 0.4-0.6 GPS-denied; yaw 0.6) with no camera mount error;
+    # hardware uses the default 1.
     command: >
       ros2 launch demnav_pkg demnav.launch.py
         gps_topic:=${GPS_TOPIC:-/aerodrone/sensor_measurements/gps}
@@ -205,6 +208,7 @@ services:
         prior_timeout_s:=2.0 search_radius_sigma_scale:=3.0
         max_search_radius_m:=${MAX_SEARCH_RADIUS_M:-2700.0}
         camera_mount_yaw_deg:=90.0 depth_is_metric:=true
+        attitude_sigma_deg:=0.5
         gps_altitude_datum:=ellipsoid geoid_file:=/usr/share/GeographicLib/geoids/egm96-5.pgm
         rangefinder_topic:=${RANGEFINDER_TOPIC:-/aerodrone/rangefinder} rangefinder_timeout_s:=0.5
 
@@ -219,6 +223,9 @@ services:
       ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
       FASTRTPS_DEFAULT_PROFILES_FILE: *fastdds-profile
     volumes: [/dev/shm:/dev/shm, *fastdds-mount, wildnav_isaac_cache:/data/wildnav_cache:ro]
+    # Fix covariance as measured here: the simulated EKF's tilt error (0.4-0.6
+    # deg RMS GPS-denied) and tiles that are the rendered ground itself (the
+    # default 3 m floor is for real imagery).
     command: >
       ros2 launch wildnav_pkg wildnav.launch.py
         image_topic:=${WILDNAV_IMAGE_TOPIC:-/aerodrone/sensor_measurements/downward_rgb/image_raw}
@@ -238,6 +245,7 @@ services:
         prior_timeout_s:=2.0 search_radius_sigma_scale:=3.0
         max_search_radius_m:=${WILDNAV_MAX_SEARCH_RADIUS_M:-3300.0}
         camera_mount_yaw_deg:=90.0
+        attitude_sigma_deg:=0.5 match_sigma_floor_m:=1.0
 
   aerostack2_autonomy:
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}

@@ -399,6 +399,42 @@ def test_tilted_camera_fixes_the_point_below_the_vehicle(
                                                               rel=0.03)
 
 
+
+def test_matching_floor_of_the_covariance_is_a_parameter(make_node):
+    """Real imagery is georeferenced to a few metres (the 3 m default);
+    simulators render the tiles themselves and set a lower floor."""
+    vehicle, height = (300.0, -150.0), 250.0
+    q = euler_quaternion(4.0, -3.0, 30.0)
+    node = make_node(match_sigma_floor_m=1.0)
+    node.cache = ProjectedCache(vehicle, camera_rotation(q, 0.0), height)
+    set_origin(node, *ORIGIN)
+    result = match(node, prior_at(*vehicle), odom=odometry(quaternion=q),
+                   camera_info=CAMERA_INFO)
+    assert result.fix.position_covariance[0] == pytest.approx(
+        horizontal_sigma(1.0, height, math.radians(1.0)) ** 2, rel=0.03)
+
+
+def test_stabilized_camera_sigma_ignores_body_rates(make_node):
+    """A gimbal holds the camera level: the body's angular rate over the
+    stamp uncertainty does not move its ray; a body-fixed camera's does."""
+    vehicle, height = (-200.0, 400.0), 250.0
+    q = euler_quaternion(yaw_deg=-35.0)
+    spinning = odometry(quaternion=q)
+    spinning.twist.twist.angular = NS(x=2.0, y=0.0, z=0.0)
+    sigma = {}
+    for stabilized in (True, False):
+        node = make_node(camera_stabilized=stabilized)
+        node.cache = ProjectedCache(vehicle, camera_rotation(q, 0.0), height)
+        set_origin(node, *ORIGIN)
+        result = match(node, prior_at(*vehicle), odom=spinning,
+                       camera_info=CAMERA_INFO)
+        sigma[stabilized] = result.fix.position_covariance[0]
+    assert sigma[True] == pytest.approx(
+        horizontal_sigma(3.0, height, math.radians(1.0)) ** 2, rel=0.03)
+    assert sigma[False] == pytest.approx(horizontal_sigma(
+        3.0, height, math.radians(1.0), 2.0, 0.0, 0.05) ** 2, rel=0.03)
+
+
 def test_jump_gate_compares_vehicle_positions(make_node):
     """800 m up and pitched 17 deg, the image centre is ~245 m behind the
     vehicle; with a 200 m jump gate the old image-centre fix was rejected

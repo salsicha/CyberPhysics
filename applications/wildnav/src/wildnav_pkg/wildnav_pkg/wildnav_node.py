@@ -168,6 +168,9 @@ class WildNavNode(Node):
             # stamp uncertainty.
             'attitude_sigma_deg': 1.0,
             'stamp_sigma_s': 0.05,
+            # Floor of the matching error: satellite imagery is georeferenced
+            # to a few metres (simulators render the tiles themselves).
+            'match_sigma_floor_m': 3.0,
             'max_attitude_offset_s': 0.25,
             'sim_clock_topic': '/clock',
         }
@@ -513,7 +516,8 @@ class WildNavNode(Node):
             return
 
         # Matching error, plus the attitude and timing errors, which move
-        # the nadir pixel by about height x angle.
+        # the nadir pixel by about height x angle (a stabilised camera stays
+        # level whatever the body's rates).
         resolution = ground_resolution_m(matched_lat, self.cache.zoom)
         height = height_above_ground(
             best['homography'], nadir, rotation, intrinsics, resolution)
@@ -521,10 +525,11 @@ class WildNavNode(Node):
             self._publish_invalid(best['inliers'], best['confidence'])
             return
         sigma = horizontal_sigma(
-            max(3.0, best['reprojection'] * resolution), height,
+            max(float(self.get_parameter('match_sigma_floor_m').value),
+                best['reprojection'] * resolution), height,
             math.radians(float(
                 self.get_parameter('attitude_sigma_deg').value)),
-            attitude.rate, attitude.speed,
+            0.0 if self.camera_stabilized else attitude.rate, attitude.speed,
             float(self.get_parameter('stamp_sigma_s').value),
             attitude.offset_s)
         variance = sigma * sigma

@@ -125,8 +125,10 @@ def make_node(dn, cache_dir):
 
 
 def render(camera_sim, east, north, yaw, agl=180.0, mount=0.0):
-    """Depth seen by the sim's body-fixed nadir camera, and the camera's
-    MSL altitude."""
+    """Relief-free depth of the sim's body-fixed nadir view (the camera
+    height above the terrain at each pixel's flat-ground point, the model
+    the relative-depth path matches with), and the camera's MSL altitude.
+    render_tilted ray-casts physical depth."""
     stub = NS(east_m=east, north_m=north, yaw_rad=yaw,
               camera_mount_yaw=math.radians(mount),
               fov=math.radians(FOV_DEG))
@@ -606,36 +608,245 @@ def test_the_attitude_at_the_frame_stamp_is_used(make_node):
     assert result.fix is None and result.valid is False
 
 
-def test_fix_covariance_adds_attitude_error_times_height(make_node,
-                                                        camera_sim):
-    node = make_node(search_radius_m=50.0, attitude_sigma_deg=5.0)
+def test_fix_covariance_adds_attitude_error_times_height(dn, make_node,
+                                                        camera_sim,
+                                                        monkeypatch):
+    monkeypatch.setattr(dn, 'match_sigma', lambda *args: 7.0)
+    node = make_node(search_radius_m=50.0, attitude_sigma_deg=5.0,
+                     depth_is_metric=True)
     east, north, yaw = 100.0, -50.0, 0.3
     depth, altitude = render(camera_sim, east, north, yaw, agl=180.0)
     result = frame(node, depth, yaw, prior=fix_at(east, north, altitude))
-    match = max(10.0, 50.0 * (1.0 - result.confidence))
-    expected = match ** 2 + (180.0 * math.radians(5.0)) ** 2
+    expected = 7.0 ** 2 + (180.0 * math.radians(5.0)) ** 2
     assert result.fix.position_covariance[0] == pytest.approx(expected,
                                                               rel=0.03)
     assert result.fix.position_covariance[4] == \
         result.fix.position_covariance[0]
 
 
-def test_tilted_range_becomes_height_below_the_camera():
-    """Metric z-depth of flat ground from a tilted camera ramps across the
-    frame (a false terrain slope); as height below the camera it is flat,
-    and level frames are unchanged."""
-    from demnav_pkg.camera_geometry import camera_rotation
-    from demnav_pkg.terrain_match import height_below_camera
-    k = camera_info().k
-    intrinsics = (k[0], k[4], k[2], k[5])
-    u, v = np.meshgrid(np.arange(WIDTH, dtype=float),
-                       np.arange(HEIGHT, dtype=float))
-    for roll, pitch, expect_flat in ((0.0, 0.0, True), (9.0, -13.0, True)):
-        rotation = camera_rotation(euler_quaternion(
-            math.radians(roll), math.radians(pitch), 0.7), 0.0)
-        rays = np.stack(((u - k[2]) / k[0], (v - k[5]) / k[4],
-                         np.ones_like(u)), axis=-1) @ rotation.T
-        z_depth = (150.0 / -rays[..., 2]).astype(np.float32)
-        height = height_below_camera(z_depth, rotation, intrinsics)
-        assert np.allclose(height, 150.0, atol=1e-3)
-        assert (np.ptp(z_depth) < 1e-3) == (roll == 0.0 and pitch == 0.0)
+def test_stabilized_camera_sigma_ignores_body_rates(dn, make_node, camera_sim,
+                                                    monkeypatch):
+    """A gimbal holds the camera level, so the body's angular rate over the
+    stamp uncertainty does not move its ray (SITL's noisy gyro rates made
+    the lite stack report 22 m for fixes 2 m off)."""
+    monkeypatch.setattr(dn, 'match_sigma', lambda *args: 3.0)
+    east, north, yaw = 100.0, -50.0, 0.3
+    depth, altitude = render(camera_sim, east, north, yaw, agl=180.0)
+    spinning = odometry(yaw)
+    spinning.twist.twist.angular = NS(x=2.0, y=0.0, z=0.0)
+    sigma = {}
+    for stabilized in (True, False):
+        node = make_node(search_radius_m=50.0, depth_is_metric=True,
+                         heading_sigma_deg=0.0, camera_stabilized=stabilized)
+        node.subs['/odom'](spinning)
+        result = frame(node, depth, yaw, prior=fix_at(east, north, altitude),
+                       odom=False)
+        sigma[stabilized] = math.sqrt(result.fix.position_covariance[0])
+    assert sigma[True] == pytest.approx(
+        math.hypot(3.0, 180.0 * math.radians(1.0)), rel=0.03)
+    # Body-fixed: 2 rad/s over the 0.05 s stamp uncertainty is 0.1 rad.
+    assert sigma[False] == pytest.approx(
+        math.hypot(3.0, 180.0 * math.hypot(math.radians(1.0), 0.1)),
+        rel=0.03)
+
+
+def test_match_sigma_follows_the_peak_score_and_sharpness():
+    from demnav_pkg.terrain_match import match_sigma
+    # A perfect fit is located to the floor.
+    assert match_sigma(1.0, [[-0.1, 0.0], [0.0, -0.1]], 400, 10.0,
+                       2.5, 0.1, 150.0) == pytest.approx(1.0)
+    # (1 - r^2) / (cells x flattest curvature) cells^2, scaled, with the
+    # floor in quadrature.
+    bound = 10.0 * math.sqrt((1.0 - 0.99 ** 2) / (400 * 0.02))
+    assert match_sigma(0.99, [[-0.08, 0.0], [0.0, -0.02]], 400, 10.0,
+                       2.5, 0.1, 150.0) == pytest.approx(
+                           math.hypot(1.0, 2.5 * bound))
+    # The flattest direction counts, whatever its orientation.
+    rotated = [[-0.05, 0.03], [0.03, -0.05]]  # eigenvalues -0.08, -0.02
+    assert match_sigma(0.99, rotated, 400, 10.0, 2.5, 0.1, 150.0) == \
+        pytest.approx(math.hypot(1.0, 2.5 * bound))
+    # A worse fit, fewer cells or a flatter peak: larger.
+    assert match_sigma(0.9, rotated, 400, 10.0, 2.5, 0.1, 150.0) > \
+        match_sigma(0.99, rotated, 400, 10.0, 2.5, 0.1, 150.0)
+    assert match_sigma(0.99, rotated, 100, 10.0, 2.5, 0.1, 150.0) > \
+        match_sigma(0.99, rotated, 400, 10.0, 2.5, 0.1, 150.0)
+    # A ridge (not a maximum in every direction) or a peak on the edge of
+    # the score map is located no better than the look-alike exclusion.
+    assert match_sigma(0.99, [[-0.1, 0.0], [0.0, 0.01]], 400, 10.0,
+                       2.5, 0.1, 150.0) == 150.0
+    assert match_sigma(0.99, None, 400, 10.0, 2.5, 0.1, 150.0) == 150.0
+    assert match_sigma(0.2, [[-1e-6, 0.0], [0.0, -1e-6]], 9, 10.0,
+                       2.5, 0.1, 150.0) == 150.0
+
+
+@pytest.mark.parametrize('east,north,roll_deg,pitch_deg,yaw_deg', [
+    (100.0, -50.0, 0.0, 12.0, 30.0), (-150.0, 60.0, -10.0, 0.0, -100.0),
+    (500.0, 200.0, 8.0, -8.0, 160.0), (40.0, 120.0, 14.0, 6.0, 45.0),
+    (-300.0, -150.0, -6.0, -9.0, 75.0)])
+def test_reported_sigma_covers_the_error(make_node, east, north, roll_deg,
+                                         pitch_deg, yaw_deg):
+    """Calibrated against simulator frames (Isaac and Gazebo with ground
+    truth), the reported sigma is neither inflated nor optimistic; here,
+    with a DEM equal to the terrain, the error stays within it."""
+    node = make_node(depth_is_metric=True)
+    roll, pitch, yaw = (math.radians(v) for v in (roll_deg, pitch_deg,
+                                                    yaw_deg))
+    depth, altitude, _ = render_tilted(east, north, roll, pitch, yaw)
+    result = frame(node, depth, yaw, roll=roll, pitch=pitch,
+                   prior=fix_at(east + 40.0, north + 25.0, altitude))
+    sigma = math.sqrt(result.fix.position_covariance[0])
+    assert math.hypot(*error_m(result, east, north)) < 2.0 * sigma
+    # Matching floor (1 m), attitude (1 deg x 180 m), heading (1 deg x how
+    # far that turn moves the match) and peak spread.
+    assert 3.0 < sigma < 8.0
+
+
+def test_detrended_correlation_ignores_the_trend_on_both_sides():
+    """Scores computed after removing a trend from template and windows do
+    not change when either side gains any amount of that trend, and equal
+    the plain normalised correlation without one. A ramp in the template
+    alone (a tilted view) otherwise moves the match."""
+    import cv2
+    from demnav_pkg.terrain_match import _detrended_scores
+    rng = np.random.default_rng(3)
+    dem = cv2.GaussianBlur(rng.normal(size=(60, 70)).astype(np.float32),
+                           (0, 0), 4.0)
+    dem = (dem - dem.mean()) / dem.std()
+    template = dem[20:40, 25:50] + 0.05 * rng.normal(size=(20, 25))
+    template = template.astype(np.float32)
+    mask = np.ones(template.shape, bool)
+    mask[:3, :4] = False
+    rows, cols = np.indices(template.shape, dtype=np.float64)
+    along = (0.8 * cols + 0.6 * rows) / 25.0
+    trend = (along - along.mean(), (along - along.mean()) ** 2)
+    plain = cv2.matchTemplate(dem, template, cv2.TM_CCOEFF_NORMED,
+                              mask=mask.astype(np.float32))
+    assert _detrended_scores(dem, template, mask, ()) == pytest.approx(
+        plain, abs=1e-4)
+    scores = _detrended_scores(dem, template, mask, trend)
+    assert np.unravel_index(np.argmax(scores), scores.shape) == (20, 25)
+    # The same trend, any amount, in the template, and across the DEM (a
+    # map-wide ramp and curvature along the same direction).
+    tilted = (template + 3.0 * trend[0] - 2.0 * trend[1]).astype(np.float32)
+    map_rows, map_cols = np.indices(dem.shape, dtype=np.float64)
+    map_along = (0.8 * map_cols + 0.6 * map_rows) / 25.0
+    sloped = (dem + 5.0 * map_along + 0.7 * map_along ** 2).astype(
+        np.float32)
+    for image, window in ((tilted, dem), (template, sloped),
+                          (tilted, sloped)):
+        assert _detrended_scores(window, image, mask, trend) == \
+            pytest.approx(scores, abs=2e-3)
+    # Matched as is, the template's ramp decides where it fits.
+    ramped = cv2.matchTemplate(dem, tilted, cv2.TM_CCOEFF_NORMED,
+                               mask=mask.astype(np.float32))
+    assert np.unravel_index(np.argmax(ramped), ramped.shape) != (20, 25)
+
+
+# Relative (log) depth of the synthetic world from a body-fixed camera at
+# 180 m: (east, north, roll, pitch, yaw) where matching the frame as is
+# (HEAD) put the fix 80-240 m away with confidence 0.36-0.73.
+TILTED_RELATIVE_FRAMES = [
+    (-229.0, -724.0, 7.8, 4.3, -72.0), (126.0, 225.0, -10.1, -13.1, -34.0),
+    (322.0, -8.0, 4.4, 8.6, -66.0), (245.0, 1110.0, 8.7, 0.0, 88.0),
+    (952.0, 200.0, 2.0, 8.2, 25.0)]
+
+
+def relative_frames(make_node):
+    node = make_node()
+    results = []
+    for east, north, *attitude in TILTED_RELATIVE_FRAMES:
+        roll, pitch, yaw = (math.radians(v) for v in attitude)
+        depth, altitude, _ = render_tilted(east, north, roll, pitch, yaw)
+        result = frame(node, np.log(depth), yaw, roll=roll, pitch=pitch,
+                       prior=fix_at(east + 30.0, north - 20.0, altitude))
+        if result.fix is not None:
+            results.append((math.hypot(*error_m(result, east, north)),
+                            math.sqrt(result.fix.position_covariance[0]),
+                            result.confidence))
+    return results
+
+
+def test_relative_depth_leaves_the_tilt_ramp_out_of_the_match(
+        dn, make_node, monkeypatch):
+    """A tilted view of flat ground ramps relative depth along the view's
+    heading, and any hillside sloping that way matched the ramp: confident
+    fixes 80-240 m off. With that profile left out of template and DEM
+    windows the same frames fix the vehicle (synthetic tests over the
+    Mount Tamalpais DEM at 0-20 deg: none over 50 m off in 227 fixes)."""
+    fixed = relative_frames(make_node)
+    assert len(fixed) >= 4
+    for error, sigma, _ in fixed:
+        assert error < 25.0
+        assert error < 3.0 * sigma
+
+    original = dn.correlate
+    monkeypatch.setattr(dn, 'correlate',
+                        lambda *args: original(*args[:7]))
+    as_is = relative_frames(make_node)
+    assert sum(1 for error, _, confidence in as_is
+               if error > 75.0 and confidence > 0.35) >= 4
+
+
+def test_relative_depth_sigma_grows_with_tilt_and_relief(dn, make_node,
+                                                         monkeypatch):
+    """Projected onto flat ground, relief dh seen at view angle a lands
+    dh x tan(a) off: relative-depth fixes add the relief times the tangent
+    of the view's edge (half the field of view plus the tilt)."""
+    monkeypatch.setattr(dn, 'match_sigma', lambda *args: 0.0)
+    node = make_node(attitude_sigma_deg=0.0, heading_sigma_deg=0.0,
+                     stamp_sigma_s=0.0)
+    east, north, yaw = 322.0, -8.0, math.radians(-66.0)
+    grid = np.linspace(-120.0, 120.0, 25)
+    relief = float(np.std(sw.terrain_height(*np.meshgrid(east + grid,
+                                                          north + grid))))
+    half_fov = math.radians(FOV_DEG / 2.0)
+    sigmas = []
+    for roll_deg, pitch_deg in ((0.0, 0.0), (4.4, 8.6)):
+        roll, pitch = math.radians(roll_deg), math.radians(pitch_deg)
+        depth, altitude, _ = render_tilted(east, north, roll, pitch, yaw)
+        result = frame(node, np.log(depth), yaw, roll=roll, pitch=pitch,
+                       prior=fix_at(east, north, altitude))
+        sigma = math.sqrt(result.fix.position_covariance[0])
+        tilt = math.acos(math.cos(roll) * math.cos(pitch))
+        assert sigma == pytest.approx(relief * math.tan(half_fov + tilt),
+                                      rel=0.5)
+        sigmas.append(sigma)
+    assert sigmas[1] > sigmas[0]
+    # Metric depth is placed in 3D: no such term.
+    metric = make_node(attitude_sigma_deg=0.0, heading_sigma_deg=0.0,
+                       stamp_sigma_s=0.0, depth_is_metric=True)
+    depth, altitude, _ = render_tilted(east, north, roll, pitch, yaw)
+    result = frame(metric, depth, yaw, roll=roll, pitch=pitch,
+                   prior=fix_at(east, north, altitude))
+    assert result.fix.position_covariance[0] == pytest.approx(0.0, abs=1e-9)
+
+
+@pytest.mark.parametrize('east,north,roll_deg,pitch_deg,yaw_deg', [
+    (500.0, 200.0, 8.0, -8.0, 160.0), (100.0, -50.0, 0.0, 12.0, 30.0),
+    (-300.0, -150.0, -6.0, -9.0, 75.0), (40.0, 120.0, 14.0, 6.0, 45.0),
+    (700.0, 300.0, 5.0, 5.0, 10.0)])
+def test_heading_sigma_is_how_far_a_heading_error_moves_the_fix(
+        make_node, east, north, roll_deg, pitch_deg, yaw_deg):
+    """A heading error turns the template about the point below the
+    vehicle: on a ridge or slope across the footprint the fix moves metres
+    per degree, over a compact feature little. The covariance adds the move
+    the turned template predicts, times heading_sigma_deg; it matches what
+    a real 2 deg heading error does to the fix."""
+    roll, pitch, yaw = (math.radians(v) for v in (roll_deg, pitch_deg,
+                                                    yaw_deg))
+    depth, altitude, _ = render_tilted(east, north, roll, pitch, yaw)
+    prior = fix_at(east + 30.0, north - 20.0, altitude)
+    quiet = {'depth_is_metric': True, 'attitude_sigma_deg': 0.0,
+             'stamp_sigma_s': 0.0}
+    without = frame(make_node(heading_sigma_deg=0.0, **quiet), depth, yaw,
+                    roll=roll, pitch=pitch, prior=prior)
+    with_heading = frame(make_node(heading_sigma_deg=2.0, **quiet), depth,
+                         yaw, roll=roll, pitch=pitch, prior=prior)
+    predicted = math.sqrt(with_heading.fix.position_covariance[0] -
+                          without.fix.position_covariance[0])
+    turned = frame(make_node(heading_sigma_deg=0.0, **quiet), depth,
+                   yaw + math.radians(2.0), roll=roll, pitch=pitch,
+                   prior=prior)
+    moved = math.hypot(*np.subtract(error_m(turned, east, north),
+                                    error_m(without, east, north)))
+    assert 0.5 * predicted < moved < 1.5 * predicted

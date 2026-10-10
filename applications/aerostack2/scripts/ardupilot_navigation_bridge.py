@@ -17,9 +17,11 @@
 2. GPS-denied corrections (``gps_input_enabled``; the node default is off,
    every ArduCopter stack enables it through ``GPS_INPUT_CORRECTIONS``,
    default true). Accepted DemNav/WildNav corrections from the fusion node
-   (``/navigation/correction_fix``: each accepted absolute fix once,
-   time-aligned to the latest odometry sample) are forwarded to ArduPilot as
-   a second GPS through the MAVROS gps_input plugin (MAVLink GPS_INPUT,
+   (``/navigation/correction_fix``: on each accepted fix, the
+   inverse-variance combination of the sources' latest fixes, time-aligned
+   to the latest odometry sample, its variance scaled for the EKF, which
+   fuses every sample as independent) are forwarded to ArduPilot as a
+   second GPS through the MAVROS gps_input plugin (MAVLink GPS_INPUT,
    GPS2_TYPE=14). Only fresh accepted fixes are sent, never the fused
    estimate. Horizontal accuracy is the fix's standard deviation; altitude,
    vertical accuracy and velocity are flagged as absent (visual fixes carry

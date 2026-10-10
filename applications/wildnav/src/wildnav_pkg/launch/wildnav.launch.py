@@ -38,6 +38,7 @@ def generate_launch_description():
         ('fov_deg', '69.0'),
         ('attitude_sigma_deg', '1.0'),
         ('stamp_sigma_s', '0.05'),
+        ('match_sigma_floor_m', '3.0'),
         ('navigation_output_topic', '/navigation/odometry'),
         ('minimum_demnav_confidence', '0.35'),
         ('minimum_wildnav_confidence', '0.20'),
@@ -98,6 +99,7 @@ def generate_launch_description():
             'fov_deg': values['fov_deg'],
             'attitude_sigma_deg': values['attitude_sigma_deg'],
             'stamp_sigma_s': values['stamp_sigma_s'],
+            'match_sigma_floor_m': values['match_sigma_floor_m'],
         }],
     )
     fusion = Node(

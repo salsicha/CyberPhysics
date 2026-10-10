@@ -114,6 +114,28 @@ def test_footprint_scales_with_view_height():
     assert span_high == pytest.approx(2.0 * span_low, rel=1e-9)
 
 
+def test_depth_is_where_each_ray_meets_the_terrain():
+    """The published depth is z-depth along each pixel's ray to the
+    terrain, not the height above the terrain at the pixel's flat-ground
+    point (which shifts relief outward by r * dh / H)."""
+    stub = make_stub(math.radians(30.0), east=100.0, north=-50.0)
+    stub.depth_width, stub.depth_height, stub.frame_id = 160, 120, 'camera'
+    stub._ground_grid = lambda *args: \
+        camera_sim.SatelliteCameraSim._ground_grid(stub, *args)
+    view_height = 150.0
+    altitude = float(sw.terrain_height(100.0, -50.0)) + view_height
+    depth = np.frombuffer(camera_sim.SatelliteCameraSim._make_depth(
+        stub, altitude, view_height, None).data, np.float32).reshape(120, 160)
+
+    east, north = ground(stub, 160, 120, view_height)
+    reach = depth / view_height
+    hit = sw.terrain_height(100.0 + (east - 100.0) * reach,
+                            -50.0 + (north + 50.0) * reach)
+    assert np.abs(altitude - depth - hit).max() < 0.01
+    flat = altitude - sw.terrain_height(east, north)
+    assert np.abs(flat - depth).max() > 10.0
+
+
 def test_attitude_helpers_match_euler_convention():
     """Quaternion helpers of the matcher nodes recover ZYX Euler angles."""
     from demnav_pkg import camera_geometry as demnav_geometry

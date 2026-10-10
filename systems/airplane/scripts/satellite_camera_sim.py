@@ -224,7 +224,18 @@ class SatelliteCameraSim(Node):
         msg.step = self.depth_width * 4
         east, north = self._ground_grid(
             self.depth_width, self.depth_height, view_height)
-        depth = np.maximum(1.0, altitude - terrain_height(east, north))
+        # A depth camera measures where each pixel's ray meets the terrain,
+        # not the terrain below that ray's flat-ground point: rays to
+        # higher ground stop short of it, rays to lower ground reach past.
+        # March each ray (z-depth = height below the level camera) there.
+        reach_east = (east - self.east_m) / view_height
+        reach_north = (north - self.north_m) / view_height
+        depth = np.full(east.shape, view_height)
+        for _ in range(40):
+            ground = terrain_height(self.east_m + reach_east * depth,
+                                    self.north_m + reach_north * depth)
+            depth += 0.7 * (altitude - ground - depth)
+        depth = np.maximum(1.0, depth)
         msg.data = depth.astype(np.float32).tobytes()
         return msg
 

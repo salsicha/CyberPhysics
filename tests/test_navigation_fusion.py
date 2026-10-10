@@ -416,8 +416,9 @@ def test_ignores_corrupted_source_state_and_extreme_variance(harness, module):
     assert harness.node._target_offset()[2] == ''
     harness.node.demnav.east = 1.0
     assert harness.node._target_offset()[2] == 'demnav'
-    harness.node.demnav.accepted_confidence = 0.35
-    harness.node.demnav.variance = 1.7e308
+    harness.node.demnav.variance = float('inf')
+    assert harness.node._target_offset()[2] == ''
+    harness.node.demnav.variance = 0.0
     assert harness.node._target_offset()[2] == ''
 
 
@@ -565,3 +566,127 @@ def test_fix_newer_than_raw_odometry_waits_for_the_next_sample(harness):
     assert state.received_ns > 0
     assert state.east == pytest.approx(4.0, abs=1e-6)  # raw x was 6 at 0.6 s
     assert len(harness.published('/navigation/correction_fix')) == 1
+
+
+def test_sources_are_weighted_by_inverse_variance_not_confidence(harness):
+    """Confidence only admits a fix; the fixes' covariances weight them (a
+    confidence factor on top counted the match quality twice)."""
+    harness.origin()
+    harness.raw(WALL_S)
+    harness.source('demnav', fix_at(WALL_S, 10.0, 0.0, sigma=4.0),
+                   confidence=0.9)
+    harness.source('wildnav', fix_at(WALL_S, 0.0, 0.0, sigma=2.0),
+                   confidence=0.3)
+    east, _, source, _, variance = harness.node._target_offset()
+    assert source == 'demnav+wildnav'
+    # 1/16 and 1/4: DemNav weighs a fifth.
+    assert east == pytest.approx(10.0 / 5.0, abs=1e-6)
+    assert variance == pytest.approx(1.0 / (1.0 / 16.0 + 1.0 / 4.0))
+
+
+def test_autopilot_gets_the_sources_combined_at_their_combined_rate(harness):
+    """ArduPilot's EKF3 holds the largest GPS accuracy of the last seconds
+    for every GPS_INPUT sample and fuses each as independent: interleaved,
+    DemNav's dense fixes gave WildNav's their accuracy and outvoted them.
+    Each accepted fix instead sends the inverse-variance combination of
+    every source's latest fix, propagated to the latest raw sample."""
+    harness.origin()
+    for step in range(11):  # 1 s north at 4 m/s
+        harness.raw(WALL_S + 0.1 * step, y=0.4 * step, vy=4.0)
+    harness.source('wildnav', fix_at(WALL_S + 0.5, 2.0, 2.0, sigma=2.0))
+    sent = harness.last('/navigation/correction_fix')
+    east, north = latlon_to_local(sent.latitude, sent.longitude, ORIGIN[0], ORIGIN[1])
+    assert (east, north) == pytest.approx((2.0, 4.0), abs=0.05)
+    for step in range(11, 16):
+        harness.raw(WALL_S + 0.1 * step, y=0.4 * step, vy=4.0)
+    harness.source('demnav', fix_at(WALL_S + 1.5, 7.0, 6.0, sigma=4.0))
+    sent = harness.last('/navigation/correction_fix')
+    assert len(harness.published('/navigation/correction_fix')) == 2
+    # WildNav's fix moved 4 m north since; weights 1/(4 + (0.3 x 1)^2)
+    # and 1/16.
+    w_wild, w_dem = 1.0 / (4.0 + 0.09), 1.0 / 16.0
+    east, north = latlon_to_local(sent.latitude, sent.longitude, ORIGIN[0], ORIGIN[1])
+    assert east == pytest.approx((2.0 * w_wild + 7.0 * w_dem) / (w_wild + w_dem), abs=0.05)
+    assert north == pytest.approx((6.0 * w_wild + 6.0 * w_dem) / (w_wild + w_dem), abs=0.05)
+    # Its variance, times the corrections sent in the last
+    # correction_correlation_s (60 s): two.
+    assert sent.position_covariance[0] == pytest.approx(2.0 / (w_wild + w_dem))
+    # A fix older than max_fix_age_s (10 s) no longer counts.
+    for step in range(16, 140):
+        harness.raw(WALL_S + 0.1 * step, y=0.4 * step, vy=4.0)
+    harness.source('demnav', fix_at(WALL_S + 13.9, 9.0, 55.6, sigma=4.0))
+    sent = harness.last('/navigation/correction_fix')
+    east, north = latlon_to_local(sent.latitude, sent.longitude, ORIGIN[0], ORIGIN[1])
+    assert (east, north) == pytest.approx((9.0, 55.6), abs=0.05)
+    assert sent.position_covariance[0] == pytest.approx(3 * 16.0)
+
+
+def test_a_fix_inconsistent_with_the_other_source_is_left_out(harness):
+    """A false WildNav match (224 m off in the lite stack, confidence just
+    above its minimum) halved into the combination and sent with the
+    stream's inflated variance passed the EKF's gate and pulled it 50 m.
+    Fixes more than 5 combined sigma apart are not combined: the one
+    farther from the fused position is left out."""
+    harness.origin()
+    for step in range(11):
+        harness.raw(WALL_S + 0.1 * step)
+    harness.source('demnav', fix_at(WALL_S + 0.9, 3.0, 1.0, sigma=4.0))
+    harness.source('wildnav', fix_at(WALL_S + 1.0, 200.0, -90.0, sigma=5.0))
+    sent = harness.last('/navigation/correction_fix')
+    east, north = latlon_to_local(sent.latitude, sent.longitude, ORIGIN[0], ORIGIN[1])
+    assert (east, north) == pytest.approx((3.0, 1.0), abs=0.05)
+    assert sent.position_covariance[0] == pytest.approx(2 * 16.0, rel=0.01)
+    # Within the gate both count.
+    for step in range(11, 16):
+        harness.raw(WALL_S + 0.1 * step)
+    harness.source('wildnav', fix_at(WALL_S + 1.4, 9.0, 1.0, sigma=5.0))
+    sent = harness.last('/navigation/correction_fix')
+    east, _ = latlon_to_local(sent.latitude, sent.longitude, ORIGIN[0], ORIGIN[1])
+    assert east == pytest.approx((3.0 / 16.0 + 9.0 / 25.0) / (1 / 16.0 + 1 / 25.0),
+                                 abs=0.1)
+
+
+def test_dense_corrections_share_one_correlation_time(module):
+    """The fixes' errors persist for tens of seconds while the EKF fuses
+    each GPS_INPUT sample as independent: n samples within
+    correction_correlation_s are each sent with n times the variance, so
+    a 5 Hz stream does not count 25 times one at 0.2 Hz."""
+    h = Harness(module, correction_correlation_s=5.0)
+    h.origin()
+    variances = []
+    for step in range(60):  # DemNav at 5 Hz for 12 s
+        t = WALL_S + 0.2 * step
+        h.raw(t)
+        h.source('demnav', fix_at(t, 3.0, 0.0, sigma=4.0))
+        variances.append(h.last('/navigation/correction_fix').position_covariance[0])
+    assert variances[0] == pytest.approx(16.0)
+    assert variances[4] == pytest.approx(5 * 16.0)
+    assert variances[-1] == pytest.approx(25 * 16.0)
+    # WildNav alone at 0.2 Hz: one sample per 5 s, sent as it is.
+    h = Harness(module, correction_correlation_s=5.0)
+    h.origin()
+    for step in range(4):
+        t = WALL_S + 5.0 * step
+        h.raw(t)
+        h.source('wildnav', fix_at(t, 3.0, 0.0, sigma=2.0))
+        assert h.last('/navigation/correction_fix').position_covariance[0] == \
+            pytest.approx(4.0)
+
+
+def test_propagation_counts_simulated_time(module):
+    """MAVROS stamps odometry in wall time but its velocity is per
+    simulated second: at a fifth of real time, a fix 5 s (wall) old has
+    moved with the vehicle for 1 s, not 5."""
+    h = Harness(module)
+    for step in range(61):  # 6 s of wall time at 0.2x, 4 m/s north
+        t = 0.1 * step
+        h.node.now_ns = int((WALL_S + t) * 1e9)
+        h.send('/clock', NS(clock=stamp(100.0 + 0.2 * t)))
+        h.raw(WALL_S + t, y=0.8 * t, vy=4.0)
+        if step == 0:
+            h.origin()
+    h.source('wildnav', fix_at(WALL_S + 1.0, 0.0, 10.0, sigma=2.0))
+    sent = h.last('/navigation/correction_fix')
+    _, north = latlon_to_local(sent.latitude, sent.longitude, ORIGIN[0], ORIGIN[1])
+    assert north == pytest.approx(10.0 + 4.0 * 0.2 * 5.0, abs=0.1)
+    assert sent.position_covariance[0] == pytest.approx(4.0 + (0.3 * 1.0) ** 2, rel=0.01)

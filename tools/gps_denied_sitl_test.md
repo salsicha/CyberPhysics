@@ -87,12 +87,28 @@ navigation fusion and the ArduPilot navigation bridge together:
    fix's camera timestamp (interpolated between samples up to 1.5 s apart;
    rejected with no sample within 0.25 s; simulator stamps are mapped
    through `/clock`).
-2. **Only accepted fixes, once.** Each accepted fix is published once on
-   `/navigation/correction_fix`, propagated from camera time to the latest
+2. **Accepted fixes, combined.** Each accepted fix publishes, on
+   `/navigation/correction_fix`, the inverse-variance combination of every
+   source's latest accepted fix (within `correction_timeout_s` and
+   `max_fix_age_s`), each propagated from camera time to the latest
    odometry sample with the odometry *velocity* (not position, which jumps
    when the EKF absorbs an earlier correction). It is never the fused
    estimate: that is ArduPilot's odometry plus an offset, and feeding it back
-   makes the EKF chase its own offset.
+   makes the EKF chase its own offset. EKF3 gives every GPS sample the
+   largest accuracy reported in the last few seconds (a decaying peak hold)
+   and fuses each as independent, so it cannot weight interleaved sources
+   (the denser DemNav would outvote the more accurate WildNav); sending only
+   the more accurate source instead starves it (position every few seconds:
+   3 deg of tilt drift in Gazebo, which moves every camera fix). The
+   variance sent is the combination's times the number of corrections sent
+   in the last `correction_correlation_s` (60 s): the fixes' errors are
+   biases lasting tens of seconds, and at their own variance the EKF jumps
+   at every sample, the controller answers with tens of degrees of tilt and
+   the camera fixes, which use the EKF's attitude, degrade with it (Gazebo:
+   20-70 m autopilot error). Fixes more than `correction_consistency_sigma`
+   (5) combined sigma apart are not combined; the one farther from the
+   fused position is left out (a false WildNav match, halved and sent with
+   that variance, passed the EKF's gate and pulled it 50 m in this test).
 3. **GPS 2 = GPS_INPUT.** The bridge sends each one through the MAVROS
    gps_input plugin with fix type 3D, GPS week/ms from the stamp, honest
    horizontal accuracy (fix sigma, HDOP = sigma / 5 m), 6 satellites (the
@@ -154,6 +170,16 @@ Full stack (`tools/gps_denied_sitl_test.sh`, DemNav corrections at 2 Hz):
 | corrections on, 300 s (defaults), two runs | 298-299 s | 8.2-8.4 / 17.0-17.4 / 20.3-20.6 m | 8.1-8.3 m | 100 %, no failsafe text | 99 % |
 | control (`GPS_INPUT_CORRECTIONS=false`) | 128 s | 51.4 / 83.1 / 86.1 m | 57.2 m | 6 % (EKF failsafe -> LAND after 8 s) | 100 % |
 | on by default with the FC parameter check (forwarding armed 15 s after start) | 299 s | 8.1 / 17.7 / 20.5 m | 8.0 m | 100 %, no failsafe text | 98 % |
+| combined corrections, variance x corrections in 60 s (item 2) | 298 s | 19.5 / 29.4 / 34.6 m | 19.4 m | 100 %, no failsafe text | 100 % |
+
+The last run's DemNav fixes were 2.2 m median off (p95 15.5 m) with a
+3.9 m sigma, but each correction went out with ~42 m (the variance scaling
+of item 2), so the EKF follows them more slowly than the earlier runs'
+per-fix ~22 m (then inflated by SITL's noisy gyro rate, which a stabilised
+camera does not see): ~28 m off within 25 s of the GPS loss, recovering
+over the next minute. The scaling is what keeps the Gazebo and Isaac
+stacks, whose body-fixed cameras close a loop through the EKF attitude,
+from diverging.
 
 Normal flight with the corrections enabled (`GPS_DENIED_DENIED_S=0
 GPS_DENIED_DENY_AFTER_S=300`, plus `ARMING_CHECK=1` layered through
@@ -165,9 +191,9 @@ and the EKF stayed on source set 1 (ArduPilot ignores them), EKF error RMSE
 
 WildNav matched rarely in this stack (a handful of fixes with 11-15
 inliers and confidence 0.15-0.30 at 150 m AGL over the synthetic tiles,
-several 100-750 m off and rejected by its jump gate or the fusion
-confidence gate), so DemNav supplied almost every correction; its
-horizontal sigma (up to ~70 m) dominates the error.
+several 100-750 m off and rejected by its jump gate, the fusion
+confidence gate or, for one 225 m off at confidence 0.22, the fusion's
+consistency gate), so DemNav supplied almost every correction.
 
 ## Pass criteria
 

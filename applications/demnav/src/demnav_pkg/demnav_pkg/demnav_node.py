@@ -39,11 +39,24 @@ from .camera_geometry import (
 )
 from .geoid import GeoidGrid
 from .heightmap import HeightMapCache
-from .terrain_match import correlate, ground_template, height_below_camera
+from .terrain_match import (
+    correlate,
+    ground_template,
+    heading_sensitivity,
+    match_sigma,
+    terrain_template,
+    view_trend,
+)
 
 # Unexplained-variance floor of the peak uniqueness test: two fits both
 # better than NCC ~0.995 are a tie, not a win for resampling noise.
 PEAK_RESIDUAL_FLOOR = 0.01
+# Steepest view angle the relative-depth relief term counts (80 deg).
+MAX_VIEW_RAD = math.radians(80.0)
+# Camera tilt beyond which relative depth also loses the curvature a
+# tilted view of flat ground puts along the view's heading (inverse or log
+# depth; under half a metre below 5 deg at 200 m with a 69 deg lens).
+QUADRATIC_TILT_RAD = math.radians(5.0)
 
 
 def fix_is_usable(fix, received, now, timeout_s) -> bool:
@@ -123,6 +136,9 @@ class DemNavNode(Node):
         self.declare_parameter('camera_stabilized', False)
         self.declare_parameter('depth_is_metric', False)
         self.declare_parameter('attitude_sigma_deg', 1.0)
+        self.declare_parameter('heading_sigma_deg', 1.0)
+        self.declare_parameter('match_sigma_scale', 2.0)
+        self.declare_parameter('match_sigma_floor_cells', 0.1)
         self.declare_parameter('stamp_sigma_s', 0.05)
         self.declare_parameter('max_attitude_offset_s', 0.25)
         self.declare_parameter('sim_clock_topic', '/clock')
@@ -168,6 +184,12 @@ class DemNavNode(Node):
         self.attitude_sigma_rad = math.radians(
             float(self.get_parameter('attitude_sigma_deg').value))
         self.stamp_sigma_s = float(self.get_parameter('stamp_sigma_s').value)
+        self.heading_sigma_rad = math.radians(
+            float(self.get_parameter('heading_sigma_deg').value))
+        self.match_sigma_scale = float(
+            self.get_parameter('match_sigma_scale').value)
+        self.match_sigma_floor_cells = float(
+            self.get_parameter('match_sigma_floor_cells').value)
         self.min_correlation  = self.get_parameter('min_correlation').value
         self.min_peak_uniqueness = float(
             self.get_parameter('min_peak_uniqueness').value)
@@ -491,16 +513,21 @@ class DemNavNode(Node):
         rotation = camera_rotation(
             attitude.quaternion, self.camera_mount_yaw_rad,
             self.camera_stabilized)
-        # Metric depth (simulator depth cameras) is range along a tilted
-        # view; as height below the camera it shows only the terrain.
-        # Relative depth (the OAK-1 network output) has no known scale or
-        # form and is matched as is.
-        template_depth = raw_depth
         if self.depth_is_metric:
-            template_depth = height_below_camera(
-                raw_depth, rotation, (fx, fy, cx, cy))
-        projected = ground_template(
-            template_depth, finite, rotation, (fx, fy, cx, cy), agl, cell_m)
+            # Metric depth (simulator depth cameras) puts every pixel on
+            # the terrain in 3D: the template is the height below the
+            # camera at each point's true ground position, free of the
+            # view's tilt and of relief displacement.
+            projected = terrain_template(
+                raw_depth, finite & (raw_depth > self.min_metric_depth) &
+                (raw_depth < self.max_metric_depth),
+                rotation, (fx, fy, cx, cy), cell_m)
+        else:
+            # Relative depth (the OAK-1 network output) has no known scale
+            # or form: it goes onto flat ground agl below the camera (the
+            # ramp a tilted view adds is left out of the correlation).
+            projected = ground_template(
+                raw_depth, finite, rotation, (fx, fy, cx, cy), agl, cell_m)
         if projected is None:
             self._publish_valid(False)
             return
@@ -539,10 +566,17 @@ class DemNavNode(Node):
         # Relative-depth models may encode either depth or inverse depth;
         # correlate() scores both polarities and also finds the best
         # look-alike outside the peak's neighbourhood (a footprint radius).
+        exclusion_cells = 0.5 * max(footprint_cells)
+        # A tilted view of flat ground ramps relative depth along the
+        # optical axis' heading; any hillside sloping that way would match
+        # the ramp. That profile is left out of the template and of every
+        # DEM window: only the rest of the relief is matched.
+        trend = () if self.depth_is_metric else view_trend(
+            rotation, depth_tmpl.shape, QUADRATIC_TILT_RAD)
         match = correlate(
             dem, depth_tmpl.astype(np.float32), valid_tmpl, anchor,
-            (center_row, center_col), radius_m / dem_res,
-            0.5 * max(footprint_cells))
+            (center_row, center_col), radius_m / dem_res, exclusion_cells,
+            trend)
         if match is None:
             self._publish_valid(False)
             return
@@ -605,12 +639,37 @@ class DemNavNode(Node):
             (metric_depth < self.min_metric_depth) |
             (metric_depth > self.max_metric_depth)] = np.nan
 
-        # Matching error, plus the attitude and timing errors of the
-        # projection (they move the point below the vehicle by about
-        # height x angle).
-        match_sigma = max(dem_res, self.search_radius_m * (1.0 - confidence))
+        # Matching error from the score and sharpness of the peak (at most
+        # the look-alike exclusion radius) and from a heading error, which
+        # turns the template about the point below the vehicle; plus the
+        # attitude and timing errors of the projection (they move that
+        # point by about height x angle).
+        located_m = match_sigma(
+            max_val, match['curvature'], int(valid_tmpl.sum()), dem_res,
+            self.match_sigma_scale, self.match_sigma_floor_cells,
+            exclusion_cells * dem_res)
+        if self.heading_sigma_rad > 0.0:
+            turning = heading_sensitivity(
+                dem, depth_tmpl.astype(np.float32), valid_tmpl, anchor,
+                match['position'], trend)
+            located_m = min(math.hypot(located_m, (
+                turning if turning is not None else float('inf')) *
+                dem_res * self.heading_sigma_rad), exclusion_cells * dem_res)
+        if not self.depth_is_metric:
+            # Projected onto flat ground, relief dh seen at view angle a
+            # lands dh x tan(a) off: the template shifts by up to the
+            # relief at the edge of the view (half the field of view off
+            # the optical axis, plus the camera's tilt).
+            tilt = math.acos(min(1.0, max(-1.0, -rotation[2, 2])))
+            view = min(math.atan(0.5 * max(img_w / fx, img_h / fy)) + tilt,
+                       MAX_VIEW_RAD)
+            located_m = math.hypot(located_m, float(
+                np.std(matched_dem[fit_mask])) * math.tan(view))
+        # A stabilised camera stays level whatever the body's rates (and
+        # turning about the vertical does not move the point below it).
         horizontal_variance = horizontal_sigma(
-            match_sigma, agl, self.attitude_sigma_rad, attitude.rate,
+            located_m, agl, self.attitude_sigma_rad,
+            0.0 if self.camera_stabilized else attitude.rate,
             attitude.speed, self.stamp_sigma_s, attitude.offset_s) ** 2
         vertical_sigma = max(dem_res, float(np.std(residual)))
         vertical_variance = vertical_sigma ** 2
