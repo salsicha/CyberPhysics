@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  FastDDS transport for the ROS containers of the Aerodrone simulation stacks
+  (FASTRTPS_DEFAULT_PROFILES_FILE; applications/aerostack2/README.md, "DDS
+  transport"). The containers share the host network and /dev/shm, so FastDDS
+  sends between them through shared memory. Its default 512 KiB segment holds
+  less than one camera frame (640x480 RGB is 0.9 MB, 32FC1 depth 1.2 MB):
+  buffers were recycled before the subscribers read them and DemNav, WildNav
+  and the validator received 1-3 % of the Genesis frames. Each sender's
+  segment now holds several RGB + depth bursts. UDP stays for peers that
+  cannot use this shared memory (Isaac Sim runs as another user and uses
+  fastdds_udp.xml), with larger socket buffers; the kernel caps them at
+  net.core.rmem_max / wmem_max.
+-->
+<profiles xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+  <transport_descriptors>
+    <transport_descriptor>
+      <transport_id>aerodrone_shm</transport_id>
+      <type>SHM</type>
+      <segment_size>8388608</segment_size>
+    </transport_descriptor>
+    <transport_descriptor>
+      <transport_id>aerodrone_udp</transport_id>
+      <type>UDPv4</type>
+      <sendBufferSize>4194304</sendBufferSize>
+      <receiveBufferSize>4194304</receiveBufferSize>
+    </transport_descriptor>
+  </transport_descriptors>
+  <participant profile_name="aerodrone_participant" is_default_profile="true">
+    <rtps>
+      <userTransports>
+        <transport_id>aerodrone_shm</transport_id>
+        <transport_id>aerodrone_udp</transport_id>
+      </userTransports>
+      <useBuiltinTransports>false</useBuiltinTransports>
+    </rtps>
+  </participant>
+</profiles>

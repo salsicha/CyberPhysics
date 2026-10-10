@@ -1,3 +1,9 @@
+# FastDDS transport of every ROS container: shared memory sized for the
+# camera frames, UDP with larger socket buffers (applications/aerostack2/README.md).
+# Isaac Sim runs as another user and uses UDP only (fastdds_udp.xml).
+x-fastdds-profile: &fastdds-profile /workspace/systems/aerodrone/config/fastdds.xml
+x-fastdds-mount: &fastdds-mount ../systems/aerodrone/config/fastdds.xml:/workspace/systems/aerodrone/config/fastdds.xml:ro
+
 services:
   demnav_assets:
     image: salsicha/cyberphysics:demnav-${CYBERPHYSICS_TAG:-latest}
@@ -88,8 +94,8 @@ services:
       ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
       ROS_DISTRO: ${ISAAC_ROS_DISTRO:-humble}
       RMW_IMPLEMENTATION: ${RMW_IMPLEMENTATION:-rmw_fastrtps_cpp}
-      FASTDDS_DEFAULT_PROFILES_FILE: /workspace/applications/isaac/config/fastdds_udp.xml
-      FASTRTPS_DEFAULT_PROFILES_FILE: /workspace/applications/isaac/config/fastdds_udp.xml
+      FASTDDS_DEFAULT_PROFILES_FILE: /workspace/systems/aerodrone/config/fastdds_udp.xml
+      FASTRTPS_DEFAULT_PROFILES_FILE: /workspace/systems/aerodrone/config/fastdds_udp.xml
       LD_LIBRARY_PATH: /isaac-sim/exts/isaacsim.ros2.core/${ISAAC_ROS_DISTRO:-humble}/lib
       NVIDIA_DRIVER_CAPABILITIES: all
       OMNI_KIT_ALLOW_ROOT: "1"
@@ -149,7 +155,8 @@ services:
     network_mode: host
     ipc: host
     depends_on: [navigator_sitl]
-    environment: {ROS_DOMAIN_ID: "${ROS_DOMAIN_ID:-0}"}
+    environment: {ROS_DOMAIN_ID: "${ROS_DOMAIN_ID:-0}", FASTRTPS_DEFAULT_PROFILES_FILE: *fastdds-profile}
+    volumes: [*fastdds-mount]
     command: ros2 launch mavros apm.launch fcu_url:=tcp://127.0.0.1:5760
 
   navigation_bridge:
@@ -162,9 +169,10 @@ services:
     network_mode: host
     ipc: host
     depends_on: [mavros]
-    environment: {ROS_DOMAIN_ID: "${ROS_DOMAIN_ID:-0}"}
+    environment: {ROS_DOMAIN_ID: "${ROS_DOMAIN_ID:-0}", FASTRTPS_DEFAULT_PROFILES_FILE: *fastdds-profile}
     volumes:
       - /dev/shm:/dev/shm
+      - *fastdds-mount
       - ../applications/aerostack2/scripts:/workspace/applications/aerostack2/scripts:ro
     command: >
       python3 /workspace/applications/aerostack2/scripts/ardupilot_navigation_bridge.py
@@ -180,7 +188,8 @@ services:
     env_file: [../systems/aerodrone/config/topics.env, ../applications/aerostack2/config/mount_tamalpais.env]
     environment:
       ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
-    volumes: [/dev/shm:/dev/shm, demnav_isaac_cache:/data/demnav_cache:ro]
+      FASTRTPS_DEFAULT_PROFILES_FILE: *fastdds-profile
+    volumes: [/dev/shm:/dev/shm, *fastdds-mount, demnav_isaac_cache:/data/demnav_cache:ro]
     command: >
       ros2 launch demnav_pkg demnav.launch.py
         gps_topic:=${GPS_TOPIC:-/aerodrone/sensor_measurements/gps}
@@ -208,7 +217,8 @@ services:
     env_file: [../systems/aerodrone/config/topics.env, ../applications/aerostack2/config/mount_tamalpais.env]
     environment:
       ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
-    volumes: [/dev/shm:/dev/shm, wildnav_isaac_cache:/data/wildnav_cache:ro]
+      FASTRTPS_DEFAULT_PROFILES_FILE: *fastdds-profile
+    volumes: [/dev/shm:/dev/shm, *fastdds-mount, wildnav_isaac_cache:/data/wildnav_cache:ro]
     command: >
       ros2 launch wildnav_pkg wildnav.launch.py
         image_topic:=${WILDNAV_IMAGE_TOPIC:-/aerodrone/sensor_measurements/downward_rgb/image_raw}
@@ -236,7 +246,8 @@ services:
     depends_on: [mavros, wildnav]
     environment:
       ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
-    volumes: [/dev/shm:/dev/shm]
+      FASTRTPS_DEFAULT_PROFILES_FILE: *fastdds-profile
+    volumes: [/dev/shm:/dev/shm, *fastdds-mount]
     command: >
       ros2 launch as2_platform_blueos blueos_autonomy.launch.py
         namespace:=aerodrone mavros_namespace:=/mavros
@@ -249,8 +260,10 @@ services:
     depends_on: [mavros, aerostack2_autonomy]
     environment:
       ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
+      FASTRTPS_DEFAULT_PROFILES_FILE: *fastdds-profile
     volumes:
       - /dev/shm:/dev/shm
+      - *fastdds-mount
       - ../applications/aerostack2/scripts:/workspace/applications/aerostack2/scripts:ro
     command: >
       python3 /workspace/applications/aerostack2/scripts/wait_for_mavros_navigation.py
@@ -268,7 +281,8 @@ services:
       terrain_assets: {condition: service_completed_successfully}
     environment:
       ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
-    volumes: [/dev/shm:/dev/shm, navsim_isaac_assets:/data/navsim_assets:ro]
+      FASTRTPS_DEFAULT_PROFILES_FILE: *fastdds-profile
+    volumes: [/dev/shm:/dev/shm, *fastdds-mount, navsim_isaac_assets:/data/navsim_assets:ro]
     command: >
       ros2 launch as2_behavior_tree behavior_trees.launch.py
         drone_id:=aerodrone use_sim_time:=false
@@ -293,10 +307,12 @@ services:
     env_file: [../systems/aerodrone/config/topics.env, ../applications/aerostack2/config/mount_tamalpais.env]
     environment:
       ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
+      FASTRTPS_DEFAULT_PROFILES_FILE: *fastdds-profile
       NAVSIM_REQUIRE_VALID: ${NAVSIM_REQUIRE_VALID:-}
       NAVSIM_REQUIRE_CORRECTION: ${NAVSIM_REQUIRE_CORRECTION:-false}
     volumes:
       - /dev/shm:/dev/shm
+      - *fastdds-mount
       - ../applications/aerostack2/scripts:/workspace/applications/aerostack2/scripts:ro
     command: >
       python3 /workspace/applications/aerostack2/scripts/validate_aerodrone_navsim.py

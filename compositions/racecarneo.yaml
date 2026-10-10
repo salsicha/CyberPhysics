@@ -1,3 +1,7 @@
+# The ROS containers do not share /dev/shm, so FastDDS uses UDP only
+# (FASTDDS_BUILTIN_TRANSPORTS), with 4 MiB socket buffers: the 208 KiB
+# default dropped 640x480 colour and depth frames for best-effort
+# subscribers (applications/racecarneo/README.md).
 services:
   racecarneo_sim:
     network_mode: host
@@ -35,7 +39,7 @@ services:
     stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
-      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4?sockets_size=4194304
     volumes:
       - ../systems/racecarneo:/workspace/racecarneo:ro
     command: >
@@ -53,7 +57,7 @@ services:
       - racecarneo_robot_state_publisher
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
-      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4?sockets_size=4194304
       - RACECAR_SIM_IP=${RACECAR_SIM_IP:-127.0.0.1}
     volumes:
       - ../systems/racecarneo/config:/workspace/config:ro
@@ -71,7 +75,7 @@ services:
       - racecarneo_bridge
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
-      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4?sockets_size=4194304
     volumes:
       - ../systems/racecarneo/config:/workspace/config:ro
     # The simulated car is smaller than the hardware one this config describes:
@@ -95,7 +99,7 @@ services:
       - racecarneo_bridge
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
-      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4?sockets_size=4194304
       - NVIDIA_VISIBLE_DEVICES=${NVIDIA_VISIBLE_DEVICES:-all}
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
     volumes:
@@ -130,7 +134,7 @@ services:
       - racecarneo_depthanything
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
-      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4?sockets_size=4194304
       - NVIDIA_VISIBLE_DEVICES=${NVIDIA_VISIBLE_DEVICES:-all}
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics,video
     volumes:
@@ -157,7 +161,7 @@ services:
       - racecarneo_bridge
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
-      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4?sockets_size=4194304
     volumes:
       - ../systems/racecarneo/config:/workspace/config:ro
     command: >
@@ -179,7 +183,7 @@ services:
       - racecarneo_nvblox
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
-      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4?sockets_size=4194304
     volumes:
       - ../systems/racecarneo/config:/workspace/config:ro
     command: >
@@ -201,7 +205,7 @@ services:
       - racecarneo_depthanything
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
-      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4?sockets_size=4194304
     command: >
       python3 /workspace/validate_stack_integration.py
         --timeout-s ${RACECAR_STACK_VALIDATION_TIMEOUT:-90}
@@ -217,7 +221,7 @@ services:
       - racecarneo_nav2
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
-      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4?sockets_size=4194304
       - RACECAR_MISSION_ID=${RACECAR_MISSION_ID:-simple_loop}
     volumes:
       - ../systems:/workspace/systems:ro
@@ -235,7 +239,7 @@ services:
       - racecarneo_nav2
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
-      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4?sockets_size=4194304
     command: >
       python3 /workspace/scripts/main.py
 

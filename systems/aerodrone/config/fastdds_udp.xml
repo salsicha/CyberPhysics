@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  FastDDS transport for Isaac Sim in compositions/aerostack2_isaac.yaml: UDP
+  only. Isaac Sim runs as user 1234 and the other ROS containers as root;
+  FastDDS creates its shared-memory files mode 0644, so shared memory between
+  them delivers nothing. Larger socket buffers than the 208 KiB default keep
+  640x480 RGB + depth bursts (2.1 MB) from overflowing them; the kernel caps
+  them at net.core.rmem_max / wmem_max. The root containers use fastdds.xml,
+  whose UDP transport has the same buffers.
+-->
+<profiles xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+  <transport_descriptors>
+    <transport_descriptor>
+      <transport_id>aerodrone_udp</transport_id>
+      <type>UDPv4</type>
+      <sendBufferSize>4194304</sendBufferSize>
+      <receiveBufferSize>4194304</receiveBufferSize>
+    </transport_descriptor>
+  </transport_descriptors>
+  <participant profile_name="aerodrone_udp_participant" is_default_profile="true">
+    <rtps>
+      <userTransports>
+        <transport_id>aerodrone_udp</transport_id>
+      </userTransports>
+      <useBuiltinTransports>false</useBuiltinTransports>
+    </rtps>
+  </participant>
+</profiles>

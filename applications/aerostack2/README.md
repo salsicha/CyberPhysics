@@ -79,6 +79,12 @@ docker compose -f compositions/aerostack2_isaac.yaml up
 
 All three use Navigator/ArduCopter through the same MAVROS and `as2_platform_blueos` boundary, build the same georeferenced terrain, and execute the generated behavior-tree mission. Topic names are defined in `systems/aerodrone/config/topics.env`; deployment values are in `applications/aerostack2/config/mount_tamalpais.env`.
 
+### DDS transport
+
+Every ROS container of the three compositions and of the lite SITL stack (`tools/gps_denied_sitl.yaml`) loads `systems/aerodrone/config/fastdds.xml` through `FASTRTPS_DEFAULT_PROFILES_FILE`. The containers share the host network and `/dev/shm` and run as root, so FastDDS (Humble, Fast DDS 2.6) sends between them through shared memory. Its default 512 KiB segment holds less than one camera frame (640x480 RGB is 0.9 MB, 32FC1 depth 1.2 MB): the sender reused buffers before the subscribers had read them, and DemNav, WildNav and the validator received 1-3 % of the Genesis frames (0.03-0.07 of 2.3 Hz), all of them with the profile. The profile gives every sender an 8 MiB segment and keeps UDP, with 4 MiB socket buffers, for peers that cannot use the shared memory. Isaac Sim runs as user 1234; FastDDS creates its shared-memory files mode 0644, so shared memory between it and the root containers delivers nothing, and it loads `fastdds_udp.xml` (UDP only, same buffers) instead. A ROS container added to these stacks needs the same profile, mount, host `/dev/shm` (`ipc: host` or a `/dev/shm` volume) and user; `tests/test_aerial_dds_transport.py` checks them.
+
+The kernel caps the socket buffers at `net.core.rmem_max` and `net.core.wmem_max`. Shared memory does not depend on them, but Isaac Sim's camera does: on a host where they are below 4 MiB (208 KiB was the long-standing default; check with `sysctl net.core.rmem_max`), its UDP frames can still be dropped. Raising them is optional and not done by the stacks: `sudo sysctl -w net.core.rmem_max=4194304 net.core.wmem_max=4194304`. A killed process leaves its segment in `/dev/shm`; `docker run --rm --ipc host salsicha/cyberphysics:aerostack2-latest fastdds shm clean` removes the stale ones.
+
 ### Navigation health check
 
 `scripts/validate_aerodrone_navsim.py` checks that a running Aerodrone navigation simulation is healthy, and is the `navsim_validator` service (`validation` profile) of all three compositions:

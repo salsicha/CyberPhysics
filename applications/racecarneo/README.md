@@ -210,6 +210,8 @@ The composition runs this pipeline:
 
 NiceGUI is available at `http://localhost:8080`.
 
+The ROS containers do not share `/dev/shm`, so FastDDS runs over UDP only, with 4 MiB socket buffers (`FASTDDS_BUILTIN_TRANSPORTS=UDPv4?sockets_size=4194304`). With the 208 KiB default, best-effort subscribers lost the 640x480 frames: with the simulator, bridge and Depth Anything running they received 74 % of the colour and 23 % of the depth frames (14.7 and 4.5 of 19.8 Hz), and Depth Anything published 3.8 Hz. With the larger buffers they receive every frame and Depth Anything publishes 17.9 Hz; it now keeps its five-frame input queue full, so its depth is about 0.3 s old (median 0.13 s before). The kernel caps the buffers at `net.core.rmem_max` and `net.core.wmem_max` (see "DDS transport" in `applications/aerostack2/README.md`).
+
 Closed-loop status: the stack comes up unattended and Nav2 reaches goals in
 Demo World. `NavigateToPose` goals relative to the start pose, each on a
 freshly started stack (SLAM, Depth Anything and nvblox running):

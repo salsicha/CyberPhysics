@@ -16,16 +16,20 @@
 # height at home), GPS_INPUT_CORRECTIONS, GPS_DENIED_OUTPUT and the mission
 # timing variables read by tools/gps_denied_sitl_mission.py.
 
+# FastDDS transport of every ROS container: shared memory sized for the
+# camera frames, UDP with larger socket buffers (applications/aerostack2/README.md).
 x-ros: &ros
   network_mode: host
   ipc: host
   environment: &ros-env
     ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
+    FASTRTPS_DEFAULT_PROFILES_FILE: /workspace/systems/aerodrone/config/fastdds.xml
     PYTHONPATH: /opt/synthetic_world:/opt/mavros_mirror
     WILDNAV_TILE_URL: synthetic://aerodrone
 
 x-sources: &sources
   - /dev/shm:/dev/shm
+  - &fastdds-mount ../systems/aerodrone/config/fastdds.xml:/workspace/systems/aerodrone/config/fastdds.xml:ro
   - ../applications/aerostack2/synthetic_world/synthetic_world:/opt/synthetic_world/synthetic_world:ro
   - ../applications/aerostack2/mavros_mirror/mavros_mirror:/opt/mavros_mirror/mavros_mirror:ro
   - ../applications/aerostack2/scripts:/workspace/applications/aerostack2/scripts:ro
@@ -55,6 +59,7 @@ services:
     <<: *ros
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
     depends_on: [sitl]
+    volumes: [*fastdds-mount]
     command: ros2 launch mavros apm.launch fcu_url:=tcp://127.0.0.1:${SITL_PORT:-5760}
 
   mirror:
@@ -115,6 +120,7 @@ services:
     depends_on: [mirror, camera]
     volumes:
       - /dev/shm:/dev/shm
+      - *fastdds-mount
       - ../applications/aerostack2/synthetic_world/synthetic_world:/opt/synthetic_world/synthetic_world:ro
       - ../applications/demnav/src/demnav_pkg/demnav_pkg:/workspace/install/lib/python3.10/site-packages/demnav_pkg:ro
       - ../applications/demnav/src/demnav_pkg/launch/demnav.launch.py:/workspace/install/share/demnav_pkg/launch/demnav.launch.py:ro
@@ -139,6 +145,7 @@ services:
     depends_on: [mirror, camera, demnav]
     volumes:
       - /dev/shm:/dev/shm
+      - *fastdds-mount
       - ../applications/aerostack2/synthetic_world/synthetic_world:/opt/synthetic_world/synthetic_world:ro
       - ../applications/wildnav/src/wildnav_pkg/wildnav_pkg:/workspace/install/lib/python3.10/site-packages/wildnav_pkg:ro
       - ../applications/wildnav/src/wildnav_pkg/launch/wildnav.launch.py:/workspace/install/share/wildnav_pkg/launch/wildnav.launch.py:ro
