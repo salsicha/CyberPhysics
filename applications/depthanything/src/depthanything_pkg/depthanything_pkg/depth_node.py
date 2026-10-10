@@ -10,7 +10,7 @@ import rclpy
 import torch
 from cv_bridge import CvBridge
 from rclpy.node import Node
-from rclpy.qos import qos_profile_sensor_data
+from rclpy.qos import HistoryPolicy, QoSProfile, qos_profile_sensor_data
 from sensor_msgs.msg import CameraInfo, Image, PointCloud2, PointField
 from std_msgs.msg import Header
 
@@ -90,8 +90,16 @@ class DepthAnythingNode(Node):
         self.bridge = CvBridge()
         self.depth_pub = self.create_publisher(Image, depth_topic, 10)
         self.pointcloud_pub = self.create_publisher(PointCloud2, pointcloud_topic, 10)
+        # Keep only the newest camera frame: inference is slower than the
+        # camera, and a deeper queue makes every depth image several frames
+        # old (median 0.31 s with sensor-data depth 5 on RACECAR, 0.13 s
+        # while DDS was dropping most frames).
+        latest_frame_qos = QoSProfile(
+            history=HistoryPolicy.KEEP_LAST, depth=1,
+            reliability=qos_profile_sensor_data.reliability,
+            durability=qos_profile_sensor_data.durability)
         self.create_subscription(
-            Image, image_topic, self.image_callback, qos_profile_sensor_data)
+            Image, image_topic, self.image_callback, latest_frame_qos)
         self.create_subscription(
             CameraInfo, camera_info_topic, self.camera_info_callback,
             qos_profile_sensor_data)
