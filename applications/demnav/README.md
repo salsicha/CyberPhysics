@@ -1,12 +1,11 @@
 
 # DemNav
 
-This app cached height maps for a specified area. It then runs a ROS2 node in one of two environments:
-
-1. Arduino App Lab brick 
-2. BlueOS extension
-
-The node receives position information, an unscaled depth image, and the latest kinematic information (velocity, acceleration, etc...), it matches the depth image to the geographic height map and produces a new position estimate.
+DemNav caches a height map (SRTM-class DEM) for an area and runs a ROS 2
+node that matches the downward depth image against it. From the depth image,
+the vehicle's attitude and a position prior, it produces an absolute position
+fix with an honest covariance for the navigation fusion and, through it,
+ArduPilot's EKF (see `systems/aerodrone/README.md`).
 
 DemNav also fits an affine metric scale to the relative depth values using the
 matched DEM window. It publishes:
@@ -108,6 +107,57 @@ changing `dem_resolution_m` cannot create source detail. Relative depth is
 projected onto flat ground at the height above ground below the vehicle, so
 steep relief across an oblique footprint still blurs its template (the
 covariance grows with it); metric depth is placed in 3D.
+
+## Where it runs
+
+DemNav is a container image built on the aerostack2 image (ROS 2 Humble):
+`salsicha/cyberphysics:demnav-latest` (amd64) in the simulation stacks, and
+`demnav-arm64` on the vehicle. The node is CPU-bound Python (NumPy/OpenCV
+correlation); it needs no GPU.
+
+- **Today: BlueOS companion computer.** `compositions/blueos_nav_core.yaml`
+  runs DemNav with MAVROS, the navigation bridge, WildNav and the fusion on
+  the aerodrone's Raspberry Pi 5 with a Blue Robotics Navigator flight
+  controller (`hardware/aerodrone.txt`), from the arm64 images. The OAK-1
+  computes the relative depth on the camera (MegaDepth, `megadepth_ros.py`).
+- **Possible later target: Arduino VENTUNO Q** (not tested here). It is an
+  edge-AI board announced for robotics; preorders opened in August 2026. It
+  pairs a Qualcomm Dragonwing IQ-8275 with an STM32H5 MCU:
+  - Linux side: octa-core CPU (2.35 GHz Gold Prime cores) and 16 GB
+    LPDDR5. It runs Ubuntu (preloaded; Debian announced) and Arduino App
+    Lab, whose "bricks" are containers.
+  - AI: a Hexagon NPU (up to 40 dense TOPS) and an Adreno 623 GPU.
+  - MCU: STM32H5F5 Cortex-M33 at 250 MHz, running the Arduino core on
+    Zephyr, reached from Linux over an RPC bridge.
+  - I/O: three MIPI-CSI camera connectors, 2.5 Gb Ethernet, Wi-Fi 6, CAN-FD.
+
+  Why it fits DemNav:
+  - 16 GB holds the DEM and tile caches and the whole navigation core
+    (MAVROS, the bridge, DemNav, WildNav, the fusion) on one board.
+  - The NPU could later take work DemNav and WildNav now do elsewhere or on
+    the CPU: the monocular depth network that runs on the OAK-1, or learned
+    features for WildNav. Neither exists here yet.
+  - MIPI-CSI would allow a camera without the OAK-1.
+
+  It would run as a companion computer next to the flight controller, not
+  instead of it: ArduPilot stays on the flight controller, reached by MAVROS
+  over serial or UDP (`BLUEOS_FCU_URL`). The MCU plays no part in DemNav.
+
+  The likely path is the same arm64 containers as BlueOS
+  (`CYBERPHYSICS_TAG=arm64` with `blueos_nav_core.yaml`), on the board's
+  Ubuntu or as an App Lab brick. The image's userland
+  (`ros:humble-ros-base`, Ubuntu 22.04) does not depend on the host's Ubuntu
+  release. Still to verify on the board:
+  - that Docker (or the App Lab brick format) runs these images;
+  - per-frame match time at `max_search_radius_m` on its CPU (the Pi 5 is
+    the reference);
+  - the OAK-1 over USB 3, or a MIPI camera with an on-board depth model;
+  - the MAVROS link to the flight controller.
+
+  Packaging DemNav as an App Lab brick is not done.
+- **Not the Arduino UNO Q.** Its quad Cortex-A53 with 2–4 GB RAM is too small
+  for the navigation core. The UNO Q is used for the turret instead
+  (`hardware/turret.md`).
 
 ## Build-time cache seeding
 

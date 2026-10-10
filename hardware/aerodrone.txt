@@ -31,6 +31,9 @@ Quick-buy baseline
   for the motor/prop setup.
 - 1 x LiPo balance charger and fire-safe charging bag.
 - 1 x Raspberry Pi 5, preferably 8 GB or 16 GB.
+  Possible later alternative, untested: an Arduino VENTUNO Q (16 GB, NPU)
+  as the companion computer; see "Where it runs" in
+  applications/demnav/README.md.
 - 1 x Raspberry Pi 5 active cooler.
 - 1 x high-endurance 128 GB or larger microSD card, or an M.2/NVMe HAT if the
   software image and vibration budget support it.
