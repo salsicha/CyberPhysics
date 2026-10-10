@@ -30,7 +30,15 @@ docker compose -f compositions/racecarneo.yaml up racecarneo_sim racecarneo_brid
 
 This also starts `racecarneo_robot_state_publisher` for the sensor frames.
 
-The Unity simulator runs under `xvfb-run` in `racecarneo_sim`, so it does not need a host X11 display. The bridge connects over UDP ports `5064` and `5065`, publishes ROS 2 sensor/state topics, and subscribes to Ackermann drive commands.
+The Unity simulator runs on its own Xvfb display in `racecarneo_sim`, so it does
+not need a host X11 display, and starts a level by itself (see
+[Unattended simulator start](#unattended-simulator-start)). The bridge connects
+over UDP ports `5064` and `5065`, publishes ROS 2 sensor/state topics, and
+subscribes to Ackermann drive commands. Its log shows
+`RACECAR Neo simulator connected; publishing ROS topics` about 5 s after
+`up`. With GPU rendering every bridge topic (camera, depth, scan, IMU, odom)
+publishes at the simulator's frame rate, about 18-22 Hz with the full stack
+running.
 
 Published topics:
 
@@ -53,11 +61,60 @@ Subscribed topics:
   m/s and steering angle in rad, positive left. The bridge divides by its
   `max_speed` and `max_steering_angle` and clamps to the simulator's [-1, 1].
 
-The bridge sends the MIT `racecar_go` autostart packet during startup, but
-RacecarSim v2.8.3 does not handle it (its async UDP port only accepts connect,
-exit, camera and lidar requests). The simulator starts on its main menu and
-waits for a level and the user program to be started from its UI; in a
-headless `-batchmode` run it was not observed to connect.
+### Unattended simulator start
+
+RacecarSim v2.8.3 has no command-line option, PlayerPrefs key or network
+message that starts a level. It opens on its main menu; a level's Python
+ports (UDP `5064`/`5065`) only exist after **Begin Simulation**, and a
+connected program then waits until the user presses START (Enter) to enter
+user-program mode. The async port accepts only connect, exit, camera and lidar
+requests, so the library's `racecar_go` packet (header 8) is ignored. A
+`-batchmode` player has no window and reads no input, so it can never get
+past the menu.
+
+`scripts/run_headless_sim.sh` therefore plays the user, without patching the
+simulator:
+
+1. It starts Xvfb on a free display (99 and up; under `network_mode: host`
+   the host's own X displays are skipped) and runs the player windowed at the
+   Xvfb screen size.
+2. It clicks **Begin Simulation** with `xdotool` once a second, at the
+   button's position relative to the window, until the simulator process has
+   bound its Python ports. This loads the menu defaults: *Sandbox
+   Environments / Demo World* in *Exploration* mode (typically 4-5 s).
+3. It then presses Enter every `RACECAR_SIM_START_PERIOD_S` seconds. Before the
+   bridge connects this only shows a "connect a Python program" hint; once
+   the bridge has connected it enters user-program mode; afterwards it is a
+   no-op. If the bridge exits or stalls for 5 s the simulator drops back to
+   default drive, and the next press resumes user-program mode when the bridge
+   is back.
+
+The script refuses to start when UDP `5064`/`5065` are already bound (one
+simulator per host under host networking), stops the simulator if no level
+loads within `RACECAR_SIM_LEVEL_TIMEOUT_S` (120 s), and forwards SIGTERM to the
+player. When the simulator exits it sends its exit command and the bridge
+shuts down too.
+
+Rendering uses Vulkan on the NVIDIA GPU when the container has the NVIDIA
+Vulkan driver, which the composition requests (a GPU reservation and
+`NVIDIA_DRIVER_CAPABILITIES=graphics,utility`; the simulator needs ~150 MiB of
+GPU memory). Without it the script falls back to Mesa's software OpenGL,
+which works but runs the simulator, and so every bridge topic, at about 3 Hz.
+
+| Variable | Default | |
+| --- | --- | --- |
+| `RACECAR_XVFB_SERVER_ARGS` | `-screen 0 1280x720x24` | Xvfb screen; keep it 16:9, the menu click is relative |
+| `RACECAR_SIM_GRAPHICS_API` | `auto` | `vulkan`, `opengl` or `auto` (Vulkan if the NVIDIA driver is present) |
+| `RACECAR_SIM_LOG_FILE` | `/dev/stdout` | Unity player log |
+| `RACECAR_SIM_START_PERIOD_S` | `1` | seconds between START presses |
+| `RACECAR_SIM_LEVEL_TIMEOUT_S` | `120` | give up when no level loads |
+
+Only the menu's default level is started. To look at the simulator's window:
+
+```bash
+docker exec racecarneo_sim bash -c '. /tmp/racecarsim.env && xwd -root -silent' > sim.xwd
+convert sim.xwd sim.png   # ImageMagick on the host
+```
 
 Simulator model limits (RacecarSim v2.8.3):
 
@@ -70,7 +127,15 @@ Simulator model limits (RacecarSim v2.8.3):
   inside Nav2's 0.75 m minimum turning radius.
 - Throttle is open-loop motor torque and the simulator reports no wheel speed,
   so `/odom` is the bridge's own estimate (command x `max_speed`, wheel slip
-  noise, encoder quantization), not measured simulator motion.
+  noise, encoder quantization), not measured simulator motion. The real car
+  does not hold the commanded speed: `Drive.FixedUpdate` applies a torque
+  proportional to the command, so the car keeps accelerating (0.2 m/s
+  commanded reached ~0.6 m/s after 2 s and ~0.8 m/s after 3 s), and a zero
+  command only brakes with `|v|^2`, so it coasts about 1 m. Short drives turn
+  the commanded way (ROS positive steering is a left turn), but `/odom`
+  under-reports both distance and heading change (a 3 s left turn: odometry
+  69 deg, the simulator's IMU ~130 deg), and SLAM has to correct the
+  difference.
 - The camera renders 640x480 with a 42.5 degree vertical field of view;
   `/camera/color/camera_info` publishes the matching intrinsics.
 - `/imu/data_raw` is converted from the simulator's Unity axes to ROS FLU,
@@ -96,6 +161,16 @@ The composition runs this pipeline:
 8. `foxglove_bridge` serves the ROS graph to Foxglove at `ws://localhost:8765`.
 
 NiceGUI is available at `http://localhost:8080`.
+
+Closed-loop status: the stack comes up unattended and Nav2 plans and drives
+the simulated car, but goals are not reached reliably yet because `/odom`
+does not follow the simulated car's real speed (see *Simulator model limits*).
+With a `NavigateToPose` goal 3 m ahead and 1.5 m to the right of the start, one
+run ended `SUCCEEDED` 0.23 m from the goal in the SLAM map after several
+replans; a repeat stopped against a wall about 1 m past the pose the stack
+believed, and Nav2 aborted with `START_OCCUPIED` (205). SLAM only maps where
+the lidar hits something, so in the open Demo World a goal outside the mapped
+area is rejected as `GOAL_OUTSIDE_MAP` (204).
 
 ## Stack Validation
 

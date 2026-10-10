@@ -4,7 +4,10 @@
     use_tf_transforms: true
     mapping_type: static_tsdf
     use_depth: true
-    use_color: true
+    # The bridge's camera is bgr8, which nvblox's color integrator rejects
+    # ("Invalid color image encoding"); color only tints the mesh, the
+    # costmap slices come from depth.
+    use_color: false
     use_lidar: false
     input_qos: SYSTEM_DEFAULT
     voxel_size: 0.05

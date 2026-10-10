@@ -4,12 +4,26 @@ services:
     pull_policy: if_not_present
     image: salsicha/cyberphysics:racecarneo-${CYBERPHYSICS_TAG:-latest}
     container_name: racecarneo_sim
+    # run_headless_sim.sh starts a level and enters user-program mode by
+    # driving the simulator's menu on its Xvfb display (see the README).
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
       - RACECAR_XVFB_SERVER_ARGS=${RACECAR_XVFB_SERVER_ARGS:--screen 0 1280x720x24}
       - RACECAR_SIM_LOG_FILE=${RACECAR_SIM_LOG_FILE:-/dev/stdout}
+      - RACECAR_SIM_GRAPHICS_API=${RACECAR_SIM_GRAPHICS_API:-auto}
+      # Vulkan rendering on the GPU (graphics capability); software OpenGL
+      # without it runs the simulator at only a few frames per second.
+      - NVIDIA_VISIBLE_DEVICES=${NVIDIA_VISIBLE_DEVICES:-all}
+      - NVIDIA_DRIVER_CAPABILITIES=graphics,utility
     command: >
       /workspace/run_headless_sim.sh
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu, graphics, utility]
 
   # Sensor frames (base_link -> racecarneo/*) from the URDF, the same
   # source the hardware stack uses; the bridge publishes only odom -> base_link.

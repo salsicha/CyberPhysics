@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 import math
 import os
-import socket
-import struct
 import sys
 import threading
 import time
@@ -14,6 +12,7 @@ from ackermann_msgs.msg import AckermannDriveStamped
 from geometry_msgs.msg import TransformStamped
 from nav_msgs.msg import Odometry
 from rcl_interfaces.msg import SetParametersResult
+from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from sensor_msgs.msg import CameraInfo, Image, Imu, LaserScan
 from std_msgs.msg import Bool, Float32, Header
@@ -62,8 +61,6 @@ class RacecarNeoBridge(Node):
         self.declare_parameter('publish_imu', True)
         # Unity's Camera.fieldOfView is vertical; RacecarSim sets 42.5 deg.
         self.declare_parameter('camera_vertical_fov_degrees', 42.5)
-        self.declare_parameter('auto_start_user_program', True)
-        self.declare_parameter('auto_start_duration_sec', 20.0)
         self.declare_parameter('publish_odom', True)
         self.declare_parameter('publish_tf', True)
         self.declare_parameter('base_frame', 'base_link')
@@ -101,8 +98,6 @@ class RacecarNeoBridge(Node):
         self.publish_lidar = bool(self.get_parameter('publish_lidar').value)
         self.publish_imu = bool(self.get_parameter('publish_imu').value)
         self.camera_vertical_fov_degrees = float(self.get_parameter('camera_vertical_fov_degrees').value)
-        self.auto_start_user_program = bool(self.get_parameter('auto_start_user_program').value)
-        self.auto_start_duration_sec = float(self.get_parameter('auto_start_duration_sec').value)
         self.publish_odom = bool(self.get_parameter('publish_odom').value)
         self.publish_tf = bool(self.get_parameter('publish_tf').value)
         self.base_frame = self.get_parameter('base_frame').value
@@ -154,7 +149,6 @@ class RacecarNeoBridge(Node):
         self._rc = None
         self._stop = False
         self._sim_thread: Optional[threading.Thread] = None
-        self._auto_start_thread: Optional[threading.Thread] = None
 
         self.color_pub = self.create_publisher(Image, 'camera/color/image_raw', 5)
         self.depth_pub = self.create_publisher(Image, 'camera/depth/image_rect_raw', 5)
@@ -219,28 +213,22 @@ class RacecarNeoBridge(Node):
                 pass
 
     def _run_racecar(self) -> None:
+        # go() connects, then waits for the simulator to enter user-program
+        # mode. RacecarSim v2.8.3 only does that on its START input (Enter),
+        # which run_headless_sim.sh presses; the library's racecar_go packet
+        # is not handled by this simulator version.
         try:
-            if self.auto_start_user_program:
-                self._auto_start_thread = threading.Thread(target=self._pulse_user_program_start, daemon=True)
-                self._auto_start_thread.start()
             self._rc.go()
-        except Exception as exc:
+        except (Exception, SystemExit) as exc:
+            # The library reports protocol errors (no free car, timeout,
+            # version mismatch) by printing them and calling exit().
             self.get_logger().error(f'RACECAR Neo simulator bridge stopped: {exc!r}')
-            rclpy.shutdown()
-
-    def _pulse_user_program_start(self) -> None:
-        # MIT RacecarSim exposes header 8 as racecar_go. Some simulator builds use
-        # this to enter user-program mode; builds that require UI input ignore it.
-        sim_ip = os.environ.get('RACECAR_SIM_IP', '127.0.0.1')
-        packet = struct.pack('B', 8)
-        deadline = time.monotonic() + max(0.0, self.auto_start_duration_sec)
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-            while not self._stop and time.monotonic() < deadline:
-                try:
-                    sock.sendto(packet, (sim_ip, 5064))
-                except OSError as exc:
-                    self.get_logger().debug(f'Unable to send RacecarSim autostart packet: {exc}')
-                time.sleep(0.25)
+            rclpy.try_shutdown()
+            return
+        if not self._stop:
+            # The simulator sent its exit command (it is shutting down).
+            self.get_logger().warn('RACECAR Neo simulator closed the connection; shutting down')
+            rclpy.try_shutdown()
 
     def _on_start(self) -> None:
         self.get_logger().info('RACECAR Neo simulator connected; publishing ROS topics')
@@ -546,6 +534,9 @@ def main() -> None:
         while rclpy.ok():
             rclpy.spin_once(node, timeout_sec=0.1)
             time.sleep(0.001)
+    except (KeyboardInterrupt, ExternalShutdownException):
+        # SIGINT/SIGTERM, or the simulator thread ending the session
+        pass
     finally:
         node.stop()
         node.destroy_node()

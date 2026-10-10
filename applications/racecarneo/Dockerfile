@@ -37,6 +37,7 @@ RUN apt update && apt install -q -y --no-install-recommends \
     libgl1 \
     libglib2.0-0 \
     libsm6 \
+    libvulkan1 \
     libx11-6 \
     libxext6 \
     libxrandr2 \
@@ -61,6 +62,9 @@ RUN apt update && apt install -q -y --no-install-recommends \
     ros-${ROS_DISTRO}-slam-toolbox \
     ros-${ROS_DISTRO}-std-msgs \
     ros-${ROS_DISTRO}-tf2-ros \
+    x11-apps \
+    xauth \
+    xdotool \
     xvfb \
     && rm -rf /var/lib/apt/lists/*
 

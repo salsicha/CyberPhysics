@@ -9,8 +9,6 @@ racecarneo_bridge:
     # Unity Camera.fieldOfView is vertical; RacecarSim v2.8 uses 42.5 deg
     # (fx = fy = 617.1 px at 640x480, ~54.8 deg horizontal).
     camera_vertical_fov_degrees: 42.5
-    auto_start_user_program: true
-    auto_start_duration_sec: 20.0
     publish_odom: true
     publish_tf: true
     base_frame: base_link

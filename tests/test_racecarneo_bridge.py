@@ -135,7 +135,6 @@ def test_racecar_is_created_on_the_main_thread(bridge):
             raise ValueError('signal only works in main thread of the main interpreter')
         return fake_rc
 
-    bridge.auto_start_user_program = False
     with patch.dict(sys.modules, {'racecar_core': NS(create_racecar=create_racecar)}), \
             patch.object(sys, 'argv', list(sys.argv)):
         bridge.start()
@@ -143,6 +142,29 @@ def test_racecar_is_created_on_the_main_thread(bridge):
     assert bridge._rc is fake_rc
     fake_rc.go.assert_called_once()  # go() itself runs on the simulator thread
     bridge.get_logger().error.assert_not_called()
+
+
+@pytest.mark.parametrize('outcome, logged', [
+    (None, 'warn'),  # the simulator sent its exit command
+    (SystemExit(0), 'error'),  # the library's exit() on a protocol error
+    (OSError('socket closed'), 'error'),
+])
+def test_bridge_shuts_down_when_the_simulator_session_ends(module, bridge, outcome, logged):
+    # A bridge that outlives its simulator session would keep its topics
+    # advertised with no data behind them.
+    bridge._rc.go.side_effect = outcome
+    with patch.object(module, 'rclpy') as rclpy:
+        bridge._run_racecar()
+    rclpy.try_shutdown.assert_called_once()
+    getattr(bridge.get_logger(), logged).assert_called_once()
+
+
+def test_stopping_bridge_does_not_report_the_session_end(module, bridge):
+    bridge._stop = True  # node.stop() ran first, e.g. on SIGINT
+    with patch.object(module, 'rclpy') as rclpy:
+        bridge._run_racecar()
+    rclpy.try_shutdown.assert_not_called()
+    bridge.get_logger().warn.assert_not_called()
 
 
 def test_watchdog_stops_car_when_commands_stop(bridge):
