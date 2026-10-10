@@ -1,0 +1,48 @@
+# Arduino UNO Q counterpart of arduino.yaml's micro-ROS Sub demo, run on the
+# UNO Q itself (applications/arduino/README.md). Flash
+# applications/arduino/scripts/unoq_sub/unoq_sub.ino to the MCU first; this
+# runs the Linux side, which subscribes to /micro_ros_arduino_subscriber
+# (std_msgs/Int32) and calls the sketch's set_led RPC through arduino-router.
+# No micro-ROS agent is involved.
+#
+#   docker compose -f compositions/arduino_uno_q.yaml up -d
+#   docker compose -f compositions/arduino_uno_q.yaml run --rm unoq_led_on
+#
+# or publish from any machine on the same ROS_DOMAIN_ID:
+#   ros2 topic pub --once /micro_ros_arduino_subscriber std_msgs/msg/Int32 "data: 1"
+
+x-unoq-image: &unoq-image
+  image: salsicha/cyberphysics:unoq-${CYBERPHYSICS_TAG:-arm64}
+  pull_policy: build
+  build:
+    context: ../applications/unoq
+
+services:
+  unoq_sub:
+    <<: *unoq-image
+    container_name: unoq_sub
+    network_mode: host
+    ipc: host
+    restart: unless-stopped
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    volumes:
+      # arduino-router's socket; restart this service after restarting the router
+      - type: bind
+        source: /var/run/arduino-router.sock
+        target: /var/run/arduino-router.sock
+        bind:
+          create_host_path: false
+      - ../applications/arduino/scripts/unoq_sub:/scripts:ro
+    command: python3 /scripts/unoq_sub_node.py
+
+  # One-shot publisher, as arduino.yaml's ros_sub service
+  unoq_led_on:
+    <<: *unoq-image
+    profiles: ["pub"]
+    network_mode: host
+    ipc: host
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    command: >
+      ros2 topic pub --once /micro_ros_arduino_subscriber std_msgs/msg/Int32 "data: 1"

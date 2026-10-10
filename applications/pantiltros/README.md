@@ -88,6 +88,15 @@ Run on the Arduino turret with an existing ROS camera:
 docker compose -f compositions/turret_hardware.yaml up --build
 ```
 
+With an Arduino UNO Q instead of the UNO R4 WiFi, the bridge runs on the
+board and the tracker on the GPU host (same `ROS_DOMAIN_ID`); see
+`hardware/turret.md`:
+
+```bash
+docker compose -f compositions/turret_uno_q.yaml --profile board up -d   # on the UNO Q
+docker compose -f compositions/turret_uno_q.yaml --profile host up       # on the host
+```
+
 Add the repository's RealSense service when it supplies the camera:
 
 ```bash
@@ -125,8 +134,31 @@ the emergency stop engages, and publishes `/turret/joint_states` only from
 echoes commands as joint states. Commands arriving while the port is closed,
 the Arduino is resetting, or the e-stop is engaged are dropped, not queued.
 `/turret/actuator_ready` is true only while commands are being written. The
-repository does not yet contain firmware for this protocol; see
+firmware is `applications/arduino/scripts/turret_firmware` (UNO R4 WiFi and
+UNO Q; compiled and unit tested, not yet run on hardware); see
 `hardware/turret.md`.
+
+The bridge's `transport` parameter (`TURRET_ARDUINO_TRANSPORT`) selects the
+link:
+
+- `serial` (default): the line protocol above on `serial_port` at `baud_rate`
+  (UNO R4 WiFi on USB).
+- `uno_q_bridge`: run on an Arduino UNO Q's Linux side
+  (`config/arduino_uno_q.env`, `compositions/turret_uno_q.yaml`). The same
+  messages travel as msgpack-RPC through arduino-router's Unix socket
+  (`router_socket`, default `/var/run/arduino-router.sock`) to the MCU:
+  requests `turret/set [pan, tilt]` and `turret/stop`, notifications
+  `turret/pos [pan, tilt]` and `turret/err [text]`. The bridge registers for
+  the notifications, probes the MCU with `turret/get_position` every second,
+  and is ready only while the MCU answers (an RPC unanswered for
+  `rpc_timeout_s`, 0.5 s, or a sketch that is not running makes it not ready).
+  The topics, e-stop handling and `/turret/actuator_ready` semantics are those
+  of the serial transport; the diagnostics name the router socket instead of
+  the port.
+
+The `uno_q_bridge` transport needs `python3-msgpack`, which the small `unoq`
+image (`applications/unoq`) provides; the PanTiltROS image only carries
+`pyserial` for the serial transport.
 
 Release (arm) or engage the emergency stop. The tracker and bridge keep the
 last value they received; do not leave two publishers with different values

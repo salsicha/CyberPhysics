@@ -38,6 +38,8 @@ docker compose -f compositions/spaceros.yaml up                 # Space ROS Curi
 docker compose -f compositions/airplane_sim.yaml up
 docker compose -f compositions/airplane_hardware.yaml up
 docker compose -f compositions/turret_hardware.yaml up
+docker compose -f compositions/turret_uno_q.yaml --profile board up    # turret bridge on an Arduino UNO Q (host: --profile host)
+docker compose -f compositions/arduino_uno_q.yaml up            # UNO Q LED demo (Linux side; run on the board)
 docker compose -f compositions/lunar_rover_hardware.yaml up
 docker compose -f compositions/vinsmono.yaml up --build
 docker compose -f compositions/cactusrt.yaml up                 # 1 kHz real-time loop demo

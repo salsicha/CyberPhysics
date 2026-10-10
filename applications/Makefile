@@ -117,6 +117,8 @@ build_turret_sim: build_pantiltros
 	APP=turret_sim ./_build_it.sh
 build_unrealengine: build_ros2
 	APP=unrealengine ./_build_it.sh
+build_unoq:
+	APP=unoq ./_build_it.sh
 build_vinsmono:
 	APP=vinsmono ./_build_it.sh
 build_whereami: build_ros2

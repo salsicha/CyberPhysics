@@ -5,6 +5,10 @@ turret_arduino_bridge:
     diagnostics_topic: /turret/diagnostics
     emergency_stop_topic: /turret/emergency_stop
     actuator_ready_topic: /turret/actuator_ready
+    # The link (transport serial or uno_q_bridge) and its port or socket come
+    # from config/arduino.env or config/arduino_uno_q.env, not from this file.
+    # uno_q_bridge: an RPC unanswered for this long makes the MCU not ready.
+    rpc_timeout_s: 0.5
     # SET lines are written only after a false message on emergency_stop_topic.
     require_estop_release: true
     diagnostic_rate_hz: 1.0

@@ -1,0 +1,65 @@
+# Physical PanTiltROS turret on an Arduino UNO Q (hardware/turret.md).
+#
+# The UNO Q's STM32U585 MCU runs applications/arduino/scripts/turret_firmware
+# and drives the ST3215/STS3215 bus. The turret bridge runs on the board's
+# Linux side (arm64, 2-4 GB RAM) in the small `unoq` image and talks to the MCU
+# through the arduino-router socket (RouterBridge msgpack-RPC). The camera and
+# the YOLO tracker stay on the GPU host, unchanged from turret_hardware.yaml,
+# and reach the board over DDS: run both with the same ROS_DOMAIN_ID on the
+# same network. Nothing moves until the emergency stop is released on
+# /turret/emergency_stop.
+#
+# On the UNO Q, from a checkout of this repository (builds the image on the
+# board on first start):
+#   docker compose -f compositions/turret_uno_q.yaml --profile board up -d
+# On the GPU host:
+#   docker compose -f compositions/turret_uno_q.yaml --profile host up
+#   (add --profile realsense for the repository's RealSense camera)
+# Do not also run turret_hardware.yaml: its serial bridge would publish a
+# second /turret/actuator_ready.
+
+services:
+  turret_unoq_bridge:
+    profiles: ["board"]
+    image: salsicha/cyberphysics:unoq-${CYBERPHYSICS_TAG:-arm64}
+    pull_policy: build
+    build:
+      context: ../applications/unoq
+    container_name: turret_unoq_bridge
+    network_mode: host
+    ipc: host
+    restart: unless-stopped
+    env_file:
+      - ../applications/pantiltros/config/arduino_uno_q.env
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+    volumes:
+      # arduino-router's socket (root:arduino-router, 0660; the container runs
+      # as root). Long syntax so a missing socket fails instead of creating a
+      # directory. Restart this service after restarting arduino-router: the
+      # router recreates the socket file.
+      - type: bind
+        source: /var/run/arduino-router.sock
+        target: /var/run/arduino-router.sock
+        bind:
+          create_host_path: false
+      - ../applications/pantiltros/scripts:/scripts:ro
+      - ../applications/pantiltros/config:/workspace/pantiltros/config:ro
+    command: >
+      python3 /scripts/turret_arduino_bridge.py
+      --ros-args
+      --params-file /workspace/pantiltros/config/arduino_bridge.yaml
+
+  pantilt_yolo:
+    profiles: ["host"]
+    extends:
+      file: turret_hardware.yaml
+      service: pantilt_yolo
+
+  turret_realsense:
+    profiles: ["realsense"]
+    extends:
+      file: turret_hardware.yaml
+      service: turret_realsense

@@ -294,6 +294,12 @@ jobs:
         if: ${{ !cancelled() && steps.prep.outcome == 'success' }}
         timeout-minutes: 60
         run: .github/workflows/scripts/ci_build_image.sh arduino
+      # Arduino UNO Q Linux side (ros:jazzy-ros-core); amd64 here, the board
+      # builds its own arm64 copy
+      - name: unoq
+        if: ${{ !cancelled() && steps.prep.outcome == 'success' }}
+        timeout-minutes: 30
+        run: .github/workflows/scripts/ci_build_image.sh unoq
       - name: simstudio
         if: ${{ !cancelled() && steps.prep.outcome == 'success' }}
         timeout-minutes: 60
