@@ -2,7 +2,7 @@ version: "2.1"
 
 services:
   micro-ros-agent:
-    image: microros/micro-ros-agent:humble
+    image: microros/micro-ros-agent:jazzy
     container_name: micro-ros-agent
     network_mode: host
     stdin_open: true
@@ -14,7 +14,7 @@ services:
     command: udp4 --port 8888 --verbose 6
 
   rqt:
-    image: osrf/ros:humble-desktop
+    image: osrf/ros:jazzy-desktop
     container_name: rqt-visualizer
     network_mode: host
     ipc: host
@@ -29,5 +29,5 @@ services:
       - QT_X11_NO_MITSHM=1
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
-    command: bash -c "source /opt/ros/humble/setup.bash && rqt"
+    command: bash -c "source /opt/ros/jazzy/setup.bash && rqt"
 
