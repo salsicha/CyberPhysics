@@ -29,8 +29,17 @@ RUN apt update && apt install -q -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 COPY src /workspace/src
 
+# colcon writes its own interpreter into the console scripts' shebangs: run
+# it with the venv's, so the nodes see the packages installed there
+# (synthetic_world), not the bare /usr/bin/python3.
 RUN . /venv/bin/activate && . /opt/ros/$ROS2_DISTRO/setup.bash && \
-    colcon build --merge-install --install-base /workspace/install
+    /venv/bin/python3 /usr/bin/colcon build --merge-install --install-base /workspace/install
+# Each console script must import its module with its own interpreter
+# (the plain ROS environment, as ros2 launch runs it).
+RUN . /opt/ros/$ROS2_DISTRO/setup.bash && . /workspace/install/setup.bash && \
+    cd / && for script in /workspace/install/lib/wildnav_pkg/*; do \
+      "$(sed -n '1s/^#!//p' "$script")" -c 'import sys; from importlib.metadata import entry_points; [ep] = [e for e in entry_points(group="console_scripts") if e.name == sys.argv[1]]; ep.load()' "${script##*/}" || exit 1; \
+    done
 
 RUN if [ "$SEED_NAV_ASSETS" = "1" ]; then \
       . /venv/bin/activate && . /opt/ros/$ROS2_DISTRO/setup.bash && \
