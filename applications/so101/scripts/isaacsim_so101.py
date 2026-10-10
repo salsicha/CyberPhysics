@@ -537,7 +537,9 @@ def main():
         )
         task_scene.close()
         bridge.destroy_node()
-        rclpy.shutdown()
+        # SIGINT may already have shut the context down; Kit must still close.
+        if rclpy.ok():
+            rclpy.shutdown()
         simulation_app.close()
 
 

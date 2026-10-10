@@ -16,7 +16,7 @@ sys.path.insert(0, str(REPO / 'applications/demnav/src/demnav_pkg'))
 sys.path.insert(0, str(REPO / 'applications/wildnav/src/wildnav_pkg'))
 
 ROS_MODULES = (
-    'rclpy', 'rclpy.node', 'rclpy.qos',
+    'rclpy', 'rclpy.executors', 'rclpy.node', 'rclpy.qos',
     'nav_msgs', 'nav_msgs.msg',
     'sensor_msgs', 'sensor_msgs.msg',
     'geometry_msgs', 'geometry_msgs.msg',

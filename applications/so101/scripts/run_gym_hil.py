@@ -49,7 +49,8 @@ def main(args=None):
     finally:
         # Clean up the environment and ROS 2
         env.close()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
         print("Environment closed and ROS 2 shut down.")
 
 if __name__ == '__main__':
