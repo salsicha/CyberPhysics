@@ -67,7 +67,9 @@ services:
     environment:
       ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
       FASTRTPS_DEFAULT_PROFILES_FILE: *fastdds-profile
-      GENESIS_BACKEND: ${GENESIS_BACKEND:-gpu}
+      # The single small rigid body steps faster on the CPU (the GPU path
+      # is kernel-launch bound); the cameras render on the GPU either way.
+      GENESIS_BACKEND: ${GENESIS_BACKEND:-cpu}
       GENESIS_LOG_LEVEL: ${GENESIS_LOG_LEVEL:-info}
       GENESIS_MAX_ROTOR_RPM: ${GENESIS_MAX_ROTOR_RPM:-21700}
       PYOPENGL_PLATFORM: ${PYOPENGL_PLATFORM:-egl}
@@ -80,7 +82,7 @@ services:
       - navsim_genesis_assets:/data/navsim_assets:ro
     command: >
       python3 /workspace/applications/genesis/scripts/aerodrone_navsim.py
-        --backend ${GENESIS_BACKEND:-gpu}
+        --backend ${GENESIS_BACKEND:-cpu}
         --lat ${INITIAL_LAT:-37.9234} --lon ${INITIAL_LON:--122.5967}
         --origin-alt ${ORIGIN_ALT:-781.0} --assets /data/navsim_assets
     deploy:

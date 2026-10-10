@@ -4,11 +4,13 @@
 from __future__ import annotations
 
 import argparse
+import array
 import faulthandler
 import json
 import math
 import os
 from pathlib import Path
+import select
 import sys
 import time
 
@@ -22,10 +24,71 @@ from sensor_msgs.msg import CameraInfo, Image
 sys.path.insert(0, "/workspace/applications/ardupilot_sitl/scripts")
 from ardupilot_json import (  # noqa: E402
     ArduPilotJSON,
-    pwm_to_rotor_speed,
     quaternion_to_matrix,
     state_from_enu,
 )
+
+# Genesis' urdf/drones/cf2x.urdf: mass, thrust (N/rpm^2) and reaction
+# moment (N m/rpm^2) coefficients.
+CF2X_MASS_KG = 0.027
+CF2X_KF = 3.16e-10
+CF2X_KM = 7.94e-12
+# Propeller hubs (the prop*_link inertial origins), body FLU metres. The
+# URDF attaches those links with no joint offset, so Genesis' own
+# set_propellers_rpm() applies every thrust at the body origin: it can
+# yaw and climb but never roll or pitch. rotor_wrench() uses these arms.
+CF2X_ROTOR_POSITIONS_FLU = np.array([
+    [0.028, -0.028],   # prop0 front-right
+    [-0.028, -0.028],  # prop1 rear-right
+    [-0.028, 0.028],   # prop2 rear-left
+    [0.028, 0.028],    # prop3 front-left
+])
+# ArduPilot's quad X (FRAME_CLASS 1, FRAME_TYPE 1; AP_MotorsMatrix) outputs
+# motor 1 front-right CCW, 2 rear-left CCW, 3 front-left CW, 4 rear-right
+# CW: cf2x propeller i is ArduPilot output MOTOR_ORDER[i].
+MOTOR_ORDER = (0, 3, 1, 2)
+# Reaction torque about body +z, opposite the propeller's spin: CCW
+# propellers (motors 1, 2) turn the body clockwise seen from above.
+ROTOR_YAW_SIGN = np.array([-1.0, 1.0, -1.0, 1.0])
+# ArduPilot's motor model (AP_Motors_Thrust_Linearization), pinned in
+# config/aerodrone_sitl.params: no thrust below MOT_SPIN_MIN of the PWM
+# range, full thrust at MOT_SPIN_MAX, (1 - MOT_THST_EXPO) r + MOT_THST_EXPO
+# r^2 in between.
+PWM_MIN, PWM_MAX = 1000.0, 2000.0
+MOT_SPIN_MIN, MOT_SPIN_MAX, MOT_THST_EXPO = 0.15, 0.95, 0.65
+GRAVITY = 9.80665
+
+
+def rotor_thrust_fraction(pwm):
+    """Thrust of each ArduPilot output, as a fraction of full thrust."""
+    actuator = (np.asarray(pwm, dtype=np.float64) - PWM_MIN) / (PWM_MAX - PWM_MIN)
+    ratio = np.clip((actuator - MOT_SPIN_MIN) / (MOT_SPIN_MAX - MOT_SPIN_MIN), 0.0, 1.0)
+    return (1.0 - MOT_THST_EXPO) * ratio + MOT_THST_EXPO * ratio * ratio
+
+
+def air_density_ratio(altitude_m):
+    """ISA density over sea level's. ArduPilot divides its motor output by
+    the barometric estimate of it, so propeller thrust must scale with it."""
+    return (1.0 - 2.25577e-5 * altitude_m) ** 4.25588
+
+
+def rotor_thrusts(pwm, maximum_thrust_n, density_ratio=1.0):
+    """Thrust (N) of cf2x propellers 0-3 from ArduPilot's motor PWM."""
+    pwm = np.asarray(pwm, dtype=np.float64)[list(MOTOR_ORDER)]
+    return maximum_thrust_n * density_ratio * rotor_thrust_fraction(pwm)
+
+
+def rotor_wrench(thrusts, moment_ratio=CF2X_KM / CF2X_KF):
+    """Body FLU force and torque of the propeller thrusts (cf2x order):
+    thrust along +z at each hub plus each propeller's reaction moment."""
+    thrusts = np.asarray(thrusts, dtype=np.float64)
+    force = np.array([0.0, 0.0, thrusts.sum()])
+    torque = np.array([
+        CF2X_ROTOR_POSITIONS_FLU[:, 1] @ thrusts,
+        -CF2X_ROTOR_POSITIONS_FLU[:, 0] @ thrusts,
+        moment_ratio * (ROTOR_YAW_SIGN @ thrusts),
+    ])
+    return force, torque
 
 
 def env_float(name, default):
@@ -141,14 +204,16 @@ class GenesisSensorPublisher(Node):
         rgb_msg.header.stamp, rgb_msg.header.frame_id = stamp, frame
         rgb_msg.height, rgb_msg.width = rgb.shape[:2]
         rgb_msg.encoding, rgb_msg.step = "rgb8", rgb.shape[1] * 3
-        rgb_msg.data = rgb.tobytes()
+        # array('B') is the message setter's fast path: bytes are checked
+        # element by element, which took a third of the lock-step time.
+        rgb_msg.data = array.array("B", rgb.tobytes())
         self.rgb_pub.publish(rgb_msg)
         self.rgb_info_pub.publish(self.camera_info(stamp, frame))
         depth_msg = Image()
         depth_msg.header.stamp, depth_msg.header.frame_id = stamp, frame
         depth_msg.height, depth_msg.width = depth.shape[:2]
         depth_msg.encoding, depth_msg.step = "32FC1", depth.shape[1] * 4
-        depth_msg.data = depth.tobytes()
+        depth_msg.data = array.array("B", depth.tobytes())
         self.depth_pub.publish(depth_msg)
         self.depth_info_pub.publish(self.camera_info(stamp, frame))
 
@@ -228,42 +293,56 @@ def main():
     dt = 1.0 / args.rate_hz
     camera_stride = max(1, int(round(args.rate_hz / args.camera_rate_hz)))
     maximum_rotor_rpm = env_float("GENESIS_MAX_ROTOR_RPM", 21700.0)
+    maximum_thrust_n = CF2X_KF * maximum_rotor_rpm ** 2
+    if not np.allclose([float(drone.get_mass()), drone.KF, drone.KM],
+                       [CF2X_MASS_KG, CF2X_KF, CF2X_KM], rtol=1e-3):
+        raise RuntimeError("Genesis cf2x.urdf no longer matches the rotor model")
+    print(
+        f"Genesis rotors: {4.0 * maximum_thrust_n:.3f} N maximum thrust, "
+        f"hover at {CF2X_MASS_KG * GRAVITY / (4.0 * maximum_thrust_n):.3f} "
+        "of it (MOT_THST_HOVER)", flush=True)
     previous_velocity = np.zeros(3)
+    position = to_numpy(drone.get_pos())[:3]
+    rotation = quaternion_to_matrix(to_numpy(drone.get_quat())[:4])
     camera_up = np.array([1.0, 0.0, 0.0])
     tick = 0
     start = time.monotonic()
     try:
         while rclpy.ok():
-            rclpy.spin_once(publisher, timeout_sec=0.0)
             frame = transport.receive()
             if frame is None:
-                time.sleep(dt)
+                # Wake on ArduPilot's next servo frame, not a whole dt later.
+                select.select([transport.socket], [], [], dt)
                 continue
-            rpm = pwm_to_rotor_speed(frame.pwm[:4], maximum_speed=maximum_rotor_rpm)
-            if hasattr(drone, "set_propellers_rpm"):
-                drone.set_propellers_rpm(rpm.tolist())
-            else:
-                drone.set_propellels_rpm(rpm.tolist())
+            # The previous step's attitude: forces are applied in world axes.
+            force, torque = rotor_wrench(rotor_thrusts(
+                frame.pwm[:4], maximum_thrust_n,
+                air_density_ratio(args.origin_alt + position[2])))
+            drone.solver.apply_links_external_force(
+                (rotation @ force)[None], [drone.base_link_idx], ref="link_com")
+            drone.solver.apply_links_external_torque(
+                (rotation @ torque)[None], [drone.base_link_idx], ref="link_com")
             scene.step()
 
             position = to_numpy(drone.get_pos())[:3]
             quaternion = to_numpy(drone.get_quat())[:4]
+            rotation = quaternion_to_matrix(quaternion)
             velocity = to_numpy(drone.get_vel())[:3]
-            angular = to_numpy(drone.get_ang())[:3]
+            angular = to_numpy(drone.get_ang())[:3]  # world axes
             acceleration_world = (velocity - previous_velocity) / dt
             previous_velocity = velocity.copy()
-            specific_force_flu = quaternion_to_matrix(quaternion).T @ (
-                acceleration_world - np.array([0.0, 0.0, -9.80665]))
+            specific_force_flu = rotation.T @ (
+                acceleration_world - np.array([0.0, 0.0, -GRAVITY]))
             transport.send(state_from_enu(
-                position, velocity, quaternion, angular, specific_force_flu,
-                args.lat, args.lon, args.origin_alt, timestamp=tick * dt,
-                reference_enu=home))
+                position, velocity, quaternion, rotation.T @ angular,
+                specific_force_flu, args.lat, args.lon, args.origin_alt,
+                timestamp=tick * dt, reference_enu=home))
 
             if tick % camera_stride == 0:
                 # Body-fixed nadir camera: the image top points along the
                 # nose (horizontal body x axis), like the physical OAK-1 with
                 # camera_mount_yaw_deg 0 and the DemNav/WildNav de-rotation.
-                forward = quaternion_to_matrix(quaternion)[:, 0]
+                forward = rotation[:, 0]
                 horizontal = np.array([forward[0], forward[1], 0.0])
                 if np.linalg.norm(horizontal) > 1e-6:
                     camera_up = horizontal / np.linalg.norm(horizontal)
@@ -271,6 +350,8 @@ def main():
                     pos=position.tolist(),
                     lookat=(position + np.array([0.0, 0.0, -10.0])).tolist(),
                     up=tuple(float(value) for value in camera_up))
+                # The node only publishes: no need to spin it every tick.
+                rclpy.spin_once(publisher, timeout_sec=0.0)
                 publisher.publish_clock(tick * dt)
                 rendered = camera.render(rgb=True, depth=True)
                 publisher.publish_camera(rendered[0], rendered[1])
@@ -281,7 +362,8 @@ def main():
                     "Genesis physics "
                     f"frame_rate={frame.frame_rate_hz}Hz "
                     f"pwm={list(frame.pwm[:4])} "
-                    f"position={position.round(3).tolist()}",
+                    f"position={position.round(3).tolist()} "
+                    f"quaternion={quaternion.round(4).tolist()}",
                     flush=True,
                 )
             tick += 1

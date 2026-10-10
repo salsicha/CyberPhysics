@@ -1,2 +1,25 @@
 # Genesis-only physics compensation layered after systems/aerodrone/config/arducopter.params.
-MOT_THST_HOVER,0.44
+# The Genesis airframe is the 27 g Crazyflie of Genesis' urdf/drones/cf2x.urdf,
+# its rotors modelled by applications/genesis/scripts/aerodrone_navsim.py.
+#
+# Motor model that script inverts (rotor_thrust_fraction): pinned so the
+# simulator and ArduPilot agree. SITL's default copter.parm turns battery
+# voltage compensation on; the simulator has no battery sag.
+MOT_THST_EXPO,0.65
+MOT_SPIN_MIN,0.15
+MOT_SPIN_MAX,0.95
+MOT_BAT_VOLT_MAX,0
+# 0.027 kg * g over the 4 x 0.1488 N full thrust (21700 rpm).
+MOT_THST_HOVER,0.445
+# Rate loops: a unit roll/pitch output gives the cf2x 595 rad/s^2 (yaw
+# 345 rad/s^2), several times a typical ArduCopter airframe, and the
+# default gains (yaw: SITL's copter.parm) leave no gain margin. Scaled to a
+# ~20 rad/s roll/pitch crossover with ~10 dB margin, ~6 rad/s for yaw.
+ATC_RAT_RLL_P,0.03
+ATC_RAT_RLL_I,0.03
+ATC_RAT_RLL_D,0.0008
+ATC_RAT_PIT_P,0.03
+ATC_RAT_PIT_I,0.03
+ATC_RAT_PIT_D,0.0008
+ATC_RAT_YAW_P,0.02
+ATC_RAT_YAW_I,0.002
