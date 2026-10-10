@@ -33,6 +33,16 @@ IDENTITY_JOINT_MAPPING = {
     "gripper": {"closed": 0.0, "open": SO101_GRIPPER_MAX},
 }
 
+# The URDF joint limits' single source of truth is
+# systems/so101/config/joint_limits.json (mounted at /workspace/systems): the
+# so101_new_calib.urdf range of a LeRobot-calibrated arm mapped into the URDF
+# with the nominal joint mapping. The ROS bridge clamps every command to them;
+# this server uses them to check that a checkpoint's recorded state range,
+# mapped with the configured joint mapping, fits the URDF.
+JOINT_LIMITS_FILE_ENV = "SO101_JOINT_LIMITS_FILE"
+JOINT_LIMITS_RELATIVE_PATH = Path("systems", "so101", "config", "joint_limits.json")
+ARM_LIMIT_TOLERANCE_RAD = 0.1
+
 
 def load_joint_mapping(path: str | None) -> dict[str, Any]:
     """Load and validate a LeRobot-degrees to URDF joint mapping file."""
@@ -55,6 +65,45 @@ def load_joint_mapping(path: str | None) -> dict[str, Any]:
         raise ValueError(f"{path}: gripper closed/open values must be finite and differ")
     mapping["gripper"] = {"closed": closed, "open": opened}
     return mapping
+
+
+def load_urdf_arm_limits(path: str | None = None) -> np.ndarray | None:
+    """URDF arm [lower, upper] limits (rad) from joint_limits.json, or None if it is not found."""
+    if path is None:
+        path = os.environ.get(JOINT_LIMITS_FILE_ENV)
+    if path is None:
+        here = Path(__file__).resolve()
+        candidates = [parent / JOINT_LIMITS_RELATIVE_PATH for parent in here.parents]
+        workspace = Path("/workspace") / JOINT_LIMITS_RELATIVE_PATH
+        if workspace not in candidates:
+            candidates.append(workspace)
+        path = next((candidate for candidate in candidates if candidate.is_file()), None)
+        if path is None:
+            return None
+    joints = json.loads(Path(path).read_text())["joints"]
+    limits = np.array(
+        [[float(joints[name]["lower"]), float(joints[name]["upper"])] for name in ARM_JOINT_NAMES],
+        dtype=np.float64,
+    )
+    if not np.all(np.isfinite(limits)) or np.any(limits[:, 0] >= limits[:, 1]):
+        raise ValueError(f"{path}: every joint needs finite limits with lower < upper")
+    return limits
+
+
+def joints_outside_urdf_limits(
+    minimum: Any,
+    maximum: Any,
+    mapping: dict[str, Any],
+    limits: np.ndarray,
+    tolerance: float = ARM_LIMIT_TOLERANCE_RAD,
+) -> list[str]:
+    """Arm joints whose LeRobot-degree [minimum, maximum] maps outside the URDF limits."""
+    low = np.asarray(minimum, dtype=np.float64).reshape(-1)[:ARM_JOINT_COUNT]
+    high = np.asarray(maximum, dtype=np.float64).reshape(-1)[:ARM_JOINT_COUNT]
+    signs, offsets = _mapping_arrays(mapping)
+    ends = np.deg2rad(np.stack([signs * low + offsets, signs * high + offsets]))
+    beyond = (ends.min(axis=0) < limits[:, 0] - tolerance) | (ends.max(axis=0) > limits[:, 1] + tolerance)
+    return [ARM_JOINT_NAMES[index] for index in np.flatnonzero(beyond)]
 
 
 def is_identity_mapping(mapping: dict[str, Any]) -> bool:
@@ -207,6 +256,7 @@ class SmolVLASO101Policy:
         local_files_only: bool,
         joint_mapping: dict[str, Any] = IDENTITY_JOINT_MAPPING,
         skip_unit_check: bool = False,
+        joint_limits: np.ndarray | None = None,
     ) -> None:
         import torch
         from lerobot.configs import PreTrainedConfig
@@ -218,6 +268,7 @@ class SmolVLASO101Policy:
         self.model_path = model_path
         self.checkpoint_units = checkpoint_units
         self.joint_mapping = joint_mapping
+        self.joint_limits = joint_limits
 
         if self.device.type == "cuda" and not torch.cuda.is_available():
             raise SystemExit(f"SmolVLA device {device!r} requested, but CUDA is unavailable")
@@ -318,6 +369,18 @@ class SmolVLASO101Policy:
             if not skip:
                 raise SystemExit(message)
             print(f"WARNING: {message}", flush=True)
+            return
+        if self.joint_limits is None:
+            return
+        outside = joints_outside_urdf_limits(*state_range, self.joint_mapping, self.joint_limits)
+        if outside:
+            print(
+                f"WARNING: the checkpoint's observation.state range for {outside}, mapped with the "
+                "joint mapping, falls outside the URDF joint limits "
+                "(systems/so101/config/joint_limits.json); the mapping or the checkpoint's units "
+                "are likely wrong for this arm, and the bridge will clamp those joints.",
+                flush=True,
+            )
 
     def reset(self) -> dict[str, Any]:
         self.policy.reset()
@@ -476,6 +539,15 @@ def main() -> None:
             flush=True,
         )
 
+    joint_limits = load_urdf_arm_limits()
+    if joint_limits is None:
+        print(
+            "WARNING: systems/so101/config/joint_limits.json not found (mount systems/ at "
+            f"/workspace/systems or set {JOINT_LIMITS_FILE_ENV}); skipping the checkpoint "
+            "state-range check against the URDF joint limits.",
+            flush=True,
+        )
+
     policy = SmolVLASO101Policy(
         model_path=args.model_path,
         device=args.device,
@@ -485,6 +557,7 @@ def main() -> None:
         local_files_only=args.local_files_only,
         joint_mapping=joint_mapping,
         skip_unit_check=args.skip_unit_check,
+        joint_limits=joint_limits,
     )
     PolicyServer(policy, args.host, args.port).run()
 

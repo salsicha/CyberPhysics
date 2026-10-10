@@ -165,12 +165,27 @@ def test_hil_safety_target_limits_step_and_joint_range():
             raise AssertionError("non-finite HIL command was accepted")
 
 
-@pytest.mark.parametrize("joint,value", [(0, 2.1), (0, -2.1), (5, -0.01), (5, 0.05)])
+# Outside systems/so101/config/joint_limits.json: pan beyond +/-110 deg, lift
+# beyond -86..114 deg, elbow beyond -22.9..170.7 deg (elbow -1.0 rad was inside
+# the old symmetric limits), wrist flex beyond -92.9..97.1 deg, roll beyond
+# -162.8..157.2 deg, gripper beyond 0..0.04 m.
+@pytest.mark.parametrize("joint,value", [
+    (0, 2.1), (0, -2.1), (1, -1.6), (1, 2.1), (2, -1.0), (2, 3.1),
+    (3, -1.7), (3, 1.8), (4, 2.8), (4, -2.9), (5, -0.01), (5, 0.05),
+])
 def test_hil_rejects_out_of_range_feedback(joint, value):
     current = np.zeros(len(JOINT_NAMES))
     current[joint] = value
     with pytest.raises(ValueError, match="measured state"):
         safe_hardware_target(current, current, 0.04)
+
+
+# Reachable by the real arm but outside the old symmetric limits.
+@pytest.mark.parametrize("joint,value", [(1, 1.9), (2, 2.9), (3, 1.67), (4, -2.8)])
+def test_hil_accepts_feedback_inside_the_physical_range(joint, value):
+    current = np.zeros(len(JOINT_NAMES))
+    current[joint] = value
+    np.testing.assert_allclose(safe_hardware_target(current, current, 0.04), current)
 
 
 def test_synthetic_rgbd_handles_extreme_joint_samples():

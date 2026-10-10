@@ -16,6 +16,8 @@ from conftest import REPO, load_script
 # The converter imports pyarrow for parquet I/O; the logic under test does not.
 for name in ('pyarrow', 'pyarrow.parquet'):
     sys.modules.setdefault(name, MagicMock())
+# ... and its joint limits from the GR00T scripts' so101_joint_limits module.
+sys.path.insert(0, str(REPO / 'applications/groot/scripts'))
 normalize = load_script(REPO / 'applications/groot/scripts/normalize_so101_dataset.py',
                         'groot_normalize_so101_dataset')
 MAPPING_FILE = REPO / 'systems/so101/config/lerobot_joint_mapping.json'

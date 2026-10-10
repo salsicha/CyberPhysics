@@ -1,0 +1,25 @@
+{
+  "_comment": [
+    "SINGLE SOURCE OF TRUTH for the SO-101 joint position limits (radians; gripper in metres), in this",
+    "repository's URDF convention: zero is the arm pointing straight up (forward_kinematics in",
+    "applications/so101/scripts/so101_common.py). Edit the limits only here: urdf/so101.urdf.xacro reads this",
+    "file, urdf/so101.urdf is generated from it (regenerate_urdf.sh), and so101_common.py (simulators, mock sim,",
+    "Gazebo relay, CBF controller, GR00T bridge, HIL guard), the GR00T scripts (so101_joint_limits.py) and the",
+    "SmolVLA server load it from /workspace/systems or the repository checkout.",
+    "Derivation: so101_new_calib_rad are TheRobotStudio Simulation/SO101/so101_new_calib.urdf limits, whose zero",
+    "is LeRobot's calibrated mid-range pose. They are mapped into this URDF with the nominal calibration in",
+    "lerobot_joint_mapping.json: limit = sign * so101_new_calib + radians(offset_deg). shoulder_pan and wrist_roll",
+    "have sign -1, so their lower and upper limits swap and change sign. Values are rounded outward to 1e-5 rad.",
+    "In degrees: pan -110..110, lift -86..114, elbow -22.93..170.73, wrist flex -92.9..97.1, roll -162.79..157.21.",
+    "The gripper is modelled as a 0-0.04 m prismatic jaw, not new_calib's revolute jaw, so it is not derived.",
+    "tests/test_so101_joint_limits.py recomputes the derivation and checks every consumer and both URDF files."
+  ],
+  "joints": {
+    "shoulder_pan": {"lower": -1.91986, "upper": 1.91986, "so101_new_calib_rad": [-1.91986, 1.91986]},
+    "shoulder_lift": {"lower": -1.50099, "upper": 1.98968, "so101_new_calib_rad": [-1.74533, 1.74533]},
+    "elbow_flex": {"lower": -0.40021, "upper": 2.9798, "so101_new_calib_rad": [-1.69, 1.69]},
+    "wrist_flex": {"lower": -1.62141, "upper": 1.69472, "so101_new_calib_rad": [-1.65806, 1.65806]},
+    "wrist_roll": {"lower": -2.84121, "upper": 2.74385, "so101_new_calib_rad": [-2.74385, 2.84121]},
+    "gripper": {"lower": 0.0, "upper": 0.04}
+  }
+}

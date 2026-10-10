@@ -111,6 +111,7 @@ services:
       - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
     volumes:
       - ../applications/so101/scripts:/workspace/so101_scripts:ro
+      - ../systems:/workspace/systems:ro
     command: >
       python3 /workspace/so101_scripts/so101_hil_guard.py
         --ros-args

@@ -234,7 +234,9 @@ the arm pointing straight up. Arm joints are converted with
 `--joint-mapping CONTAINER_PATH`). Its values are a nominal calibration derived
 from TheRobotStudio's `so101_new_calib.urdf` (whose zero is LeRobot's calibrated
 mid-range), not a measurement of your arm, so verify them; converted values
-outside the URDF joint limits are rejected, and the mapping used is recorded in
+more than 0.1 rad outside the URDF joint limits
+(`systems/so101/config/joint_limits.json`, the arm's physical range in this
+URDF's convention) are rejected, and the mapping used is recorded in
 `meta/so101_units.json`.
 
 Example:

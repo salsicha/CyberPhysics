@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate SO-101 camera calibration, frame alignment, and dataset sync manifests."""
+"""Validate SO-101 camera calibration, joint limits, frame alignment, and dataset sync manifests."""
 
 import argparse
 import json
@@ -10,8 +10,11 @@ from pathlib import Path
 import numpy as np
 
 from so101_common import (
+    JOINT_LIMITS,
+    JOINT_NAMES,
     base_to_camera_link,
     camera_info_values,
+    joint_limits_file,
     rpy_to_matrix,
     scenario_camera,
 )
@@ -120,6 +123,19 @@ def validate_urdf_alignment(urdf_path, scenario_path=None):
     return metrics
 
 
+def validate_joint_limits(urdf_path, limits=JOINT_LIMITS):
+    """The URDF's joint limits must equal their source of truth, joint_limits.json."""
+    joints, _ = urdf_model(urdf_path)
+    errors = {}
+    for name, (lower, upper) in zip(JOINT_NAMES, np.asarray(limits, dtype=np.float64)):
+        if name not in joints or joints[name].find("limit") is None:
+            raise AssertionError(f"URDF joint {name} has no <limit>")
+        limit = joints[name].find("limit")
+        actual = [float(limit.attrib["lower"]), float(limit.attrib["upper"])]
+        errors[name] = assert_near(f"{name} limits vs {joint_limits_file()}", actual, [lower, upper], 1e-9)
+    return {"joint_limits_source": str(joint_limits_file()), "max_error": max(errors.values())}
+
+
 def validate_scenario_camera(scenario_path, camera_info_path=None):
     scenario = load_json(scenario_path)
     camera = scenario_camera(scenario)
@@ -195,6 +211,7 @@ def main():
 
     results = {
         "urdf_alignment": validate_urdf_alignment(args.urdf, args.scenario),
+        "joint_limits": validate_joint_limits(args.urdf),
         "scenario_camera": validate_scenario_camera(args.scenario, args.camera_info_json),
     }
     if args.tf_json:

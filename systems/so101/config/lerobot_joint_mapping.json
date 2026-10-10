@@ -11,7 +11,8 @@
     "wrist_roll (axis reversed) turn the opposite way. wrist_roll's zero cannot be derived because this URDF",
     "models the gripper as a sliding jaw, so its offset is assumed 0.",
     "Verify on your arm (pose it at known URDF angles and read LeRobot's degrees). Mapped values outside this",
-    "URDF's joint limits are rejected by normalize_so101_dataset.py.",
+    "URDF's joint limits are rejected by normalize_so101_dataset.py. Those limits (joint_limits.json) are",
+    "so101_new_calib.urdf's limits mapped with these nominal values; re-derive them if you change them.",
     "gripper.closed/open are LeRobot's 0-100 gripper readings at fully closed and at 0.04 m opening.",
     "LeRobot's default use_degrees=False (-100..100) data cannot be mapped without the arm's calibration file and is rejected."
   ],

@@ -64,6 +64,8 @@ RUN --mount=type=cache,target=/root/.cache/uv,sharing=locked \
 COPY scripts/smoke_test.py /workspace/smoke_test.py
 COPY scripts/so101_policy_server.py /workspace/so101_policy_server.py
 COPY scripts/so101_task_policy.py /workspace/so101_task_policy.py
+# Loads systems/so101/config/joint_limits.json from the /workspace/systems mount.
+COPY scripts/so101_joint_limits.py /workspace/so101_joint_limits.py
 COPY scripts/policy_healthcheck.py /workspace/policy_healthcheck.py
 COPY config/ /workspace/groot_config/
 COPY scripts/ /workspace/groot_scripts/

@@ -70,6 +70,31 @@ class SO101AdapterTest(unittest.TestCase):
         self.assertEqual(mapping["joints"]["shoulder_pan"]["sign"], -1.0)
         self.assertEqual(mapping["joints"]["elbow_flex"]["offset_deg"], 73.9)
 
+    def test_checkpoint_range_is_checked_against_the_urdf_limits(self):
+        repo = Path(__file__).resolve().parents[3]
+        mapping_path = repo / "systems/so101/config/lerobot_joint_mapping.json"
+        limits = server.load_urdf_arm_limits()
+        if limits is None or not mapping_path.is_file():
+            self.skipTest("repository systems/ directory is not mounted")
+        mapping = server.load_joint_mapping(str(mapping_path))
+        # LeRobot degrees at the ends of so101_new_calib.urdf's range (zero =
+        # calibration mid-range) fit the URDF through the nominal mapping.
+        low = np.degrees([-1.91986, -1.74533, -1.69, -1.65806, -2.74385])
+        high = np.degrees([1.91986, 1.74533, 1.69, 1.65806, 2.84121])
+        self.assertEqual(server.joints_outside_urdf_limits(low, high, mapping, limits), [])
+        # The identity mapping puts the elbow 97 deg backwards, which the arm cannot reach.
+        identity = server.load_joint_mapping(None)
+        self.assertEqual(server.joints_outside_urdf_limits(low, high, identity, limits),
+                         ["shoulder_lift", "elbow_flex"])
+        policy = server.SmolVLASO101Policy.__new__(server.SmolVLASO101Policy)
+        policy.joint_mapping, policy.joint_limits = identity, limits
+        normalizer = SimpleNamespace(stats={"observation.state": {
+            "min": np.append(low, 0.0), "max": np.append(high, 100.0)}})
+        policy.preprocessor = SimpleNamespace(steps=[normalizer])
+        with patch("builtins.print") as printed:
+            policy._check_checkpoint_units(skip=False)
+        self.assertIn("elbow_flex", printed.call_args.args[0])
+
     def test_lerobot_range_statistics_are_detected(self):
         # use_degrees=False data saturates at exactly +/-100 and never exceeds it.
         self.assertTrue(server.looks_like_lerobot_range_values(

@@ -21,6 +21,15 @@
     </link>
   </xacro:macro>
 
+  <!-- Joint position limits come from their single source of truth,
+       systems/so101/config/joint_limits.json (see the derivation there).
+       A relative load_yaml path resolves against this file's directory. -->
+  <xacro:property name="joint_limits" value="${xacro.load_yaml('../config/joint_limits.json')['joints']}"/>
+  <xacro:macro name="joint_limit" params="name effort velocity">
+    <limit lower="${joint_limits[name]['lower']}" upper="${joint_limits[name]['upper']}"
+           effort="${effort}" velocity="${velocity}"/>
+  </xacro:macro>
+
   <link name="world"/>
   <xacro:box_link name="base_link" sx="0.12" sy="0.12" sz="0.045" mass="0.42" color="so101_black"/>
   <joint name="world_to_base" type="fixed">
@@ -31,7 +40,7 @@
   <joint name="shoulder_pan" type="revolute">
     <parent link="base_link"/><child link="shoulder_link"/>
     <origin xyz="0 0 0.065"/><axis xyz="0 0 1"/>
-    <limit lower="-1.9199" upper="1.9199" effort="6.0" velocity="3.0"/>
+    <xacro:joint_limit name="shoulder_pan" effort="6.0" velocity="3.0"/>
     <dynamics damping="0.08" friction="0.02"/>
   </joint>
 
@@ -43,7 +52,7 @@
   <joint name="shoulder_lift" type="revolute">
     <parent link="shoulder_link"/><child link="upper_arm_link"/>
     <origin xyz="0 0 0.045"/><axis xyz="0 1 0"/>
-    <limit lower="-1.7453" upper="1.7453" effort="6.0" velocity="3.0"/>
+    <xacro:joint_limit name="shoulder_lift" effort="6.0" velocity="3.0"/>
     <dynamics damping="0.08" friction="0.02"/>
   </joint>
 
@@ -55,7 +64,7 @@
   <joint name="elbow_flex" type="revolute">
     <parent link="upper_arm_link"/><child link="forearm_link"/>
     <origin xyz="0 0 0.14"/><axis xyz="0 1 0"/>
-    <limit lower="-1.7453" upper="1.7453" effort="6.0" velocity="3.0"/>
+    <xacro:joint_limit name="elbow_flex" effort="6.0" velocity="3.0"/>
     <dynamics damping="0.07" friction="0.02"/>
   </joint>
 
@@ -63,7 +72,7 @@
   <joint name="wrist_flex" type="revolute">
     <parent link="forearm_link"/><child link="wrist_pitch_link"/>
     <origin xyz="0 0 0.13"/><axis xyz="0 1 0"/>
-    <limit lower="-1.6581" upper="1.6581" effort="3.0" velocity="4.0"/>
+    <xacro:joint_limit name="wrist_flex" effort="3.0" velocity="4.0"/>
     <dynamics damping="0.05" friction="0.01"/>
   </joint>
 
@@ -71,7 +80,7 @@
   <joint name="wrist_roll" type="revolute">
     <parent link="wrist_pitch_link"/><child link="wrist_roll_link"/>
     <origin xyz="0 0 0.055"/><axis xyz="0 0 1"/>
-    <limit lower="-2.7439" upper="2.7439" effort="3.0" velocity="4.0"/>
+    <xacro:joint_limit name="wrist_roll" effort="3.0" velocity="4.0"/>
     <dynamics damping="0.04" friction="0.01"/>
   </joint>
 
@@ -84,7 +93,7 @@
   <joint name="gripper" type="prismatic">
     <parent link="gripper_base_link"/><child link="gripper_jaw_link"/>
     <origin xyz="0.025 0 0.035"/><axis xyz="1 0 0"/>
-    <limit lower="0.0" upper="0.04" effort="2.0" velocity="0.15"/>
+    <xacro:joint_limit name="gripper" effort="2.0" velocity="0.15"/>
     <dynamics damping="0.05" friction="0.01"/>
   </joint>
 

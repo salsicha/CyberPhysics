@@ -66,4 +66,6 @@ services:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
     depends_on:
       - isaacsim
+    volumes:
+      - ../systems:/workspace/systems:ro
     command: ros2 run so101_description so101_cbf_control.py

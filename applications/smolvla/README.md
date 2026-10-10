@@ -151,7 +151,10 @@ values are a nominal calibration derived from TheRobotStudio's
 `so101_new_calib.urdf` (whose zero is LeRobot's calibrated mid-range), not a
 measurement of your arm: verify the offsets and signs (pose it at known URDF
 angles and read LeRobot's degrees). The server warns if the mapping is the
-identity. A typical full fine-tune on a Hub dataset is:
+identity, and if the checkpoint's recorded state range, mapped this way, falls
+outside the URDF joint limits (`systems/so101/config/joint_limits.json`, the
+physical range of a LeRobot-calibrated arm in this URDF's convention). A typical
+full fine-tune on a Hub dataset is:
 
 ```bash
 docker compose \

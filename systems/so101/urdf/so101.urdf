@@ -56,7 +56,7 @@
     <child link="shoulder_link" />
     <origin xyz="0 0 0.065" />
     <axis xyz="0 0 1" />
-    <limit lower="-1.9199" upper="1.9199" effort="6.0" velocity="3.0" />
+    <limit lower="-1.91986" upper="1.91986" effort="6.0" velocity="3.0" />
     <dynamics damping="0.08" friction="0.02" />
   </joint>
   <link name="upper_arm_link">
@@ -84,7 +84,7 @@
     <child link="upper_arm_link" />
     <origin xyz="0 0 0.045" />
     <axis xyz="0 1 0" />
-    <limit lower="-1.7453" upper="1.7453" effort="6.0" velocity="3.0" />
+    <limit lower="-1.50099" upper="1.98968" effort="6.0" velocity="3.0" />
     <dynamics damping="0.08" friction="0.02" />
   </joint>
   <link name="forearm_link">
@@ -112,7 +112,7 @@
     <child link="forearm_link" />
     <origin xyz="0 0 0.14" />
     <axis xyz="0 1 0" />
-    <limit lower="-1.7453" upper="1.7453" effort="6.0" velocity="3.0" />
+    <limit lower="-0.40021" upper="2.9798" effort="6.0" velocity="3.0" />
     <dynamics damping="0.07" friction="0.02" />
   </joint>
   <link name="wrist_pitch_link">
@@ -138,7 +138,7 @@
     <child link="wrist_pitch_link" />
     <origin xyz="0 0 0.13" />
     <axis xyz="0 1 0" />
-    <limit lower="-1.6581" upper="1.6581" effort="3.0" velocity="4.0" />
+    <limit lower="-1.62141" upper="1.69472" effort="3.0" velocity="4.0" />
     <dynamics damping="0.05" friction="0.01" />
   </joint>
   <link name="wrist_roll_link">
@@ -164,7 +164,7 @@
     <child link="wrist_roll_link" />
     <origin xyz="0 0 0.055" />
     <axis xyz="0 0 1" />
-    <limit lower="-2.7439" upper="2.7439" effort="3.0" velocity="4.0" />
+    <limit lower="-2.84121" upper="2.74385" effort="3.0" velocity="4.0" />
     <dynamics damping="0.04" friction="0.01" />
   </joint>
   <link name="gripper_base_link">

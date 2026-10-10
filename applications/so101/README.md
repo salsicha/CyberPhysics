@@ -37,7 +37,11 @@ applications/so101/scripts/regenerate_urdf.sh
 ```
 
 The compose files mount `systems/` at `/workspace/systems`, and the default
-launch/script paths point at `/workspace/systems/so101`.
+launch/script paths point at `/workspace/systems/so101`. The joint position
+limits are read from `systems/so101/config/joint_limits.json` (their single
+source of truth, see `systems/so101/README.md`), so every container that runs
+these scripts, including the CBF controller and the HIL guard, needs that mount
+(or `SO101_JOINT_LIMITS_FILE`); `so101_common.py` refuses to start without it.
 
 ## Gazebo Harmonic
 

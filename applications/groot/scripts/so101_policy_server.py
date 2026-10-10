@@ -10,16 +10,7 @@ import numpy as np
 from gr00t.policy.policy import BasePolicy
 from gr00t.policy.server_client import PolicyServer
 
-from so101_task_policy import ScriptedPickPlaceController
-
-JOINT_LIMITS = np.array([
-    [-1.9199, 1.9199],
-    [-1.7453, 1.7453],
-    [-1.7453, 1.7453],
-    [-1.6581, 1.6581],
-    [-2.7439, 2.7439],
-    [0.0, 0.04],
-], dtype=np.float32)
+from so101_task_policy import JOINT_LIMITS, ScriptedPickPlaceController
 
 
 def joint_positions_modality_config() -> dict[str, Any]:

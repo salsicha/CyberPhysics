@@ -14,15 +14,11 @@ from typing import Any
 
 import numpy as np
 
+from so101_joint_limits import JOINT_LIMITS as URDF_JOINT_LIMITS
 
-JOINT_LIMITS = np.array([
-    [-1.9199, 1.9199],
-    [-1.7453, 1.7453],
-    [-1.7453, 1.7453],
-    [-1.6581, 1.6581],
-    [-2.7439, 2.7439],
-    [0.0, 0.04],
-], dtype=np.float32)
+
+# From systems/so101/config/joint_limits.json, the single source of truth.
+JOINT_LIMITS = URDF_JOINT_LIMITS.astype(np.float32)
 
 # Kinematic dimensions from systems/so101/urdf/so101.urdf. The last segment
 # ends at the centre of the jaws, which is the point used for demo grasping.

@@ -17,6 +17,8 @@ import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from so101_joint_limits import JOINT_LIMITS
+
 
 JOINT_NAMES = [
     "shoulder_pan",
@@ -28,8 +30,11 @@ JOINT_NAMES = [
 ]
 VECTOR_COLUMNS = ("observation.state", "action")
 UNIT_MARKER = "so101_units.json"
-# systems/so101/urdf/so101.urdf arm joint limits (radians).
-ARM_JOINT_LIMITS = np.array([1.9199, 1.7453, 1.7453, 1.6581, 2.7439], dtype=np.float64)
+# URDF arm joint [lower, upper] limits (radians) from their single source of
+# truth, systems/so101/config/joint_limits.json. They are the physical range of
+# a LeRobot-calibrated arm mapped with the nominal lerobot_joint_mapping.json,
+# so they are asymmetric (e.g. elbow_flex -22.9..170.7 deg).
+ARM_JOINT_LIMITS = JOINT_LIMITS[:5]
 ARM_LIMIT_TOLERANCE_RAD = 0.1
 # LeRobot use_degrees=True: deg = (raw - mid) * 360 / 4095 with an integer or
 # half-integer mid, so every degree value is a multiple of 180/4095.
@@ -153,7 +158,9 @@ def transform_matrix(
         signs = np.asarray([joint_mapping[name]["sign"] for name in JOINT_NAMES[:5]])
         offsets = np.asarray([joint_mapping[name]["offset_deg"] for name in JOINT_NAMES[:5]])
         arm = np.deg2rad(signs * output[:, :5].astype(np.float64) + offsets)
-        beyond = np.abs(arm) > ARM_JOINT_LIMITS + ARM_LIMIT_TOLERANCE_RAD
+        beyond = (arm < ARM_JOINT_LIMITS[:, 0] - ARM_LIMIT_TOLERANCE_RAD) | (
+            arm > ARM_JOINT_LIMITS[:, 1] + ARM_LIMIT_TOLERANCE_RAD
+        )
         if np.any(beyond):
             joints = [JOINT_NAMES[index] for index in np.flatnonzero(beyond.any(axis=0))]
             raise ValueError(
