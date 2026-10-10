@@ -4,6 +4,7 @@
 #include <atomic>
 #include <chrono>
 #include <memory>
+#include <mutex>
 #include <string>
 
 #include <as2_core/aerial_platform.hpp>
@@ -42,6 +43,8 @@ public:
 
 private:
   bool setFlightMode(const std::string & mode);
+  void restoreModeAfterLandingHandover();
+  bool waitForAutopilotDisarm();
   bool waitForService(const rclcpp::ClientBase::SharedPtr & client);
 
   std::string mavros_ns_;
@@ -56,6 +59,14 @@ private:
   std::atomic<double> vehicle_altitude_{0.0};
   std::atomic<double> takeoff_start_altitude_{0.0};
   std::chrono::milliseconds service_timeout_;
+  std::chrono::milliseconds landing_disarm_timeout_;
+  // ArduPilot's current mode, and the mode a refused post-landing disarm
+  // switched away from to LAND (empty when none is pending).
+  std::mutex mode_mutex_;
+  std::string flight_mode_;
+  std::string mode_before_landing_handover_;
+  // ArduPilot's armed state as seen on service_node_, which blocking calls spin.
+  std::atomic_bool autopilot_armed_{true};
 
   as2_msgs::msg::ControlMode requested_control_mode_;
   rclcpp::Node::SharedPtr service_node_;
@@ -68,6 +79,7 @@ private:
   rclcpp::Publisher<sensor_msgs::msg::BatteryState>::SharedPtr as2_battery_pub_;
 
   rclcpp::Subscription<mavros_msgs::msg::State>::SharedPtr state_sub_;
+  rclcpp::Subscription<mavros_msgs::msg::State>::SharedPtr service_state_sub_;
   rclcpp::Subscription<mavros_msgs::msg::ExtendedState>::SharedPtr extended_state_sub_;
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
   rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_sub_;

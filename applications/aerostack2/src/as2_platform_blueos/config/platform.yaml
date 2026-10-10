@@ -8,3 +8,6 @@
     stop_mode: "BRAKE"
     takeoff_altitude: 2.0
     service_timeout_ms: 3000
+    # A refused disarm after landing: how long to wait for ArduPilot to
+    # disarm itself in LAND.
+    landing_disarm_timeout_ms: 10000

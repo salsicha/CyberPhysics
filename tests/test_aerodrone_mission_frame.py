@@ -1,5 +1,6 @@
 import importlib.util
 import json
+from xml.etree import ElementTree
 from pathlib import Path
 import re
 import sys
@@ -102,6 +103,26 @@ class MissionFrameTest(unittest.TestCase):
                    for pose in re.findall(r'pose="([^"]+)"', xml)]
         self.assertEqual(heights, [34.8, 249.8, 299.8, 7.8])
         self.assertEqual(terrain_builder.waypoint_agl("climb", 55.0, 0.0), 55.0)
+
+    def test_mission_ends_with_a_disarm_that_tolerates_landing_disarmed(self):
+        # Aerostack2's Land disarms on touchdown, and its platform then
+        # rejects another disarm: that must not fail the mission.
+        mission = {"missions": [{"id": "m", "phases": [{"name": "takeoff", "waypoints": [
+            {"id": "arm_start", "position_enu_m": [0, 0, 0]}]}]}]}
+        grid = np.full((9, 9), 100.0, dtype=np.float32)
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+            mission_path = output / "mission.json"
+            mission_path.write_text(json.dumps(mission), encoding="utf-8")
+            args = SimpleNamespace(mission=str(mission_path), origin_alt=80.0,
+                                   area_km=8.0, cruise_agl=0.0)
+            terrain_builder.write_behavior_tree(grid, args, output)
+            tree = ElementTree.parse(output / "wilderness_mission.xml")
+        steps = list(tree.find("./BehaviorTree/Sequence"))
+        self.assertEqual(steps[-2].get("ID"), "Land")
+        self.assertEqual(steps[-1].tag, "ForceSuccess")
+        [disarm] = list(steps[-1])
+        self.assertEqual((disarm.tag, disarm.get("ID")), ("Action", "Disarm"))
 
 
 class TerrainTextureTest(unittest.TestCase):

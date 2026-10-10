@@ -2,9 +2,11 @@
 
 #include <algorithm>
 #include <cmath>
+#include <thread>
 #include <utility>
 
 #include <as2_core/names/topics.hpp>
+#include <as2_msgs/msg/platform_status.hpp>
 
 namespace
 {
@@ -25,6 +27,8 @@ BlueOSPlatform::BlueOSPlatform(const rclcpp::NodeOptions & options)
   takeoff_altitude_ = this->declare_parameter<double>("takeoff_altitude", 2.0);
   service_timeout_ = std::chrono::milliseconds(
     this->declare_parameter<int>("service_timeout_ms", 3000));
+  landing_disarm_timeout_ = std::chrono::milliseconds(
+    this->declare_parameter<int>("landing_disarm_timeout_ms", 10000));
 
   velocity_pub_ = this->create_publisher<geometry_msgs::msg::TwistStamped>(
     mavros_ns_ + "/setpoint_velocity/cmd_vel", rclcpp::QoS(10));
@@ -48,6 +52,11 @@ BlueOSPlatform::BlueOSPlatform(const rclcpp::NodeOptions & options)
     mavros_ns_ + "/cmd/land");
   command_client_ = service_node_->create_client<mavros_msgs::srv::CommandLong>(
     mavros_ns_ + "/cmd/command");
+  service_state_sub_ = service_node_->create_subscription<mavros_msgs::msg::State>(
+    mavros_ns_ + "/state", rclcpp::QoS(1),
+    [this](const mavros_msgs::msg::State::SharedPtr msg) {
+      autopilot_armed_.store(msg->armed);
+    });
 
   configureSensors();
 }
@@ -69,6 +78,8 @@ void BlueOSPlatform::configureSensors()
       platform_info_msg_.connected = msg->connected;
       platform_info_msg_.armed = msg->armed;
       platform_info_msg_.offboard = msg->mode == guided_mode_;
+      std::lock_guard<std::mutex> lock(mode_mutex_);
+      flight_mode_ = msg->mode;
     });
   extended_state_sub_ = this->create_subscription<mavros_msgs::msg::ExtendedState>(
     mavros_ns_ + "/extended_state", 10,
@@ -149,6 +160,9 @@ bool BlueOSPlatform::ownSetArmingState(bool state)
   if (!waitForService(arm_client_)) {
     return false;
   }
+  if (state) {
+    restoreModeAfterLandingHandover();
+  }
   auto request = std::make_shared<mavros_msgs::srv::CommandBool::Request>();
   request->value = state;
   auto future = arm_client_->async_send_request(request);
@@ -157,7 +171,70 @@ bool BlueOSPlatform::ownSetArmingState(bool state)
   {
     return false;
   }
-  return future.get()->success;
+  const bool success = future.get()->success;
+  // Aerostack2 copies its state machine's state into platform_info_msg_ only
+  // when it publishes the platform info, so right after the LANDED
+  // transition this still reads LANDING.
+  const auto platform_state = platform_info_msg_.status.state;
+  const bool landing = platform_state == as2_msgs::msg::PlatformStatus::LANDING ||
+    platform_state == as2_msgs::msg::PlatformStatus::LANDED;
+  if (!success && !state && landing) {
+    // In GUIDED, ArduCopter accepts a disarm only once its land detector has
+    // tripped, which needs the motors at minimum throttle; the zero-velocity
+    // hover setpoint Aerostack2 sends after touchdown holds them above it.
+    // LAND mode drives the throttle down and disarms by itself once landed;
+    // wait for that, so the landing ends disarmed (Aerostack2's Land
+    // behaviour disarms on touchdown). A disarm while flying is still just
+    // refused.
+    RCLCPP_INFO(
+      this->get_logger(), "ArduPilot refused to disarm after landing; switching to LAND");
+    {
+      std::lock_guard<std::mutex> lock(mode_mutex_);
+      if (mode_before_landing_handover_.empty() && flight_mode_ != "LAND") {
+        mode_before_landing_handover_ = flight_mode_;
+      }
+    }
+    if (setFlightMode("LAND") && waitForAutopilotDisarm()) {
+      RCLCPP_INFO(this->get_logger(), "ArduPilot disarmed in LAND");
+      return true;
+    }
+    RCLCPP_WARN(
+      this->get_logger(), "ArduPilot did not disarm in LAND within %ld ms",
+      static_cast<long>(landing_disarm_timeout_.count()));
+  }
+  return success;
+}
+
+bool BlueOSPlatform::waitForAutopilotDisarm()
+{
+  // The armed state arrives with MAVROS's 1 Hz state messages; this callback
+  // blocks the node's own subscriptions, so read them on service_node_.
+  autopilot_armed_.store(true);
+  const auto deadline = std::chrono::steady_clock::now() + landing_disarm_timeout_;
+  while (rclcpp::ok() && std::chrono::steady_clock::now() < deadline) {
+    rclcpp::spin_some(service_node_);
+    if (!autopilot_armed_.load()) {
+      return true;
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+  }
+  return false;
+}
+
+void BlueOSPlatform::restoreModeAfterLandingHandover()
+{
+  // ArduCopter cannot arm in LAND, where the disarm hand-over left it.
+  std::string previous;
+  {
+    std::lock_guard<std::mutex> lock(mode_mutex_);
+    previous.swap(mode_before_landing_handover_);
+  }
+  if (!previous.empty()) {
+    RCLCPP_INFO(
+      this->get_logger(), "Restoring ArduPilot mode %s after the landing hand-over",
+      previous.c_str());
+    setFlightMode(previous);
+  }
 }
 
 bool BlueOSPlatform::ownSetOffboardControl(bool offboard)

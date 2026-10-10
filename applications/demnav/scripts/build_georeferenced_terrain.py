@@ -249,9 +249,14 @@ def write_behavior_tree(grid, args, output_dir):
                 actions.append(
                     f'      <Delay delay_msec="{int(settle_s * 1000)}"><AlwaysSuccess/></Delay>')
                 waypoint_count += 1
+    # Aerostack2's Land behaviour disarms on touchdown (the BlueOS platform
+    # finishes that in ArduPilot's LAND mode when ArduCopter refuses), and
+    # Aerostack2 then rejects disarming an already disarmed platform. Disarm
+    # once more only for a landing that did not: a failure here is no
+    # mission failure.
     actions.extend([
         '      <Action ID="Land" speed="0.5"/>',
-        '      <Action ID="Disarm" service_name="set_arming_state"/>',
+        '      <ForceSuccess><Action ID="Disarm" service_name="set_arming_state"/></ForceSuccess>',
     ])
     xml = "\n".join([
         '<?xml version="1.0"?>',
