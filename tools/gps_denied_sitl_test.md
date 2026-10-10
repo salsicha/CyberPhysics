@@ -19,12 +19,16 @@ images (`make -C applications build_navigator build_demnav build_wildnav`).
 The working tree's Python sources are mounted over the images' installed
 packages, so a stale image still runs the repository's code. No GPU, Gazebo
 or network access is needed. A run takes about 10 minutes; telemetry,
-the score and all container logs land in `generated/gps_denied_sitl/`.
+the score, the navigation validation and all container logs land in
+`generated/gps_denied_sitl/` (`telemetry.json`, `score.json`,
+`validation.log`, `stack.log`).
 
 Variables: `ROS_DOMAIN_ID`, `SITL_INSTANCE` (MAVLink on 5760 + 10 N),
 `GPS_DENIED_DENY_AFTER_S` (60), `GPS_DENIED_DENIED_S` (300),
 `GPS_DENIED_RESTORE_S` (30), `GPS_DENIED_TAKEOFF_ALT_M` (150),
 `GPS_DENIED_LEG_M` (300), `GPS_DENIED_OUTPUT`, `GPS_DENIED_TIMEOUT_S`,
+`GPS_DENIED_VALIDATION_TIMEOUT_S` (90), `GPS_DENIED_PROJECT` (compose
+project name, default `gps_denied_sitl_<SITL_INSTANCE>`),
 `GPS_DENIED_COMPOSE_OVERRIDE` (an extra compose file, for example to layer
 another parameter file on the SITL through `ARDUCOPTER_PARAM_FILE`).
 
@@ -53,7 +57,24 @@ navigation fusion and the ArduPilot navigation bridge together:
   arm, take off to 150 m, flies a 300 m square of local setpoints, sets
   `SIM_GPS_DISABLE=1` (ArduPilot 4.6: GPS 1 then reports no fix) after 60 s,
   restores it after 300 s, and records 1 Hz telemetry;
-- `tools/gps_denied_sitl_scorer.py`: scores the denied phase.
+- `tools/gps_denied_sitl_scorer.py`: scores the denied phase;
+- `validator` (`validation` profile,
+  `applications/aerostack2/scripts/validate_aerodrone_navsim.py`, the
+  `navsim_validator` of the Gazebo/Genesis/Isaac compositions with this
+  stack's topics): run once by the test script when the mission logs
+  `EVENT at_altitude`, before the GPS is denied. It needs, over at least
+  10 s, fresh and valid MAVROS GPS/odometry/IMU, the camera image, depth and
+  camera_info DemNav and WildNav consume (frame
+  `aerodrone/downward_optical_frame`), the latched `/navigation/origin`
+  near home, fused `/navigation/odometry` and `/navigation/fix` with a
+  bounded covariance, live DemNav/WildNav `valid` streams, at least one
+  valid DemNav match, `correction_source` not `dead_reckoning`, and MAVROS's
+  static TF (`map -> map_ned`, `odom -> odom_ned`,
+  `base_link -> base_link_frd`). This stack has no rangefinder. A failed
+  validation fails the test with exit code 3 (when the score passed) and
+  `validation.log` lists every missing, stale or invalid item. To run it by
+  hand against a running stack:
+  `docker compose -p <project> -f tools/gps_denied_sitl.yaml run --rm -T validator`.
 
 ## How corrections reach ArduPilot
 
@@ -159,6 +180,8 @@ These are the agreed pass criteria for the SITL test (about 1.5-3x what the
 runs above achieved: tight enough to catch the control run and frame/clock
 regressions, loose enough for run-to-run variation). They stay scorer
 parameters so a run can be scored against other limits.
+The navigation validation at altitude must pass too (exit code 3
+otherwise).
 
 ## Limits
 

@@ -173,3 +173,34 @@ services:
     command: >
       python3 /workspace/tools/gps_denied_sitl_mission.py --output /out/telemetry.json
     restart: "no"
+
+  # Navigation stack health check (applications/aerostack2/scripts/
+  # validate_aerodrone_navsim.py, also the `validation` profile of the
+  # Gazebo/Genesis/Isaac compositions). The test script runs it once the
+  # vehicle is at altitude: raw MAVROS sensors, this stack's camera topics,
+  # the EKF origin, fused odometry/fix, DemNav/WildNav streams, at least one
+  # valid DemNav match, corrections being applied and MAVROS's static TF
+  # (the only TF this stack has). No rangefinder here.
+  validator:
+    <<: *ros
+    image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
+    profiles: ["validation"]
+    volumes: *sources
+    command: >
+      python3 /workspace/applications/aerostack2/scripts/validate_aerodrone_navsim.py
+        --timeout-s ${GPS_DENIED_VALIDATION_TIMEOUT_S:-90}
+        --gps-topic /aerodrone/sensor_measurements/gps
+        --odom-topic /aerodrone/sensor_measurements/odom
+        --imu-topic /aerodrone/sensor_measurements/imu
+        --image-topic /aerodrone/downward/image_highres
+        --image-info-topic /aerodrone/downward/image_highres/camera_info
+        --depth-topic /aerodrone/downward/relative_depth
+        --depth-info-topic /aerodrone/downward/camera_info
+        --camera-frame aerodrone/downward_optical_frame
+        --rangefinder-topic ""
+        --navigation-odom-topic /navigation/odometry
+        --wildnav-rate-hz ${GPS_DENIED_WILDNAV_HZ:-0.5}
+        --expected-lat ${INITIAL_LAT:-37.9234} --expected-lon ${INITIAL_LON:--122.5967}
+        --required-tf map:map_ned odom:odom_ned base_link:base_link_frd
+        --require-valid demnav --require-correction
+    restart: "no"

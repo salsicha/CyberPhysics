@@ -78,3 +78,33 @@ docker compose -f compositions/aerostack2_isaac.yaml up
 ```
 
 All three use Navigator/ArduCopter through the same MAVROS and `as2_platform_blueos` boundary, build the same georeferenced terrain, and execute the generated behavior-tree mission. Topic names are defined in `systems/aerodrone/config/topics.env`; deployment values are in `applications/aerostack2/config/mount_tamalpais.env`.
+
+### Navigation health check
+
+`scripts/validate_aerodrone_navsim.py` checks that a running Aerodrone navigation simulation is healthy, and is the `navsim_validator` service (`validation` profile) of all three compositions:
+
+```bash
+docker compose -f compositions/aerostack2_genesis.yaml --profile validation up -d
+docker compose -f compositions/aerostack2_genesis.yaml logs -f navsim_validator
+```
+
+It starts once `flight_ready` completes and passes (exit 0) when, at the same moment and over at least 10 s of observation:
+
+- MAVROS GPS, odometry and IMU (`GPS_TOPIC`, `RAW_ODOM_TOPIC`, `IMU_TOPIC`) are fresh and finite;
+- the downward image and camera_info WildNav uses (`WILDNAV_IMAGE_TOPIC`, `WILDNAV_CAMERA_INFO_TOPIC`) and the depth image and camera_info DemNav uses (`DEPTH_TOPIC`, `CAMERA_INFO_TOPIC`) are fresh and well formed, agree on frame and size (aspect ratio for the depth pair, which DemNav rescales), carry the stack's camera frame (Genesis/Isaac `downward_camera_optical_frame`), and at least 25 % of the depth pixels are finite (DemNav's own threshold); the rangefinder too when the stack has one (none of the three simulates one, so they pass `--rangefinder-topic ""`);
+- `/navigation/origin` (latched) has arrived, finite and within 50 km of `INITIAL_LAT`/`INITIAL_LON`;
+- `/navigation/odometry` and `/navigation/fix` are fresh and finite, with a known, positive, symmetric covariance whose horizontal sigma is at most 1 km, the fix status is not NO_FIX, and the fused odometry is in the `odom` frame;
+- `/demnav/valid` and `/wildnav/valid` are alive (WildNav may be four `WILDNAV_RATE_HZ` periods old), `/demnav/confidence` and `/wildnav/confidence` have arrived and lie in [0, 1], any `/demnav/fix` or `/wildnav/fix` received is valid, and `/navigation/correction_source` and `correction_confidence` are fresh and valid;
+- the TF links resolve and dynamic ones are under 10 s old: `earth -> aerodrone/map -> aerodrone/odom -> aerodrone/base_link` (the Aerostack2 state estimator) and MAVROS's `map -> map_ned` and `base_link -> base_link_frd`.
+
+DemNav only publishes a confidence for a terrain correlation above `min_correlation`, which needs the camera about 40 m above ground, so the check can only pass once the wilderness mission has climbed and DemNav has matched; it waits up to `NAVSIM_VALIDATION_TIMEOUT_S` (900 s). The fused fix turns NO_FIX after 300 s without an accepted correction, which the check also reports. Otherwise it exits 1 and lists each missing (with whether anything publishes the topic), stale or invalid item, for example:
+
+```text
+Aerodrone navsim validation FAILED after 45.0 s; 4 problem(s):
+  - correction source [/navigation/correction_source]: invalid: dead_reckoning: no accepted DemNav/WildNav correction is active
+  - DemNav valid [/demnav/valid]: missing: no message received (no publisher on this topic)
+  - DemNav confidence [/demnav/confidence]: missing: no message received (no publisher on this topic)
+  - DemNav valid [/demnav/valid]: never reported a valid match (data: true)
+```
+
+`NAVSIM_REQUIRE_VALID=demnav` (or `"demnav wildnav"`) additionally requires a valid match from those sources, and `NAVSIM_REQUIRE_CORRECTION=true` requires the fusion to be applying corrections (`correction_source` not `dead_reckoning`). Run `python3 scripts/validate_aerodrone_navsim.py --help` for every option; topic options default to the `topics.env` variables. The lite SITL stack runs the same script with its own topics once the vehicle is airborne (`tools/gps_denied_sitl_test.md`).

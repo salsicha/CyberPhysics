@@ -60,6 +60,7 @@ services:
     depends_on:
       terrain_assets: {condition: service_completed_successfully}
     environment:
+      ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
       QT_QPA_PLATFORM: offscreen
       LIBGL_ALWAYS_SOFTWARE: "1"
       MESA_GL_VERSION_OVERRIDE: "3.3"
@@ -85,6 +86,7 @@ services:
     network_mode: host
     depends_on: [gazebo]
     environment:
+      ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
       GZ_SIM_RESOURCE_PATH: /data/navsim_assets:/data/navsim_assets/models
     volumes:
       - /dev/shm:/dev/shm
@@ -113,6 +115,8 @@ services:
     network_mode: host
     depends_on: [gazebo_bridges, navigator_sitl]
     env_file: [../systems/aerodrone/config/topics.env, ../applications/aerostack2/config/mount_tamalpais.env]
+    environment:
+      ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
     volumes:
       - /dev/shm:/dev/shm
       - navsim_gazebo_assets:/data/navsim_assets:ro
@@ -218,6 +222,8 @@ services:
     network_mode: host
     ipc: host
     depends_on: [mavros, wildnav]
+    environment:
+      ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
     volumes: [/dev/shm:/dev/shm]
     command: >
       ros2 launch as2_platform_blueos blueos_autonomy.launch.py
@@ -229,6 +235,8 @@ services:
     network_mode: host
     ipc: host
     depends_on: [mavros, aerostack2_autonomy]
+    environment:
+      ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
     volumes:
       - /dev/shm:/dev/shm
       - ../applications/aerostack2/scripts:/workspace/applications/aerostack2/scripts:ro
@@ -246,6 +254,8 @@ services:
       aerostack2_autonomy: {condition: service_started}
       flight_ready: {condition: service_completed_successfully}
       terrain_assets: {condition: service_completed_successfully}
+    environment:
+      ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
     volumes:
       - /dev/shm:/dev/shm
       - navsim_gazebo_assets:/data/navsim_assets:ro
@@ -253,6 +263,40 @@ services:
       ros2 launch as2_behavior_tree behavior_trees.launch.py
         drone_id:=aerodrone use_sim_time:=false
         tree:=/data/navsim_assets/wilderness_mission.xml server_timeout:=120000
+
+  navsim_validator:
+    # Navigation health check, opt-in (exits 0 or lists what is missing,
+    # stale or invalid; applications/aerostack2/README.md):
+    #   docker compose -f compositions/aerostack2_sim.yaml --profile validation up
+    # Raw MAVROS GPS/odometry/IMU, downward camera and depth, the latched
+    # /navigation/origin, fused odometry/fix, DemNav/WildNav streams and the
+    # Aerostack2 + MAVROS TF. DemNav first matches during the mission's climb
+    # (its footprint needs about 40 m AGL), hence the long timeout. No
+    # simulated rangefinder in this stack.
+    # Gazebo's camera frame ids come from as2_gazebo_assets; only their
+    # image/camera_info agreement is checked.
+    profiles: ["validation"]
+    image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
+    network_mode: host
+    ipc: host
+    depends_on:
+      flight_ready: {condition: service_completed_successfully}
+    env_file: [../systems/aerodrone/config/topics.env, ../applications/aerostack2/config/mount_tamalpais.env]
+    environment:
+      ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
+      NAVSIM_REQUIRE_VALID: ${NAVSIM_REQUIRE_VALID:-}
+      NAVSIM_REQUIRE_CORRECTION: ${NAVSIM_REQUIRE_CORRECTION:-false}
+    volumes:
+      - /dev/shm:/dev/shm
+      - ../applications/aerostack2/scripts:/workspace/applications/aerostack2/scripts:ro
+    command: >
+      python3 /workspace/applications/aerostack2/scripts/validate_aerodrone_navsim.py
+        --timeout-s ${NAVSIM_VALIDATION_TIMEOUT_S:-900}
+        --freshness-s ${NAVSIM_VALIDATION_FRESHNESS_S:-10}
+        --rangefinder-topic ""
+        --required-tf earth:aerodrone/map aerodrone/map:aerodrone/odom
+        aerodrone/odom:aerodrone/base_link map:map_ned base_link:base_link_frd
+    restart: "no"
 
 volumes:
   demnav_gazebo_cache:
