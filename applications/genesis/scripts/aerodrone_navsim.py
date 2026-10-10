@@ -16,6 +16,7 @@ import numpy as np
 import rclpy
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
+from rosgraph_msgs.msg import Clock
 from sensor_msgs.msg import CameraInfo, Image
 
 sys.path.insert(0, "/workspace/applications/ardupilot_sitl/scripts")
@@ -88,6 +89,7 @@ class GenesisSensorPublisher(Node):
         self.rgb_info_pub = self.create_publisher(CameraInfo, args.rgb_info_topic, 10)
         self.depth_pub = self.create_publisher(Image, args.depth_topic, 10)
         self.depth_info_pub = self.create_publisher(CameraInfo, args.depth_info_topic, 10)
+        self.clock_pub = self.create_publisher(Clock, "/clock", 10)
 
     def camera_info(self, stamp, frame):
         width, height = self.args.width, self.args.height
@@ -102,6 +104,14 @@ class GenesisSensorPublisher(Node):
         msg.p = [fx, 0.0, width / 2.0, 0.0, 0.0, fx, height / 2.0,
                  0.0, 0.0, 0.0, 1.0, 0.0]
         return msg
+
+    def publish_clock(self, seconds):
+        """Simulation time (ArduPilot's lock-step time) on /clock: the
+        navigation fusion ages its dead reckoning by it, not by wall time."""
+        nanoseconds = round(seconds * 1e9)
+        msg = Clock()
+        msg.clock.sec, msg.clock.nanosec = divmod(nanoseconds, 1_000_000_000)
+        self.clock_pub.publish(msg)
 
     def publish_truth(self, position, quaternion, velocity, angular):
         stamp = self.get_clock().now().to_msg()
@@ -176,13 +186,20 @@ def main():
     height_field = mesh_heights[::-2, ::2].T
     half_m = float(manifest["terrain"]["area_km"]) * 500.0
     horizontal_scale = 2.0 * half_m / (height_field.shape[0] - 1)
-    terrain_surface = gs.surfaces.Default(
-        diffuse_texture=gs.textures.ImageTexture(
-            image_path=str(assets / "orthophoto.jpg")))
     scene.add_entity(gs.morphs.Terrain(
         height_field=height_field, horizontal_scale=horizontal_scale,
         vertical_scale=1.0, pos=(-half_m, -half_m, 0.0),
-        visualization=True, collision=True), surface=terrain_surface)
+        visualization=False, collision=True))
+    # The cameras see the shared textured terrain mesh (Gazebo's and
+    # Isaac's too) with its georeferenced UVs: Terrain's own UVs would
+    # stretch the orthophoto, which only covers the WildNav tile mosaic,
+    # over the whole heightfield.
+    terrain_surface = gs.surfaces.Default(
+        diffuse_texture=gs.textures.ImageTexture(
+            image_path=str(assets / manifest["assets"]["texture"])))
+    scene.add_entity(gs.morphs.Mesh(
+        file=str(assets / manifest["assets"]["mesh"]), fixed=True,
+        collision=False), surface=terrain_surface)
     # The common home is the top of Gazebo's conservative DEM collision cell.
     # Put a small real collision pad at that same surveyed elevation so the
     # lightweight drone starts at rest instead of falling onto a steep,
@@ -192,11 +209,13 @@ def main():
         size=(3.0, 3.0, 0.2), fixed=True))
     drone = scene.add_entity(gs.morphs.Drone(
         file="urdf/drones/cf2x.urdf", pos=tuple(home.tolist())))
+    # far: the CRUISE_AGL_M cruise plus the terrain's relief across the
+    # footprint must stay in range of the depth image.
     camera = scene.add_camera(
         res=(args.width, args.height), pos=tuple(home.tolist()),
         lookat=(home[0], home[1], home[2] - 10.0), up=(1.0, 0.0, 0.0),
         fov=vertical_fov_deg(args.fov_deg, args.width, args.height),
-        near=0.3, far=300.0, GUI=False)
+        near=0.3, far=1000.0, GUI=False)
     print("Genesis scene build starting", flush=True)
     scene.build()
     print("Genesis scene build complete", flush=True)
@@ -252,6 +271,7 @@ def main():
                     pos=position.tolist(),
                     lookat=(position + np.array([0.0, 0.0, -10.0])).tolist(),
                     up=tuple(float(value) for value in camera_up))
+                publisher.publish_clock(tick * dt)
                 rendered = camera.render(rgb=True, depth=True)
                 publisher.publish_camera(rendered[0], rendered[1])
                 publisher.publish_truth(position.tolist(), quaternion.tolist(),

@@ -61,6 +61,7 @@ import rclpy
 from geometry_msgs.msg import Quaternion
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
+from rosgraph_msgs.msg import Clock
 
 sys.path.insert(0, "/workspace/applications/ardupilot_sitl/scripts")
 from ardupilot_json import (  # noqa: E402
@@ -131,7 +132,8 @@ def add_camera(stage, tick_rate):
     camera.GetHorizontalApertureAttr().Set(21.0)
     camera.GetVerticalApertureAttr().Set(15.75)
     camera.GetFocalLengthAttr().Set(18.2)
-    camera.GetClippingRangeAttr().Set(Gf.Vec2f(0.3, 300.0))
+    # Far enough for the CRUISE_AGL_M cruise over the terrain's relief.
+    camera.GetClippingRangeAttr().Set(Gf.Vec2f(0.3, 1000.0))
     xform = UsdGeom.Xformable(camera)
     xform.AddTranslateOp().Set(Gf.Vec3d(0.0, 0.0, -0.08))
 
@@ -184,6 +186,15 @@ class TruthPublisher(Node):
         super().__init__("isaac_sim_ground_truth")
         self.publisher = self.create_publisher(
             Odometry, "/aerodrone/simulation/ground_truth/odom", 10)
+        self.clock_publisher = self.create_publisher(Clock, "/clock", 10)
+
+    def publish_clock(self, seconds):
+        """Simulation time (ArduPilot's lock-step time) on /clock: the
+        navigation fusion ages its dead reckoning by it, not by wall time."""
+        nanoseconds = round(seconds * 1e9)
+        msg = Clock()
+        msg.clock.sec, msg.clock.nanosec = divmod(nanoseconds, 1_000_000_000)
+        self.clock_publisher.publish(msg)
 
     def publish_state(self, position, quaternion, velocity, angular):
         msg = Odometry()
@@ -305,6 +316,7 @@ def main():
                 specific_force_flu, args.lat, args.lon, args.origin_alt,
                 timestamp=tick * dt, reference_enu=home))
             if render:
+                truth.publish_clock(tick * dt)
                 truth.publish_state(position.tolist(), quaternion.tolist(),
                                     velocity.tolist(), angular_velocity_world.tolist())
             if tick % max(1, int(physics_rate * 5.0)) == 0:

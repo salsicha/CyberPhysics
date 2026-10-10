@@ -69,9 +69,8 @@ class ArduPilotJSONTest(unittest.TestCase):
             atol=1e-8)
 
 
-class GenesisCameraModelTest(unittest.TestCase):
-    """The Genesis camera takes a vertical FOV; FOV_DEG and the published
-    camera_info are horizontal, and both must describe the rendered image."""
+class GenesisNavsimTestCase(unittest.TestCase):
+    """Loads applications/genesis/scripts/aerodrone_navsim.py with ROS stubbed."""
 
     @classmethod
     def setUpClass(cls):
@@ -80,9 +79,16 @@ class GenesisCameraModelTest(unittest.TestCase):
         from conftest import install_ros_stubs
         with mock.patch.dict(sys.modules):
             install_ros_stubs()
+            for name in ("rosgraph_msgs", "rosgraph_msgs.msg"):
+                sys.modules[name] = mock.MagicMock()
             cls.navsim = load_module(
                 "genesis_aerodrone_navsim",
                 "applications/genesis/scripts/aerodrone_navsim.py")
+
+
+class GenesisCameraModelTest(GenesisNavsimTestCase):
+    """The Genesis camera takes a vertical FOV; FOV_DEG and the published
+    camera_info are horizontal, and both must describe the rendered image."""
 
     def test_camera_info_matches_the_rendered_focal_length(self):
         from types import SimpleNamespace
@@ -102,6 +108,14 @@ class GenesisCameraModelTest(unittest.TestCase):
     def test_square_image_keeps_its_fov(self):
         self.assertAlmostEqual(
             self.navsim.vertical_fov_deg(60.0, 480, 480), 60.0, places=9)
+
+    def test_clock_carries_the_lock_step_simulation_time(self):
+        from unittest import mock
+        publisher = mock.MagicMock()
+        self.navsim.GenesisSensorPublisher.publish_clock(
+            mock.MagicMock(clock_pub=publisher), 1234 * (1.0 / 1200.0))
+        clock = publisher.publish.call_args.args[0].clock
+        self.assertEqual((clock.sec, clock.nanosec), (1, 28333333))
 
 
 class TerrainCollisionTest(unittest.TestCase):

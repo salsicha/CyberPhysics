@@ -1,6 +1,7 @@
 import importlib.util
 import json
 from pathlib import Path
+import re
 import sys
 import tempfile
 from types import SimpleNamespace
@@ -60,7 +61,8 @@ class MissionFrameTest(unittest.TestCase):
             mission_path = output / "mission.json"
             mission_path.write_text(json.dumps(mission), encoding="utf-8")
             args = SimpleNamespace(
-                mission=str(mission_path), origin_alt=80.0, area_km=8.0)
+                mission=str(mission_path), origin_alt=80.0, area_km=8.0,
+                cruise_agl=0.0)
 
             count, home = terrain_builder.write_behavior_tree(grid, args, output)
             xml = (output / "wilderness_mission.xml").read_text(encoding="utf-8")
@@ -71,6 +73,68 @@ class MissionFrameTest(unittest.TestCase):
         self.assertGreaterEqual(
             xml.count('<Delay delay_msec="2000"><AlwaysSuccess/></Delay>'), 2)
         self.assertNotIn('pose="-700.000;-240.000', xml)
+
+    def test_cruise_altitude_raises_only_en_route_waypoints(self):
+        def waypoint(name, agl):
+            return {"id": name, "position_enu_m": [-700, -240, agl],
+                    "target_agl_m": agl}
+        mission = {"missions": [{"id": "cruise_test", "phases": [
+            {"name": "takeoff", "waypoints": [
+                {"id": "arm_start", "position_enu_m": [-720, -260, 0]},
+                waypoint("clear_pad", 35)]},
+            {"name": "climb", "waypoints": [
+                waypoint("low", 55), waypoint("high", 300)]},
+            {"name": "land", "waypoints": [waypoint("flare", 8)]},
+        ]}]}
+        grid = np.full((9, 9), 100.0, dtype=np.float32)
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+            mission_path = output / "mission.json"
+            mission_path.write_text(json.dumps(mission), encoding="utf-8")
+            args = SimpleNamespace(
+                mission=str(mission_path), origin_alt=80.0, area_km=8.0,
+                cruise_agl=250.0)
+            terrain_builder.write_behavior_tree(grid, args, output)
+            xml = (output / "wilderness_mission.xml").read_text(encoding="utf-8")
+
+        # Flat terrain 20 m above the origin; home reference 0.2 m above it.
+        heights = [float(pose.split(";")[2])
+                   for pose in re.findall(r'pose="([^"]+)"', xml)]
+        self.assertEqual(heights, [34.8, 249.8, 299.8, 7.8])
+        self.assertEqual(terrain_builder.waypoint_agl("climb", 55.0, 0.0), 55.0)
+
+
+class TerrainTextureTest(unittest.TestCase):
+    def test_mesh_uvs_put_each_vertex_on_its_orthophoto_pixel(self):
+        """The renderers (Gazebo, Isaac, Genesis) sample the orthophoto
+        mosaic at each vertex's UV (v up, as in OBJ/USD). That pixel must
+        be the vertex's own geographic position as WildNav's tile cache
+        computes it."""
+        from synthetic_world import local_to_latlon
+        from wildnav_pkg.satellite_cache import latlon_to_tile, tile_pixel_to_latlon
+
+        lat0, lon0, zoom = 37.9234, -122.5967, 17
+        args = SimpleNamespace(lat=lat0, lon=lon0, area_km=2.0, zoom=zoom,
+                               origin_alt=700.0, max_grid_size=257)
+        # A mosaic covering only part of the terrain, like the real one.
+        x0, y0 = (int(value) for value in latlon_to_tile(
+            *local_to_latlon(-600.0, 500.0, lat0, lon0), zoom))
+        x1, y1 = (int(value) for value in latlon_to_tile(
+            *local_to_latlon(400.0, -300.0, lat0, lon0), zoom))
+        bounds = (x0, x1, y0, y1, (x1 - x0 + 1) * 256, (y1 - y0 + 1) * 256)
+        grid = np.full((21, 21), 750.0, dtype=np.float32)
+        with tempfile.TemporaryDirectory() as directory:
+            terrain_builder.make_mesh(grid, args, bounds, Path(directory))
+            mesh = np.load(Path(directory) / "terrain_mesh.npz")
+            vertices, uvs = mesh["vertices"], mesh["uvs"]
+
+        width_px, height_px = bounds[4], bounds[5]
+        for (east, north, _), (u, v) in zip(vertices, uvs):
+            lat, lon = tile_pixel_to_latlon(
+                x0, y0, float(u) * width_px, (1.0 - float(v)) * height_px, zoom)
+            expected = local_to_latlon(float(east), float(north), lat0, lon0)
+            self.assertAlmostEqual(lat, expected[0], delta=1e-7)  # ~1 cm
+            self.assertAlmostEqual(lon, expected[1], delta=1e-7)
 
 
 if __name__ == "__main__":

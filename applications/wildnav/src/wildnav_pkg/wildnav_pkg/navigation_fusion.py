@@ -27,6 +27,10 @@ stamp that lies in the simulator clock's recent history onto wall time by
 interpolation before matching. Without ``/clock`` (hardware) nothing is
 translated.
 
+The dead-reckoning *age* below is measured on that simulator clock while it
+runs (a simulator slower than real time must not age the estimate faster
+than the vehicle flies), and in wall time without it.
+
 Outputs
 -------
 ``output_topic``: raw odometry plus the smoothed horizontal correction
@@ -206,8 +210,9 @@ class NavigationFusionNode(Node):
         self.offset_north = 0.0
         self.last_publish_ns = None
         self.origin = None
-        self.origin_ns = None
-        self.last_correction_ns = None
+        self.origin_time = None
+        self.last_correction_time = None
+        self.sim_now_ns = None
         self.last_correction_variance = None
         self.autopilot_absorbs = False
 
@@ -289,7 +294,7 @@ class NavigationFusionNode(Node):
                 'previous origin')
             self._reset_corrections()
         self.origin = origin
-        self.origin_ns = self.get_clock().now().nanoseconds
+        self.origin_time = self._now()
         self.get_logger().info(
             f'Navigation origin {origin[0]:.7f}, {origin[1]:.7f}, '
             f'{origin[2]:.2f} m')
@@ -298,6 +303,7 @@ class NavigationFusionNode(Node):
         """Record (simulator ns, wall ns) pairs, at most every 10 ms."""
         sim_ns = stamp_ns(msg.clock)
         wall_ns = self.get_clock().now().nanoseconds
+        self.sim_now_ns = sim_ns
         if self.clock_history:
             last_sim = self.clock_history[-1][0]
             if sim_ns < last_sim:
@@ -341,8 +347,20 @@ class NavigationFusionNode(Node):
                                   confidence=self.wildnav.confidence)
         self.offset_east = self.offset_north = 0.0
         self.last_publish_ns = None
-        self.last_correction_ns = None
+        self.last_correction_time = None
         self.last_correction_variance = None
+
+    def _now(self):
+        """(wall ns, simulator ns or None when no /clock has arrived)."""
+        return self.get_clock().now().nanoseconds, self.sim_now_ns
+
+    def _elapsed_s(self, since):
+        """Seconds since a _now() reading: on the simulator clock when both
+        readings have it and it has not been reset, else in wall time."""
+        wall_ns, sim_ns = self._now()
+        if sim_ns is not None and since[1] is not None and sim_ns >= since[1]:
+            return (sim_ns - since[1]) / 1e9
+        return max(0.0, (wall_ns - since[0]) / 1e9)
 
     def _state(self, source):
         return self.demnav if source == 'demnav' else self.wildnav
@@ -515,7 +533,7 @@ class NavigationFusionNode(Node):
         state.north = north
         state.variance = max(1.0, variance)
         state.received_ns = now_ns
-        self.last_correction_ns = now_ns
+        self.last_correction_time = self._now()
         self.last_correction_variance = state.variance
         self._publish_correction_fix(
             msg, fix_east, fix_north, message_stamp, state.variance)
@@ -627,14 +645,13 @@ class NavigationFusionNode(Node):
     # ------------------------------------------------------------------
     def _horizontal_variance(self, raw):
         """(variance m^2, seconds since the last accepted correction)."""
-        now = self.get_clock().now().nanoseconds
-        if self.last_correction_ns is not None:
+        if self.last_correction_time is not None:
             base = self.last_correction_variance
-            since = self.last_correction_ns
+            since = self.last_correction_time
         else:
             base = float(self.get_parameter('uncorrected_variance_m2').value)
-            since = self.origin_ns if self.origin_ns is not None else now
-        age_s = max(0.0, (now - since) / 1e9)
+            since = self.origin_time if self.origin_time is not None else self._now()
+        age_s = self._elapsed_s(since)
         drift = float(self.get_parameter('dead_reckoning_drift_mps').value)
         model = base + (drift * age_s) ** 2
         raw_variance = max(raw.pose.covariance[0], raw.pose.covariance[7])

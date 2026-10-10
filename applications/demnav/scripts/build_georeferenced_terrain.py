@@ -19,6 +19,8 @@ from terrain_collisions import terrain_collision_height, write_terrain_collision
 
 
 METERS_PER_DEG_LAT = 111_320.0
+# Phases flown close to the ground; every other waypoint is en route.
+GROUND_PHASES = {"takeoff", "land"}
 
 
 def parse_args():
@@ -34,6 +36,9 @@ def parse_args():
     parser.add_argument("--output-dir", default="/data/navsim_assets")
     parser.add_argument("--mission", required=True)
     parser.add_argument("--max-grid-size", type=int, default=257)
+    parser.add_argument("--cruise-agl", type=float, default=0.0,
+                        help="lowest height above ground of the en-route waypoints "
+                             "(0 keeps the mission's own)")
     return parser.parse_args()
 
 
@@ -188,6 +193,14 @@ def terrain_height(grid, args, east, north):
     return float(value - args.origin_alt)
 
 
+def waypoint_agl(phase_name, agl, cruise_agl):
+    """Target height above ground of a waypoint: the mission's, raised to
+    cruise_agl on en-route phases (take-off and landing keep theirs)."""
+    if phase_name in GROUND_PHASES:
+        return agl
+    return max(agl, cruise_agl)
+
+
 def write_behavior_tree(grid, args, output_dir):
     mission = json.loads(Path(args.mission).read_text(encoding="utf-8"))
     first_waypoint = mission["missions"][0]["phases"][0]["waypoints"][0]
@@ -214,7 +227,9 @@ def write_behavior_tree(grid, args, output_dir):
                 north = world_north - home_north
                 if waypoint["id"] in {"arm_start", "touchdown"}:
                     continue
-                agl = float(waypoint.get("target_agl_m", waypoint["position_enu_m"][2]))
+                agl = waypoint_agl(phase["name"], float(
+                    waypoint.get("target_agl_m", waypoint["position_enu_m"][2])),
+                    args.cruise_agl)
                 up = terrain_collision_height(
                     grid, args.origin_alt, args.area_km, world_east, world_north)
                 up += agl - home_reference_up

@@ -273,6 +273,41 @@ def test_uncertainty_grows_and_status_degrades_without_corrections(module):
     assert h.last('/navigation/fix').status.status == NavSatStatus.STATUS_NO_FIX
 
 
+
+def test_dead_reckoning_ages_on_the_simulator_clock(module):
+    """Genesis and Isaac run slower than real time; the uncertainty and the
+    NO_FIX limit follow their /clock, not wall time."""
+    h = Harness(module, dead_reckoning_drift_mps=1.0, dead_reckoning_limit_s=60.0)
+
+    def at(wall_s):  # the simulator runs at a tenth of real time
+        h.node.now_ns = int((WALL_S + wall_s) * 1e9)
+        h.send('/clock', NS(clock=stamp(0.1 * wall_s)))
+        h.raw(WALL_S + wall_s)
+
+    at(0.0)
+    h.origin()
+    at(300.0)  # 30 s simulated
+    assert h.last('/navigation/fix').status.status == NavSatStatus.STATUS_FIX
+    assert h.last('/navigation/fix').position_covariance[0] == pytest.approx(100.0 + 30.0 ** 2)
+    h.source('demnav', fix_at(WALL_S + 300.0, 0.0, 0.0, sigma=4.0))
+    at(500.0)  # 20 s simulated since the correction
+    assert h.last('/navigation/fix').position_covariance[0] == pytest.approx(16.0 + 20.0 ** 2)
+    at(899.0)
+    assert h.last('/navigation/fix').status.status == NavSatStatus.STATUS_FIX
+    at(901.0)  # 60.1 s simulated
+    assert h.last('/navigation/fix').status.status == NavSatStatus.STATUS_NO_FIX
+
+
+def test_simulator_reset_falls_back_to_wall_time(module):
+    h = Harness(module, dead_reckoning_drift_mps=1.0)
+    h.node.now_ns = int(WALL_S * 1e9)
+    h.send('/clock', NS(clock=stamp(500.0)))
+    h.origin()
+    h.node.now_ns = int((WALL_S + 10.0) * 1e9)
+    h.send('/clock', NS(clock=stamp(1.0)))  # the simulator restarted
+    h.raw(WALL_S + 10.0)
+    assert h.last('/navigation/fix').position_covariance[0] == pytest.approx(100.0 + 10.0 ** 2)
+
 def test_gbas_status_is_never_claimed(harness):
     harness.origin()
     harness.raw(WALL_S)

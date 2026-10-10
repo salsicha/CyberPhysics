@@ -48,6 +48,7 @@ services:
         --origin-alt ${ORIGIN_ALT:-781.0} --area-km ${AREA_KM:-8.0}
         --resolution-m ${DEM_RESOLUTION_M:-10.0} --zoom ${WILDNAV_ZOOM:-17}
         --mission /workspace/missions/wilderness_missions.json
+        --cruise-agl ${CRUISE_AGL_M:-250.0}
     restart: "no"
 
   genesis:
@@ -241,10 +242,10 @@ services:
     #   docker compose -f compositions/aerostack2_genesis.yaml --profile validation up
     # Raw MAVROS GPS/odometry/IMU, downward camera and depth, the latched
     # /navigation/origin, fused odometry/fix, DemNav/WildNav streams and the
-    # Aerostack2 + MAVROS TF. A DemNav match is required only with
-    # NAVSIM_REQUIRE_VALID=demnav: at this mission's 35-75 m AGL the depth
-    # footprint is too small for a unique DEM match. No simulated
-    # rangefinder in this stack.
+    # Aerostack2 + MAVROS TF. DemNav matches once the mission has climbed
+    # to CRUISE_AGL_M (NAVSIM_REQUIRE_VALID=demnav waits for it), which
+    # takes many minutes in a simulator slower than real time, hence the
+    # long timeout. No simulated rangefinder in this stack.
     profiles: ["validation"]
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
     network_mode: host
@@ -261,7 +262,7 @@ services:
       - ../applications/aerostack2/scripts:/workspace/applications/aerostack2/scripts:ro
     command: >
       python3 /workspace/applications/aerostack2/scripts/validate_aerodrone_navsim.py
-        --timeout-s ${NAVSIM_VALIDATION_TIMEOUT_S:-900}
+        --timeout-s ${NAVSIM_VALIDATION_TIMEOUT_S:-1800}
         --freshness-s ${NAVSIM_VALIDATION_FRESHNESS_S:-10}
         --rangefinder-topic ""
         --camera-frame downward_camera_optical_frame

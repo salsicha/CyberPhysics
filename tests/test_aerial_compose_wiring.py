@@ -100,3 +100,52 @@ def test_gps_input_corrections_stay_off_for_arduplane():
     assert 'gps_input_enabled:=false' in bridge
     assert _env_value(REPO / 'systems/airplane/config/blueos.env',
                       'GPS_INPUT_CORRECTIONS') == 'false'
+
+
+def env_value(name):
+    env = (REPO / 'applications/aerostack2/config/mount_tamalpais.env').read_text()
+    return float(re.search(rf'^{name}=(.*)$', env, re.MULTILINE).group(1))
+
+
+@pytest.mark.parametrize('name', sorted(SIM_MOUNTS))
+def test_mission_cruises_at_the_configured_altitude(name):
+    command = services(name)['terrain_assets']['command']
+    assert '--cruise-agl ${CRUISE_AGL_M:-' in command
+    # DemNav needs the footprint of a high cruise to find a unique match.
+    assert env_value('CRUISE_AGL_M') >= 200.0
+
+
+def test_every_simulated_camera_sees_the_ground_from_the_cruise():
+    """Depth and colour far planes leave room for the cruise height plus
+    the terrain's relief across the footprint (twice the cruise height)."""
+    needed = 2.0 * env_value('CRUISE_AGL_M')
+    sources = {
+        'applications/genesis/scripts/aerodrone_navsim.py': r'far=([0-9.]+)',
+        'applications/isaac/scripts/aerodrone_navsim.py':
+            r'GetClippingRangeAttr\(\)\.Set\(Gf\.Vec2f\([0-9.]+, ([0-9.]+)\)\)',
+        'applications/gazebo/models/rgbd_camera.sdf.jinja': r'<far>([0-9.]+)</far>',
+        'applications/gazebo/models/hd_camera.sdf.jinja': r'<far>([0-9.]+)</far>',
+    }
+    for path, pattern in sources.items():
+        planes = [float(value) for value in re.findall(pattern, (REPO / path).read_text())]
+        assert planes and min(planes) >= needed, (path, planes)
+
+
+def test_cruise_footprint_stays_inside_the_imagery_and_dem():
+    """Every en-route waypoint's camera footprint at the cruise height lies
+    inside the seeded orthophoto (WILDNAV_SEARCH_RADIUS_M about the origin)
+    and DemNav's widest search inside the DEM (AREA_KM square)."""
+    import json
+    import math
+    cruise = env_value('CRUISE_AGL_M')
+    half_fov = math.radians(env_value('FOV_DEG') / 2.0)
+    # Corner of a 4:3 frame from a nadir camera.
+    footprint = cruise * math.tan(half_fov) * math.hypot(1.0, 0.75)
+    mission = json.loads(
+        (REPO / 'applications/aerostack2/missions/wilderness_missions.json').read_text())
+    farthest = max(math.hypot(*waypoint['position_enu_m'][:2])
+                   for entry in mission['missions'] for phase in entry['phases']
+                   for waypoint in phase['waypoints'])
+    assert farthest + footprint <= env_value('WILDNAV_SEARCH_RADIUS_M')
+    assert farthest + footprint + env_value('MAX_SEARCH_RADIUS_M') <= (
+        500.0 * env_value('AREA_KM'))

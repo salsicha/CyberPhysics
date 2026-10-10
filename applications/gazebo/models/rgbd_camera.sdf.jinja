@@ -15,8 +15,8 @@
         <horizontal_fov>1.0472</horizontal_fov>
         <lens><intrinsics><fx>277.1</fx><fy>277.1</fy><cx>160.5</cx><cy>120.5</cy><s>0</s></intrinsics></lens>
         <image><width>320</width><height>240</height><format>R8G8B8</format></image>
-        <clip><near>0.1</near><far>300</far></clip>
-        <depth_camera><clip><near>0.3</near><far>200</far></clip></depth_camera>
+        <clip><near>0.1</near><far>1000</far></clip>
+        <depth_camera><clip><near>0.3</near><far>1000</far></clip></depth_camera>
         <noise><type>gaussian</type><mean>0</mean><stddev>0.007</stddev></noise>
 {% if sensor.model == 'gimbal_speed' or sensor.model == 'gimbal_position' -%}
         <optical_frame_id>/{{ namespace }}/{{ sensor.name }}/_0/_1/_2/{{ sensor.sensor_attached }}/{{ sensor.sensor_attached_type }}/rgbd_camera/optical_frame</optical_frame_id>
