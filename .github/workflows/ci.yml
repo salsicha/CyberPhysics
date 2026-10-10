@@ -98,8 +98,15 @@ jobs:
         run: |
           git lfs install --local
           git lfs pull --include="applications/vinsmono/**"
+      # Pull ros:jazzy-ros-base through mirror.gcr.io (Docker Hub's anonymous
+      # pull limit failed this job with 429 Too Many Requests), and retry the
+      # build once if it still hits the limit
+      - name: Use Google's Docker Hub mirror
+        run: .github/workflows/scripts/use_docker_hub_mirror.sh
       - name: Build VINS-Mono
-        run: docker build -t salsicha/cyberphysics:vinsmono-ci applications/vinsmono
+        run: >
+          .github/workflows/scripts/retry_on_rate_limit.sh
+          docker build -t salsicha/cyberphysics:vinsmono-ci applications/vinsmono
       - name: Check sensor flow and normal shutdown
         run: >
           docker run --rm --network none

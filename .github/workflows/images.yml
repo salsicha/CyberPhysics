@@ -1,0 +1,314 @@
+# Build the application images that fit on a GitHub-hosted runner, so a broken
+# Dockerfile shows up in CI. Nothing is pushed anywhere.
+#
+# One job per base image: the base is built once with the repo's own
+# applications/_build_it.sh (through scripts/ci_build_image.sh), then each
+# image FROM it is built against that local copy in its own step and deleted
+# again to free the disk. A failed image does not stop the rest of its family
+# but fails the job; the children of a failed base are skipped. Docker Hub
+# pulls go through mirror.gcr.io, and a build that still hits the Hub's pull
+# rate limit is retried once.
+#
+# Not built here:
+#   nvblox, isaac, groot          CUDA/Isaac images of 20-40 GB
+#   genesis, depthanything        PyTorch images of 10-13 GB
+#   pantiltros, turret_sim        PyTorch/Ultralytics images of about 10 GB
+#   smolvla, lerobot (so101)      CUDA PyTorch/LeRobot stacks
+#   matlab                        needs a MathWorks download and license
+#   vinsmono                      built and smoke-tested by ci.yml
+name: Images
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'applications/**'
+      - '.github/workflows/images.yml'
+      - '.github/workflows/scripts/**'
+  pull_request:
+    paths:
+      - 'applications/**'
+      - '.github/workflows/images.yml'
+      - '.github/workflows/scripts/**'
+  workflow_dispatch:
+  # Weekly, to catch drift in upstream packages and base images
+  schedule:
+    - cron: '23 5 * * 1'
+
+# A newer run for the same branch or PR cancels the one it supersedes
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+# What applications/Makefile passes to _build_it.sh
+env:
+  REPOSITORY: salsicha/cyberphysics
+  PLATFORM: amd64
+  DOCKER_BUILDKIT: '1'
+
+jobs:
+  ros2-family:
+    name: ros2 family
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v4
+
+      # Base image pulls go through mirror.gcr.io to avoid Docker Hub's
+      # anonymous rate limit; a failure here skips every build in the job
+      - name: Use Google's Docker Hub mirror
+        run: .github/workflows/scripts/use_docker_hub_mirror.sh
+
+      - name: Free runner disk
+        id: prep
+        run: |
+          df -h
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+            /usr/local/.ghcup /opt/hostedtoolcache/CodeQL /usr/share/swift
+          docker system prune --all --force
+          docker info --format 'Docker {{.ServerVersion}}, storage driver {{.Driver}}'
+          df -h
+
+      # blackfly bind-mounts its Spinnaker SDK tarball, stored in Git LFS. The
+      # LFS objects are cached so repeated runs do not use LFS bandwidth.
+      - name: Find blackfly's LFS objects
+        id: lfs
+        run: |
+          git lfs install --local
+          oids=$(git lfs ls-files --long --include='applications/blackfly/files/*amd64*' | awk '{print $1}')
+          echo "key=lfs-blackfly-$(sha256sum <<< "$oids" | cut -c1-16)" >> "$GITHUB_OUTPUT"
+      - name: Restore LFS cache
+        id: lfs-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .git/lfs/objects
+          key: ${{ steps.lfs.outputs.key }}
+      - name: Fetch blackfly's LFS objects
+        id: lfs-pull
+        run: git lfs pull --include='applications/blackfly/files/*amd64*'
+      - name: Save LFS cache
+        if: steps.lfs-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .git/lfs/objects
+          key: ${{ steps.lfs.outputs.key }}
+
+      - name: ros2 (family base)
+        id: ros2
+        if: ${{ !cancelled() && steps.prep.outcome == 'success' }}
+        timeout-minutes: 90
+        run: .github/workflows/scripts/ci_build_image.sh ros2 --keep
+
+      - name: racecarneo
+        if: ${{ !cancelled() && steps.ros2.outcome == 'success' }}
+        timeout-minutes: 60
+        run: .github/workflows/scripts/ci_build_image.sh racecarneo
+      - name: nicegui
+        if: ${{ !cancelled() && steps.ros2.outcome == 'success' }}
+        timeout-minutes: 60
+        run: .github/workflows/scripts/ci_build_image.sh nicegui
+      - name: rangefinder
+        if: ${{ !cancelled() && steps.ros2.outcome == 'success' }}
+        timeout-minutes: 60
+        run: .github/workflows/scripts/ci_build_image.sh rangefinder
+      - name: record
+        if: ${{ !cancelled() && steps.ros2.outcome == 'success' }}
+        timeout-minutes: 60
+        run: .github/workflows/scripts/ci_build_image.sh record
+      - name: realsense
+        if: ${{ !cancelled() && steps.ros2.outcome == 'success' }}
+        timeout-minutes: 60
+        run: .github/workflows/scripts/ci_build_image.sh realsense
+      - name: navigation2
+        if: ${{ !cancelled() && steps.ros2.outcome == 'success' }}
+        timeout-minutes: 60
+        run: .github/workflows/scripts/ci_build_image.sh navigation2
+      - name: tello
+        if: ${{ !cancelled() && steps.ros2.outcome == 'success' }}
+        timeout-minutes: 60
+        run: .github/workflows/scripts/ci_build_image.sh tello
+      - name: whereami
+        if: ${{ !cancelled() && steps.ros2.outcome == 'success' }}
+        timeout-minutes: 60
+        run: .github/workflows/scripts/ci_build_image.sh whereami
+      - name: unrealengine
+        if: ${{ !cancelled() && steps.ros2.outcome == 'success' }}
+        timeout-minutes: 60
+        run: .github/workflows/scripts/ci_build_image.sh unrealengine
+      - name: rai
+        if: ${{ !cancelled() && steps.ros2.outcome == 'success' }}
+        timeout-minutes: 60
+        run: .github/workflows/scripts/ci_build_image.sh rai
+      - name: gazebo
+        if: ${{ !cancelled() && steps.ros2.outcome == 'success' }}
+        timeout-minutes: 60
+        run: .github/workflows/scripts/ci_build_image.sh gazebo
+      - name: roboticstoolbox
+        if: ${{ !cancelled() && steps.ros2.outcome == 'success' }}
+        timeout-minutes: 60
+        run: .github/workflows/scripts/ci_build_image.sh roboticstoolbox
+      - name: blackfly
+        if: ${{ !cancelled() && steps.ros2.outcome == 'success' && steps.lfs-pull.outcome == 'success' }}
+        timeout-minutes: 60
+        run: .github/workflows/scripts/ci_build_image.sh blackfly
+      - name: qgroundcontrol
+        if: ${{ !cancelled() && steps.ros2.outcome == 'success' }}
+        timeout-minutes: 60
+        run: .github/workflows/scripts/ci_build_image.sh qgroundcontrol
+
+      - name: Disk usage
+        if: ${{ !cancelled() }}
+        run: |
+          docker system df
+          df -h
+
+  aerostack2-family:
+    name: aerostack2 family
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+
+      # Base image pulls go through mirror.gcr.io to avoid Docker Hub's
+      # anonymous rate limit; a failure here skips every build in the job
+      - name: Use Google's Docker Hub mirror
+        run: .github/workflows/scripts/use_docker_hub_mirror.sh
+
+      - name: Free runner disk
+        id: prep
+        run: |
+          df -h
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+            /usr/local/.ghcup /opt/hostedtoolcache/CodeQL /usr/share/swift
+          docker system prune --all --force
+          docker info --format 'Docker {{.ServerVersion}}, storage driver {{.Driver}}'
+          df -h
+
+      # oak1 copies its DepthAI model blobs, stored in Git LFS (the build
+      # checks one is not a pointer file). Cached like blackfly's above.
+      - name: Find oak1's LFS objects
+        id: lfs
+        run: |
+          git lfs install --local
+          oids=$(git lfs ls-files --long --include='applications/oak1/**' | awk '{print $1}')
+          echo "key=lfs-oak1-$(sha256sum <<< "$oids" | cut -c1-16)" >> "$GITHUB_OUTPUT"
+      - name: Restore LFS cache
+        id: lfs-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .git/lfs/objects
+          key: ${{ steps.lfs.outputs.key }}
+      - name: Fetch oak1's LFS objects
+        id: lfs-pull
+        run: git lfs pull --include='applications/oak1/**'
+      - name: Save LFS cache
+        if: steps.lfs-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .git/lfs/objects
+          key: ${{ steps.lfs.outputs.key }}
+
+      - name: aerostack2 (family base)
+        id: aerostack2
+        if: ${{ !cancelled() && steps.prep.outcome == 'success' }}
+        timeout-minutes: 90
+        run: .github/workflows/scripts/ci_build_image.sh aerostack2 --keep
+
+      # demnav and wildnav download their DEM/map tile seed caches while building
+      - name: demnav
+        if: ${{ !cancelled() && steps.aerostack2.outcome == 'success' }}
+        timeout-minutes: 60
+        run: .github/workflows/scripts/ci_build_image.sh demnav
+      - name: wildnav
+        if: ${{ !cancelled() && steps.aerostack2.outcome == 'success' }}
+        timeout-minutes: 60
+        run: .github/workflows/scripts/ci_build_image.sh wildnav
+      - name: oak1
+        if: ${{ !cancelled() && steps.aerostack2.outcome == 'success' && steps.lfs-pull.outcome == 'success' }}
+        timeout-minutes: 60
+        run: .github/workflows/scripts/ci_build_image.sh oak1
+      - name: boat
+        if: ${{ !cancelled() && steps.aerostack2.outcome == 'success' }}
+        timeout-minutes: 60
+        run: .github/workflows/scripts/ci_build_image.sh boat
+      - name: submarine
+        if: ${{ !cancelled() && steps.aerostack2.outcome == 'success' }}
+        timeout-minutes: 60
+        run: .github/workflows/scripts/ci_build_image.sh submarine
+
+      - name: Disk usage
+        if: ${{ !cancelled() }}
+        run: |
+          docker system df
+          df -h
+
+  standalone:
+    name: standalone images
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+
+      # Base image pulls go through mirror.gcr.io to avoid Docker Hub's
+      # anonymous rate limit; a failure here skips every build in the job
+      - name: Use Google's Docker Hub mirror
+        run: .github/workflows/scripts/use_docker_hub_mirror.sh
+
+      - name: Free runner disk
+        id: prep
+        run: |
+          df -h
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+            /usr/local/.ghcup /opt/hostedtoolcache/CodeQL /usr/share/swift
+          docker system prune --all --force
+          docker info --format 'Docker {{.ServerVersion}}, storage driver {{.Driver}}'
+          df -h
+
+      - name: ardupilot_sitl (base of navigator)
+        id: ardupilot_sitl
+        if: ${{ !cancelled() && steps.prep.outcome == 'success' }}
+        timeout-minutes: 90
+        run: .github/workflows/scripts/ci_build_image.sh ardupilot_sitl --keep
+      - name: navigator
+        if: ${{ !cancelled() && steps.ardupilot_sitl.outcome == 'success' }}
+        timeout-minutes: 60
+        run: .github/workflows/scripts/ci_build_image.sh navigator
+
+      # Independent images: each one is built even if an earlier one failed
+      - name: so101
+        if: ${{ !cancelled() && steps.prep.outcome == 'success' }}
+        timeout-minutes: 60
+        run: .github/workflows/scripts/ci_build_image.sh so101
+      - name: cactusrt
+        if: ${{ !cancelled() && steps.prep.outcome == 'success' }}
+        timeout-minutes: 60
+        run: .github/workflows/scripts/ci_build_image.sh cactusrt
+      - name: marimo
+        if: ${{ !cancelled() && steps.prep.outcome == 'success' }}
+        timeout-minutes: 60
+        run: .github/workflows/scripts/ci_build_image.sh marimo
+      - name: arduino
+        if: ${{ !cancelled() && steps.prep.outcome == 'success' }}
+        timeout-minutes: 60
+        run: .github/workflows/scripts/ci_build_image.sh arduino
+      - name: simstudio
+        if: ${{ !cancelled() && steps.prep.outcome == 'success' }}
+        timeout-minutes: 60
+        run: .github/workflows/scripts/ci_build_image.sh simstudio
+      - name: pysimcoder
+        if: ${{ !cancelled() && steps.prep.outcome == 'success' }}
+        timeout-minutes: 60
+        run: .github/workflows/scripts/ci_build_image.sh pysimcoder
+      - name: spaceros
+        if: ${{ !cancelled() && steps.prep.outcome == 'success' }}
+        timeout-minutes: 60
+        run: .github/workflows/scripts/ci_build_image.sh spaceros
+
+      - name: Disk usage
+        if: ${{ !cancelled() }}
+        run: |
+          docker system df
+          df -h
