@@ -43,7 +43,9 @@ public:
 
 private:
   bool setFlightMode(const std::string & mode);
-  void restoreModeAfterLandingHandover();
+  std::string preMissionMode();
+  void returnToPreMissionMode();
+  void leaveLandMode();
   bool waitForAutopilotDisarm();
   bool waitForService(const rclcpp::ClientBase::SharedPtr & client);
 
@@ -60,11 +62,11 @@ private:
   std::atomic<double> takeoff_start_altitude_{0.0};
   std::chrono::milliseconds service_timeout_;
   std::chrono::milliseconds landing_disarm_timeout_;
-  // ArduPilot's current mode, and the mode a refused post-landing disarm
-  // switched away from to LAND (empty when none is pending).
+  // ArduPilot's current mode, and the mode it was in before the mission
+  // switched it to GUIDED (empty until then).
   std::mutex mode_mutex_;
   std::string flight_mode_;
-  std::string mode_before_landing_handover_;
+  std::string mode_before_offboard_;
   // ArduPilot's armed state as seen on service_node_, which blocking calls spin.
   std::atomic_bool autopilot_armed_{true};
 

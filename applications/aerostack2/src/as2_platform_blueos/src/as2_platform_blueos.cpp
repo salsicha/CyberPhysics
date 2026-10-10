@@ -161,7 +161,7 @@ bool BlueOSPlatform::ownSetArmingState(bool state)
     return false;
   }
   if (state) {
-    restoreModeAfterLandingHandover();
+    leaveLandMode();
   }
   auto request = std::make_shared<mavros_msgs::srv::CommandBool::Request>();
   request->value = state;
@@ -171,7 +171,7 @@ bool BlueOSPlatform::ownSetArmingState(bool state)
   {
     return false;
   }
-  const bool success = future.get()->success;
+  bool success = future.get()->success;
   // Aerostack2 copies its state machine's state into platform_info_msg_ only
   // when it publishes the platform info, so right after the LANDED
   // transition this still reads LANDING.
@@ -188,19 +188,17 @@ bool BlueOSPlatform::ownSetArmingState(bool state)
     // refused.
     RCLCPP_INFO(
       this->get_logger(), "ArduPilot refused to disarm after landing; switching to LAND");
-    {
-      std::lock_guard<std::mutex> lock(mode_mutex_);
-      if (mode_before_landing_handover_.empty() && flight_mode_ != "LAND") {
-        mode_before_landing_handover_ = flight_mode_;
-      }
-    }
-    if (setFlightMode("LAND") && waitForAutopilotDisarm()) {
+    success = setFlightMode("LAND") && waitForAutopilotDisarm();
+    if (success) {
       RCLCPP_INFO(this->get_logger(), "ArduPilot disarmed in LAND");
-      return true;
+    } else {
+      RCLCPP_WARN(
+        this->get_logger(), "ArduPilot did not disarm in LAND within %ld ms",
+        static_cast<long>(landing_disarm_timeout_.count()));
     }
-    RCLCPP_WARN(
-      this->get_logger(), "ArduPilot did not disarm in LAND within %ld ms",
-      static_cast<long>(landing_disarm_timeout_.count()));
+  }
+  if (success && !state) {
+    returnToPreMissionMode();
   }
   return success;
 }
@@ -221,19 +219,37 @@ bool BlueOSPlatform::waitForAutopilotDisarm()
   return false;
 }
 
-void BlueOSPlatform::restoreModeAfterLandingHandover()
+std::string BlueOSPlatform::preMissionMode()
 {
-  // ArduCopter cannot arm in LAND, where the disarm hand-over left it.
-  std::string previous;
+  std::lock_guard<std::mutex> lock(mode_mutex_);
+  return mode_before_offboard_;
+}
+
+void BlueOSPlatform::returnToPreMissionMode()
+{
+  // A disarmed vehicle goes back to the mode it was in before the mission's
+  // offboard switch, so the next mission starts like this one: Aerostack2
+  // refuses Offboard while ArduPilot is still in GUIDED, and ArduCopter
+  // cannot arm in LAND (where the disarm hand-over leaves it).
+  const std::string mode = preMissionMode();
+  if (!mode.empty()) {
+    RCLCPP_INFO(this->get_logger(), "Returning ArduPilot to %s after disarming", mode.c_str());
+    setFlightMode(mode);
+  }
+}
+
+void BlueOSPlatform::leaveLandMode()
+{
+  // Fallback for an arm request while ArduPilot is still in LAND, e.g. when
+  // the switch after disarming failed.
+  std::string current;
   {
     std::lock_guard<std::mutex> lock(mode_mutex_);
-    previous.swap(mode_before_landing_handover_);
+    current = flight_mode_;
   }
-  if (!previous.empty()) {
-    RCLCPP_INFO(
-      this->get_logger(), "Restoring ArduPilot mode %s after the landing hand-over",
-      previous.c_str());
-    setFlightMode(previous);
+  if (current == "LAND") {
+    const std::string mode = preMissionMode();
+    setFlightMode(mode.empty() ? manual_mode_ : mode);
   }
 }
 
@@ -241,6 +257,12 @@ bool BlueOSPlatform::ownSetOffboardControl(bool offboard)
 {
   if (platform_info_msg_.offboard == offboard) {
     return true;
+  }
+  if (offboard) {
+    std::lock_guard<std::mutex> lock(mode_mutex_);
+    if (!flight_mode_.empty() && flight_mode_ != guided_mode_ && flight_mode_ != "LAND") {
+      mode_before_offboard_ = flight_mode_;
+    }
   }
   return setFlightMode(offboard ? guided_mode_ : manual_mode_);
 }
