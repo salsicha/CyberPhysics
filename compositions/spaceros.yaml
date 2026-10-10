@@ -1,19 +1,33 @@
-
-# SpaceROS
+# Space ROS Curiosity rover demo (space-ros/demos curiosity_rover, built into
+# the spaceros image): Gazebo Harmonic with the Mars world, ros2_control
+# controllers, ros_gz bridges (/clock, /scan, /image_raw, odometry) and the
+# Space ROS demo nodes behind the /move_forward, /turn_left, /turn_right,
+# /move_stop, /open_arm, /close_arm, /mast_open, /mast_close and /mast_rotate
+# services (std_srvs/srv/Empty).
+#
+# The Gazebo GUI opens on the host X server (run `xhost +local:` first if
+# needed). Without a display:
+#   SPACEROS_GUI=false docker compose -f compositions/spaceros.yaml up
+# Rendering falls back to Mesa (CPU); see applications/spaceros/README.md for
+# passing a GPU in.
 
 services:
   spaceros:
-    network_mode: "host"
-    image: salsicha/cyberphysics:spaceros-latest
+    image: salsicha/cyberphysics:spaceros-${CYBERPHYSICS_TAG:-latest}
     container_name: spaceros
+    network_mode: host
+    ipc: host
     environment:
-      - "DISPLAY=${DISPLAY}"
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - PYTHONUNBUFFERED=1
+      - DISPLAY=${DISPLAY:-:0}
       - XAUTHORITY=/tmp/.XAuthority
+      - QT_X11_NO_MITSHM=1
     volumes:
-      - "/tmp/.X11-unix:/tmp/.X11-unix"
+      - /tmp/.X11-unix:/tmp/.X11-unix
       - /dev/shm:/dev/shm
       - ${XAUTHORITY:-/tmp/.Xauthority}:/tmp/.XAuthority:ro
     command: >
-      stdbuf -o L
-      /demos/curiosity_rover/run.sh
-      
+      ros2 launch /launch/curiosity_sim.launch.py
+      gui:=${SPACEROS_GUI:-true}
+    stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM

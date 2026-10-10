@@ -27,7 +27,7 @@ Quick-buy baseline
   gravel, and regolith simulant.
 - 2 x motor controller banks with current sensing and ROS 2-compatible control
   interfaces, such as CAN, RS-485, or USB.
-- 1 x onboard compute module capable of running Space ROS and ROS 2 Humble,
+- 1 x onboard compute module capable of running Space ROS and ROS 2 Jazzy,
   preferably an x86-64 rugged mini PC or Jetson-class computer with 16 GB RAM.
 - 1 x safety microcontroller or watchdog board for motor inhibit, e-stop,
   heartbeat monitoring, and power sequencing.
@@ -61,7 +61,7 @@ Quick-buy baseline
 
 Software stack
 
-- Space ROS / ROS 2 Humble in `applications/spaceros`.
+- Space ROS / ROS 2 Jazzy in `applications/spaceros`.
 - Space ROS Curiosity rover demo for baseline rover workflows.
 - CyberPhysics `lunar_rover_sim.py` for deterministic south-pole terrain,
   slip, illumination, thermal, battery, IMU, wheel-state, and odometry topics.

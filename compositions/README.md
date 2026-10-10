@@ -34,6 +34,7 @@ docker compose -f compositions/nvblox.yaml up
 docker compose -f compositions/boat_sim.yaml up
 docker compose -f compositions/submarine_sim.yaml up
 docker compose -f compositions/lunar_rover_sim.yaml up
+docker compose -f compositions/spaceros.yaml up                 # Space ROS Curiosity demo (SPACEROS_GUI=false: headless)
 docker compose -f compositions/airplane_sim.yaml up
 docker compose -f compositions/airplane_hardware.yaml up
 docker compose -f compositions/turret_hardware.yaml up

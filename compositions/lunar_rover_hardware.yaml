@@ -12,9 +12,12 @@ services:
     network_mode: host
     ipc: host
     restart: unless-stopped
+    # PID 1 `sleep` ignores signals; tini forwards them so `down` is immediate
+    init: true
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
-      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+      # Space ROS ships only Cyclone DDS; drivers should use it too
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
     volumes:
       - ../systems/lunar_rover/config:/workspace/config:ro
       - /dev/shm:/dev/shm

@@ -11,9 +11,10 @@ does not claim flight qualification.
 ## Expected Space ROS Setup
 
 - `salsicha/cyberphysics:spaceros-latest` built from `applications/spaceros`.
-- ROS 2 Humble and Space ROS sourced by the container entrypoint.
-- Optional use of the upstream Space ROS Curiosity rover demo for baseline
-  rover behavior.
+- ROS 2 Jazzy and Space ROS (Cyclone DDS) sourced by the container entrypoint.
+- Optional use of the upstream Space ROS Curiosity rover demo, built into the
+  same image, for baseline rover behavior
+  (`docker compose -f compositions/spaceros.yaml up`).
 - Local RViz, Foxglove, or ROS 2 CLI tools for inspection.
 
 ## Run
