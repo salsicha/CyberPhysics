@@ -1,7 +1,12 @@
 racecarneo_bridge:
   ros__parameters:
     frame_prefix: racecarneo
-    max_speed: 0.35
+    # ackermann_cmd speed is a closed-loop setpoint in m/s, clamped to
+    # +-max_speed (the simulated car reaches ~1.3 m/s at full throttle).
+    max_speed: 1.0
+    # drive.set_max_speed: RacecarSim's motor torque per unit throttle. The
+    # drive model below was identified at 0.35.
+    throttle_scale: 0.35
     publish_camera: true
     publish_depth: true
     publish_lidar: true
@@ -16,11 +21,11 @@ racecarneo_bridge:
     map_frame: map
     # The RacecarSim v2.8.3 car's wheel colliders sit at +-1.125 Unity units
     # (1 unit = 0.1 m), so its wheelbase is 0.225 m, not the hardware 0.33 m.
-    # Odometry integrates yaw rate with it.
+    # The simulator stack's cmd_vel_to_ackermann uses the same value; the
+    # bridge's odometry takes its heading from the simulator's yaw rate.
     wheelbase: 0.225
-    # /ackermann_cmd is SI; these convert it to simulator ratios. RacecarSim
-    # v2.8 steers the front wheels angle * 20 deg (0.349 rad) and applies
-    # motor torque, not a speed, so max_speed is an open-loop estimate.
+    # /ackermann_cmd steering is SI; RacecarSim v2.8 steers the front wheels
+    # angle * 20 deg (0.349 rad), so the bridge sends it as a ratio of that.
     max_steering_angle: 0.349
     sensor_random_seed: 101
     camera_dropout_probability: 0.0
@@ -43,3 +48,43 @@ racecarneo_bridge:
     estop_engaged: false
     command_timeout_s: 0.5
     publish_actuator_feedback: true
+
+    # Closed-loop speed control. RacecarSim's throttle is motor torque and it
+    # reports no wheel speed, so the bridge estimates the forward speed and
+    # runs a PI loop on it (SpeedEstimator / SpeedController in the bridge).
+    # Throttle per m/s error, per m of integrated error, and the drive
+    # model's steady-state throttle per m/s (drag / accel_per_throttle).
+    # Stop commands (speed 0) skip throttle_time_constant_s.
+    speed_kp: 1.5
+    speed_ki: 1.0
+    speed_feedforward: 0.72
+    speed_integral_limit: 0.5
+    # Integrate only within this many m/s of the setpoint (no rise overshoot).
+    speed_integral_band: 0.05
+    max_throttle: 1.0
+    # Stopping: reverse throttle brake_gain * speed while faster than
+    # stop_speed (m/s), then exactly zero throttle, the simulator's own brake.
+    brake_gain: 3.0
+    stop_speed: 0.15
+    # Speed estimate: the simulator's forward acceleration integrated over
+    # its frame time, pulled toward this drive model with
+    # speed_model_time_constant_s while driving and the shorter
+    # speed_model_braking_time_constant_s while braking (0 = IMU only, which
+    # drifts by 0.01-0.05 m/s^2 while the motor pushes). Identified against
+    # lidar ranges (Long Hallway level, Demo World circles) at
+    # throttle_scale 0.35: dv/dt = accel_per_throttle * throttle
+    # - (drag + turn_drag * steering_ratio^2) * v, brake_accel_per_throttle
+    # when the throttle opposes the motion, and at exactly zero throttle the
+    # simulator's brake decelerates at zero_throttle_decel (m/s^2).
+    drive_model_accel_per_throttle: 1.18
+    drive_model_brake_accel_per_throttle: 1.0
+    drive_model_drag: 0.85
+    drive_model_turn_drag: 0.15
+    drive_model_zero_throttle_decel: 1.0
+    speed_model_time_constant_s: 1.0
+    speed_model_braking_time_constant_s: 0.25
+    # Zero-velocity update: zero throttle and |forward accel| (m/s^2) and
+    # |yaw rate| (rad/s) under these for zupt_time_s means the car is at rest.
+    zupt_time_s: 0.3
+    zupt_accel_threshold: 0.15
+    zupt_yaw_rate_threshold: 0.05

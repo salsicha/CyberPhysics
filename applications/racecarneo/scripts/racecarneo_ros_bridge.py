@@ -50,11 +50,159 @@ def sim_imu_to_ros(accel, gyro):
     return accel_ros, gyro_ros
 
 
+def _clamp(value, limit):
+    return max(-limit, min(limit, value))
+
+
+class SpeedEstimator:
+    """Forward speed of the simulated car, which RacecarSim v2.8 does not report.
+
+    The estimate integrates the simulator's forward acceleration (ROS x) over
+    simulator time. On its own that drifts: against lidar ranges to the end
+    wall of the Long Hallway level it read 0.01-0.05 m/s^2 high whenever the
+    motor pushed, under-read hard braking and lagged it by about two frames,
+    and was up to 0.2 m/s off after stops. Two corrections bound it:
+
+    * a drive model identified against lidar (throttle_scale 0.35, flat
+      ground): dv/dt = accel_per_throttle * u - (drag + turn_drag * s^2) * v
+      while the throttle u drives (s is the steering ratio; the car is ~20%
+      slower at full lock), brake_accel_per_throttle replaces
+      accel_per_throttle while u opposes the motion, and at exactly zero
+      throttle the simulator's own wheel brake stops the car at
+      zero_throttle_decel. The estimate is pulled toward the model speed with
+      model_time_constant_s while driving, so the IMU carries transients (a
+      collision, a slope) and the model the steady state, and with the
+      shorter braking_time_constant_s while braking, where the IMU is least
+      reliable. A time constant of 0 disables the model (pure IMU).
+    * a zero-velocity update: after zupt_time_s of exactly zero throttle with
+      the IMU still (forward acceleration and yaw rate under the thresholds)
+      the car is at rest, and both speeds are reset to zero.
+    """
+
+    def __init__(self, accel_per_throttle=1.18, brake_accel_per_throttle=1.0, drag=0.85,
+                 turn_drag=0.15, zero_throttle_decel=1.0, model_time_constant_s=1.0,
+                 braking_time_constant_s=0.25, zupt_time_s=0.3, zupt_accel=0.15,
+                 zupt_yaw_rate=0.05):
+        self.accel_per_throttle = float(accel_per_throttle)
+        self.brake_accel_per_throttle = float(brake_accel_per_throttle)
+        self.drag = float(drag)
+        self.turn_drag = float(turn_drag)
+        self.zero_throttle_decel = float(zero_throttle_decel)
+        self.model_time_constant_s = float(model_time_constant_s)
+        self.braking_time_constant_s = float(braking_time_constant_s)
+        self.zupt_time_s = float(zupt_time_s)
+        self.zupt_accel = float(zupt_accel)
+        self.zupt_yaw_rate = float(zupt_yaw_rate)
+        self.speed = 0.0
+        self.model_speed = 0.0
+        self.still_s = 0.0
+
+    def reset(self) -> None:
+        self.speed = self.model_speed = self.still_s = 0.0
+
+    def update(self, dt: float, accel: float, yaw_rate: float, throttle: float,
+               steering: float = 0.0) -> float:
+        """Advance by dt simulator seconds driven with `throttle` and the
+        `steering` ratio; returns m/s."""
+        if not dt > 0.0:
+            return self.speed
+        braking = throttle == 0.0 or throttle * self.speed < 0.0
+        self._advance_model(dt, throttle, steering)
+        self.speed += accel * dt
+        time_constant = self.braking_time_constant_s if braking else self.model_time_constant_s
+        if time_constant > 0.0:
+            self.speed += (self.model_speed - self.speed) * min(1.0, dt / time_constant)
+        still = (throttle == 0.0 and abs(accel) < self.zupt_accel
+                 and abs(yaw_rate) < self.zupt_yaw_rate)
+        self.still_s = self.still_s + dt if still else 0.0
+        if self.still_s >= self.zupt_time_s:
+            self.speed = self.model_speed = 0.0
+        return self.speed
+
+    def _advance_model(self, dt: float, throttle: float, steering: float) -> None:
+        v = self.model_speed
+        if throttle == 0.0:
+            self.model_speed = v - math.copysign(min(abs(v), self.zero_throttle_decel * dt), v)
+            return
+        gain = self.brake_accel_per_throttle if v * throttle < 0.0 else self.accel_per_throttle
+        drag = self.drag + self.turn_drag * steering * steering
+        self.model_speed = v + (gain * throttle - drag * v) * dt
+
+
+class SpeedController:
+    """Throttle in [-1, 1] that makes the estimated speed follow a setpoint.
+
+    RacecarSim's throttle is motor torque, so an open-loop ratio keeps
+    accelerating. This is feedforward (the drive model's steady-state
+    throttle per m/s) plus PI on the speed error. The integral only trims
+    what the feedforward misses: it integrates only within integral_band of
+    the setpoint (integrating the whole rise overshoots by 20-35%), is
+    clamped, and is frozen while the output saturates in the direction it
+    would grow.
+
+    Stopping: with a zero setpoint the controller pushes reverse throttle
+    against the motion while the car is faster than stop_speed, then
+    outputs exactly 0.0, which engages the simulator's wheel brake; that
+    brake cannot drive the car backwards, so braking never turns into
+    reversing. Likewise a forward setpoint never gets reverse throttle once
+    the car is slower than stop_speed (and vice versa for reverse).
+    """
+
+    def __init__(self, kp=1.5, ki=1.0, feedforward=0.72, integral_limit=0.5,
+                 integral_band=0.05, max_throttle=1.0, brake_gain=3.0, stop_speed=0.15,
+                 deadband=1e-3):
+        self.kp = float(kp)
+        self.ki = float(ki)
+        self.feedforward = float(feedforward)
+        self.integral_limit = float(integral_limit)
+        self.integral_band = float(integral_band)
+        self.max_throttle = float(max_throttle)
+        self.brake_gain = float(brake_gain)
+        self.stop_speed = float(stop_speed)
+        self.deadband = float(deadband)
+        self.integral = 0.0
+        self._last_direction = 0.0
+
+    def reset(self) -> None:
+        self.integral = 0.0
+        self._last_direction = 0.0
+
+    def update(self, setpoint: float, speed: float, dt: float) -> float:
+        if abs(setpoint) < self.deadband:
+            self.reset()
+            if abs(speed) <= self.stop_speed:
+                return 0.0
+            return -math.copysign(min(self.max_throttle, self.brake_gain * abs(speed)), speed)
+        direction = math.copysign(1.0, setpoint)
+        if direction != self._last_direction:
+            self.integral = 0.0
+            self._last_direction = direction
+        error = setpoint - speed
+        proportional = self.feedforward * setpoint + self.kp * error
+        integral = self.integral
+        if abs(error) <= self.integral_band:
+            integral = _clamp(integral + self.ki * error * max(0.0, dt), self.integral_limit)
+        unclamped = proportional + integral
+        if abs(unclamped) > self.max_throttle and unclamped * error > 0.0:
+            integral = self.integral  # anti-windup: do not grow into saturation
+            unclamped = proportional + integral
+        self.integral = integral
+        throttle = _clamp(unclamped, self.max_throttle)
+        if throttle * direction < 0.0 and speed * direction <= self.stop_speed:
+            # Slowing a car that is barely moving: brake, never reverse it.
+            return 0.0
+        return throttle
+
+
 class RacecarNeoBridge(Node):
     def __init__(self) -> None:
         super().__init__('racecarneo_bridge')
         self.declare_parameter('frame_prefix', 'racecarneo')
-        self.declare_parameter('max_speed', 0.35)
+        # ackermann_cmd speeds are clamped to +-max_speed (m/s).
+        self.declare_parameter('max_speed', 1.0)
+        # RacecarSim drive.set_max_speed: motor torque per unit throttle. The
+        # drive model below was identified at 0.35.
+        self.declare_parameter('throttle_scale', 0.35)
         self.declare_parameter('publish_camera', True)
         self.declare_parameter('publish_depth', True)
         self.declare_parameter('publish_lidar', True)
@@ -90,9 +238,29 @@ class RacecarNeoBridge(Node):
         self.declare_parameter('estop_engaged', False)
         self.declare_parameter('command_timeout_s', 0.5)
         self.declare_parameter('publish_actuator_feedback', True)
+        # Closed-loop speed control (see SpeedEstimator and SpeedController).
+        self.declare_parameter('speed_kp', 1.5)
+        self.declare_parameter('speed_ki', 1.0)
+        self.declare_parameter('speed_feedforward', 0.72)
+        self.declare_parameter('speed_integral_limit', 0.5)
+        self.declare_parameter('speed_integral_band', 0.05)
+        self.declare_parameter('max_throttle', 1.0)
+        self.declare_parameter('brake_gain', 3.0)
+        self.declare_parameter('stop_speed', 0.15)
+        self.declare_parameter('drive_model_accel_per_throttle', 1.18)
+        self.declare_parameter('drive_model_brake_accel_per_throttle', 1.0)
+        self.declare_parameter('drive_model_drag', 0.85)
+        self.declare_parameter('drive_model_turn_drag', 0.15)
+        self.declare_parameter('drive_model_zero_throttle_decel', 1.0)
+        self.declare_parameter('speed_model_time_constant_s', 1.0)
+        self.declare_parameter('speed_model_braking_time_constant_s', 0.25)
+        self.declare_parameter('zupt_time_s', 0.3)
+        self.declare_parameter('zupt_accel_threshold', 0.15)
+        self.declare_parameter('zupt_yaw_rate_threshold', 0.05)
 
         self.frame_prefix = self.get_parameter('frame_prefix').value
         self.max_speed = float(self.get_parameter('max_speed').value)
+        self.throttle_scale = min(1.0, max(0.0, float(self.get_parameter('throttle_scale').value)))
         self.publish_camera = bool(self.get_parameter('publish_camera').value)
         self.publish_depth = bool(self.get_parameter('publish_depth').value)
         self.publish_lidar = bool(self.get_parameter('publish_lidar').value)
@@ -127,6 +295,30 @@ class RacecarNeoBridge(Node):
         self.estop_engaged = bool(self.get_parameter('estop_engaged').value)
         self.command_timeout_s = float(self.get_parameter('command_timeout_s').value)
         self.publish_actuator_feedback = bool(self.get_parameter('publish_actuator_feedback').value)
+
+        def number(name):
+            return float(self.get_parameter(name).value)
+
+        self._speed_controller = SpeedController(
+            kp=number('speed_kp'), ki=number('speed_ki'),
+            feedforward=number('speed_feedforward'),
+            integral_limit=number('speed_integral_limit'),
+            integral_band=number('speed_integral_band'),
+            # The library rejects throttles outside [-1, 1].
+            max_throttle=min(1.0, abs(number('max_throttle'))),
+            brake_gain=number('brake_gain'),
+            stop_speed=number('stop_speed'))
+        self._speed_estimator = SpeedEstimator(
+            accel_per_throttle=number('drive_model_accel_per_throttle'),
+            brake_accel_per_throttle=number('drive_model_brake_accel_per_throttle'),
+            drag=number('drive_model_drag'),
+            turn_drag=number('drive_model_turn_drag'),
+            zero_throttle_decel=number('drive_model_zero_throttle_decel'),
+            model_time_constant_s=number('speed_model_time_constant_s'),
+            braking_time_constant_s=number('speed_model_braking_time_constant_s'),
+            zupt_time_s=number('zupt_time_s'),
+            zupt_accel=number('zupt_accel_threshold'),
+            zupt_yaw_rate=number('zupt_yaw_rate_threshold'))
         # E-stop, manual override, and the watchdog timeout can change at
         # runtime, e.g. `ros2 param set /racecarneo_bridge estop_engaged true`.
         self.add_on_set_parameters_callback(self._on_set_parameters)
@@ -139,6 +331,10 @@ class RacecarNeoBridge(Node):
         self._last_update_time = None
         self._last_speed_mps = 0.0
         self._last_yaw_rate = 0.0
+        # Throttle and steering ratio sent to the simulator; the next
+        # update's IMU sample shows their effect.
+        self._throttle = 0.0
+        self._sent_steering = 0.0
 
         self._cmd_lock = threading.Lock()
         self._speed = 0.0
@@ -164,8 +360,9 @@ class RacecarNeoBridge(Node):
         self.create_subscription(AckermannDriveStamped, 'ackermann_cmd', self._cmd_callback, 10)
 
     def _cmd_callback(self, msg: AckermannDriveStamped) -> None:
-        # ackermann_cmd is SI (m/s, rad, positive left); the simulator takes
-        # ratios of its own limits.
+        # ackermann_cmd is SI (m/s, rad, positive left). The speed is the
+        # speed controller's setpoint; the steering angle becomes a ratio of
+        # the simulator's steering lock.
         speed = float(msg.drive.speed)
         steering = float(msg.drive.steering_angle)
         # min/max would turn NaN into a full-scale command; drop it and let
@@ -173,10 +370,9 @@ class RacecarNeoBridge(Node):
         if not (math.isfinite(speed) and math.isfinite(steering)):
             self.get_logger().warn('Ignoring non-finite ackermann_cmd', throttle_duration_sec=1.0)
             return
-        speed = speed / self.max_speed if self.max_speed > 0.0 else 0.0
         steering = steering / self.max_steering_angle if self.max_steering_angle > 0.0 else 0.0
-        speed = max(-1.0, min(1.0, speed))
-        steering = max(-1.0, min(1.0, steering))
+        speed = _clamp(speed, max(0.0, self.max_speed))
+        steering = _clamp(steering, 1.0)
         with self._cmd_lock:
             self._speed = speed
             self._steering = steering
@@ -200,7 +396,9 @@ class RacecarNeoBridge(Node):
         sys.argv = [sys.argv[0], '-s', '-h']
         import racecar_core
         self._rc = racecar_core.create_racecar(isSimulation=True)
-        self._rc.set_start_update(self._on_start, self._on_update, self._on_update_slow)
+        # No update_slow: with it the library fetches the frame time after
+        # update() and update() would read the previous frame's.
+        self._rc.set_start_update(self._on_start, self._on_update)
         self._sim_thread = threading.Thread(target=self._run_racecar, daemon=True)
         self._sim_thread.start()
 
@@ -233,12 +431,9 @@ class RacecarNeoBridge(Node):
     def _on_start(self) -> None:
         self.get_logger().info('RACECAR Neo simulator connected; publishing ROS topics')
         try:
-            self._rc.drive.set_max_speed(self.max_speed)
+            self._rc.drive.set_max_speed(self.throttle_scale)
         except Exception as exc:
-            self.get_logger().warn(f'Unable to set simulator max speed: {exc}')
-
-    def _on_update_slow(self) -> None:
-        pass
+            self.get_logger().warn(f'Unable to set simulator throttle scale: {exc}')
 
     def _on_update(self) -> None:
         if self._stop:
@@ -249,10 +444,11 @@ class RacecarNeoBridge(Node):
 
         now = self.get_clock().now()
         stamp = now.to_msg()
-        speed_cmd, steering_cmd = self._update_vehicle_state(now)
-        # ROS steering (and this bridge's odometry) is positive to the left;
-        # the RACECAR library's angle is -1 full left, +1 full right.
-        self._rc.drive.set_speed_angle(speed_cmd, -steering_cmd)
+        accel, gyro = self._read_imu()
+        throttle, steering_cmd = self._update_vehicle_state(now, accel, gyro)
+        # ROS steering is positive to the left; the RACECAR library's angle
+        # is -1 full left, +1 full right.
+        self._rc.drive.set_speed_angle(throttle, -steering_cmd)
 
         if self.publish_camera:
             self._publish_color(stamp)
@@ -262,12 +458,13 @@ class RacecarNeoBridge(Node):
         if self.publish_lidar:
             self._publish_scan(stamp)
         if self.publish_imu:
-            self._publish_imu(stamp)
+            self._publish_imu(stamp, accel, gyro)
         if self.publish_odom:
             self._publish_odom(stamp)
         if self.publish_tf:
             self._publish_tf(stamp)
-        self._publish_feedback(stamp, speed_cmd, steering_cmd)
+        self._publish_feedback(stamp, self._last_speed_mps,
+                               steering_cmd * self.max_steering_angle)
 
     def _header(self, stamp, frame: str) -> Header:
         header = Header()
@@ -280,14 +477,36 @@ class RacecarNeoBridge(Node):
             return frame
         return f'{self.frame_prefix}/{frame}'
 
-    def _update_vehicle_state(self, now):
+    def _read_imu(self):
+        """The simulator's IMU on ROS FLU axes, without the bridge's sensor noise."""
+        return sim_imu_to_ros(self._rc.physics.get_linear_acceleration(),
+                              self._rc.physics.get_angular_velocity())
+
+    def _frame_time(self, now) -> float:
+        """Seconds of simulation since the previous update.
+
+        RacecarSim's frame time is the physics time the IMU sample covers;
+        Unity caps it at 0.1 s, so a slow simulator runs slower than the
+        wall clock. Fall back to the ROS clock if it is unavailable.
+        """
+        wall = max(0.0, (now - self._last_update_time).nanoseconds * 1e-9)
+        try:
+            sim = float(self._rc.get_delta_time())
+        except Exception:
+            sim = math.nan
+        if math.isfinite(sim) and 0.0 < sim <= 0.5:
+            return sim
+        return min(wall, 0.5)
+
+    def _update_vehicle_state(self, now, accel, gyro):
+        """Advance the speed loop and odometry; returns (throttle, steering ratio)."""
         if self._last_update_time is None:
             self._last_update_time = now
-            return self._actual_speed_cmd, self._actual_steering_cmd
-        dt = max(0.0, (now - self._last_update_time).nanoseconds * 1e-9)
+            return self._throttle, self._actual_steering_cmd
+        dt = self._frame_time(now)
         self._last_update_time = now
         if dt <= 0.0:
-            return self._actual_speed_cmd, self._actual_steering_cmd
+            return self._throttle, self._actual_steering_cmd
 
         with self._cmd_lock:
             # Watchdog: never keep driving on a command stream that stopped.
@@ -306,26 +525,41 @@ class RacecarNeoBridge(Node):
             if estop_engaged:
                 target_steering = 0.0
 
+        # First-order command lags (m/s for speed, steering lock ratio).
         throttle_alpha = min(1.0, dt / self.throttle_time_constant_s)
         steering_alpha = min(1.0, dt / self.steering_time_constant_s)
-        self._actual_speed_cmd += (target_speed - self._actual_speed_cmd) * throttle_alpha
+        if target_speed == 0.0:
+            self._actual_speed_cmd = 0.0  # stop at once, do not ease into it
+        else:
+            self._actual_speed_cmd += (target_speed - self._actual_speed_cmd) * throttle_alpha
         self._actual_steering_cmd += (target_steering - self._actual_steering_cmd) * steering_alpha
 
-        # Open-loop model: RacecarSim v2.8 turns the speed ratio into motor
-        # torque and reports no wheel speed, so odometry assumes a full
-        # command reaches max_speed. It is not measured simulator motion.
-        speed = float(self._actual_speed_cmd) * self.max_speed
-        speed *= 1.0 + float(self.rng.normal(0.0, self.wheel_slip_std))
-        steering_angle = float(self._actual_steering_cmd) * self.max_steering_angle
-        curvature = math.tan(steering_angle) / self.wheelbase if abs(self.wheelbase) > 1e-6 else 0.0
-        distance = self._encoder_distance(speed * dt)
-        yaw = self._yaw + distance * curvature
+        # The IMU sample shows the throttle the car drove with since the last
+        # update; the new throttle closes the loop on that estimate.
+        forward_accel, yaw_rate = float(accel[0]), float(gyro[2])
+        speed = self._speed_estimator.update(dt, forward_accel, yaw_rate, self._throttle,
+                                             self._sent_steering)
+        if estop_engaged:
+            self._speed_controller.reset()
+            throttle = 0.0  # cut the motor; zero throttle is the sim's brake
+        else:
+            throttle = self._speed_controller.update(self._actual_speed_cmd, speed, dt)
+        self._throttle = throttle
+        self._sent_steering = self._actual_steering_cmd
+
+        # Odometry: estimated speed (with wheel slip noise and encoder
+        # quantization) along the heading integrated from the simulator's
+        # yaw rate, not from the commanded steering.
+        travelled = speed * (1.0 + float(self.rng.normal(0.0, self.wheel_slip_std)))
+        distance = self._encoder_distance(travelled * dt)
+        heading = self._yaw + 0.5 * yaw_rate * dt
+        self._x += distance * math.cos(heading)
+        self._y += distance * math.sin(heading)
+        yaw = self._yaw + yaw_rate * dt
         self._yaw = math.atan2(math.sin(yaw), math.cos(yaw))
-        self._x += distance * math.cos(self._yaw)
-        self._y += distance * math.sin(self._yaw)
         self._last_speed_mps = speed
-        self._last_yaw_rate = speed * curvature
-        return self._actual_speed_cmd, self._actual_steering_cmd
+        self._last_yaw_rate = yaw_rate
+        return throttle, self._actual_steering_cmd
 
     def _encoder_distance(self, distance: float) -> float:
         """Report travel in whole encoder ticks and carry the remainder.
@@ -486,11 +720,11 @@ class RacecarNeoBridge(Node):
         msg.ranges = ranges
         self.lidar_pub.publish(msg)
 
-    def _publish_imu(self, stamp) -> None:
+    def _publish_imu(self, stamp, accel=None, gyro=None) -> None:
         msg = Imu()
         msg.header = self._header(stamp, 'imu_link')
-        accel, gyro = sim_imu_to_ros(self._rc.physics.get_linear_acceleration(),
-                                     self._rc.physics.get_angular_velocity())
+        if accel is None or gyro is None:
+            accel, gyro = self._read_imu()
         # Bias and noise are specified on the ROS (FLU) axes.
         accel = accel + self.imu_accel_bias + self.rng.normal(0.0, self.imu_accel_noise_std, size=3)
         gyro = gyro + self.imu_gyro_bias + self.rng.normal(0.0, self.imu_gyro_noise_std, size=3)
@@ -505,14 +739,15 @@ class RacecarNeoBridge(Node):
         msg.orientation_covariance[0] = -1.0
         self.imu_pub.publish(msg)
 
-    def _publish_feedback(self, stamp, speed_cmd, steering_cmd) -> None:
+    def _publish_feedback(self, stamp, speed_mps, steering_rad) -> None:
         if self.publish_actuator_feedback:
             msg = AckermannDriveStamped()
             msg.header.stamp = stamp
             msg.header.frame_id = self.base_frame
-            # SI like ackermann_cmd: the actuator state, not the raw ratio.
-            msg.drive.speed = float(speed_cmd) * self.max_speed
-            msg.drive.steering_angle = float(steering_cmd) * self.max_steering_angle
+            # SI like ackermann_cmd: estimated speed and the steering angle
+            # sent to the simulator.
+            msg.drive.speed = float(speed_mps)
+            msg.drive.steering_angle = float(steering_rad)
             self.ackermann_feedback_pub.publish(msg)
         manual = Bool()
         manual.data = bool(self.manual_override)

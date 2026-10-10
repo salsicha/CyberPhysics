@@ -47,8 +47,11 @@ Published topics:
 - `/camera/color/camera_info` (`sensor_msgs/CameraInfo`)
 - `/scan` (`sensor_msgs/LaserScan`)
 - `/imu/data_raw` (`sensor_msgs/Imu`)
-- `/odom` (`nav_msgs/Odometry`)
-- `/ackermann_feedback` (`ackermann_msgs/AckermannDriveStamped`, m/s and rad)
+- `/odom` (`nav_msgs/Odometry`): the estimated speed (see
+  [Speed control](#speed-control)) along the heading integrated from the
+  simulator's yaw rate; the twist is that speed and yaw rate
+- `/ackermann_feedback` (`ackermann_msgs/AckermannDriveStamped`, m/s and rad):
+  estimated speed and the steering angle sent to the simulator
 - `/racecarneo/manual_override` (`std_msgs/Bool`)
 - `/racecarneo/estop` (`std_msgs/Bool`)
 - `/racecarneo/battery_voltage` (`std_msgs/Float32`)
@@ -58,8 +61,11 @@ Published topics:
 Subscribed topics:
 
 - `/ackermann_cmd` (`ackermann_msgs/AckermannDriveStamped`): SI units, speed in
-  m/s and steering angle in rad, positive left. The bridge divides by its
-  `max_speed` and `max_steering_angle` and clamps to the simulator's [-1, 1].
+  m/s and steering angle in rad, positive left. The speed is the setpoint of
+  the bridge's speed controller, clamped to +-`max_speed` (1.0 m/s); the
+  steering angle is divided by `max_steering_angle` (the simulator's 20 deg
+  lock) and clamped to [-1, 1]. Without commands for `command_timeout_s`
+  (0.5 s) the car brakes to a stop.
 
 ### Unattended simulator start
 
@@ -125,21 +131,63 @@ Simulator model limits (RacecarSim v2.8.3):
   (`bridge.yaml`), the simulator's `cmd_vel_to_ackermann` overrides and the
   URDF's `sim_geometry:=true` use these values; its tightest turn is ~0.62 m,
   inside Nav2's 0.75 m minimum turning radius.
-- Throttle is open-loop motor torque and the simulator reports no wheel speed,
-  so `/odom` is the bridge's own estimate (command x `max_speed`, wheel slip
-  noise, encoder quantization), not measured simulator motion. The real car
-  does not hold the commanded speed: `Drive.FixedUpdate` applies a torque
-  proportional to the command, so the car keeps accelerating (0.2 m/s
-  commanded reached ~0.6 m/s after 2 s and ~0.8 m/s after 3 s), and a zero
-  command only brakes with `|v|^2`, so it coasts about 1 m. Short drives turn
-  the commanded way (ROS positive steering is a left turn), but `/odom`
-  under-reports both distance and heading change (a 3 s left turn: odometry
-  69 deg, the simulator's IMU ~130 deg), and SLAM has to correct the
-  difference.
+- The throttle is motor torque (`Drive.FixedUpdate`), not a speed, and the
+  simulator reports no wheel or body speed; the bridge closes the speed loop
+  itself (next section). Exactly zero throttle engages the simulator's wheel
+  brake; any other value, however small, lets the car coast.
 - The camera renders 640x480 with a 42.5 degree vertical field of view;
   `/camera/color/camera_info` publishes the matching intrinsics.
 - `/imu/data_raw` is converted from the simulator's Unity axes to ROS FLU,
   with gravity as +9.81 m/s^2 on z at rest (level-ground assumption).
+
+### Speed control
+
+`racecarneo_ros_bridge.py` runs a speed loop every simulator frame
+(parameters in `systems/racecarneo/config/bridge.yaml`):
+
+- **Estimate** (`SpeedEstimator`): the simulator's forward acceleration is
+  integrated over its frame time. Measured against lidar ranges to the end
+  wall of the *Long Hallway Sandbox* level, that IMU reads 0.01-0.05 m/s^2
+  high whenever the motor pushes, under-reads hard braking and lags it by
+  about two frames, so pure integration drifts by 0.2-0.5 m/s within a few
+  maneuvers. The estimate is therefore pulled toward a drive model identified
+  from the same lidar data (dv/dt = 1.18 u - (0.85 + 0.15 s^2) v for throttle
+  u and steering ratio s; at exactly zero throttle the brake decelerates at
+  ~1 m/s^2) with a 1 s time constant while driving and 0.25 s while
+  braking, and reset to zero after 0.3 s of zero throttle with a still IMU
+  (zero-velocity update). In steady state the speed therefore comes from the
+  model: the car runs ~20% slower than estimated at full steering lock and
+  the model knows nothing about slopes.
+- **Controller** (`SpeedController`): feedforward from the model (0.72
+  throttle per m/s) plus PI on the estimate; the integral only runs within
+  0.05 m/s of the setpoint and freezes while the throttle saturates. A stop
+  command (speed 0, the command watchdog, manual override) brakes with
+  reverse throttle 3 x speed while the estimate is above 0.15 m/s, then sends
+  exactly zero throttle, the simulator's own brake, which cannot reverse the
+  car. E-stop cuts the throttle to zero at once.
+- **Odometry**: the estimated speed (with the configured wheel slip noise and
+  encoder quantization) along the heading integrated from the simulator's yaw
+  rate. The steering model (0.225 m wheelbase, 20 deg lock, Nav2's 0.75 m
+  minimum turning radius) is unchanged.
+
+Measured with the real simulator (true speed from the lidar range to a wall
+behind the car, least-squares over the second half of the hold; 6 s holds
+in the *Long Hallway Sandbox*, selected from the menu by hand):
+
+| Command | True speed | Distance after the stop command |
+| --- | --- | --- |
+| 0.2 m/s (Long Hallway, 4 runs) | 0.176-0.186 m/s (-12 to -7%) | 0.09-0.10 m |
+| 0.5 m/s (Long Hallway, 4 runs) | 0.478-0.501 m/s (-4 to 0%) | 0.22-0.41 m (wall 7-8 m away, +-0.07 m lidar noise) |
+| -0.2 m/s (Demo World, reverse, 4 s hold) | -0.180 m/s (-10%) | 0.09 m |
+| -0.5 m/s (Demo World, reverse, 2 runs, 2.5 s hold) | -0.470 to -0.474 m/s (-6 to -5%) | 0.23-0.24 m |
+
+The estimate runs 0.01-0.02 m/s above the true speed at 0.2 m/s (the IMU's
+bias through the 1 s model time constant), so slow commands come out up to
+~12% slow.
+
+Before this loop the same 0.2 m/s command reached ~0.6 m/s after 2 s and
+kept accelerating, a zero command coasted ~1 m, and a 3 s left turn showed
+69 deg in `/odom` against ~130 deg from the IMU.
 
 ## Full Navigation Stack
 
@@ -162,15 +210,24 @@ The composition runs this pipeline:
 
 NiceGUI is available at `http://localhost:8080`.
 
-Closed-loop status: the stack comes up unattended and Nav2 plans and drives
-the simulated car, but goals are not reached reliably yet because `/odom`
-does not follow the simulated car's real speed (see *Simulator model limits*).
-With a `NavigateToPose` goal 3 m ahead and 1.5 m to the right of the start, one
-run ended `SUCCEEDED` 0.23 m from the goal in the SLAM map after several
-replans; a repeat stopped against a wall about 1 m past the pose the stack
-believed, and Nav2 aborted with `START_OCCUPIED` (205). SLAM only maps where
-the lidar hits something, so in the open Demo World a goal outside the mapped
-area is rejected as `GOAL_OUTSIDE_MAP` (204).
+Closed-loop status: the stack comes up unattended and Nav2 reaches goals in
+Demo World. `NavigateToPose` goals relative to the start pose, each on a
+freshly started stack (SLAM, Depth Anything and nvblox running):
+
+| Goal (x, y, yaw) | Runs | Succeeded | Recoveries | Final error (SLAM map) |
+| --- | --- | --- | --- | --- |
+| 3.0, -1.5, -30 deg | 6 | 6 | 0 | 0.23-0.24 m, 0.7-4.1 deg |
+| 1.0, -3.0, -90 deg (right turn) | 3 | 3 | 0 | 0.23 m, 2-10 deg |
+| 5.0, -1.5, 0 deg | 3 | 3 | 0 | 0.22-0.23 m, 3-6 deg |
+
+The goal checker's tolerance is 0.25 m / 0.35 rad. Matching the final scan
+against the SLAM map put the car within 0.07 m of the pose the stack
+reported. `/odom` still over-reports distance by 7-10% against the SLAM map
+on these routes, which SLAM corrects. Before the speed loop, the first goal
+succeeded once in two runs after five recoveries; the other run stopped
+against a wall ~1 m from where the stack believed it was. SLAM only maps
+where the lidar hits something, so in the open Demo World a goal outside
+the mapped area is rejected as `GOAL_OUTSIDE_MAP` (204).
 
 ## Stack Validation
 
