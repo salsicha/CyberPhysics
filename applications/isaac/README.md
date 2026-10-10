@@ -29,3 +29,12 @@ composition. RGB/depth data comes from the Isaac render product rather than
 procedural arrays. The supplied UDP-only Fast DDS profile is required for
 interoperability between Isaac's bundled Humble middleware and the other ROS 2
 containers.
+
+`scripts/aerodrone_navsim.py` steps the physics exactly once per ArduPilot
+servo frame (lock-step; `World.step(render=True)` would run a whole camera
+period of physics inside one frame). Every `ISAAC_PHYSICS_HZ / ISAAC_CAMERA_HZ`
+frames it renders that physics state, reads the RGB and depth annotators once
+they hold the frame of the current simulation time (RTX delivers each frame
+two renders later), and publishes the frames, their camera_info, the ground
+truth and `/clock` with one stamp. The terrain is lit by a uniform sky dome,
+so the ground shows the orthophoto's own colours.

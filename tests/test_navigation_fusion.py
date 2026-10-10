@@ -411,12 +411,111 @@ def test_recovers_invalid_internal_offset_without_restart(module):
 
 def test_ignores_corrupted_source_state_and_extreme_variance(harness, module):
     harness.node.demnav = module.Correction(
-        valid=True, confidence=1.0, east=float('nan'), received_ns=1)
+        valid=True, confidence=1.0, accepted_confidence=1.0, east=float('nan'),
+        received_ns=1, received_at=harness.node._now())
     assert harness.node._target_offset()[2] == ''
     harness.node.demnav.east = 1.0
-    harness.node.demnav.confidence = 0.35
+    assert harness.node._target_offset()[2] == 'demnav'
+    harness.node.demnav.accepted_confidence = 0.35
     harness.node.demnav.variance = 1.7e308
     assert harness.node._target_offset()[2] == ''
+
+
+def no_match(harness, name, confidence=0.0):
+    """A later frame without an accepted match, as DemNav/WildNav report it
+    (WildNav also sends its confidence, 0 when nothing matched)."""
+    if name == 'wildnav':
+        harness.send('/wildnav/confidence', NS(data=confidence))
+    harness.send(f'/{name}/valid', NS(data=False))
+
+
+@pytest.mark.parametrize('name', ['demnav', 'wildnav'])
+def test_correction_is_held_through_later_frames_without_a_match(module, name):
+    """valid=false (and WildNav's zero confidence) for later frames does not
+    withdraw an accepted correction: it stays active, and the offset keeps
+    converging, until correction_timeout_s."""
+    h = Harness(module, correction_time_constant_s=1.0)
+    h.origin()
+    h.raw(WALL_S + 0.0)
+    h.raw(WALL_S + 0.1)
+    h.source(name, fix_at(WALL_S + 0.05, 20.0, -10.0))
+    for step in range(2, 100):  # 10 s of frames without a match
+        if step % 2 == 0:
+            no_match(h, name)
+        h.raw(WALL_S + 0.1 * step)
+        assert h.last('/navigation/correction_source').data == name
+    fused = h.last('/navigation/odometry').pose.pose.position
+    assert (fused.x, fused.y) == pytest.approx((20.0, -10.0), abs=0.01)
+    assert h.last('/navigation/correction_confidence').data == pytest.approx(0.8)
+    h.raw(WALL_S + 30.0)
+    assert h.last('/navigation/correction_source').data == name
+    h.raw(WALL_S + 30.2)  # 30.15 s after the correction: timed out
+    assert h.last('/navigation/correction_source').data == 'dead_reckoning'
+    # The offset itself stays: dead reckoning continues from the corrected
+    # position.
+    assert h.last('/navigation/odometry').pose.pose.position.x == pytest.approx(20.0, abs=1e-3)
+
+
+def test_correction_timeout_ages_on_the_simulator_clock(module):
+    """At a tenth of real time a correction stays active for 30 s of
+    simulated flight (300 s of wall time)."""
+    h = Harness(module)
+
+    def at(wall_s):
+        h.node.now_ns = int((WALL_S + wall_s) * 1e9)
+        h.send('/clock', NS(clock=stamp(0.1 * wall_s)))
+        h.raw(WALL_S + wall_s)
+
+    at(0.0)
+    h.origin()
+    at(0.1)
+    h.source('demnav', fix_at(WALL_S + 0.1, 5.0, 0.0))
+    at(0.2)
+    no_match(h, 'demnav')
+    at(299.0)
+    assert h.last('/navigation/correction_source').data == 'demnav'
+    at(302.0)
+    assert h.last('/navigation/correction_source').data == 'dead_reckoning'
+
+
+def test_accepted_correction_keeps_its_own_confidence(harness):
+    """A later rejected WildNav match (valid=false with its confidence) does
+    not re-weight the correction accepted before it."""
+    harness.origin()
+    harness.raw(WALL_S)
+    harness.source('wildnav', fix_at(WALL_S, 5.0, 0.0), confidence=0.3)
+    no_match(harness, 'wildnav', confidence=0.9)
+    harness.raw(WALL_S + 0.1)
+    assert harness.last('/navigation/correction_source').data == 'wildnav'
+    assert harness.last('/navigation/correction_confidence').data == pytest.approx(0.3)
+
+
+def test_validated_fix_waiting_for_odometry_survives_the_next_frame(harness):
+    """A fix newer than the raw odometry waits for it; the next frame's
+    valid=false must not withdraw it."""
+    harness.origin()
+    harness.raw(WALL_S + 0.0, x=0.0)
+    harness.source('demnav', fix_at(WALL_S + 0.6, 10.0, 0.0))
+    no_match(harness, 'demnav')
+    assert harness.node.demnav.received_ns == 0
+    harness.raw(WALL_S + 1.0, x=10.0)
+    assert harness.node.demnav.received_ns > 0
+    assert harness.node.demnav.east == pytest.approx(4.0, abs=1e-6)
+    assert harness.last('/navigation/correction_source').data == 'demnav'
+
+
+@pytest.mark.parametrize('confidence', [0.8, 0.1])
+def test_fix_its_source_reports_invalid_or_unconfident_is_not_used(harness, confidence):
+    """valid=false for the fix's own frame (e.g. no EKF origin at the source
+    yet), or a confidence under the minimum: the fix is never accepted."""
+    harness.origin()
+    harness.raw(WALL_S)
+    harness.source('demnav', fix_at(WALL_S, 10.0, 0.0), confidence=confidence,
+                   valid=confidence < 0.35)
+    harness.raw(WALL_S + 0.1)
+    assert harness.node.demnav.received_ns == 0
+    assert harness.last('/navigation/correction_source').data == 'dead_reckoning'
+    assert not harness.published('/navigation/correction_fix')
 
 
 def test_body_frame_twist_is_rotated_to_enu(module):

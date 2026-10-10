@@ -1,18 +1,68 @@
 #!/usr/bin/env python3
-"""Isaac Sim terrain, rotor physics, sensors, and ArduPilot JSON backend."""
+"""Isaac Sim terrain, rotor physics, sensors, and ArduPilot JSON backend.
+
+Lock-step: every new ArduPilot servo frame advances the physics by exactly
+one ``1 / ISAAC_PHYSICS_HZ`` step and is answered with the resulting state,
+stamped ``tick * dt`` (ArduPilot's clock, also published on /clock). No
+physics runs without a servo frame. ``World.step(render=True)`` must never
+be used here: with the world's rendering_dt it runs a whole camera period
+of physics substeps (120 at 1200 Hz) in one call, without the motor forces
+and outside ArduPilot's clock.
+
+Camera: every ``ISAAC_PHYSICS_HZ / ISAAC_CAMERA_HZ`` ticks the stage is
+rendered without stepping physics until the annotators deliver the frame of
+the current simulation time (RTX hands annotators each frame two renders
+later), then the RGB and depth frames, their camera_info, the ground truth
+and /clock are published together with one stamp, so each frame shows the
+vehicle pose it is stamped with.
+"""
 
 from __future__ import annotations
 
 import argparse
+import array
 import json
 import math
 import os
 from pathlib import Path
+import select
 import sys
 import time
 
 import numpy as np
-from isaacsim import SimulationApp
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "ardupilot_sitl" / "scripts"))
+from ardupilot_json import (  # noqa: E402
+    ArduPilotJSON,
+    pwm_to_rotor_speed,
+    quaternion_to_matrix,
+    state_from_enu,
+)
+
+
+DRONE_SIZE_M = (0.47, 0.47, 0.11)
+CAMERA_PATH = "/World/NavDrone/downward_camera"
+CAMERA_FRAME = "downward_camera_optical_frame"
+# Optical centre below the body origin.
+CAMERA_OFFSET_M = 0.08
+IMAGE_WIDTH = 640
+IMAGE_HEIGHT = 480
+# 60 degrees across the width; RTX derives the vertical extent from the
+# image aspect ratio (square pixels).
+HORIZONTAL_APERTURE_MM = 21.0
+FOCAL_LENGTH_MM = 18.2
+# Uniform sky: the ground shows the orthophoto's own (already sunlit)
+# colours, as WildNav's reference tiles do. Isaac Sim 6 lights follow USD's
+# physical units, so a small-angle DistantLight of a few thousand units
+# leaves the terrain black.
+SKY_INTENSITY = 900.0
+# Anti-aliasing at the full image resolution (DLAA). The real-time path
+# tracer otherwise uses Isaac's default DLSS "performance" mode, which
+# renders a 640x480 frame at 320x240. Applied once the stage exists: a new
+# stage resets the launch config's render settings.
+RENDER_SETTINGS = {"/rtx/post/aa/op": 4}
+# Renders allowed for a camera frame to reach the annotators.
+MAX_RENDERS_PER_FRAME = 8
 
 
 def env_float(name, default):
@@ -38,43 +88,38 @@ def parse_args():
     return parser.parse_known_args()[0]
 
 
-args = parse_args()
-simulation_app = SimulationApp({
-    "headless": args.headless,
-    "renderer": os.environ.get("ISAAC_RENDERER", "RaytracedLighting"),
-})
-
-import omni.graph.core as og
-import omni.kit.commands
-import omni.usd
-import usdrt
-from isaacsim.core.api import World
-from isaacsim.core.api.objects import DynamicCuboid, FixedCuboid
-from isaacsim.core.experimental.prims import RigidPrim
-from isaacsim.core.utils.extensions import enable_extension
-from pxr import Gf, PhysxSchema, Sdf, UsdGeom, UsdPhysics, UsdShade
-
-enable_extension("isaacsim.ros2.bridge")
-simulation_app.update()
-
-import rclpy
-from geometry_msgs.msg import Quaternion
-from nav_msgs.msg import Odometry
-from rclpy.node import Node
-from rosgraph_msgs.msg import Clock
-
-sys.path.insert(0, "/workspace/applications/ardupilot_sitl/scripts")
-from ardupilot_json import (  # noqa: E402
-    ArduPilotJSON,
-    latlon_from_enu,
-    pwm_to_rotor_speed,
-    quaternion_to_matrix,
-    state_from_enu,
-)
+def camera_intrinsics(width=IMAGE_WIDTH, height=IMAGE_HEIGHT,
+                      horizontal_aperture_mm=HORIZONTAL_APERTURE_MM,
+                      focal_length_mm=FOCAL_LENGTH_MM):
+    """(fx, fy, cx, cy) of the rendered image in ROS convention (pixel
+    centres at integer coordinates). RTX maps the horizontal aperture onto
+    the image width with square pixels and the optical axis through the
+    image centre."""
+    fx = width * focal_length_mm / horizontal_aperture_mm
+    return fx, fx, (width - 1) / 2.0, (height - 1) / 2.0
 
 
-CAMERA_PATH = "/World/NavDrone/downward_camera"
-CAMERA_GRAPH = "/World/ROS2CameraGraph"
+def render_stride(physics_rate_hz, camera_rate_hz):
+    """Physics ticks per camera frame."""
+    return max(1, int(round(physics_rate_hz / camera_rate_hz)))
+
+
+def is_new_frame(frame, last_frame_count):
+    """A servo frame ArduPilot has not been answered for yet. ArduPilot
+    re-sends the same frame (same frame_count) when no state arrives within
+    a second; that one must not advance the physics again."""
+    return frame is not None and frame.frame_count != last_frame_count
+
+
+def rgb8(rgba):
+    """Annotator RGBA (H x W x 4, uint8) to a contiguous rgb8 array."""
+    return np.ascontiguousarray(np.asarray(rgba, dtype=np.uint8)[..., :3])
+
+
+def depth32(distance):
+    """distance_to_image_plane (metres along the optical axis) as 32FC1."""
+    return np.ascontiguousarray(np.asarray(distance, dtype=np.float32).reshape(
+        np.shape(distance)[:2]))
 
 
 def as_numpy(value):
@@ -84,6 +129,8 @@ def as_numpy(value):
 
 
 def add_terrain(stage, asset_dir):
+    from pxr import PhysxSchema, Sdf, UsdGeom, UsdPhysics, UsdShade
+
     data = np.load(Path(asset_dir) / "terrain_mesh.npz")
     vertices = data["vertices"]
     faces = data["faces"]
@@ -122,110 +169,90 @@ def add_terrain(stage, asset_dir):
     UsdShade.MaterialBindingAPI.Apply(mesh.GetPrim()).Bind(material)
 
 
-def add_camera(stage, tick_rate):
+def add_sky(stage):
+    from pxr import UsdLux
+
+    UsdLux.DomeLight.Define(stage, "/World/Sky").CreateIntensityAttr(SKY_INTENSITY)
+
+
+def add_camera(stage):
+    from pxr import Gf, UsdGeom
+
+    # A child of the drone, looking down its -z axis: the image top points
+    # along the body +y axis (left of the nose), camera_mount_yaw_deg 90.
+    # The drone prim is scaled to its box size; undo that for the camera.
     camera = UsdGeom.Camera.Define(stage, CAMERA_PATH)
-    # Isaac Sim 6 uses this authored sensor rate to gate render-product work.
-    # Without it, OnPlaybackTick can drive the ROS writers at the 1200 Hz
-    # flight-physics rate even when World.step(render=False) is requested.
-    camera.GetPrim().CreateAttribute(
-        "omni:sensor:tickRate", Sdf.ValueTypeNames.Float).Set(tick_rate)
-    camera.GetHorizontalApertureAttr().Set(21.0)
-    camera.GetVerticalApertureAttr().Set(15.75)
-    camera.GetFocalLengthAttr().Set(18.2)
+    camera.GetHorizontalApertureAttr().Set(HORIZONTAL_APERTURE_MM)
+    camera.GetVerticalApertureAttr().Set(
+        HORIZONTAL_APERTURE_MM * IMAGE_HEIGHT / IMAGE_WIDTH)
+    camera.GetFocalLengthAttr().Set(FOCAL_LENGTH_MM)
     # Far enough for the CRUISE_AGL_M cruise over the terrain's relief.
     camera.GetClippingRangeAttr().Set(Gf.Vec2f(0.3, 1000.0))
     xform = UsdGeom.Xformable(camera)
-    xform.AddTranslateOp().Set(Gf.Vec3d(0.0, 0.0, -0.08))
+    xform.AddTranslateOp().Set(Gf.Vec3d(0.0, 0.0, -CAMERA_OFFSET_M / DRONE_SIZE_M[2]))
+    xform.AddScaleOp().Set(Gf.Vec3f(*(1.0 / size for size in DRONE_SIZE_M)))
 
 
-def create_camera_graph():
-    keys = og.Controller.Keys
-    og.Controller.edit(
-        {"graph_path": CAMERA_GRAPH, "evaluator_name": "execution"},
-        {
-            keys.CREATE_NODES: [
-                ("OnPlaybackTick", "omni.graph.action.OnPlaybackTick"),
-                ("createRenderProduct", "isaacsim.core.nodes.IsaacCreateRenderProduct"),
-                ("rgb", "isaacsim.ros2.bridge.ROS2CameraHelper"),
-                ("rgbInfo", "isaacsim.ros2.bridge.ROS2CameraInfoHelper"),
-                ("depth", "isaacsim.ros2.bridge.ROS2CameraHelper"),
-                ("depthInfo", "isaacsim.ros2.bridge.ROS2CameraInfoHelper"),
-            ],
-            keys.CONNECT: [
-                ("OnPlaybackTick.outputs:tick", "createRenderProduct.inputs:execIn"),
-                *[("createRenderProduct.outputs:execOut", f"{name}.inputs:execIn")
-                  for name in ("rgb", "rgbInfo", "depth", "depthInfo")],
-                *[("createRenderProduct.outputs:renderProductPath",
-                   f"{name}.inputs:renderProductPath")
-                  for name in ("rgb", "rgbInfo", "depth", "depthInfo")],
-            ],
-            keys.SET_VALUES: [
-                ("createRenderProduct.inputs:cameraPrim",
-                 [usdrt.Sdf.Path(CAMERA_PATH)]),
-                ("createRenderProduct.inputs:width", 640),
-                ("createRenderProduct.inputs:height", 480),
-                ("rgb.inputs:frameId", "downward_camera_optical_frame"),
-                ("rgb.inputs:topicName", args.rgb_topic),
-                ("rgb.inputs:type", "rgb"),
-                ("rgbInfo.inputs:frameId", "downward_camera_optical_frame"),
-                ("rgbInfo.inputs:topicName", args.rgb_info_topic),
-                ("depth.inputs:frameId", "downward_camera_optical_frame"),
-                ("depth.inputs:topicName", args.depth_topic),
-                ("depth.inputs:type", "depth"),
-                ("depthInfo.inputs:frameId", "downward_camera_optical_frame"),
-                ("depthInfo.inputs:topicName", args.depth_info_topic),
-                *[(f"{name}.inputs:useSystemTime", True)
-                  for name in ("rgb", "rgbInfo", "depth", "depthInfo")],
-            ],
-        },
-    )
+class DownwardCamera:
+    """RGB and depth annotators on the downward camera's render product,
+    with the simulation time of the frame they hold."""
 
-
-class TruthPublisher(Node):
     def __init__(self):
-        super().__init__("isaac_sim_ground_truth")
-        self.publisher = self.create_publisher(
-            Odometry, "/aerodrone/simulation/ground_truth/odom", 10)
-        self.clock_publisher = self.create_publisher(Clock, "/clock", 10)
+        import omni.replicator.core as rep
 
-    def publish_clock(self, seconds):
-        """Simulation time (ArduPilot's lock-step time) on /clock: the
-        navigation fusion ages its dead reckoning by it, not by wall time."""
-        nanoseconds = round(seconds * 1e9)
-        msg = Clock()
-        msg.clock.sec, msg.clock.nanosec = divmod(nanoseconds, 1_000_000_000)
-        self.clock_publisher.publish(msg)
+        self.render_product = rep.create.render_product(
+            CAMERA_PATH, (IMAGE_WIDTH, IMAGE_HEIGHT))
+        self.rgb = rep.AnnotatorRegistry.get_annotator("rgb")
+        self.depth = rep.AnnotatorRegistry.get_annotator("distance_to_image_plane")
+        self.time = rep.AnnotatorRegistry.get_annotator("IsaacReadSimulationTime")
+        for annotator in (self.rgb, self.depth, self.time):
+            annotator.attach([self.render_product])
 
-    def publish_state(self, position, quaternion, velocity, angular):
-        msg = Odometry()
-        msg.header.stamp = self.get_clock().now().to_msg()
-        msg.header.frame_id = "earth"
-        msg.child_frame_id = "aerodrone/base_link"
-        msg.pose.pose.position.x, msg.pose.pose.position.y, msg.pose.pose.position.z = position
-        msg.pose.pose.orientation = Quaternion(
-            w=float(quaternion[0]), x=float(quaternion[1]),
-            y=float(quaternion[2]), z=float(quaternion[3]))
-        msg.twist.twist.linear.x, msg.twist.twist.linear.y, msg.twist.twist.linear.z = velocity
-        msg.twist.twist.angular.x, msg.twist.twist.angular.y, msg.twist.twist.angular.z = angular
-        self.publisher.publish(msg)
+    def frame_time(self):
+        """Simulation time the annotators' frame was rendered at, or None."""
+        try:
+            return float(self.time.get_data()["simulationTime"])
+        except (KeyError, TypeError, ValueError):
+            return None
+
+    def read(self):
+        """(rgb8, 32FC1 depth), or None before the first rendered frame."""
+        rgba = np.asarray(self.rgb.get_data())
+        distance = np.asarray(self.depth.get_data())
+        if rgba.ndim != 3 or distance.ndim < 2:
+            return None
+        return rgb8(rgba), depth32(distance)
+
+    def capture(self, world, tolerance_s):
+        """Render the current physics state (no physics step) until the
+        annotators hold its frame: (rgb8, depth), or None if they do not
+        within MAX_RENDERS_PER_FRAME renders."""
+        for _ in range(MAX_RENDERS_PER_FRAME):
+            world.render()
+            frame_time = self.frame_time()
+            if frame_time is not None and abs(frame_time - world.current_time) <= tolerance_s:
+                return self.read()
+        return None
 
 
-def main():
-    asset_dir = Path(args.assets)
-    manifest = json.loads((asset_dir / "manifest.json").read_text(encoding="utf-8"))
+def build_world(asset_dir, physics_rate, camera_rate):
+    """The terrain, sky, launch pad, drone and its downward camera.
+    Returns (world, rigid body view of the drone, home ENU position)."""
+    import carb
+    import omni.usd
+    from isaacsim.core.api import World
+    from isaacsim.core.api.objects import DynamicCuboid, FixedCuboid
+    from isaacsim.core.experimental.prims import RigidPrim
+    from pxr import PhysxSchema
+
+    manifest = json.loads((Path(asset_dir) / "manifest.json").read_text(encoding="utf-8"))
     home = np.asarray(manifest["home_enu_m"], dtype=np.float64)
-    ready_path = Path("/tmp/isaac_sim_ready")
-    ready_path.unlink(missing_ok=True)
-    physics_rate = env_float("ISAAC_PHYSICS_HZ", 1200.0)
-    camera_rate = env_float("ISAAC_CAMERA_HZ", 10.0)
     world = World(physics_dt=1.0 / physics_rate,
                   rendering_dt=1.0 / camera_rate,
                   stage_units_in_meters=1.0)
     stage = omni.usd.get_context().get_stage()
     add_terrain(stage, asset_dir)
-    omni.kit.commands.execute("CreatePrim", prim_path="/World/Sun",
-                              prim_type="DistantLight",
-                              attributes={"inputs:intensity": 3500.0, "inputs:angle": 0.8})
+    add_sky(stage)
     # The common home is the surveyed top of the conservative DEM collision
     # cell.  This pad prevents a cold-start fall onto a coarser mesh triangle
     # while ArduPilot initializes, without replacing the surrounding terrain.
@@ -236,7 +263,7 @@ def main():
         color=np.array([0.20, 0.22, 0.24])))
     world.scene.add(DynamicCuboid(
         prim_path="/World/NavDrone", name="nav_drone", position=home,
-        scale=np.array([0.47, 0.47, 0.11]), mass=1.5,
+        scale=np.array(DRONE_SIZE_M), mass=1.5,
         color=np.array([0.04, 0.18, 0.72])))
     # Match the passive rigid-body losses present in the Gazebo rotor model.
     # A perfectly lossless cuboid is not a credible airframe and makes the
@@ -245,13 +272,139 @@ def main():
         stage.GetPrimAtPath("/World/NavDrone"))
     physx_body.CreateLinearDampingAttr().Set(0.15)
     physx_body.CreateAngularDampingAttr().Set(0.20)
-    add_camera(stage, camera_rate)
+    add_camera(stage)
     rigid = RigidPrim("/World/NavDrone", masses=[1.5])
     world.reset()
-    create_camera_graph()
+    settings = carb.settings.get_settings()
+    for key, value in RENDER_SETTINGS.items():
+        settings.set(key, value)
+    return world, rigid, home
+
+
+def make_publisher(args):
+    """ROS 2 node publishing ground truth, /clock and the camera frames."""
+    from geometry_msgs.msg import Quaternion
+    from nav_msgs.msg import Odometry
+    from rclpy.node import Node
+    from rosgraph_msgs.msg import Clock
+    from sensor_msgs.msg import CameraInfo, Image
+
+    class SimPublisher(Node):
+        def __init__(self):
+            super().__init__("isaac_sim_ground_truth")
+            self.publisher = self.create_publisher(
+                Odometry, "/aerodrone/simulation/ground_truth/odom", 10)
+            self.clock_publisher = self.create_publisher(Clock, "/clock", 10)
+            self.rgb_publisher = self.create_publisher(Image, args.rgb_topic, 10)
+            self.rgb_info_publisher = self.create_publisher(
+                CameraInfo, args.rgb_info_topic, 10)
+            self.depth_publisher = self.create_publisher(Image, args.depth_topic, 10)
+            self.depth_info_publisher = self.create_publisher(
+                CameraInfo, args.depth_info_topic, 10)
+
+        def stamp(self):
+            return self.get_clock().now().to_msg()
+
+        def publish_clock(self, seconds):
+            """Simulation time (ArduPilot's lock-step time) on /clock: the
+            navigation fusion ages its dead reckoning by it, not by wall time."""
+            nanoseconds = round(seconds * 1e9)
+            msg = Clock()
+            msg.clock.sec, msg.clock.nanosec = divmod(nanoseconds, 1_000_000_000)
+            self.clock_publisher.publish(msg)
+
+        def publish_state(self, stamp, position, quaternion, velocity, angular):
+            msg = Odometry()
+            msg.header.stamp = stamp
+            msg.header.frame_id = "earth"
+            msg.child_frame_id = "aerodrone/base_link"
+            msg.pose.pose.position.x, msg.pose.pose.position.y, msg.pose.pose.position.z = position
+            msg.pose.pose.orientation = Quaternion(
+                w=float(quaternion[0]), x=float(quaternion[1]),
+                y=float(quaternion[2]), z=float(quaternion[3]))
+            msg.twist.twist.linear.x, msg.twist.twist.linear.y, msg.twist.twist.linear.z = velocity
+            msg.twist.twist.angular.x, msg.twist.twist.angular.y, msg.twist.twist.angular.z = angular
+            self.publisher.publish(msg)
+
+        def camera_info(self, stamp, width, height):
+            fx, fy, cx, cy = camera_intrinsics(width, height)
+            msg = CameraInfo()
+            msg.header.stamp = stamp
+            msg.header.frame_id = CAMERA_FRAME
+            msg.width, msg.height = width, height
+            msg.distortion_model = "plumb_bob"
+            msg.d = [0.0] * 5
+            msg.k = [fx, 0.0, cx, 0.0, fy, cy, 0.0, 0.0, 1.0]
+            msg.r = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+            msg.p = [fx, 0.0, cx, 0.0, 0.0, fy, cy, 0.0, 0.0, 0.0, 1.0, 0.0]
+            return msg
+
+        @staticmethod
+        def image(stamp, pixels, encoding, pixel_bytes):
+            msg = Image()
+            msg.header.stamp = stamp
+            msg.header.frame_id = CAMERA_FRAME
+            msg.height, msg.width = pixels.shape[:2]
+            msg.encoding = encoding
+            msg.is_bigendian = 0
+            msg.step = msg.width * pixel_bytes
+            # An array.array skips rclpy's per-byte range check (~0.5 s per
+            # frame pair).
+            msg.data = array.array("B", pixels.tobytes())
+            return msg
+
+        def publish_camera(self, stamp, rgb, depth):
+            self.rgb_publisher.publish(self.image(stamp, rgb, "rgb8", 3))
+            self.rgb_info_publisher.publish(
+                self.camera_info(stamp, rgb.shape[1], rgb.shape[0]))
+            self.depth_publisher.publish(self.image(stamp, depth, "32FC1", 4))
+            self.depth_info_publisher.publish(
+                self.camera_info(stamp, depth.shape[1], depth.shape[0]))
+
+    return SimPublisher()
+
+
+def wait_for_frame(transport, timeout_s):
+    """The newest servo frame, waiting up to timeout_s for one."""
+    frame = transport.receive()
+    if frame is None:
+        select.select([transport.socket], [], [], timeout_s)
+        frame = transport.receive()
+    return frame
+
+
+def start_app(args):
+    """Isaac Sim with its bundled ROS 2 (rclpy importable afterwards)."""
+    from isaacsim import SimulationApp
+
+    simulation_app = SimulationApp({
+        "headless": args.headless,
+        # Isaac Sim 6 renders with the real-time path tracer whatever is
+        # asked for here (RaytracedLighting falls back to it).
+        "renderer": os.environ.get("ISAAC_RENDERER", "RealTimePathTracing"),
+    })
+    from isaacsim.core.utils.extensions import enable_extension
+
+    enable_extension("isaacsim.ros2.bridge")
+    simulation_app.update()
+    return simulation_app
+
+
+def main():
+    args = parse_args()
+    simulation_app = start_app(args)
+    import rclpy
+
+    asset_dir = Path(args.assets)
+    ready_path = Path("/tmp/isaac_sim_ready")
+    ready_path.unlink(missing_ok=True)
+    physics_rate = env_float("ISAAC_PHYSICS_HZ", 1200.0)
+    camera_rate = env_float("ISAAC_CAMERA_HZ", 10.0)
+    world, rigid, home = build_world(asset_dir, physics_rate, camera_rate)
+    camera = DownwardCamera()
 
     rclpy.init()
-    truth = TruthPublisher()
+    publisher = make_publisher(args)
     transport = ArduPilotJSON(port=int(os.environ.get("ARDUPILOT_JSON_PORT", "9002")))
     ready_path.touch()
     previous_velocity = np.zeros(3)
@@ -265,20 +418,26 @@ def main():
     thrust_coefficient = 8.54858e-6
     moment_coefficient = 0.016
     dt = 1.0 / physics_rate
-    render_stride = max(1, int(round(physics_rate / camera_rate)))
+    stride = render_stride(physics_rate, camera_rate)
     maximum_rotor_speed = env_float("ISAAC_MAX_ROTOR_SPEED", 1000.0)
     tick = 0
+    last_frame_count = None
+    state = None
     start = time.monotonic()
+    report = (tick, start)
 
     try:
         while simulation_app.is_running() and rclpy.ok():
-            rclpy.spin_once(truth, timeout_sec=0.0)
-            frame = transport.receive()
+            if args.duration_s > 0 and time.monotonic() - start >= args.duration_s:
+                break
+            frame = wait_for_frame(transport, 0.01)
             if frame is None:
-                world.step(render=(tick % render_stride == 0))
-                tick += 1
-                time.sleep(dt)
                 continue
+            if not is_new_frame(frame, last_frame_count):
+                if state is not None:
+                    transport.send(state)  # the answer to this frame was lost
+                continue
+            last_frame_count = frame.frame_count
             target_rotor_speed = pwm_to_rotor_speed(
                 frame.pwm[:4], maximum_speed=maximum_rotor_speed)
             motor_tau = np.where(target_rotor_speed > rotor_speed, 0.0125, 0.025)
@@ -293,8 +452,8 @@ def main():
             ]])
             rigid.apply_forces_and_torques_at_pos(
                 force, torque, local_frame=True)
-            render = tick % render_stride == 0
-            world.step(render=render)
+            world.step(render=False)  # exactly one physics step
+            tick += 1
 
             positions, orientations = rigid.get_world_poses()
             linear, angular = rigid.get_velocities()
@@ -311,31 +470,41 @@ def main():
             angular_velocity_flu = rotation.T @ angular_velocity_world
             specific_force_flu = rotation.T @ (
                 filtered_acceleration_world - np.array([0.0, 0.0, -9.80665]))
-            transport.send(state_from_enu(
+            state = state_from_enu(
                 position, velocity, quaternion, angular_velocity_flu,
                 specific_force_flu, args.lat, args.lon, args.origin_alt,
-                timestamp=tick * dt, reference_enu=home))
-            if render:
-                truth.publish_clock(tick * dt)
-                truth.publish_state(position.tolist(), quaternion.tolist(),
-                                    velocity.tolist(), angular_velocity_world.tolist())
+                timestamp=tick * dt, reference_enu=home)
+            if tick % stride == 0:
+                # Render this physics state (no physics step) before ArduPilot
+                # sees it, then publish the frame, its pose and time together.
+                frames = camera.capture(world, 0.5 * dt)
+                stamp = publisher.stamp()
+                publisher.publish_clock(tick * dt)
+                publisher.publish_state(stamp, position.tolist(), quaternion.tolist(),
+                                        velocity.tolist(), angular_velocity_world.tolist())
+                if frames is not None:
+                    publisher.publish_camera(stamp, *frames)
+                else:
+                    print(f"Isaac camera: no frame rendered for t={tick * dt:.3f} s", flush=True)
+                rclpy.spin_once(publisher, timeout_sec=0.0)
+            transport.send(state)
             if tick % max(1, int(physics_rate * 5.0)) == 0:
+                now = time.monotonic()
                 print(
                     "Isaac physics "
                     f"frame_rate={frame.frame_rate_hz}Hz "
                     f"pwm={list(frame.pwm[:4])} "
                     f"position={position.round(3).tolist()} "
-                    f"quaternion={quaternion.round(4).tolist()}",
+                    f"quaternion={quaternion.round(4).tolist()} "
+                    f"real_time_factor={(tick - report[0]) * dt / max(now - report[1], 1e-6):.2f}",
                     flush=True,
                 )
-            tick += 1
-            if args.duration_s > 0 and time.monotonic() - start >= args.duration_s:
-                break
+                report = (tick, now)
     except KeyboardInterrupt:
         pass
     finally:
         transport.close()
-        truth.destroy_node()
+        publisher.destroy_node()
         if rclpy.ok():
             rclpy.shutdown()
         simulation_app.close()

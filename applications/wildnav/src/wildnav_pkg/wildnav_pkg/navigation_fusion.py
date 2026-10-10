@@ -55,7 +55,14 @@ No fix is published before the origin is known. ``STATUS_GBAS_FIX`` is never
 claimed: the estimate is not ground-based-augmentation quality.
 
 ``<prefix>/correction_source``: ``demnav``, ``wildnav``, ``demnav+wildnav``
-while accepted corrections are active, else ``dead_reckoning``.
+while accepted corrections are active, else ``dead_reckoning``. A correction
+is active for ``correction_timeout_s`` after it was accepted (on the
+simulator clock while one runs, like the dead-reckoning age). The sources'
+``valid``/``confidence`` reports for later frames without a match do not
+end it: they say nothing about the accepted fix. A fix is accepted only
+once its source has reported it valid with enough confidence; a later
+report cannot withdraw a fix that is waiting for raw odometry to reach its
+stamp.
 
 ``<prefix>/correction_fix``: each accepted absolute fix exactly once,
 propagated from its camera time to the latest raw sample with the raw
@@ -153,13 +160,22 @@ def enu_velocity(msg):
 
 @dataclass
 class Correction:
+    # The source's latest reports, for the frame it last processed.
     valid: bool = False
     confidence: float = 0.0
+    # The accepted correction: offset, variance, the confidence its fix was
+    # reported with, and when it was accepted (wall ns; _now() reading).
     east: float = 0.0
     north: float = 0.0
     variance: float = 10000.0
+    accepted_confidence: float = 0.0
     received_ns: int = 0
+    received_at: tuple = None
+    # The latest fix, not yet judged: whether its source reported it valid
+    # (sticky) and with which confidence.
     pending: object = None
+    pending_valid: bool = False
+    pending_confidence: float = 0.0
     processed_stamp_ns: int = -1
 
 
@@ -365,20 +381,33 @@ class NavigationFusionNode(Node):
     def _state(self, source):
         return self.demnav if source == 'demnav' else self.wildnav
 
+    @staticmethod
+    def _validate_pending(state):
+        """The source reports its current frame valid: so is the fix it
+        published for that frame (DemNav/WildNav publish a fix, then
+        valid=true; WildNav sends its confidence first, DemNav after)."""
+        if state.valid and state.pending is not None and (
+                stamp_ns(state.pending.header.stamp) != state.processed_stamp_ns):
+            state.pending_valid = True
+            state.pending_confidence = state.confidence
+
     def _on_valid(self, source, state, msg):
         state.valid = bool(msg.data)
-        if state.valid:
-            self._accept_pending(source, state)
+        self._validate_pending(state)
+        self._accept_pending(source, state)
 
     def _on_confidence(self, source, state, msg):
         confidence = float(msg.data)
         state.confidence = confidence if math.isfinite(confidence) and 0 <= confidence <= 1 else 0.0
-        if state.confidence == 0:
-            state.received_ns = 0
+        if state.pending_valid and state.valid:
+            # The confidence of the frame just reported valid.
+            state.pending_confidence = state.confidence
         self._accept_pending(source, state)
 
     def _on_fix(self, source, state, msg):
         state.pending = msg
+        state.pending_valid = False
+        self._validate_pending(state)
         self._accept_pending(source, state)
 
     def _on_raw(self, msg):
@@ -460,14 +489,15 @@ class NavigationFusionNode(Node):
     # ------------------------------------------------------------------
     def _accept_pending(self, source, state):
         msg = state.pending
-        if msg is None or self.latest_raw is None or not state.valid:
+        if msg is None or self.latest_raw is None or not state.pending_valid:
             return
         original_stamp = stamp_ns(msg.header.stamp)
         if original_stamp == state.processed_stamp_ns:
             return
         minimum = float(
             self.get_parameter(f'minimum_{source}_confidence').value)
-        if not math.isfinite(state.confidence) or not 0 < state.confidence <= 1 or state.confidence < minimum:
+        confidence = state.pending_confidence
+        if not math.isfinite(confidence) or not 0 < confidence <= 1 or confidence < minimum:
             return
         latest_ns = self.raw_history[-1][0] if self.raw_history else 0
         max_age_s = float(self.get_parameter('max_fix_age_s').value)
@@ -532,7 +562,9 @@ class NavigationFusionNode(Node):
         state.east = east
         state.north = north
         state.variance = max(1.0, variance)
+        state.accepted_confidence = confidence
         state.received_ns = now_ns
+        state.received_at = self._now()
         self.last_correction_time = self._now()
         self.last_correction_variance = state.variance
         self._publish_correction_fix(
@@ -609,22 +641,21 @@ class NavigationFusionNode(Node):
         self.correction_pub.publish(fix)
 
     def _target_offset(self):
-        now = self.get_clock().now().nanoseconds
-        timeout_ns = int(
-            float(self.get_parameter('correction_timeout_s').value) * 1e9)
+        timeout_s = float(self.get_parameter('correction_timeout_s').value)
         active = []
         for name in SOURCES:
             state = self._state(name)
             minimum = float(
                 self.get_parameter(f'minimum_{name}_confidence').value)
+            confidence = state.accepted_confidence
             if (
-                    state.valid and 0 < state.confidence <= 1 and state.confidence >= minimum and
+                    0 < confidence <= 1 and confidence >= minimum and
                     all(math.isfinite(value) for value in (
-                        state.east, state.north, state.confidence, state.variance)) and
+                        state.east, state.north, confidence, state.variance)) and
                     state.variance > 0 and
-                    state.received_ns > 0 and
-                    now - state.received_ns <= timeout_ns):
-                weight = state.confidence * state.confidence / state.variance
+                    state.received_ns > 0 and state.received_at is not None and
+                    self._elapsed_s(state.received_at) <= timeout_s):
+                weight = confidence * confidence / state.variance
                 if math.isfinite(weight) and weight > 0:
                     active.append((name, state, weight))
         if not active:
@@ -636,7 +667,7 @@ class NavigationFusionNode(Node):
         north = sum(item[1].north * item[2] for item in active) / total
         source = '+'.join(item[0] for item in active)
         confidence = sum(
-            item[1].confidence * item[2] for item in active) / total
+            item[1].accepted_confidence * item[2] for item in active) / total
         variance = 1.0 / total
         return east, north, source, confidence, variance
 
