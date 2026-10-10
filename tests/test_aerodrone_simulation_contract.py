@@ -69,6 +69,41 @@ class ArduPilotJSONTest(unittest.TestCase):
             atol=1e-8)
 
 
+class GenesisCameraModelTest(unittest.TestCase):
+    """The Genesis camera takes a vertical FOV; FOV_DEG and the published
+    camera_info are horizontal, and both must describe the rendered image."""
+
+    @classmethod
+    def setUpClass(cls):
+        from unittest import mock
+
+        from conftest import install_ros_stubs
+        with mock.patch.dict(sys.modules):
+            install_ros_stubs()
+            cls.navsim = load_module(
+                "genesis_aerodrone_navsim",
+                "applications/genesis/scripts/aerodrone_navsim.py")
+
+    def test_camera_info_matches_the_rendered_focal_length(self):
+        from types import SimpleNamespace
+        width, height, fov = 640, 480, 69.0
+        vertical = self.navsim.vertical_fov_deg(fov, width, height)
+        # Genesis' pinhole focal length (gs Camera.f) for that vertical FOV.
+        rendered_f = 0.5 * height / np.tan(np.deg2rad(0.5 * vertical))
+        info = self.navsim.GenesisSensorPublisher.camera_info(
+            SimpleNamespace(args=SimpleNamespace(
+                width=width, height=height, fov_deg=fov)),
+            None, "downward_camera_optical_frame")
+        self.assertAlmostEqual(info.k[0], rendered_f, places=6)
+        self.assertAlmostEqual(info.k[4], rendered_f, places=6)
+        self.assertAlmostEqual(
+            np.degrees(2.0 * np.arctan(0.5 * width / info.k[0])), fov, places=6)
+
+    def test_square_image_keeps_its_fov(self):
+        self.assertAlmostEqual(
+            self.navsim.vertical_fov_deg(60.0, 480, 480), 60.0, places=9)
+
+
 class TerrainCollisionTest(unittest.TestCase):
     def test_collision_height_is_conservative(self):
         grid = np.arange(81, dtype=np.float32).reshape(9, 9)

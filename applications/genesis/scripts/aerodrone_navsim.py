@@ -35,6 +35,13 @@ def env_int(name, default):
     return int(os.environ.get(name, default))
 
 
+def vertical_fov_deg(horizontal_fov_deg, width, height):
+    """Genesis cameras take the vertical field of view; FOV_DEG (like the
+    camera_info published here) is the horizontal one, square pixels."""
+    half = math.tan(math.radians(horizontal_fov_deg) / 2.0) * height / width
+    return math.degrees(2.0 * math.atan(half))
+
+
 def to_numpy(value):
     if hasattr(value, "detach"):
         value = value.detach()
@@ -188,7 +195,8 @@ def main():
     camera = scene.add_camera(
         res=(args.width, args.height), pos=tuple(home.tolist()),
         lookat=(home[0], home[1], home[2] - 10.0), up=(1.0, 0.0, 0.0),
-        fov=args.fov_deg, near=0.3, far=300.0, GUI=False)
+        fov=vertical_fov_deg(args.fov_deg, args.width, args.height),
+        near=0.3, far=300.0, GUI=False)
     print("Genesis scene build starting", flush=True)
     scene.build()
     print("Genesis scene build complete", flush=True)
