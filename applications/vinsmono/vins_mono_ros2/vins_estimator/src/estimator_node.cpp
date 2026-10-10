@@ -360,7 +360,7 @@ void process()
     }
 }
 
-int main(int argc, char **argv)
+static int run(int argc, char **argv)
 {
     rclcpp::init(argc, argv);
     auto n = rclcpp::Node::make_shared("vins_estimator");
@@ -392,6 +392,16 @@ int main(int argc, char **argv)
     }};
     try {
         rclcpp::spin(n);
+    } catch (const rclcpp::exceptions::RCLError &) {
+        // A SIGINT/SIGTERM that arrives before spin() starts shuts the context
+        // down, and the executor then cannot create its guard condition. That
+        // is a normal shutdown, not an error.
+        if (rclcpp::ok()) {
+            stopMeasurements();
+            measurement_process.join();
+            unregisterPub();
+            throw;
+        }
     } catch (...) {
         stopMeasurements();
         measurement_process.join();
@@ -405,4 +415,19 @@ int main(int argc, char **argv)
         rclcpp::shutdown();
 
     return 0;
+}
+
+int main(int argc, char **argv)
+{
+    // A SIGINT/SIGTERM during startup shuts the context down, so the next
+    // rclcpp call (creating a publisher, a subscription or the executor)
+    // throws. That is a normal shutdown, not an error.
+    try {
+        return run(argc, argv);
+    } catch (const rclcpp::exceptions::RCLError &) {
+        if (rclcpp::ok())
+            throw;
+        unregisterPub();
+        return 0;
+    }
 }

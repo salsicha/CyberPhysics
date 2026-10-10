@@ -210,7 +210,7 @@ void img_callback(const sensor_msgs::msg::Image::SharedPtr img_msg)
     // RCUTILS_LOG_INFO("whole feature tracker processing costs: %fms", t_r.toc());
 }
 
-int main(int argc, char **argv)
+static int run(int argc, char **argv)
 {
     rclcpp::init(argc, argv);
     auto n = rclcpp::Node::make_shared("feature_tracker");
@@ -250,6 +250,23 @@ int main(int argc, char **argv)
     if (rclcpp::ok())
         rclcpp::shutdown();
     return 0;
+}
+
+int main(int argc, char **argv)
+{
+    // A SIGINT/SIGTERM during startup shuts the context down, so the next
+    // rclcpp call (creating a publisher, a subscription or the executor)
+    // throws. That is a normal shutdown, not an error.
+    try {
+        return run(argc, argv);
+    } catch (const rclcpp::exceptions::RCLError &) {
+        if (rclcpp::ok())
+            throw;
+        pub_img.reset();
+        pub_match.reset();
+        pub_restart.reset();
+        return 0;
+    }
 }
 
 

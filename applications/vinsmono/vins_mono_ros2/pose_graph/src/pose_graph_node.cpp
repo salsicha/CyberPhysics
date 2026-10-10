@@ -475,7 +475,7 @@ void command()
     }
 }
 
-int main(int argc, char **argv)
+static int run(int argc, char **argv)
 {
     rclcpp::init(argc, argv);
     auto n = rclcpp::Node::make_shared("pose_graph");
@@ -605,6 +605,13 @@ int main(int argc, char **argv)
     };
     try {
         rclcpp::spin(n);
+    } catch (const rclcpp::exceptions::RCLError &) {
+        // A SIGINT/SIGTERM before spin() starts invalidates the context, so the
+        // executor cannot create its guard condition: a normal shutdown.
+        if (rclcpp::ok()) {
+            cleanup();
+            throw;
+        }
     } catch (...) {
         cleanup();
         throw;
@@ -614,4 +621,19 @@ int main(int argc, char **argv)
         rclcpp::shutdown();
 
     return 0;
+}
+
+int main(int argc, char **argv)
+{
+    // A SIGINT/SIGTERM during startup shuts the context down, so the next
+    // rclcpp call (creating a publisher, a subscription or the executor)
+    // throws. That is a normal shutdown, not an error.
+    try {
+        return run(argc, argv);
+    } catch (const rclcpp::exceptions::RCLError &) {
+        if (rclcpp::ok())
+            throw;
+        posegraph.shutdown();
+        return 0;
+    }
 }
