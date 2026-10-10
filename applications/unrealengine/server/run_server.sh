@@ -174,12 +174,15 @@ ue_pid=$!
 if [ -n "$stop_requested" ]; then
     stop_engine
 fi
+wait "$ue_pid" || true
+# A trapped signal interrupts wait (status 128+n); keep waiting for the engine
+# to exit
+while kill -0 "$ue_pid" 2> /dev/null; do
+    wait "$ue_pid" || true
+done
+# Its own status: bash keeps it even when the engine exited, and was reaped,
+# before the loop above could wait for it
 status=0
 wait "$ue_pid" || status=$?
-# A trapped signal interrupts wait; keep waiting for the engine to exit
-while kill -0 "$ue_pid" 2> /dev/null; do
-    status=0
-    wait "$ue_pid" || status=$?
-done
 log "Unreal Engine exited with status ${status}"
 exit "$status"
