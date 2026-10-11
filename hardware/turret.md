@@ -5,9 +5,17 @@ against the `applications/pantiltros` ROS 2 control stack. The turret should
 segment a realistic camera scene, select a target object, and drive pan/tilt
 servos to keep that object centered while it moves through the scene.
 
+The pan/tilt mechanism, its base (tripod adapter) and the camera mounts are
+printed: CadQuery sources, STLs and printing and assembly instructions in
+[hardware/parts/turret/README.md](parts/turret/README.md); the generated
+part and fastener tables are under "3D-printed parts" below.
+
+## Purchased parts
+
 Baseline hardware
 
-- 1 x two-axis pan-tilt mechanism compatible with `pan_tilt_ros`.
+- 1 x two-axis pan-tilt mechanism compatible with `pan_tilt_ros`: printed
+  (see "3D-printed parts").
 - 2 x Waveshare ST3215, Waveshare ST3215-HS, or Feetech STS3215 serial bus
   servos for pan and tilt.
 - 1 x turret controller, either:
@@ -32,7 +40,8 @@ Baseline hardware
   3.3 V for the UNO Q). Do not power the servos from the Arduino board.
 - 1 x optional USB serial bus servo adapter for one-time servo ID, midpoint,
   and limit setup before the Arduino firmware takes over runtime control.
-- 1 x rigid base or tripod mount with enough stiffness to avoid camera shake.
+- 1 x rigid base or tripod mount with enough stiffness to avoid camera shake:
+  printed (the base plate, with a captive 1/4"-20 tripod nut).
 - 1 x RGB camera mounted on the tilt payload link. Use a global-shutter camera
   if fast moving targets are required; otherwise a UVC camera or OAK RGB stream
   is acceptable for simulation parity.
@@ -44,6 +53,91 @@ Baseline hardware
   publish the software stop on `/turret/emergency_stop` (see below).
 - Cabling, strain relief, mounting hardware, and optional cable chain so the
   pan/tilt range cannot pull camera or servo cables tight.
+
+For the printed mechanism:
+
+- The servos are the **12 V** versions (ST3215 30 kg.cm; the 7.4 V
+  ST3215-C001 is 19.5 kg.cm): the Waveshare Bus Servo Adapter (A) takes
+  9-12.6 V and passes it to the servos. Two servos at locked rotor draw
+  2 x 2.7 A at 12 V; the adapter's servo port is marked 6 A maximum. Each
+  servo needs an output and an idler horn with 4 x M3 on a 14 mm circle
+  (Waveshare's pack shows two aluminium horns per servo; Feetech sells the
+  STS3215 without accessories: check yours).
+- The camera plates take the **Arducam B0385** board (38 mm, M2 holes on a
+  34 mm square, the RACECAR Turret's camera) or any camera with a 1/4"-20
+  thread in its base (RealSense D435i, cased UVC cameras) up to about 150 g.
+- The base plate has standoffs for the Arduino UNO R4 WiFi or UNO Q and for
+  the Waveshare Bus Servo Adapter (A), the half-duplex interface (also
+  needed for the direct-from-host option). Its UART side appears to run at
+  3.3 V (its schematic powers the half-duplex buffers from 3.3 V): direct for
+  the UNO Q and a Linux host; with the 5 V UNO R4 WiFi check that the board
+  reads the adapter's 3.3 V TX reliably, or add a level shifter.
+- The emergency stop must switch the servo supply's current (5.4 A at 12 V
+  with both servos stalled). A 22 mm control switch is rated for much less
+  DC current: use an enclosed e-stop rated for the load, or let its contact
+  open a relay in the servo supply.
+- Screws, inserts, the tripod nut and rubber feet: the generated fastener
+  table below.
+
+Why these parts are bought, not printed:
+
+| Part | Why it stays purchased |
+|---|---|
+| Servos and their horns | Motors and gearboxes; the aluminium horns carry the joint torque on a 25-tooth spline that printed plastic would strip. |
+| Camera, controller, adapter, supply | Electronics. |
+| Emergency stop, relay, fuses | Safety: rated parts that must open the servo supply every time. |
+| Screws, inserts, nuts | Metal threads; printed threads strip and creep. The tripod thread is a steel 1/4"-20 nut held captive in the base plate. |
+| Cables, spiral wrap | Flex with the pan and tilt motion. |
+
+## 3D-printed parts
+
+Designed in CadQuery (`hardware/parts/turret/`), validated and exported by
+`tools/build_printable_parts.py`; STLs in [`parts/turret/stl/`](parts/turret/stl/).
+Printer: Bambu Lab P1S. Plates, settings, post-processing and assembly:
+[parts/turret/README.md](parts/turret/README.md). Print the "fit test
+first" parts before the rest; print one of the two camera plates, and the
+base plate only for the standalone turret (the RACECAR Turret stands on its
+own plate). Times and masses are estimates.
+
+<!-- BEGIN GENERATED: printed-parts (tools/build_printable_parts.py) -->
+| Part | Qty | Material | Bambu Studio settings (P1S, 0.4 mm) | Est. time (each) | Est. mass (each) | File |
+|---|---|---|---|---|---|---|
+| Base plate (standalone turret, tripod adapter) | 1 | PETG | 0.20 mm, 3 walls, 25% gyroid, no supports, brim outer brim only, 5 mm | 2 h 26 min | 88 g | [base_plate.stl](parts/turret/stl/base_plate.stl) |
+| Camera plate, Arducam B0385 | 1 | ASA | 0.20 mm, 3 walls, 40% gyroid, no supports | 11 min | 5.5 g | [camera_plate_b0385.stl](parts/turret/stl/camera_plate_b0385.stl) |
+| Camera plate, 1/4"-20 shelf | 1 | ASA | 0.20 mm, 4 walls, 40% gyroid, no supports | 26 min | 12 g | [camera_plate_tripod.stl](parts/turret/stl/camera_plate_tripod.stl) |
+| Camera yoke (tilt stage) (fit test first) | 1 | ASA | 0.20 mm, 4 walls, 40% gyroid, no supports | 21 min | 9.2 g | [camera_yoke.stl](parts/turret/stl/camera_yoke.stl) |
+| Pan base (pan servo) (fit test first) | 1 | ASA | 0.20 mm, 4 walls, 40% gyroid, no supports | 1 h 09 min | 36 g | [pan_base.stl](parts/turret/stl/pan_base.stl) |
+| Pan hub (on the pan horn) (fit test first) | 1 | ASA | 0.20 mm, 4 walls, 50% gyroid, no supports | 22 min | 11 g | [pan_hub.stl](parts/turret/stl/pan_hub.stl) |
+| Tilt bracket (on the pan horn) (fit test first) | 1 | ASA | 0.20 mm, 4 walls, 40% gyroid, no supports | 34 min | 16 g | [tilt_bracket.stl](parts/turret/stl/tilt_bracket.stl) |
+| **Total, all pieces** | | | | **5 h 29 min** | **177 g** | |
+<!-- END GENERATED: printed-parts -->
+
+### Fasteners
+
+Totals for one turret with both camera plates, from the parts' metadata
+(screws are listed with the part their head bears on). Buy 10-20 % spares.
+
+<!-- BEGIN GENERATED: fasteners (tools/build_printable_parts.py) -->
+| Item | Qty | Where |
+|---|---|---|
+| 1/4"-20 UNC hex nut | 1 | tripod thread, captive under the pan base (base_plate, 1) |
+| 1/4"-20 UNC x 3/8" button head screw | 1 | camera to the tripod plate shelf (camera_plate_tripod, 1) |
+| M2 x 10 pan head screw (or PA2.0 x 10 self-tapping) | 2 | pan servo to the pan base, from below into the idler-face holes (pan_base, 2) |
+| M2 x 3 mm brass heat-set insert (CNC Kitchen type, 3.2 mm hole) | 8 | Bus Servo Adapter standoffs, from the top (base_plate, 4); standoffs, from the top (camera_plate_b0385, 4) |
+| M2 x 5 socket head cap screw | 8 | Bus Servo Adapter (A) to the base plate standoffs (base_plate, 4); Arducam B0385 board to the camera plate standoffs (camera_plate_b0385, 4) |
+| M2 x 6 socket head cap screw (or PA2.0 x 6 self-tapping) | 2 | tilt servo into the tilt bracket's -y wall (heads in counterbores, 4 mm into the case) (tilt_bracket, 2) |
+| M2 x 8 socket head cap screw (or PA2.0 x 8 self-tapping) | 2 | tilt servo into the tilt bracket's +y wall (heads in counterbores, 4 mm into the case) (tilt_bracket, 2) |
+| M3 x 10 socket head cap screw | 4 | pan base to the base plate or turret plate (pan_base, 4) |
+| M3 x 3 mm brass heat-set insert (CNC Kitchen type, 4 mm hole) | 8 | Arduino standoffs, from the top (base_plate, 4); crossbar, from the front, through holes pressed flush (camera_yoke, 4) |
+| M3 x 5 socket head cap screw | 16 | Arduino UNO to the base plate standoffs (base_plate, 4); camera yoke to the tilt servo's output and idler horns (no longer: the tip must stay inside the horn flange) (camera_yoke, 8); pan hub to the pan servo's horn (no longer: the tip must stay inside the horn flange) (pan_hub, 4) |
+| M3 x 5.7 mm brass heat-set insert (CNC Kitchen type, 4 mm hole) | 8 | pan base screws, from the top (base_plate, 4); column top face (tilt bracket screws) (pan_hub, 4) |
+| M3 x 6 socket head cap screw | 8 | camera plate to the camera yoke's crossbar inserts (camera_plate_b0385, 4); tripod plate to the camera yoke's crossbar inserts (camera_plate_tripod, 4) |
+| M3 x 8 socket head cap screw | 4 | tilt bracket to the pan hub (heads recessed in the floor) (tilt_bracket, 4) |
+| adhesive rubber foot, 10-12 mm | 4 | base plate corners, for bench use (base_plate, 4) |
+| zip tie 2.5 mm | 6 | servo bus and USB cables on the base plate (base_plate, 3); camera USB cable at the camera plate's bottom slot (camera_plate_b0385, 1); servo cables at the pan base's rear hook (pan_base, 1); cable loop at the tilt bracket's rear hook (tilt_bracket, 1) |
+<!-- END GENERATED: fasteners -->
+
+## Integration, firmware and ROS contract
 
 Arduino integration
 

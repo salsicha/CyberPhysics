@@ -10,10 +10,12 @@ committed so they can be downloaded straight from GitHub.
 | aerodrone | [`aerodrone/`](aerodrone/) | [aerodrone/README.md](aerodrone/README.md) | [../aerodrone.md](../aerodrone.md) |
 | airplane | [`airplane/`](airplane/) | [airplane/README.md](airplane/README.md) | [../airplane.md](../airplane.md) |
 | boat | [`boat/`](boat/) | [boat/README.md](boat/README.md) | [../boat.md](../boat.md) |
+| racecarneo | [`racecarneo/`](racecarneo/) | [racecarneo/README.md](racecarneo/README.md) | [../racecarneo.md](../racecarneo.md) |
 | submarine | [`submarine/`](submarine/) | [submarine/README.md](submarine/README.md) | [../submarine.md](../submarine.md) |
+| turret | [`turret/`](turret/) | [turret/README.md](turret/README.md) | [../turret.md](../turret.md) |
 
-The other platforms (lunar_rover, racecarneo, so101, turret) follow the
-same layout when their parts are added.
+The other platforms (lunar_rover, so101) follow the same layout when their
+parts are added.
 
 ## Reference printer
 

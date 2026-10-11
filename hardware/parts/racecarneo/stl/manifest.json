@@ -1,0 +1,1503 @@
+{
+ "platform": "racecarneo",
+ "generator": "tools/build_printable_parts.py",
+ "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+ "usable_volume_mm": [
+  250.0,
+  250.0,
+  250.0
+ ],
+ "stl_tolerance_mm": 0.05,
+ "stl_angular_tolerance_rad": 0.3,
+ "parts": [
+  {
+   "id": "camera_arm",
+   "name": "Camera arm (RealSense over the lidar)",
+   "quantity": 1,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "on top of the car in the sun; carries the camera, so it must not creep",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 5,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 40,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "on its side: the flat +y face (the tongue side) on the plate",
+    "rotate": [
+     [
+      "X",
+      -90
+     ]
+    ]
+   },
+   "stl": "hardware/parts/racecarneo/stl/camera_arm.stl",
+   "step": "generated/parts/racecarneo/camera_arm.step",
+   "volume_cm3": 137.27,
+   "area_cm2": 291.2,
+   "print_size_mm": [
+    164.0,
+    101.0,
+    26.0
+   ],
+   "footprint_mm": [
+    164.0,
+    101.0
+   ],
+   "triangles": 836,
+   "estimate": {
+    "mass_g": 89.5,
+    "time_min": 159,
+    "mass_g_all": 89.5,
+    "time_min_all": 159
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 3.3,
+    "min_wall_p1_mm": 4.47,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 5501,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "Slamtec RPLIDAR C1 (clearance)",
+     "dimensions": "fin 31-44 mm behind the lidar axis, inside its 50 mm blind range; boom 4.5 mm over its top",
+     "source": "Slamtec RPLIDAR C1 datasheet v1.1, Figure 4-1 'RPLIDAR C1 Mechanical Dimensions' and section 'Coordinate System Definition' (https://cdn.shopify.com/s/files/1/0058/3145/8904/files/SLAMTEC_rplidar_datasheet_C1_v1.1_en.pdf); specification page https://www.slamtec.com/en/c1/spec",
+     "verified": true
+    },
+    {
+     "part": "lidar_mast (printed)",
+     "dimensions": "foot on the mast flange, two M3 through flange and deck",
+     "source": "hardware/parts/racecarneo/_frame.py",
+     "verified": true
+    },
+    {
+     "part": "camera_cradle (printed)",
+     "dimensions": "M3 pivot and M3 lock through the tongue",
+     "source": "hardware/parts/racecarneo/camera_cradle.py",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M3 x 25 socket head cap screw",
+     "qty": 2,
+     "use": "camera arm foot through the lidar mast flange and the deck"
+    },
+    {
+     "item": "M3 nyloc nut",
+     "qty": 2,
+     "use": "under the deck, camera arm foot screws"
+    },
+    {
+     "item": "M3 washer",
+     "qty": 4,
+     "use": "camera arm foot screws, both ends"
+    },
+    {
+     "item": "zip tie 2.5 mm",
+     "qty": 4,
+     "use": "RealSense USB cable along the camera arm"
+    }
+   ],
+   "notes": [
+    "The arm is the only printed part in the lidar's scan plane: it hides a rear sector of about +-23 deg (the assembly check reports it) and returns no ranges because it is inside the C1's 50 mm blind range.",
+    "Run the RealSense cable down the arm's ties and the fin, never in front of or beside the lidar."
+   ]
+  },
+  {
+   "id": "camera_cradle",
+   "name": "Camera cradle (RealSense D435i / D455, pitch adjust)",
+   "quantity": 1,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "touches the RealSense housing (it runs warm) and sits in the sun",
+   "flight_critical": false,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 40,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "upside down: the camera seat on the plate, cheeks up",
+    "rotate": [
+     [
+      "X",
+      180
+     ]
+    ]
+   },
+   "stl": "hardware/parts/racecarneo/stl/camera_cradle.stl",
+   "step": "generated/parts/racecarneo/camera_cradle.step",
+   "volume_cm3": 9.15,
+   "area_cm2": 64.7,
+   "print_size_mm": [
+    29.5,
+    73.5,
+    19.5
+   ],
+   "footprint_mm": [
+    29.5,
+    73.5
+   ],
+   "triangles": 1168,
+   "estimate": {
+    "mass_g": 9.1,
+    "time_min": 19,
+    "mass_g_all": 9.1,
+    "time_min_all": 19
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 2.31,
+    "min_wall_p1_mm": 2.62,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 1728,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "RealSense D435i",
+     "dimensions": "1/4\"-20 in the bottom; left imager 17.5 mm from the screw centre line; 90 x 25 x 25.05 mm",
+     "source": "RealSense D400 Series datasheet 337029-017 (Mar 2026), Table 3-52, Figure 10-9, Table 4-20, Table 3-49 (https://www.realsenseai.com/wp-content/uploads/2026/03/RealSense-D400-Series-Datasheet-Mar-2026.pdf); realsense-ros _d435.urdf.xacro (https://github.com/IntelRealSense/realsense-ros/blob/ros2-development/realsense2_description/urdf/_d435.urdf.xacro)",
+     "verified": true
+    },
+    {
+     "part": "RealSense D435i 1/4\"-20 position along the depth",
+     "dimensions": "14.9 mm behind the front face (realsense-ros, not the datasheet)",
+     "source": "RealSense D400 Series datasheet 337029-017 (Mar 2026), Table 3-52, Figure 10-9, Table 4-20, Table 3-49 (https://www.realsenseai.com/wp-content/uploads/2026/03/RealSense-D400-Series-Datasheet-Mar-2026.pdf); realsense-ros _d435.urdf.xacro (https://github.com/IntelRealSense/realsense-ros/blob/ros2-development/realsense2_description/urdf/_d435.urdf.xacro)",
+     "verified": false
+    },
+    {
+     "part": "RealSense D455",
+     "dimensions": "1/4\"-20 15.8 mm behind the front face, left imager 47.5 mm from it; USB-C on the bottom 37.01 mm right of it",
+     "source": "RealSense D400 Series datasheet 337029-017 (Mar 2026), Table 3-53, Figure 10-12, Table 4-21, Table 3-49 (https://www.realsenseai.com/wp-content/uploads/2026/03/RealSense-D400-Series-Datasheet-Mar-2026.pdf); realsense-ros _d455.urdf.xacro",
+     "verified": true
+    },
+    {
+     "part": "camera_arm (printed)",
+     "dimensions": "12 mm tongue, M3 pivot and lock 11 mm behind it",
+     "source": "hardware/parts/racecarneo/camera_arm.py",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "1/4\"-20 UNC x 3/8\" button head screw",
+     "qty": 1,
+     "use": "RealSense to the cradle (6 mm of thread in the camera; the D455 allows 9 mm)"
+    },
+    {
+     "item": "M3 x 30 socket head cap screw",
+     "qty": 2,
+     "use": "camera cradle pivot and pitch lock, through the arm's tongue"
+    },
+    {
+     "item": "M3 nyloc nut",
+     "qty": 2,
+     "use": "camera cradle pivot and pitch lock"
+    },
+    {
+     "item": "M3 washer",
+     "qty": 4,
+     "use": "camera cradle pivot and pitch lock, both sides"
+    }
+   ],
+   "notes": [
+    "D435i: screw at the slot mark 17.5 mm right of the centre line; D455: at the far end, 47.5 mm right. Either way camera_link lands on the car's centre line.",
+    "The D455 seat sits 2 mm low for the URDF (its imager is 14.5 mm above its base, the D435i's 12.5 mm): set camera_joint z to 0.222 m, or measure.",
+    "Pitch: level for the URDF (rpy 0). Tighten the pivot nut only enough to hold, then lock with the second screw.",
+    "D455: use a USB-C cable with a right-angle plug; its socket is on the bottom face."
+   ]
+  },
+  {
+   "id": "deck_front",
+   "name": "Deck, front half",
+   "quantity": 1,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "the top of the car, in the sun; the Jetson warms it from above",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 3,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 25,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "outer brim only, 5 mm",
+    "orientation": "flat: underside on the plate, rims up",
+    "rotate": []
+   },
+   "stl": "hardware/parts/racecarneo/stl/deck_front.stl",
+   "step": "generated/parts/racecarneo/deck_front.step",
+   "volume_cm3": 103.96,
+   "area_cm2": 499.2,
+   "print_size_mm": [
+    160.0,
+    144.0,
+    11.0
+   ],
+   "footprint_mm": [
+    170.0,
+    154.0
+   ],
+   "triangles": 2860,
+   "estimate": {
+    "mass_g": 66.5,
+    "time_min": 117,
+    "mass_g_all": 66.5,
+    "time_min_all": 117
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 2.5,
+    "min_wall_p1_mm": 2.5,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 18382,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "deck_rear (printed)",
+     "dimensions": "lap joint over x = 36-50 mm, 2.5 mm each",
+     "source": "hardware/parts/racecarneo/_frame.py",
+     "verified": true
+    },
+    {
+     "part": "post_adapter_front (printed) through deck_grommet (printed TPU)",
+     "dimensions": "6.2 mm grommet holes at (150.0, 60.0)",
+     "source": "hardware/parts/racecarneo/_frame.py",
+     "verified": true
+    },
+    {
+     "part": "lidar_mast, camera_arm, jetson_tray (printed)",
+     "dimensions": "M3 through holes and M3 x 3 inserts",
+     "source": "hardware/parts/racecarneo/_frame.py",
+     "verified": true
+    }
+   ],
+   "inserts": [
+    {
+     "size": "M3-short",
+     "qty": 4,
+     "where": "top face, through holes, pressed flush: Jetson tray"
+    }
+   ],
+   "fasteners": [
+    {
+     "item": "M3 x 16 socket head cap screw",
+     "qty": 2,
+     "use": "deck to the front post adapters, through a pair of deck grommets"
+    },
+    {
+     "item": "M3 washer",
+     "qty": 2,
+     "use": "on the upper deck grommets, front"
+    }
+   ],
+   "notes": [
+    "Lay the front half over the rear half's lap; the lidar mast flange screws and the two rim screws at x = 43 clamp the joint."
+   ]
+  },
+  {
+   "id": "deck_grommet",
+   "name": "Deck grommet (TPU top hat)",
+   "quantity": 8,
+   "material": "TPU95A",
+   "material_fallback": null,
+   "material_reason": "damper: no hard contact between the deck and the chassis",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu TPU 95A HF (or Bambu TPU 95A)",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 3,
+    "top_shell_layers": 4,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 100,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "flange down, sleeve up",
+    "rotate": []
+   },
+   "stl": "hardware/parts/racecarneo/stl/deck_grommet.stl",
+   "step": "generated/parts/racecarneo/deck_grommet.step",
+   "volume_cm3": 0.2,
+   "area_cm2": 3.1,
+   "print_size_mm": [
+    10.5,
+    10.5,
+    4.4
+   ],
+   "footprint_mm": [
+    10.5,
+    10.5
+   ],
+   "triangles": 504,
+   "estimate": {
+    "mass_g": 0.2,
+    "time_min": 2,
+    "mass_g_all": 2.0,
+    "time_min_all": 14
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 1.35,
+    "min_wall_p1_mm": 1.35,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 78,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "deck_front, deck_rear (printed)",
+     "dimensions": "6.2 mm hole in a 5 mm deck",
+     "source": "hardware/parts/racecarneo/_frame.py",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [],
+   "notes": [
+    "Tighten the deck screws only until the flanges start to bulge: crushed TPU passes vibration straight through."
+   ]
+  },
+  {
+   "id": "deck_rear",
+   "name": "Deck, rear half",
+   "quantity": 1,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "the top of the car, in the sun; the VESC heatsink sits on it",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 3,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 25,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "outer brim only, 5 mm",
+    "orientation": "flat: underside on the plate, rims up",
+    "rotate": []
+   },
+   "stl": "hardware/parts/racecarneo/stl/deck_rear.stl",
+   "step": "generated/parts/racecarneo/deck_rear.step",
+   "volume_cm3": 163.82,
+   "area_cm2": 759.0,
+   "print_size_mm": [
+    235.0,
+    144.0,
+    11.0
+   ],
+   "footprint_mm": [
+    245.0,
+    154.0
+   ],
+   "triangles": 6168,
+   "estimate": {
+    "mass_g": 102.2,
+    "time_min": 179,
+    "mass_g_all": 102.2,
+    "time_min_all": 179
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 2.5,
+    "min_wall_p1_mm": 2.5,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 31749,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "deck_front (printed)",
+     "dimensions": "lap joint over x = 36-50 mm",
+     "source": "hardware/parts/racecarneo/_frame.py",
+     "verified": true
+    },
+    {
+     "part": "post_adapter_rear (printed) through deck_grommet (printed TPU)",
+     "dimensions": "6.2 mm grommet holes at (-158.0, 60.0)",
+     "source": "hardware/parts/racecarneo/_frame.py",
+     "verified": true
+    },
+    {
+     "part": "imu_mount, power_tray, vesc_tray, estop_tower (printed)",
+     "dimensions": "M3 x 3 inserts in the top face",
+     "source": "hardware/parts/racecarneo/_frame.py",
+     "verified": true
+    }
+   ],
+   "inserts": [
+    {
+     "size": "M3-short",
+     "qty": 22,
+     "where": "top face, through holes, pressed flush: IMU, power tray, VESC tray, e-stop tower, and 8 for the RACECAR Turret's plate posts"
+    }
+   ],
+   "fasteners": [
+    {
+     "item": "M3 x 16 socket head cap screw",
+     "qty": 2,
+     "use": "deck to the rear post adapters, through a pair of deck grommets"
+    },
+    {
+     "item": "M3 washer",
+     "qty": 2,
+     "use": "on the upper deck grommets, rear"
+    },
+    {
+     "item": "M3 x 12 socket head cap screw",
+     "qty": 2,
+     "use": "lap joint rim screws at x = 43 mm"
+    },
+    {
+     "item": "M3 nyloc nut",
+     "qty": 2,
+     "use": "lap joint rim screws"
+    }
+   ],
+   "notes": [
+    "The eight inserts near the four turret post positions are for the RACECAR Turret; press them anyway."
+   ]
+  },
+  {
+   "id": "estop_tower",
+   "name": "E-stop tower (22 mm mushroom)",
+   "quantity": 1,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "outdoors, and it is hit by hand: ASA keeps its stiffness in the sun",
+   "flight_critical": false,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 40,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "upright: ears on the plate, panel on top (bridged)",
+    "rotate": []
+   },
+   "stl": "hardware/parts/racecarneo/stl/estop_tower.stl",
+   "step": "generated/parts/racecarneo/estop_tower.step",
+   "volume_cm3": 30.01,
+   "area_cm2": 202.3,
+   "print_size_mm": [
+    38.0,
+    62.2,
+    60.0
+   ],
+   "footprint_mm": [
+    38.0,
+    62.2
+   ],
+   "triangles": 968,
+   "estimate": {
+    "mass_g": 32.1,
+    "time_min": 66,
+    "mass_g_all": 32.1,
+    "time_min_all": 66
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 3.0,
+    "min_wall_p1_mm": 3.0,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 923,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "Schneider XB5AS8442 emergency stop",
+     "dimensions": "22.4 mm cut-out in a 4 mm panel (1-6 mm allowed), 40 mm mushroom",
+     "source": "Schneider Electric XB5AS8442 datasheet (https://www.se.com/us/en/product/download-pdf/XB5AS8442)",
+     "verified": true
+    },
+    {
+     "part": "XB5AS8442 body under the panel",
+     "dimensions": "budgeted 50 mm long, dia. 30 mm (the 82 mm overall depth is not split in the datasheet)",
+     "source": "Schneider Electric XB5AS8442 datasheet (https://www.se.com/us/en/product/download-pdf/XB5AS8442)",
+     "verified": false
+    },
+    {
+     "part": "deck_rear (printed)",
+     "dimensions": "four M3 x 3 inserts",
+     "source": "hardware/parts/racecarneo/_frame.py",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M3 x 8 socket head cap screw",
+     "qty": 4,
+     "use": "e-stop tower ears to the rear deck inserts"
+    }
+   ],
+   "notes": [
+    "The e-stop's NC contact opens the contactor coil (see the BOM): a 22 mm switch must never carry motor current.",
+    "Its top is in the lidar's rear blind sector (behind the camera arm's fin), so it may stand above the scan plane."
+   ]
+  },
+  {
+   "id": "imu_mount",
+   "name": "IMU mount (BNO085 breakout)",
+   "quantity": 1,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "on the deck in the sun",
+   "flight_critical": false,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 3,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 40,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "flat: plate on the build plate, bosses up",
+    "rotate": []
+   },
+   "stl": "hardware/parts/racecarneo/stl/imu_mount.stl",
+   "step": "generated/parts/racecarneo/imu_mount.step",
+   "volume_cm3": 4.51,
+   "area_cm2": 38.1,
+   "print_size_mm": [
+    30.0,
+    44.0,
+    8.0
+   ],
+   "footprint_mm": [
+    30.0,
+    44.0
+   ],
+   "triangles": 1888,
+   "estimate": {
+    "mass_g": 4.4,
+    "time_min": 9,
+    "mass_g_all": 4.4,
+    "time_min_all": 9
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 1.75,
+    "min_wall_p1_mm": 1.75,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 1288,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "Adafruit BNO085 breakout (4754)",
+     "dimensions": "25.4 x 22.86 mm board, holes 20.32 x 17.78 mm",
+     "source": "Adafruit product 4754 (https://www.adafruit.com/product/4754) and its fab print in the learn guide downloads (https://learn.adafruit.com/adafruit-9-dof-orientation-imu-fusion-breakout-bno085/downloads)",
+     "verified": true
+    },
+    {
+     "part": "Adafruit BNO085 hole diameter",
+     "dimensions": "2.5 mm for M2.5 (not dimensioned)",
+     "source": "Adafruit product 4754 (https://www.adafruit.com/product/4754) and its fab print in the learn guide downloads (https://learn.adafruit.com/adafruit-9-dof-orientation-imu-fusion-breakout-bno085/downloads)",
+     "verified": false
+    },
+    {
+     "part": "deck_rear (printed)",
+     "dimensions": "two M3 x 3 inserts",
+     "source": "hardware/parts/racecarneo/_frame.py",
+     "verified": true
+    }
+   ],
+   "inserts": [
+    {
+     "size": "M2.5",
+     "qty": 4,
+     "where": "IMU bosses, from the top"
+    }
+   ],
+   "fasteners": [
+    {
+     "item": "M2.5 x 6 socket head cap screw",
+     "qty": 4,
+     "use": "BNO085 breakout to the IMU mount"
+    },
+    {
+     "item": "M3 x 6 socket head cap screw",
+     "qty": 2,
+     "use": "IMU mount to the rear deck inserts"
+    }
+   ],
+   "notes": [
+    "The arrow points forward: fit the breakout with its silkscreen x axis along the arrow (imu_link rpy 0).",
+    "The IMU sits 62 mm above the URDF's nominal imu_link z (0.08 m), on the isolated deck with the lidar and camera; set imu_joint z to 0.142 m or leave it (an IMU's height does not affect its readings)."
+   ]
+  },
+  {
+   "id": "jetson_tray",
+   "name": "Jetson tray (Orin Nano developer kit carrier)",
+   "quantity": 1,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "under the Jetson's carrier board, which runs warm, and in the sun",
+   "flight_critical": false,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 3,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 30,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "flat: plate on the build plate, bosses up",
+    "rotate": []
+   },
+   "stl": "hardware/parts/racecarneo/stl/jetson_tray.stl",
+   "step": "generated/parts/racecarneo/jetson_tray.step",
+   "volume_cm3": 18.55,
+   "area_cm2": 147.5,
+   "print_size_mm": [
+    79.0,
+    108.0,
+    9.0
+   ],
+   "footprint_mm": [
+    79.0,
+    108.0
+   ],
+   "triangles": 2632,
+   "estimate": {
+    "mass_g": 16.7,
+    "time_min": 30,
+    "mass_g_all": 16.7,
+    "time_min_all": 30
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 1.5,
+    "min_wall_p1_mm": 1.75,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 5914,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "Jetson Orin Nano developer kit carrier (P3768)",
+     "dimensions": "100 x 79 mm board; bottom parts at most 4.3 mm (bosses 6 mm)",
+     "source": "NVIDIA Jetson Orin Nano Developer Kit Carrier Board Specification SP-11324-001 v1.3, Figures 4-1 and 4-2, sections 2-3 (https://developer.nvidia.com/downloads/assets/embedded/secure/jetson/orin_nano/docs/jetson_orin_nano_devkit_carrier_board_specification_sp.pdf)",
+     "verified": true
+    },
+    {
+     "part": "Jetson carrier mounting holes",
+     "dimensions": "4 x M2.5, 86 x 58 mm, 17.0 mm from the I/O edge and 4.0 mm from the DC-jack end (scaled from the drawing; the specification does not dimension them)",
+     "source": "NVIDIA Jetson Orin Nano Developer Kit Carrier Board Specification SP-11324-001 v1.3, Figures 4-1 and 4-2, sections 2-3 (https://developer.nvidia.com/downloads/assets/embedded/secure/jetson/orin_nano/docs/jetson_orin_nano_devkit_carrier_board_specification_sp.pdf)",
+     "verified": false
+    },
+    {
+     "part": "deck_front (printed)",
+     "dimensions": "four M3 x 3 inserts",
+     "source": "hardware/parts/racecarneo/_frame.py",
+     "verified": true
+    }
+   ],
+   "inserts": [
+    {
+     "size": "M2.5",
+     "qty": 4,
+     "where": "carrier bosses, from the top"
+    }
+   ],
+   "fasteners": [
+    {
+     "item": "M2.5 x 6 socket head cap screw",
+     "qty": 4,
+     "use": "Jetson carrier to the tray bosses"
+    },
+    {
+     "item": "M3 x 6 socket head cap screw",
+     "qty": 4,
+     "use": "Jetson tray to the front deck inserts"
+    },
+    {
+     "item": "zip tie 2.5 mm",
+     "qty": 4,
+     "use": "USB cables along the Jetson tray's sides"
+    }
+   ],
+   "notes": [
+    "Take the carrier off its plastic stand (four screws). Keep the stand: the tray replaces it on the car only.",
+    "Screw the tray to the deck before fitting the Jetson: the tray screws sit under the carrier.",
+    "The fan's top ends about 9 mm under the lidar's scan plane; nothing may be stacked on the Jetson."
+   ]
+  },
+  {
+   "id": "lidar_mast",
+   "name": "Lidar mast (RPLIDAR C1)",
+   "quantity": 1,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "on top of the car in the sun",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 40,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "flange down on the plate, seat up",
+    "rotate": []
+   },
+   "stl": "hardware/parts/racecarneo/stl/lidar_mast.stl",
+   "step": "generated/parts/racecarneo/lidar_mast.step",
+   "volume_cm3": 43.32,
+   "area_cm2": 222.5,
+   "print_size_mm": [
+    93.0,
+    64.0,
+    18.2
+   ],
+   "footprint_mm": [
+    93.0,
+    64.0
+   ],
+   "triangles": 3092,
+   "estimate": {
+    "mass_g": 34.6,
+    "time_min": 63,
+    "mass_g_all": 34.6,
+    "time_min_all": 63
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 1.81,
+    "min_wall_p1_mm": 3.0,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 5695,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "Slamtec RPLIDAR C1",
+     "dimensions": "4 x M2.5 on a 43 mm square, at most 4 mm deep; scan plane 29.8 mm above the base",
+     "source": "Slamtec RPLIDAR C1 datasheet v1.1, Figure 4-1 'RPLIDAR C1 Mechanical Dimensions' and section 'Coordinate System Definition' (https://cdn.shopify.com/s/files/1/0058/3145/8904/files/SLAMTEC_rplidar_datasheet_C1_v1.1_en.pdf); specification page https://www.slamtec.com/en/c1/spec",
+     "verified": true
+    },
+    {
+     "part": "deck_front, deck_rear (printed)",
+     "dimensions": "six M3 screws through the flange and the deck (two through the lap joint)",
+     "source": "hardware/parts/racecarneo/_frame.py",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M2.5 x 8 socket head cap screw",
+     "qty": 4,
+     "use": "RPLIDAR C1 to the mast seat, from below (enters the lidar 3.5 mm; 4 mm is the limit)"
+    },
+    {
+     "item": "M3 x 16 socket head cap screw",
+     "qty": 6,
+     "use": "lidar mast flange through the deck (and the lap joint)"
+    },
+    {
+     "item": "M3 nyloc nut",
+     "qty": 6,
+     "use": "under the deck, lidar mast flange screws"
+    },
+    {
+     "item": "M3 washer",
+     "qty": 6,
+     "use": "under the nyloc nuts of the lidar mast flange"
+    }
+   ],
+   "notes": [
+    "Screw the C1 on before bolting the mast to the deck: the M2.5 screws go in from below through the side windows.",
+    "Turn the C1 so its 0 deg mark faces the front of the car, then confirm with /scan (an object ahead must appear at angle 0)."
+   ]
+  },
+  {
+   "id": "post_adapter_front",
+   "name": "Post adapter, front (chassis body post to deck)",
+   "quantity": 2,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "outdoors, over the warm chassis; carries the deck",
+   "flight_critical": false,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 5,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 50,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "upside down: the seat face on the plate, sleeve up",
+    "rotate": [
+     [
+      "X",
+      180
+     ]
+    ]
+   },
+   "stl": "hardware/parts/racecarneo/stl/post_adapter_front.stl",
+   "step": "generated/parts/racecarneo/post_adapter_front.step",
+   "volume_cm3": 6.78,
+   "area_cm2": 37.1,
+   "print_size_mm": [
+    14.0,
+    49.5,
+    24.0
+   ],
+   "footprint_mm": [
+    14.0,
+    49.5
+   ],
+   "triangles": 1024,
+   "estimate": {
+    "mass_g": 7.0,
+    "time_min": 16,
+    "mass_g_all": 13.9,
+    "time_min_all": 32
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 1.3,
+    "min_wall_p1_mm": 1.43,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 463,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "Traxxas Slash 4x4 body post",
+     "dimensions": "round post dia. 6 mm at (150, +-30) mm; the sleeve clamps anywhere along 24 mm",
+     "source": "not published by Traxxas: measure the posts on your chassis and set POSTS and POST_D in hardware/parts/racecarneo/_frame.py",
+     "verified": false
+    },
+    {
+     "part": "deck halves through deck_grommet (printed)",
+     "dimensions": "M3 insert at the deck mounting point (150, +-60) mm",
+     "source": "hardware/parts/racecarneo/_frame.py",
+     "verified": true
+    }
+   ],
+   "inserts": [
+    {
+     "size": "M3",
+     "qty": 1,
+     "where": "seat, from the top (deck screw)"
+    }
+   ],
+   "fasteners": [
+    {
+     "item": "M3 x 20 socket head cap screw",
+     "qty": 1,
+     "use": "post adapter pinch clamp (front)"
+    },
+    {
+     "item": "M3 nyloc nut",
+     "qty": 1,
+     "use": "post adapter pinch clamp (front)"
+    }
+   ],
+   "notes": [
+    "Slide the sleeve over the body post, set the deck height (deck top 132 mm above the ground with the car on its wheels, which puts the lidar's scan plane at the URDF's 180 mm), then tighten the pinch screw.",
+    "If your chassis has Traxxas' clipless latching body mounts (2020 and later Slash 4x4 kits) instead of round posts, this adapter does not fit: measure the mounts and adapt the sleeve."
+   ]
+  },
+  {
+   "id": "post_adapter_rear",
+   "name": "Post adapter, rear (chassis body post to deck)",
+   "quantity": 2,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "outdoors, over the warm chassis; carries the deck",
+   "flight_critical": false,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 5,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 50,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "upside down: the seat face on the plate, sleeve up",
+    "rotate": [
+     [
+      "X",
+      180
+     ]
+    ]
+   },
+   "stl": "hardware/parts/racecarneo/stl/post_adapter_rear.stl",
+   "step": "generated/parts/racecarneo/post_adapter_rear.step",
+   "volume_cm3": 5.34,
+   "area_cm2": 31.8,
+   "print_size_mm": [
+    14.0,
+    37.5,
+    24.0
+   ],
+   "footprint_mm": [
+    14.0,
+    37.5
+   ],
+   "triangles": 1024,
+   "estimate": {
+    "mass_g": 5.7,
+    "time_min": 14,
+    "mass_g_all": 11.4,
+    "time_min_all": 28
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 1.3,
+    "min_wall_p1_mm": 1.42,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 319,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "Traxxas Slash 4x4 body post",
+     "dimensions": "round post dia. 6 mm at (-158, +-42) mm; the sleeve clamps anywhere along 24 mm",
+     "source": "not published by Traxxas: measure the posts on your chassis and set POSTS and POST_D in hardware/parts/racecarneo/_frame.py",
+     "verified": false
+    },
+    {
+     "part": "deck halves through deck_grommet (printed)",
+     "dimensions": "M3 insert at the deck mounting point (-158, +-60) mm",
+     "source": "hardware/parts/racecarneo/_frame.py",
+     "verified": true
+    }
+   ],
+   "inserts": [
+    {
+     "size": "M3",
+     "qty": 1,
+     "where": "seat, from the top (deck screw)"
+    }
+   ],
+   "fasteners": [
+    {
+     "item": "M3 x 20 socket head cap screw",
+     "qty": 1,
+     "use": "post adapter pinch clamp (rear)"
+    },
+    {
+     "item": "M3 nyloc nut",
+     "qty": 1,
+     "use": "post adapter pinch clamp (rear)"
+    }
+   ],
+   "notes": [
+    "Slide the sleeve over the body post, set the deck height (deck top 132 mm above the ground with the car on its wheels, which puts the lidar's scan plane at the URDF's 180 mm), then tighten the pinch screw.",
+    "If your chassis has Traxxas' clipless latching body mounts (2020 and later Slash 4x4 kits) instead of round posts, this adapter does not fit: measure the mounts and adapt the sleeve."
+   ]
+  },
+  {
+   "id": "power_tray",
+   "name": "Power tray (converters, fuse, contactor)",
+   "quantity": 2,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "converters and the contactor coil run warm; on the deck in the sun",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 3,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 25,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "flat: plate on the build plate, lip up",
+    "rotate": []
+   },
+   "stl": "hardware/parts/racecarneo/stl/power_tray.stl",
+   "step": "generated/parts/racecarneo/power_tray.step",
+   "volume_cm3": 8.02,
+   "area_cm2": 69.8,
+   "print_size_mm": [
+    61.0,
+    40.0,
+    7.0
+   ],
+   "footprint_mm": [
+    61.0,
+    40.0
+   ],
+   "triangles": 996,
+   "estimate": {
+    "mass_g": 7.9,
+    "time_min": 15,
+    "mass_g_all": 15.8,
+    "time_min_all": 30
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 2.0,
+    "min_wall_p1_mm": 2.0,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 2252,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "deck_rear (printed)",
+     "dimensions": "two M3 x 3 inserts",
+     "source": "hardware/parts/racecarneo/_frame.py",
+     "verified": true
+    },
+    {
+     "part": "DC-DC converters, fuse holder, contactor",
+     "dimensions": "any module up to about 53 x 34 mm, held by zip ties through the slots or foam tape",
+     "source": "Requirement of this design: module sizes vary by vendor",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M3 x 6 socket head cap screw",
+     "qty": 2,
+     "use": "power tray to the rear deck inserts"
+    },
+    {
+     "item": "zip tie 2.5 mm",
+     "qty": 4,
+     "use": "modules and leads on the power trays"
+    }
+   ],
+   "notes": [
+    "Left tray (+y): the 19 V converter for the Jetson. Right tray (-y): the 6 V servo BEC, the main fuse and the e-stop contactor."
+   ]
+  },
+  {
+   "id": "rim_clip",
+   "name": "Rim cable clip",
+   "quantity": 10,
+   "material": "PETG",
+   "material_fallback": null,
+   "material_reason": "flexes to snap on and to take the cable without cracking",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu PETG Basic",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 100,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "on its side: the clip profile flat on the plate",
+    "rotate": [
+     [
+      "Y",
+      90
+     ]
+    ]
+   },
+   "stl": "hardware/parts/racecarneo/stl/rim_clip.stl",
+   "step": "generated/parts/racecarneo/rim_clip.step",
+   "volume_cm3": 0.89,
+   "area_cm2": 11.0,
+   "print_size_mm": [
+    14.0,
+    20.0,
+    10.0
+   ],
+   "footprint_mm": [
+    14.0,
+    20.0
+   ],
+   "triangles": 296,
+   "estimate": {
+    "mass_g": 1.1,
+    "time_min": 4,
+    "mass_g_all": 11.3,
+    "time_min_all": 35
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 1.92,
+    "min_wall_p1_mm": 1.93,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 89,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "deck_front, deck_rear rims (printed)",
+     "dimensions": "4 x 6 mm rim",
+     "source": "hardware/parts/racecarneo/_frame.py",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [],
+   "notes": [
+    "Push down over the rim, ring inboard; open the ring with a thumb to lay the cable in.",
+    "Positions: x = -120, -60, 30, 110, 175 mm on both sides (the assembly figure shows them)."
+   ]
+  },
+  {
+   "id": "vesc_tray",
+   "name": "VESC tray",
+   "quantity": 1,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "carries the motor controller, whose heatsink runs hot",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 3,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 30,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "flat: plate on the build plate, guides up",
+    "rotate": []
+   },
+   "stl": "hardware/parts/racecarneo/stl/vesc_tray.stl",
+   "step": "generated/parts/racecarneo/vesc_tray.step",
+   "volume_cm3": 18.4,
+   "area_cm2": 148.3,
+   "print_size_mm": [
+    92.0,
+    93.0,
+    11.0
+   ],
+   "footprint_mm": [
+    92.0,
+    93.0
+   ],
+   "triangles": 1544,
+   "estimate": {
+    "mass_g": 17.1,
+    "time_min": 31,
+    "mass_g_all": 17.1,
+    "time_min_all": 31
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 1.46,
+    "min_wall_p1_mm": 1.74,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 5142,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "Trampa VESC 6 MkVI",
+     "dimensions": "75 x 70 x 18 mm housing between corner guides (0.6 mm clearance)",
+     "source": "Trampa VESC 6 MkVI product page (https://trampa.co.uk/product/vesc6-mk6/)",
+     "verified": true
+    },
+    {
+     "part": "deck_rear (printed)",
+     "dimensions": "four M3 x 3 inserts",
+     "source": "hardware/parts/racecarneo/_frame.py",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M3 x 6 socket head cap screw",
+     "qty": 4,
+     "use": "VESC tray to the rear deck inserts"
+    },
+    {
+     "item": "hook-and-loop strap, 20 mm, 200 mm",
+     "qty": 2,
+     "use": "VESC to its tray"
+    },
+    {
+     "item": "silicone thermal pad or rubber pad, 70 x 60 x 1 mm",
+     "qty": 1,
+     "use": "between the VESC and its tray"
+    }
+   ],
+   "notes": [
+    "A smaller VESC (e.g. Flipsky Mini FSESC 6.7, 67 x 39 mm) fits between the guides with a foam spacer, but check its input range: the Mini FSESC 6.7 needs 4S or more and does not run on this car's 3S pack.",
+    "Battery leads to the e-stop contactor, motor leads down through the deck's wire window ahead of the tray."
+   ]
+  }
+ ],
+ "plates": [
+  {
+   "name": "A",
+   "material": "ASA",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "deck_rear",
+     "qty": 1
+    },
+    {
+     "id": "jetson_tray",
+     "qty": 1
+    },
+    {
+     "id": "lidar_mast",
+     "qty": 1
+    },
+    {
+     "id": "estop_tower",
+     "qty": 1
+    }
+   ],
+   "time_min": 344,
+   "mass_g": 186
+  },
+  {
+   "name": "B",
+   "material": "ASA",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "deck_front",
+     "qty": 1
+    },
+    {
+     "id": "power_tray",
+     "qty": 2
+    },
+    {
+     "id": "camera_cradle",
+     "qty": 1
+    },
+    {
+     "id": "imu_mount",
+     "qty": 1
+    },
+    {
+     "id": "post_adapter_front",
+     "qty": 2
+    },
+    {
+     "id": "post_adapter_rear",
+     "qty": 2
+    }
+   ],
+   "time_min": 241,
+   "mass_g": 121
+  },
+  {
+   "name": "C",
+   "material": "ASA",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "camera_arm",
+     "qty": 1
+    },
+    {
+     "id": "vesc_tray",
+     "qty": 1
+    }
+   ],
+   "time_min": 196,
+   "mass_g": 107
+  },
+  {
+   "name": "D",
+   "material": "PETG",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "rim_clip",
+     "qty": 10
+    }
+   ],
+   "time_min": 46,
+   "mass_g": 11
+  },
+  {
+   "name": "E",
+   "material": "TPU95A",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "deck_grommet",
+     "qty": 8
+    }
+   ],
+   "time_min": 22,
+   "mass_g": 2
+  }
+ ],
+ "assembly": {
+  "bodies": 96,
+  "interferences": "none",
+  "intended_press_fits": 10,
+  "scan_plane_blind_sectors": [
+   "camera_arm: 157.2 to -157.2 deg (45.5 deg wide), 31-46 mm from the lidar axis (inside the 50 mm blind range: no returns)"
+  ],
+  "scan_plane_in_the_fin_shadow": [
+   "estop_tower: 175.2 to -175.2 deg (9.6 deg wide), 227 mm from the lidar axis",
+   "estop_body: 176.5 to -176.5 deg (7.0 deg wide), 231 mm from the lidar axis"
+  ],
+  "scan_plane_measured": "none",
+  "fin_shadow_deg": "+-22.8 about the rear (180 deg)",
+  "camera_view_clear": "yes (D455 colour 90 x 65 deg + 2 deg margin, at pitch -10, 0, +10 deg)",
+  "lidar_link_mm": "(80, 0, 180.0); URDF (80, 0, 180)",
+  "camera_link_mm": "D435i (179.7, 0.0, 220.0), D455 (180.2, 0.0, 222.0); URDF (180, 0, 220)",
+  "imu_link_mm": "(0, 0, 142); URDF (0, 0, 80)",
+  "jetson_fan_top_mm": "170.9 (9.1 mm under the scan plane)",
+  "added_mass_g": 1350,
+  "passed": true
+ }
+}

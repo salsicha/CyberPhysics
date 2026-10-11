@@ -49,7 +49,7 @@ environment with sensor-driven waypoint navigation.
    - Drive missions through `NavigateToPose` or `NavigateThroughPoses`, not by
      teleporting or using ground-truth control.
 3. Simulate all hardware sensors and control interfaces from
-   `hardware/racecarneo.txt`.
+   `hardware/racecarneo.md`.
    - Forward RGB/RGB-D camera on `/camera/color/image_raw`,
      `/camera/color/camera_info`, optional depth fallback, and realistic lens
      distortion, exposure, motion blur, rolling/global shutter selection,

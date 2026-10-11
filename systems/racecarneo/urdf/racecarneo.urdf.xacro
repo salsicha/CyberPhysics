@@ -6,7 +6,7 @@
   names match systems/racecarneo/config/topics.yaml.
 
   The hardware offsets are nominal values for the build in
-  hardware/racecarneo.txt (1/10 Traxxas Slash 4x4-class chassis, base_link on
+  hardware/racecarneo.md (1/10 Traxxas Slash 4x4-class chassis, base_link on
   the ground under the chassis centre): RealSense on the front of the top deck
   0.18 m forward and 0.22 m up, 2D lidar 0.08 m forward and 0.18 m up, IMU on
   the compute deck 0.08 m up. Measure your build and update them.
