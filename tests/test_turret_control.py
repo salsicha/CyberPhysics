@@ -113,14 +113,17 @@ def test_loop_settles_with_one_to_three_frames_of_latency(tracker, total_frames,
     assert ramp < 0.07
 
 
-def run_plant(tracker, turret_sim, latency_frames, law='new', feedback=False, variant='nominal'):
+def run_plant(tracker, turret_sim, latency_frames, law='new', feedback=False, variant='nominal',
+              lead=False):
     """Closed loop against the turret_sim plant (velocity limits, quantization,
     backlash, command latency) and synthetic detector. Detections reach the
-    controller `latency_frames` frames after capture."""
+    controller `latency_frames` frames after capture. With `lead` the target's
+    bearing rate is fed forward as the node does (it needs measured feedback)."""
     sim = turret_sim.TurretSim(SCENARIO, variant_name=variant)
     pantilt = SCENARIO['pantilt']
     dt = float(SCENARIO['dt_s'])
     ctrl = controller(tracker)
+    bearing = tracker.BearingRate()
     pending, errors = deque(), []
     last, previous_error = (0.0, 0.0), None
     for k in range(int(float(SCENARIO['duration_s']) / dt) + 1):
@@ -139,7 +142,11 @@ def run_plant(tracker, turret_sim, latency_frames, law='new', feedback=False, va
             if not detected or estop or sim.command_dropped(t):
                 continue
             if law == 'new':
-                command = ctrl.update(captured, ax, ay, t)
+                rate = None
+                if lead and feedback:
+                    bearing.add(captured, ctrl.sight(captured, ax, ay, t))
+                    rate = bearing.rate(t)
+                command = ctrl.update(captured, ax, ay, t, lead=rate)
             else:
                 # Previous law on hardware: integrate the bridge's echoed command.
                 d = (0.0, 0.0) if previous_error is None else (
@@ -167,6 +174,18 @@ def test_tracker_meets_pointing_thresholds_on_sim_plant(tracker, turret_sim, lat
     mean, p95 = run_plant(tracker, turret_sim, latency_frames, feedback=feedback)
     assert mean <= THRESHOLDS['max_mean_angular_error_deg']
     assert p95 <= THRESHOLDS['max_p95_angular_error_deg']
+
+
+@pytest.mark.parametrize('latency_frames', [0, 1, 2, 3])
+def test_target_lead_keeps_the_fixed_turret_within_thresholds(tracker, turret_sim,
+                                                              latency_frames):
+    plain = run_plant(tracker, turret_sim, latency_frames, feedback=True)
+    lead = run_plant(tracker, turret_sim, latency_frames, feedback=True, lead=True)
+    print(f'warehouse, {latency_frames} frames: mean/p95 {plain[0]:.2f}/{plain[1]:.2f} deg, '
+          f'with lead {lead[0]:.2f}/{lead[1]:.2f} deg')
+    assert lead[0] <= THRESHOLDS['max_mean_angular_error_deg']
+    assert lead[1] <= THRESHOLDS['max_p95_angular_error_deg']
+    assert lead[0] < plain[0]
 
 
 @pytest.mark.parametrize('variant', sorted(SCENARIO['variants']))
@@ -217,13 +236,10 @@ def make_node(tracker, require_release=False):
     node.get_clock = lambda: NS(now=lambda: NS(nanoseconds=int(node.clock_s * 1e9),
                                                to_msg=lambda: None))
     node.get_logger = MagicMock()
-    node.command_enabled = True
-    node.controller = controller(tracker, feedback_timeout_s=0.5)
-    node.estop_engaged = require_release
-    node.actuator_ready = False
-    node.actuator_ready_time = -math.inf
-    node.actuator_ready_timeout_s = 1.0
-    node.command_state = 'idle'
+    parameters = dict(tracker.DEFAULT_PARAMETERS, actuator_latency_s=0.05,
+                      require_estop_release=require_release)
+    node.get_parameter = lambda name: NS(value=parameters[name])
+    node._configure()
     node.command_pub = MagicMock()
     return node
 

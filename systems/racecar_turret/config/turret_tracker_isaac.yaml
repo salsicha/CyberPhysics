@@ -1,0 +1,69 @@
+# RACECAR Turret tracker in Isaac Sim (compositions/racecar_turret_isaac.yaml,
+# systems/racecar_turret/interfaces.md): turret_tracker.yaml with simulation
+# time and gains for the simulated servos, whose joint states arrive stamped
+# with the images' clock, so the loop does not depend on the latency estimate.
+#
+# The evaluator selects the target with a lock on /turret/command, as the UI
+# does; the tracker starts idle. No emergency-stop release is needed in
+# simulation (a true /turret/emergency_stop still stops it).
+pantilt_yolo_tracker:
+  ros__parameters:
+    use_sim_time: true
+    camera_topic: /turret/camera/image_raw
+    camera_info_topic: /turret/camera/camera_info
+    joint_state_topic: /turret/joint_states
+    joint_command_topic: /turret/joint_commands
+    segments_topic: /turret/yolo/segments
+    target_mask_topic: /turret/yolo/target_mask
+    target_bbox_topic: /turret/yolo/target_bbox
+    target_confidence_topic: /turret/yolo/target_confidence
+    annotated_image_topic: /turret/yolo/annotated_image
+    pixel_error_topic: /turret/target/pixel_error
+    angular_error_topic: /turret/target/angular_error
+    selected_id_topic: /turret/target/selected_id
+    locked_topic: /turret/target/locked
+    diagnostics_topic: /turret/diagnostics
+    emergency_stop_topic: /turret/emergency_stop
+    actuator_ready_topic: /turret/actuator_ready
+    command_topic: /turret/command
+    status_topic: /turret/status
+    model_path: /workspace/cache/models/yoloe-26s-seg.pt
+    device: "0"
+    image_size: 640
+    confidence: 0.25
+    class_prompts:
+      - person
+    target_id: target
+    target_class: person
+    initial_selection_normalized: [0.5, 0.5]
+    association_gate_fraction: 0.15
+    auto_start: false
+    track_timeout_s: 1.0
+    command_enabled: true
+    require_estop_release: false
+    kp: 0.4
+    max_rate_rad_s: 1.5
+    # One simulation step plus transport between command and motion.
+    actuator_latency_s: 0.05
+    joint_state_timeout_s: 0.5
+    actuator_ready_timeout_s: 1.0
+    pan_min_rad: -1.5708
+    pan_max_rad: 1.5708
+    tilt_min_rad: -0.65
+    tilt_max_rad: 0.75
+    base_compensation: true
+    base_imu_topic: /imu/data_raw
+    base_imu_frame: ""
+    base_frame: turret/base_link
+    imu_timeout_s: 0.5
+    target_lead: true
+    lead_window_s: 0.5
+    control_rate_hz: 50.0
+    manual_timeout_s: 0.5
+    status_rate_hz: 5.0
+    lock_tolerance_px: 36.0
+    publish_annotated_image: true
+    show_window: false
+    window_name: RACECAR Turret (Isaac)
+    warmup: true
+    ready_file: /tmp/pantilt_yolo_ready

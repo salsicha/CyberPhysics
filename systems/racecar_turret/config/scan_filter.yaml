@@ -1,0 +1,32 @@
+# Mask the turret plate's four posts out of the lidar scan (laser_filters).
+#
+# The plate sits above the lidar, but its posts cross the scan plane behind
+# it: post centres at x = -0.145 and -0.055 m, y = +-0.045 m in base_link
+# (hardware/racecar_turret.md), i.e. 0.14 and 0.23 m from the lidar at
+# bearings of about +-162 and +-169 deg. They are inside Nav2's 0.22 m robot
+# radius, so unmasked they would be lethal cost inside the footprint and
+# stop the collision monitor's FootprintApproach (min_points 4).
+#
+# The box filter blanks (NaN) only the returns inside this box around the
+# posts, in base_link, so the rest of the rear view stays. Run the lidar
+# driver on /scan_raw and this chain in front of every /scan consumer:
+#
+#   ros2 run laser_filters scan_to_scan_filter_chain --ros-args \
+#     --params-file scan_filter.yaml -r scan:=/scan_raw -r scan_filtered:=/scan
+#
+# It needs base_link -> racecarneo/lidar_link (robot_state_publisher).
+# Measure your posts and adjust the box: 25 mm of margin around them here.
+scan_to_scan_filter_chain:
+  ros__parameters:
+    filter1:
+      name: turret_plate_posts
+      type: laser_filters/LaserScanBoxFilter
+      params:
+        box_frame: base_link
+        min_x: -0.17
+        max_x: -0.03
+        min_y: -0.07
+        max_y: 0.07
+        min_z: 0.0
+        max_z: 0.40
+        invert: false

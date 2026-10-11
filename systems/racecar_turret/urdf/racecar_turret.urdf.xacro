@@ -1,0 +1,217 @@
+<?xml version="1.0"?>
+<!--
+  RACECAR Turret frame model: the RACECAR Neo (racecarneo.urdf.xacro, its
+  frames and arguments unchanged) with the PanTiltROS turret on a raised
+  plate behind the lidar. Nominal offsets for the build in
+  hardware/racecar_turret.txt; measure your build and update them.
+
+  The plate sits above the lidar (scan plane 0.18 m, RPLIDAR top about
+  0.20 m), so only its four thin posts cross the scan plane. Joint names and
+  signs are those of /turret/joint_states and the PanTiltROS tracker:
+  pan_joint positive turns the camera right (image +u), tilt_joint positive
+  turns it up (image -v). robot_state_publisher must read the turret joints
+  from /turret/joint_states.
+
+  The include is relative to this file, so systems/racecarneo must sit next
+  to systems/racecar_turret (mount ../systems, not one platform folder).
+
+  sim_vehicle:=true adds what a physics simulator needs to drive the car
+  (applications/isaac/scripts/racecar_turret_isaac.py): a chassis collision
+  box with ground clearance, two steering knuckles and four wheels of a
+  1/10 Traxxas Slash 4x4-class chassis (wheelbase 0.33 m, track 0.30 m,
+  wheel radius 0.055 m; about 3.5 kg with the turret). Leave it false for
+  robot_state_publisher on the car: it adds no frame the stack uses, only
+  links whose joints nothing on the car publishes. Keep sim_geometry false
+  with it (sim_geometry is the smaller RacecarSim car).
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="racecar_turret">
+  <xacro:arg name="sim_vehicle" default="false"/>
+  <xacro:include filename="../../racecarneo/urdf/racecarneo.urdf.xacro"/>
+
+  <!-- Turret geometry (metres, radians); systems/racecar_turret/interfaces.md -->
+  <xacro:property name="turret_mount_xyz" value="-0.10 0 0.24"/>
+  <xacro:property name="pan_axis_height" value="0.045"/>
+  <xacro:property name="tilt_axis_height" value="0.055"/>
+  <xacro:property name="camera_forward" value="0.035"/>
+  <xacro:property name="pan_limit" value="1.5708"/>
+  <xacro:property name="tilt_min" value="-0.65"/>
+  <xacro:property name="tilt_max" value="0.75"/>
+  <!-- ST3215 at 12 V: about 2.9 N m stall, 0.222 s per 60 degrees -->
+  <xacro:property name="servo_effort" value="2.9"/>
+  <xacro:property name="servo_velocity" value="4.7"/>
+
+  <!-- The plate and the pan servo, whose body is fixed on it (ST3215,
+       45 x 25 x 35 mm, output shaft up at the pan axis) -->
+  <link name="turret/base_link">
+    <visual>
+      <origin xyz="0 0 0.0025" rpy="0 0 0"/>
+      <geometry><box size="0.11 0.11 0.005"/></geometry>
+      <material name="turret_grey"><color rgba="0.35 0.35 0.38 1"/></material>
+    </visual>
+    <visual>
+      <origin xyz="-0.01 0 0.0225" rpy="0 0 0"/>
+      <geometry><box size="0.045 0.025 0.035"/></geometry>
+      <material name="turret_black"><color rgba="0.05 0.05 0.05 1"/></material>
+    </visual>
+    <inertial>
+      <mass value="0.18"/>
+      <origin xyz="-0.0033 0 0.0092" rpy="0 0 0"/>
+      <inertia ixx="0.00014" ixy="0" ixz="0" iyy="0.00015" iyz="0" izz="0.00025"/>
+    </inertial>
+  </link>
+  <joint name="turret_mount_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="turret/base_link"/>
+    <origin xyz="${turret_mount_xyz}" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Pan stage: the bracket on the pan servo's horn and the tilt servo it
+       carries -->
+  <link name="turret/pan_link">
+    <visual>
+      <origin xyz="0 0 0.02" rpy="0 0 0"/>
+      <geometry><box size="0.045 0.06 0.04"/></geometry>
+      <material name="turret_grey"/>
+    </visual>
+    <inertial>
+      <mass value="0.09"/>
+      <origin xyz="0 0 0.02" rpy="0 0 0"/>
+      <inertia ixx="0.000039" ixy="0" ixz="0" iyy="0.000027" iyz="0" izz="0.000042"/>
+    </inertial>
+  </link>
+  <joint name="pan_joint" type="revolute">
+    <parent link="turret/base_link"/>
+    <child link="turret/pan_link"/>
+    <origin xyz="0 0 ${pan_axis_height}" rpy="0 0 0"/>
+    <axis xyz="0 0 -1"/>
+    <limit lower="${-pan_limit}" upper="${pan_limit}" effort="${servo_effort}" velocity="${servo_velocity}"/>
+  </joint>
+
+  <!-- Tilt stage: the camera on the tilt servo's horn -->
+  <link name="turret/tilt_link">
+    <visual>
+      <origin xyz="0.015 0 0" rpy="0 0 0"/>
+      <geometry><box size="0.05 0.045 0.035"/></geometry>
+      <material name="turret_black"/>
+    </visual>
+    <inertial>
+      <mass value="0.08"/>
+      <origin xyz="0.015 0 0" rpy="0 0 0"/>
+      <inertia ixx="0.00002" ixy="0" ixz="0" iyy="0.00003" iyz="0" izz="0.00003"/>
+    </inertial>
+  </link>
+  <joint name="tilt_joint" type="revolute">
+    <parent link="turret/pan_link"/>
+    <child link="turret/tilt_link"/>
+    <origin xyz="0 0 ${tilt_axis_height}" rpy="0 0 0"/>
+    <axis xyz="0 -1 0"/>
+    <limit lower="${tilt_min}" upper="${tilt_max}" effort="${servo_effort}" velocity="${servo_velocity}"/>
+  </joint>
+
+  <!-- Turret camera body, x forward / y left / z up, and its optical frame -->
+  <link name="turret/camera_link"/>
+  <joint name="turret_camera_joint" type="fixed">
+    <parent link="turret/tilt_link"/>
+    <child link="turret/camera_link"/>
+    <origin xyz="${camera_forward} 0 0" rpy="0 0 0"/>
+  </joint>
+  <link name="turret/camera_optical_frame"/>
+  <joint name="turret_camera_optical_joint" type="fixed">
+    <parent link="turret/camera_link"/>
+    <child link="turret/camera_optical_frame"/>
+    <origin xyz="0 0 0" rpy="-1.57079632679 0 -1.57079632679"/>
+  </joint>
+
+  <!--
+    Simulation-only running gear (sim_vehicle:=true). The RACECAR URDF's
+    base_link box (0.36 x 0.22 x 0.10 m from the ground up) is the car's
+    envelope and reaches z = 0, so the simulator disables that collision and
+    uses racecarneo/chassis_link's box, 0.03 m off the ground, instead.
+    Nothing collides at the lidar's scan plane (0.18 m). Wheels collide as
+    spheres of the tyre radius: a sphere rolls without the facets of a
+    cylinder hull and touches flat ground at the same point. Knuckles turn
+    about z (positive left, like /ackermann_cmd); wheels spin about y
+    (positive rolls the car forward).
+  -->
+  <xacro:property name="sim_wheelbase" value="0.33"/>
+  <xacro:property name="sim_track" value="0.30"/>
+  <xacro:property name="sim_wheel_radius" value="0.055"/>
+  <xacro:property name="sim_wheel_width" value="0.045"/>
+  <xacro:property name="sim_wheel_mass" value="0.035"/>
+  <xacro:property name="sim_knuckle_mass" value="0.02"/>
+  <!-- The inner wheel's Ackermann angle at the 0.42 rad lock is 0.51 rad -->
+  <xacro:property name="sim_knuckle_limit" value="0.55"/>
+  <!-- 20 kg-cm steering servo: about 2 N m and 0.16 s per 60 degrees -->
+  <xacro:property name="sim_steering_effort" value="2.0"/>
+  <xacro:property name="sim_steering_velocity" value="6.5"/>
+  <xacro:property name="sim_wheel_effort" value="1.0"/>
+  <xacro:property name="sim_wheel_velocity" value="100.0"/>
+
+  <xacro:macro name="sim_wheel" params="name parent xyz">
+    <link name="racecarneo/${name}_wheel_link">
+      <visual>
+        <origin xyz="0 0 0" rpy="1.57079632679 0 0"/>
+        <geometry><cylinder radius="${sim_wheel_radius}" length="${sim_wheel_width}"/></geometry>
+        <material name="sim_tyre"/>
+      </visual>
+      <collision>
+        <geometry><sphere radius="${sim_wheel_radius}"/></geometry>
+      </collision>
+      <inertial>
+        <mass value="${sim_wheel_mass}"/>
+        <inertia ixx="${sim_wheel_mass * (3 * sim_wheel_radius ** 2 + sim_wheel_width ** 2) / 12}"
+                 ixy="0" ixz="0"
+                 iyy="${sim_wheel_mass * sim_wheel_radius ** 2 / 2}" iyz="0"
+                 izz="${sim_wheel_mass * (3 * sim_wheel_radius ** 2 + sim_wheel_width ** 2) / 12}"/>
+      </inertial>
+    </link>
+    <joint name="${name}_wheel_joint" type="continuous">
+      <parent link="${parent}"/>
+      <child link="racecarneo/${name}_wheel_link"/>
+      <origin xyz="${xyz}" rpy="0 0 0"/>
+      <axis xyz="0 1 0"/>
+      <limit effort="${sim_wheel_effort}" velocity="${sim_wheel_velocity}"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:macro name="sim_steered_wheel" params="side y">
+    <link name="racecarneo/front_${side}_knuckle_link">
+      <inertial>
+        <mass value="${sim_knuckle_mass}"/>
+        <inertia ixx="0.000004" ixy="0" ixz="0" iyy="0.000004" iyz="0" izz="0.000004"/>
+      </inertial>
+    </link>
+    <joint name="front_${side}_steering_joint" type="revolute">
+      <parent link="base_link"/>
+      <child link="racecarneo/front_${side}_knuckle_link"/>
+      <origin xyz="${sim_wheelbase / 2} ${y} ${sim_wheel_radius}" rpy="0 0 0"/>
+      <axis xyz="0 0 1"/>
+      <limit lower="${-sim_knuckle_limit}" upper="${sim_knuckle_limit}"
+             effort="${sim_steering_effort}" velocity="${sim_steering_velocity}"/>
+    </joint>
+    <xacro:sim_wheel name="front_${side}" parent="racecarneo/front_${side}_knuckle_link" xyz="0 0 0"/>
+  </xacro:macro>
+
+  <xacro:if value="$(arg sim_vehicle)">
+    <material name="sim_tyre"><color rgba="0.03 0.03 0.03 1"/></material>
+
+    <link name="racecarneo/chassis_link">
+      <collision>
+        <origin xyz="0 0 0.075" rpy="0 0 0"/>
+        <geometry><box size="0.44 0.20 0.09"/></geometry>
+      </collision>
+    </link>
+    <joint name="chassis_joint" type="fixed">
+      <parent link="base_link"/>
+      <child link="racecarneo/chassis_link"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+
+    <xacro:sim_steered_wheel side="left" y="${sim_track / 2}"/>
+    <xacro:sim_steered_wheel side="right" y="${-sim_track / 2}"/>
+    <xacro:sim_wheel name="rear_left" parent="base_link"
+                     xyz="${-sim_wheelbase / 2} ${sim_track / 2} ${sim_wheel_radius}"/>
+    <xacro:sim_wheel name="rear_right" parent="base_link"
+                     xyz="${-sim_wheelbase / 2} ${-sim_track / 2} ${sim_wheel_radius}"/>
+  </xacro:if>
+</robot>

@@ -19,6 +19,7 @@ Data that is specific to one vehicle may also live with its system: `racecarneo/
 - `submarine/`: BlueROV2/BlueOS/ArduSub configuration.
 - `lunar_rover/`: lunar rover configuration.
 - `racecarneo/`: MIT RACECAR Neo configuration and calibration.
+- `racecar_turret/`: the RACECAR Neo with the PanTiltROS turret on a raised plate: its interface contract, combined URDF, turret tracker profiles, turret camera calibration and lidar mask (`hardware/racecar_turret.md`, `compositions/racecar_turret_hardware.yaml`).
 - `so101/`: SO-101 arm description and controller configuration.
 - `realsense/` and `blackfly/`: physical camera configuration.
 - `vinsmono/`: camera/IMU calibration for the VINS-Mono stack.

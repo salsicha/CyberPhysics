@@ -1,0 +1,31 @@
+# Turret camera intrinsics for /turret/camera/camera_info (usb_cam reads this
+# through camera_info_url in compositions/racecar_turret_hardware.yaml).
+#
+# NOMINAL values, not a calibration: an ideal pinhole at 640x480 with the
+# 70 deg horizontal field of view of the recommended camera (Arducam B0385,
+# OV9782 global shutter with its low-distortion M12 lens, hardware/
+# racecar_turret.md): fx = fy = 320 / tan(35 deg) = 457. The tracker turns
+# pixel errors into angles with these, so calibrate your camera (ros2 run
+# camera_calibration cameracalibrator with a checkerboard, at 640x480) and
+# replace this file with the result, keeping camera_name. Check the field of
+# view at 640x480 too: a sensor mode that crops instead of scaling narrows it.
+image_width: 640
+image_height: 480
+camera_name: turret_camera
+camera_matrix:
+  rows: 3
+  cols: 3
+  data: [457.0, 0.0, 320.0, 0.0, 457.0, 240.0, 0.0, 0.0, 1.0]
+distortion_model: plumb_bob
+distortion_coefficients:
+  rows: 1
+  cols: 5
+  data: [0.0, 0.0, 0.0, 0.0, 0.0]
+rectification_matrix:
+  rows: 3
+  cols: 3
+  data: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+projection_matrix:
+  rows: 3
+  cols: 4
+  data: [457.0, 0.0, 320.0, 0.0, 0.0, 457.0, 240.0, 0.0, 0.0, 0.0, 1.0, 0.0]

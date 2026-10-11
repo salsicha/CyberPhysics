@@ -54,6 +54,7 @@ RUN apt update && apt install -q -y --no-install-recommends \
     ros-${ROS_DISTRO}-cv-bridge \
     ros-${ROS_DISTRO}-diagnostic-updater \
     ros-${ROS_DISTRO}-image-transport \
+    ros-${ROS_DISTRO}-laser-filters \
     ros-${ROS_DISTRO}-nav-msgs \
     ros-${ROS_DISTRO}-nav2-bringup \
     ros-${ROS_DISTRO}-navigation2 \

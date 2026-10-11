@@ -204,8 +204,8 @@ The composition runs this pipeline:
 3. `racecarneo_nvblox` consumes the estimated depth image and camera info, then publishes TSDF/ESDF map slices.
 4. `racecarneo_slam` runs SLAM Toolbox to provide `map -> odom`.
 5. `racecarneo_nav2` plans and controls with Nav2 using nvblox costmap layers plus lidar fallback.
-6. `racecarneo_cmd_vel_to_ackermann` converts Nav2 `/cmd_vel` into `/ackermann_cmd`.
-7. `racecarneo_nicegui` serves a browser UI for observation and waypoint commands.
+6. `racecarneo_cmd_vel_to_ackermann` converts Nav2 `/cmd_vel` into `/ackermann_cmd`; manual driving on `/cmd_vel_teleop` takes priority while it keeps arriving, and `/racecarneo/stop_request` latches a stop (`systems/racecarneo/config/cmd_vel_to_ackermann.yaml`).
+7. `racecarneo_nicegui` serves a browser UI: the map with goals by tap, a drive joystick, Stop/Resume and pipeline status (`applications/nicegui/README.md`).
 8. `foxglove_bridge` serves the ROS graph to Foxglove at `ws://localhost:8765`.
 
 NiceGUI is available at `http://localhost:8080`.

@@ -10,7 +10,7 @@ import time
 from bisect import bisect_right
 from collections import deque
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import cv2
 import numpy as np
@@ -25,9 +25,17 @@ from rclpy.qos import (
     ReliabilityPolicy,
     qos_profile_sensor_data,
 )
-from sensor_msgs.msg import CameraInfo, Image, JointState
+from sensor_msgs.msg import CameraInfo, Image, Imu, JointState
 from std_msgs.msg import Bool, Float32, Float32MultiArray, String
 from ultralytics import YOLO
+
+try:  # only base-rotation compensation needs it (the IMU's mounting)
+    import tf2_ros
+except ImportError:
+    tf2_ros = None
+
+
+IDENTITY = np.eye(3)
 
 
 def clamp(value: float, low: float, high: float) -> float:
@@ -45,6 +53,246 @@ def finite(*values: Any) -> bool:
 
 def stamp_seconds(stamp: Any) -> float:
     return float(stamp.sec) + float(stamp.nanosec) * 1e-9
+
+
+def unit(vector: np.ndarray) -> np.ndarray:
+    return vector / np.linalg.norm(vector)
+
+
+def rotation_vector_matrix(vector: np.ndarray) -> np.ndarray:
+    """Rotation by |vector| radians about vector (Rodrigues)."""
+    angle = float(np.linalg.norm(vector))
+    if angle < 1e-12:
+        return IDENTITY
+    x, y, z = vector / angle
+    k = np.array([[0.0, -z, y], [z, 0.0, -x], [-y, x, 0.0]])
+    return IDENTITY + math.sin(angle) * k + (1.0 - math.cos(angle)) * (k @ k)
+
+
+def quaternion_matrix(x: float, y: float, z: float, w: float) -> np.ndarray:
+    norm = math.sqrt(x * x + y * y + z * z + w * w)
+    x, y, z, w = x / norm, y / norm, z / norm, w / norm
+    return np.array(
+        [
+            [1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+            [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+            [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)],
+        ]
+    )
+
+
+def joint_direction(pan: float, tilt: float) -> np.ndarray:
+    """Optical axis in turret/base_link: pan_joint turns about -z (positive
+    right), tilt_joint about the pan link's -y (positive up)."""
+    return np.array(
+        [
+            math.cos(pan) * math.cos(tilt),
+            -math.sin(pan) * math.cos(tilt),
+            math.sin(tilt),
+        ]
+    )
+
+
+def direction_joints(direction: np.ndarray) -> tuple[float, float]:
+    """Inverse of joint_direction: the (pan, tilt) that point along direction."""
+    x, y, z = (float(value) for value in direction)
+    return math.atan2(-y, x), math.atan2(z, math.hypot(x, y))
+
+
+def camera_ray(pan: float, tilt: float, err_pan: float, err_tilt: float) -> np.ndarray:
+    """Line of sight in turret/base_link to a point seen at angular image
+    errors (right and up positive) with the turret at (pan, tilt)."""
+    # camera_link (x forward, y left, z up) turned by Rz(-pan) Ry(-tilt)
+    ray = np.array([1.0, -math.tan(err_pan), math.tan(err_tilt)])
+    cp, sp, ct, st = math.cos(pan), math.sin(pan), math.cos(tilt), math.sin(tilt)
+    pan_rotation = np.array([[cp, sp, 0.0], [-sp, cp, 0.0], [0.0, 0.0, 1.0]])
+    tilt_rotation = np.array([[ct, 0.0, -st], [0.0, 1.0, 0.0], [st, 0.0, ct]])
+    return unit(pan_rotation @ tilt_rotation @ ray)
+
+
+def fixed_attitude(_t: float) -> np.ndarray:
+    return IDENTITY
+
+
+Attitude = Callable[[float], np.ndarray]
+
+
+class BaseRotation:
+    """Orientation of turret/base_link in a world-fixed frame, from gyro rates.
+
+    Integrating the base's angular velocity gives the rotation between any two
+    recent instants, which is all the aim needs: the absolute heading of the
+    integration frame, and its slow gyro drift, do not matter because the
+    camera closes the loop. Past a sample the rotation continues at that
+    sample's rate for at most ``extrapolation_s``, so when the rates stop
+    arriving the attitude freezes and aiming falls back to a fixed base.
+    """
+
+    def __init__(
+        self,
+        timeout_s: float = 0.5,
+        extrapolation_s: float = 0.25,
+        history_s: float = 2.0,
+        max_rate_rad_s: float = 10.0,
+    ) -> None:
+        self.timeout_s = float(timeout_s)
+        self.extrapolation_s = float(extrapolation_s)
+        self.history_s = float(history_s)
+        self.max_rate = float(max_rate_rad_s)
+        self.samples: deque[tuple[float, np.ndarray, np.ndarray]] = deque()
+
+    def add(self, t: float, omega: Any) -> bool:
+        """Add the base's angular velocity (rad/s, turret/base_link axes)."""
+        omega = np.asarray(omega, dtype=float).reshape(3)
+        if not finite(t, *omega) or np.linalg.norm(omega) > self.max_rate:
+            return False
+        if self.samples and t < self.samples[-1][0]:
+            self.samples.clear()  # source restarted or the clock jumped back
+        if self.samples and t == self.samples[-1][0]:
+            return True
+        rotation = IDENTITY
+        if self.samples:
+            last_t, last_rotation, last_omega = self.samples[-1]
+            if t - last_t <= self.timeout_s:
+                step = 0.5 * (last_omega + omega) * (t - last_t)
+            else:  # across a gap, as attitude() extrapolates
+                step = last_omega * self.extrapolation_s
+            rotation = last_rotation @ rotation_vector_matrix(step)
+        self.samples.append((float(t), rotation, omega))
+        while len(self.samples) > 2 and t - self.samples[1][0] > self.history_s:
+            self.samples.popleft()
+        return True
+
+    def fresh(self, now: float) -> bool:
+        return bool(self.samples) and now - self.samples[-1][0] <= self.timeout_s
+
+    def attitude(self, t: float) -> np.ndarray:
+        """Rotation from turret/base_link at time t into the world-fixed frame."""
+        if not self.samples:
+            return IDENTITY
+        times = [sample[0] for sample in self.samples]
+        index = bisect_right(times, t)
+        if index == 0:
+            return self.samples[0][1]
+        t0, rotation, omega = self.samples[index - 1]
+        if index < len(self.samples):
+            t1, _, next_omega = self.samples[index]
+            if t1 - t0 <= self.timeout_s:
+                return rotation @ rotation_vector_matrix(
+                    0.5 * (omega + next_omega) * (t - t0)
+                )
+        return rotation @ rotation_vector_matrix(
+            omega * min(t - t0, self.extrapolation_s)
+        )
+
+
+class BearingRate:
+    """Rate of change of the target's line of sight (a unit vector in the
+    world-fixed frame) from a least-squares line through the last
+    ``window_s`` of detections.
+
+    Fed forward, it removes the lag of the aim filter and of the
+    capture-to-actuation latency for a target whose bearing changes steadily:
+    a walking target, or the car driving past a still one.
+    """
+
+    def __init__(
+        self, window_s: float = 0.5, min_samples: int = 4, max_rate_rad_s: float = 1.5
+    ) -> None:
+        self.window_s = float(window_s)
+        self.min_samples = int(min_samples)
+        self.max_rate = float(max_rate_rad_s)
+        self.samples: deque[tuple[float, np.ndarray]] = deque()
+
+    def reset(self) -> None:
+        self.samples.clear()
+
+    def add(self, t: float, sight: np.ndarray) -> None:
+        if not finite(t, *sight):
+            return
+        if self.samples and t <= self.samples[-1][0]:
+            if t == self.samples[-1][0]:
+                return
+            self.samples.clear()
+        self.samples.append((float(t), np.asarray(sight, dtype=float)))
+        while self.samples and t - self.samples[0][0] > self.window_s:
+            self.samples.popleft()
+
+    def rate(self, now: float) -> np.ndarray | None:
+        """Line-of-sight rate (1/s), or None without enough recent samples."""
+        if len(self.samples) < self.min_samples or not (
+            0.0 <= now - self.samples[-1][0] <= self.window_s
+        ):
+            return None
+        times = np.array([sample[0] for sample in self.samples])
+        sights = np.array([sample[1] for sample in self.samples])
+        offsets = times - times.mean()
+        spread = float(offsets @ offsets)
+        if spread < 1e-6:
+            return None
+        slope = offsets @ (sights - sights.mean(axis=0)) / spread
+        last = sights[-1]
+        slope = slope - float(slope @ last) * last  # keep it on the unit sphere
+        speed = float(np.linalg.norm(slope))
+        if speed > self.max_rate:
+            slope *= self.max_rate / speed
+        return slope
+
+
+class DetectionTracks:
+    """Stable string IDs for detections across frames.
+
+    A detection continues the nearest track of its class whose last box
+    centre lies within ``gate`` box diagonals; tracks survive ``timeout_s``
+    without detections so an object keeps its ID through short occlusions.
+    """
+
+    def __init__(self, timeout_s: float = 1.0, gate: float = 1.0) -> None:
+        self.timeout_s = float(timeout_s)
+        self.gate = float(gate)
+        self.tracks: dict[str, dict[str, Any]] = {}
+        self.next_id = 1
+        self.last_time = -math.inf
+
+    def get(self, track_id: str) -> dict[str, Any] | None:
+        return self.tracks.get(track_id)
+
+    def update(self, t: float, detections: list[dict[str, Any]]) -> None:
+        """Set each detection's "id"."""
+        if t < self.last_time:
+            self.tracks.clear()  # the clock jumped back
+        self.last_time = t
+        self.tracks = {
+            track_id: track
+            for track_id, track in self.tracks.items()
+            if t - track["t"] <= self.timeout_s
+        }
+        pairs = []
+        for track_id, track in self.tracks.items():
+            for index, detection in enumerate(detections):
+                if detection["class"] != track["class"]:
+                    continue
+                box, other = track["bbox_xywh"], detection["bbox_xywh"]
+                size = max(1.0, math.hypot(box[2], box[3]), math.hypot(other[2], other[3]))
+                cost = math.dist(box[:2], other[:2]) / size
+                if cost <= self.gate:
+                    pairs.append((cost, int(track_id), index))
+        assigned: dict[int, str] = {}
+        for _, track_id, index in sorted(pairs):
+            if index not in assigned and str(track_id) not in assigned.values():
+                assigned[index] = str(track_id)
+        for index, detection in enumerate(detections):
+            track_id = assigned.get(index)
+            if track_id is None:
+                track_id = str(self.next_id)
+                self.next_id += 1
+            detection["id"] = track_id
+            self.tracks[track_id] = {
+                "t": float(t),
+                "class": detection["class"],
+                "bbox_xywh": list(detection["bbox_xywh"]),
+                "centroid_px": list(detection["centroid_px"]),
+            }
 
 
 class PanTiltController:
@@ -68,6 +316,17 @@ class PanTiltController:
     n = 1..4 frames; the 0.82 per-frame gain this replaces is unstable from two
     frames of delay (pole magnitude 1.09). Keep ``gain`` at or below 0.45 when
     the latency estimate is uncertain.
+
+    On a moving base (``attitude``: the base's rotation into a world-fixed
+    frame, from its gyro) or with a target whose bearing keeps changing
+    (``lead``: its line-of-sight rate in that frame), the same filter runs on
+    world directions instead of joint angles: the target's line of sight is
+    predicted to when the command will take effect (``now`` plus
+    :meth:`actuation_delay`), the previous aim is carried along by the base's
+    rotation and the lead, and both are turned back into joint angles through
+    the base's attitude at that time. A target that moves as predicted then
+    leaves no lag, and :meth:`hold` keeps the aim on it between frames.
+    Without either, the update is the fixed-base one above.
     """
 
     def __init__(
@@ -104,6 +363,11 @@ class PanTiltController:
             [(-math.inf, float(initial_position[0]), float(initial_position[1]))]
         )
         self.last_command: tuple[float, float, float] | None = None
+        self.last_update: float | None = None
+        # Moving-base aim: (time it applies, world direction, line-of-sight rate).
+        self.aim: tuple[float, np.ndarray, np.ndarray] | None = None
+        self.delay = self.actuator_latency_s
+        self.delay_time = -math.inf
 
     def add_measured(self, t: float, pan: float, tilt: float) -> bool:
         if not finite(t, pan, tilt):
@@ -117,6 +381,59 @@ class PanTiltController:
     def has_feedback(self, now: float) -> bool:
         return bool(self.measured) and now - self.measured[-1][0] <= self.feedback_timeout_s
 
+    def continuing(self, now: float) -> bool:
+        """Whether the last command is recent enough to continue from."""
+        return (
+            self.last_command is not None
+            and 0.0 <= now - self.last_command[0] <= self.resume_timeout_s
+        )
+
+    def position(self, now: float) -> tuple[float, float, float]:
+        """(time, pan, tilt): the best estimate of where the turret is going."""
+        if self.continuing(now):
+            return self.last_command
+        # First command, or resuming after a pause: start from the best
+        # estimate of where the turret is now rather than a stale command.
+        return self.measured[-1] if self.has_feedback(now) else self.commanded[-1]
+
+    def actuation_delay(self, now: float) -> float:
+        """Delay from a command to the turret's motion, the horizon the
+        moving-base aim predicts over: fitted to the measured joint states
+        (twice a second, while the commands move the turret), otherwise
+        ``actuator_latency_s``. A wrong horizon points the turret ahead of or
+        behind the target by the base's rate times the error, which the
+        camera loop cannot see as its own."""
+        if not self.has_feedback(now):
+            return self.actuator_latency_s
+        if not 0.0 <= now - self.delay_time < 0.5:
+            self.delay_time = now
+            fitted = self._fit_delay(now)
+            if fitted is not None:
+                self.delay = 0.5 * (self.delay + fitted)
+        return self.delay
+
+    def _fit_delay(
+        self, now: float, window_s: float = 2.0, max_delay_s: float = 0.3
+    ) -> float | None:
+        """The delay that best explains the last ``window_s`` of measured
+        positions as the commands in effect that much earlier; None while the
+        commands barely moved (a still turret says nothing about its delay)."""
+        commanded = np.array(self.commanded)
+        # Only positions every candidate delay maps to a sent command (not the
+        # assumed start pose before the first one).
+        start = max(now - window_s, commanded[min(1, len(commanded) - 1), 0] + max_delay_s)
+        measured = np.array([sample for sample in self.measured if sample[0] >= start])
+        recent = commanded[commanded[:, 0] >= start - max_delay_s, 1:]
+        if len(measured) < 10 or len(recent) < 2 or np.ptp(recent, axis=0).max() < 0.05:
+            return None
+        delays = np.arange(0.0, max_delay_s + 1e-9, 0.01)
+        costs = []
+        for delay in delays:
+            index = np.searchsorted(commanded[:, 0], measured[:, 0] - delay, side="right")
+            residual = measured[:, 1:] - commanded[np.maximum(index - 1, 0), 1:]
+            costs.append(float(np.mean(residual**2)))
+        return float(delays[int(np.argmin(costs))])
+
     def reference(self, t_image: float, now: float) -> tuple[tuple[float, float], str]:
         """Turret position when the frame stamped ``t_image`` was captured."""
         if self.has_feedback(now):
@@ -126,35 +443,103 @@ class PanTiltController:
             "commanded",
         )
 
+    def sight(
+        self,
+        t_image: float,
+        err_pan: float,
+        err_tilt: float,
+        now: float,
+        attitude: Attitude | None = None,
+    ) -> np.ndarray:
+        """The target's line of sight at capture, in the world-fixed frame of
+        ``attitude`` (turret/base_link without one)."""
+        (pan, tilt), _ = self.reference(t_image, now)
+        rotate = attitude or fixed_attitude
+        return rotate(t_image) @ camera_ray(pan, tilt, err_pan, err_tilt)
+
     def update(
-        self, t_image: float, err_pan: float, err_tilt: float, now: float
+        self,
+        t_image: float,
+        err_pan: float,
+        err_tilt: float,
+        now: float,
+        attitude: Attitude | None = None,
+        lead: np.ndarray | None = None,
     ) -> tuple[float, float] | None:
         """Return the next (pan, tilt) command, or None for invalid input."""
         if not finite(t_image, err_pan, err_tilt, now):
             return None
-        reference, _ = self.reference(t_image, now)
-        target = (reference[0] + err_pan, reference[1] + err_tilt)
-        if (
-            self.last_command is not None
-            and 0.0 <= now - self.last_command[0] <= self.resume_timeout_s
-        ):
-            previous = self.last_command[1:]
-            dt = max(1e-3, now - self.last_command[0])
+        if lead is not None and not finite(*lead):
+            lead = None
+        dt = self._step_time(now)
+        if attitude is None and lead is None:
+            self.aim = None
+            reference, _ = self.reference(t_image, now)
+            target = (reference[0] + err_pan, reference[1] + err_tilt)
+            return self._command(now, self.position(now)[1:], target, dt, False)
+
+        rotate = attitude or fixed_attitude
+        rate = np.zeros(3) if lead is None else np.asarray(lead, dtype=float)
+        t_aim = now + self.actuation_delay(now)
+        to_base = rotate(t_aim).T
+        sight = self.sight(t_image, err_pan, err_tilt, now, attitude)
+        target = direction_joints(to_base @ unit(sight + rate * (t_aim - t_image)))
+        if self.continuing(now) and self.aim is not None:
+            previous = self.hold(t_aim, attitude)
         else:
-            # First command, or resuming after a pause: start from the best
-            # estimate of where the turret is now rather than a stale command.
-            previous = (
-                self.measured[-1][1:] if self.has_feedback(now) else self.commanded[-1][1:]
-            )
-            dt = min(self.resume_timeout_s, 0.1)
+            t_q, pan, tilt = self.position(now)
+            previous = direction_joints(to_base @ rotate(t_q) @ joint_direction(pan, tilt))
+        command = self._command(now, previous, target, dt, True)
+        self.aim = (t_aim, rotate(t_aim) @ joint_direction(*command), rate)
+        return command
+
+    def hold(
+        self, t: float, attitude: Attitude | None = None
+    ) -> tuple[float, float] | None:
+        """Joints that keep the moving-base aim on its world direction at time
+        ``t`` (when the command takes effect), extrapolating the lead for at
+        most ``resume_timeout_s`` past the last frame."""
+        if self.aim is None or not finite(t):
+            return None
+        t_aim, direction, rate = self.aim
+        elapsed = min(max(t - t_aim, 0.0), self.resume_timeout_s)
+        rotate = attitude or fixed_attitude
+        pan, tilt = direction_joints(rotate(t).T @ unit(direction + rate * elapsed))
+        return clamp(pan, *self.limits[0]), clamp(tilt, *self.limits[1])
+
+    def record(self, now: float, pan: float, tilt: float) -> None:
+        """Note a command sent to the actuator."""
+        self.last_command = (float(now), float(pan), float(tilt))
+        self.commanded.append(self.last_command)
+        self._prune(self.commanded, now)
+
+    def _step_time(self, now: float) -> float:
+        # The rate limit applies per camera update, so it uses the time since
+        # the last update even when hold() commands were sent in between.
+        if (
+            self.continuing(now)
+            and self.last_update is not None
+            and 0.0 <= now - self.last_update <= self.resume_timeout_s
+        ):
+            return max(1e-3, now - self.last_update)
+        return min(self.resume_timeout_s, 0.1)
+
+    def _command(
+        self,
+        now: float,
+        previous: tuple[float, float],
+        target: tuple[float, float],
+        dt: float,
+        wrap: bool,
+    ) -> tuple[float, float]:
         step_limit = self.max_rate * dt
         command = []
         for prev, goal, (low, high) in zip(previous, target, self.limits):
-            step = max(-step_limit, min(step_limit, self.gain * (goal - prev)))
+            error = math.remainder(goal - prev, 2.0 * math.pi) if wrap else goal - prev
+            step = max(-step_limit, min(step_limit, self.gain * error))
             command.append(clamp(prev + step, low, high))
-        self.last_command = (float(now), command[0], command[1])
-        self.commanded.append(self.last_command)
-        self._prune(self.commanded, now)
+        self.record(now, command[0], command[1])
+        self.last_update = float(now)
         return command[0], command[1]
 
     def _prune(self, history: deque, now: float) -> None:
@@ -238,60 +623,220 @@ def joint_position(msg: JointState | None, name: str) -> float | None:
     return None
 
 
+COMMANDING = ("measured", "commanded")
+
+DEFAULT_PARAMETERS: dict[str, Any] = {
+    "camera_topic": "/turret/camera/image_raw",
+    "camera_info_topic": "/turret/camera/camera_info",
+    "joint_state_topic": "/turret/joint_states",
+    "joint_command_topic": "/turret/joint_commands",
+    "segments_topic": "/turret/yolo/segments",
+    "target_mask_topic": "/turret/yolo/target_mask",
+    "target_bbox_topic": "/turret/yolo/target_bbox",
+    "target_confidence_topic": "/turret/yolo/target_confidence",
+    "pixel_error_topic": "/turret/target/pixel_error",
+    "angular_error_topic": "/turret/target/angular_error",
+    "annotated_image_topic": "/turret/yolo/annotated_image",
+    "selected_id_topic": "/turret/target/selected_id",
+    "locked_topic": "/turret/target/locked",
+    "diagnostics_topic": "/turret/diagnostics",
+    "emergency_stop_topic": "/turret/emergency_stop",
+    "actuator_ready_topic": "/turret/actuator_ready",
+    "command_topic": "/turret/command",
+    "status_topic": "/turret/status",
+    "model_path": "/workspace/cache/models/yoloe-26s-seg.pt",
+    "device": "0",
+    "image_size": 640,
+    "confidence": 0.003,
+    "class_prompts": ["blue utility cart"],
+    "target_id": "cart_blue_01",
+    "target_class": "blue utility cart",
+    "initial_selection_normalized": [0.13, 0.565],
+    "association_gate_fraction": 0.50,
+    # Track target_class from start-up (the selection above); false waits
+    # for a lock command on command_topic.
+    "auto_start": True,
+    # Detections keep their ID this long without being seen.
+    "track_timeout_s": 1.0,
+    "command_enabled": True,
+    # Commands stay disabled until a false emergency-stop message arrives.
+    "require_estop_release": False,
+    # Fraction of the remaining pointing error corrected per frame; see
+    # PanTiltController for the latency/stability trade-off.
+    "kp": 0.4,
+    "max_rate_rad_s": 1.5,
+    # Command-to-motion delay used when no measured joint states arrive.
+    "actuator_latency_s": 0.1,
+    "joint_state_timeout_s": 0.5,
+    "actuator_ready_timeout_s": 1.0,
+    "pan_min_rad": -1.5708,
+    "pan_max_rad": 1.5708,
+    "tilt_min_rad": -0.65,
+    "tilt_max_rad": 0.75,
+    # Moving base: the base's angular velocity (sensor_msgs/Imu), rotated into
+    # base_frame through TF from the messages' frame_id (or base_imu_frame).
+    "base_compensation": True,
+    "base_imu_topic": "/imu/data_raw",
+    "base_imu_frame": "",
+    "base_frame": "turret/base_link",
+    "imu_timeout_s": 0.5,
+    # Feed forward the target's bearing rate, estimated over lead_window_s.
+    "target_lead": True,
+    "lead_window_s": 0.5,
+    # Manual rates, centring and the moving-base aim between frames.
+    "control_rate_hz": 50.0,
+    "manual_timeout_s": 0.5,
+    # Wall-clock rate, so the UI sees the status however fast sim time runs.
+    "status_rate_hz": 5.0,
+    "lock_tolerance_px": 36.0,
+    "publish_annotated_image": True,
+    "show_window": False,
+    "window_name": "PanTiltROS YOLO",
+    "warmup": True,
+    "ready_file": "/tmp/pantilt_yolo_ready",
+}
+
+
 class PanTiltYoloTracker(Node):
     def __init__(self) -> None:
         super().__init__("pantilt_yolo_tracker")
-        defaults: dict[str, Any] = {
-            "camera_topic": "/turret/camera/image_raw",
-            "camera_info_topic": "/turret/camera/camera_info",
-            "joint_state_topic": "/turret/joint_states",
-            "joint_command_topic": "/turret/joint_commands",
-            "segments_topic": "/turret/yolo/segments",
-            "target_mask_topic": "/turret/yolo/target_mask",
-            "target_bbox_topic": "/turret/yolo/target_bbox",
-            "target_confidence_topic": "/turret/yolo/target_confidence",
-            "pixel_error_topic": "/turret/target/pixel_error",
-            "angular_error_topic": "/turret/target/angular_error",
-            "annotated_image_topic": "/turret/yolo/annotated_image",
-            "selected_id_topic": "/turret/target/selected_id",
-            "locked_topic": "/turret/target/locked",
-            "diagnostics_topic": "/turret/diagnostics",
-            "emergency_stop_topic": "/turret/emergency_stop",
-            "actuator_ready_topic": "/turret/actuator_ready",
-            "model_path": "/workspace/cache/models/yoloe-26s-seg.pt",
-            "device": "0",
-            "image_size": 640,
-            "confidence": 0.003,
-            "class_prompts": ["blue utility cart"],
-            "target_id": "cart_blue_01",
-            "target_class": "blue utility cart",
-            "initial_selection_normalized": [0.13, 0.565],
-            "association_gate_fraction": 0.50,
-            "command_enabled": True,
-            # Commands stay disabled until a false emergency-stop message arrives.
-            "require_estop_release": False,
-            # Fraction of the remaining pointing error corrected per frame; see
-            # PanTiltController for the latency/stability trade-off.
-            "kp": 0.4,
-            "max_rate_rad_s": 1.5,
-            # Command-to-motion delay used when no measured joint states arrive.
-            "actuator_latency_s": 0.1,
-            "joint_state_timeout_s": 0.5,
-            "actuator_ready_timeout_s": 1.0,
-            "pan_min_rad": -1.5708,
-            "pan_max_rad": 1.5708,
-            "tilt_min_rad": -0.65,
-            "tilt_max_rad": 0.75,
-            "lock_tolerance_px": 36.0,
-            "publish_annotated_image": True,
-            "show_window": False,
-            "window_name": "PanTiltROS YOLO",
-            "warmup": True,
-            "ready_file": "/tmp/pantilt_yolo_ready",
-        }
-        for name, default in defaults.items():
+        for name, default in DEFAULT_PARAMETERS.items():
             self.declare_parameter(name, default)
+        self._configure()
 
+        self.segments_pub = self.create_publisher(
+            String, str(self.parameter("segments_topic")), 10
+        )
+        self.mask_pub = self.create_publisher(
+            Image, str(self.parameter("target_mask_topic")), 10
+        )
+        self.bbox_pub = self.create_publisher(
+            Float32MultiArray, str(self.parameter("target_bbox_topic")), 10
+        )
+        self.confidence_pub = self.create_publisher(
+            Float32, str(self.parameter("target_confidence_topic")), 10
+        )
+        self.pixel_error_pub = self.create_publisher(
+            Float32MultiArray, str(self.parameter("pixel_error_topic")), 10
+        )
+        self.angular_error_pub = self.create_publisher(
+            Float32MultiArray, str(self.parameter("angular_error_topic")), 10
+        )
+        self.annotated_pub = self.create_publisher(
+            Image,
+            str(self.parameter("annotated_image_topic")),
+            qos_profile_sensor_data,
+        )
+        self.selected_id_pub = self.create_publisher(
+            String, str(self.parameter("selected_id_topic")), 10
+        )
+        self.locked_pub = self.create_publisher(
+            Bool, str(self.parameter("locked_topic")), 10
+        )
+        self.command_pub = self.create_publisher(
+            JointState, str(self.parameter("joint_command_topic")), 10
+        )
+        self.diagnostics_pub = self.create_publisher(
+            DiagnosticArray, str(self.parameter("diagnostics_topic")), 10
+        )
+        latched_qos = QoSProfile(
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=1,
+        )
+        self.status_pub = self.create_publisher(
+            String, str(self.parameter("status_topic")), latched_qos
+        )
+        camera_qos = QoSProfile(
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=1,
+        )
+        self.create_subscription(
+            CameraInfo,
+            str(self.parameter("camera_info_topic")),
+            self._camera_info,
+            camera_qos,
+        )
+        self.create_subscription(
+            JointState,
+            str(self.parameter("joint_state_topic")),
+            self._joint_state,
+            qos_profile_sensor_data,
+        )
+        self.create_subscription(
+            Image,
+            str(self.parameter("camera_topic")),
+            self._image,
+            camera_qos,
+        )
+        # The latched subscription receives the last state from transient-local
+        # publishers; the volatile one also matches default-QoS publishers
+        # (e.g. a plain `ros2 topic pub`), which a transient-local reader cannot.
+        for qos in (latched_qos, 10):
+            self.create_subscription(
+                Bool,
+                str(self.parameter("emergency_stop_topic")),
+                self._emergency_stop,
+                qos,
+            )
+        self.create_subscription(
+            Bool,
+            str(self.parameter("actuator_ready_topic")),
+            self._actuator_ready,
+            latched_qos,
+        )
+        self.create_subscription(
+            String, str(self.parameter("command_topic")), self._turret_command, 10
+        )
+        if self.base_compensation:
+            if tf2_ros is not None:
+                self.tf_buffer = tf2_ros.Buffer()
+                self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
+            # Inference blocks this executor for tens of milliseconds; keep
+            # the rates that arrive meanwhile.
+            imu_qos = QoSProfile(
+                reliability=ReliabilityPolicy.BEST_EFFORT,
+                history=HistoryPolicy.KEEP_LAST,
+                depth=50,
+            )
+            self.create_subscription(
+                Imu, str(self.parameter("base_imu_topic")), self._imu, imu_qos
+            )
+        # Node (simulation) time: the deadman, manual rates and the aim follow
+        # the clock the images and joint states are stamped with.
+        self.create_timer(self.control_period_s, self._control_tick)
+        self.create_timer(
+            1.0 / max(0.5, float(self.parameter("status_rate_hz"))),
+            self._publish_status,
+            clock=rclpy.clock.Clock(clock_type=rclpy.clock.ClockType.STEADY_TIME),
+        )
+        self._publish_status()
+
+        self.get_logger().info(
+            f"Loading Ultralytics checkpoint {self.model_path} on {self.device}"
+        )
+        self.model = YOLO(self.model_path)
+        if "yoloe-" in Path(self.model_path).name.lower():
+            self.model.set_classes(self.class_prompts)
+        if bool(self.parameter("warmup")):
+            self.model.predict(
+                np.zeros((self.image_size, self.image_size, 3), dtype=np.uint8),
+                conf=self.confidence,
+                imgsz=self.image_size,
+                device=self.device,
+                verbose=False,
+            )
+        self.ready_file.parent.mkdir(parents=True, exist_ok=True)
+        self.ready_file.write_text("ready\n")
+        self.get_logger().info(
+            f"PanTiltROS YOLO ready: target={self.target_class!r}, "
+            f"camera={self.parameter('camera_topic')}"
+        )
+
+    def _configure(self) -> None:
+        """Read the parameters and set up the tracking state (no ROS entities)."""
         self.model_path = str(self.parameter("model_path"))
         self.device = str(self.parameter("device"))
         self.image_size = int(self.parameter("image_size"))
@@ -346,107 +891,40 @@ class PanTiltYoloTracker(Node):
         self.target_centroid: tuple[float, float] | None = None
         self.frame_count = 0
 
-        self.segments_pub = self.create_publisher(
-            String, str(self.parameter("segments_topic")), 10
-        )
-        self.mask_pub = self.create_publisher(
-            Image, str(self.parameter("target_mask_topic")), 10
-        )
-        self.bbox_pub = self.create_publisher(
-            Float32MultiArray, str(self.parameter("target_bbox_topic")), 10
-        )
-        self.confidence_pub = self.create_publisher(
-            Float32, str(self.parameter("target_confidence_topic")), 10
-        )
-        self.pixel_error_pub = self.create_publisher(
-            Float32MultiArray, str(self.parameter("pixel_error_topic")), 10
-        )
-        self.angular_error_pub = self.create_publisher(
-            Float32MultiArray, str(self.parameter("angular_error_topic")), 10
-        )
-        self.annotated_pub = self.create_publisher(
-            Image,
-            str(self.parameter("annotated_image_topic")),
-            qos_profile_sensor_data,
-        )
-        self.selected_id_pub = self.create_publisher(
-            String, str(self.parameter("selected_id_topic")), 10
-        )
-        self.locked_pub = self.create_publisher(
-            Bool, str(self.parameter("locked_topic")), 10
-        )
-        self.command_pub = self.create_publisher(
-            JointState, str(self.parameter("joint_command_topic")), 10
-        )
-        self.diagnostics_pub = self.create_publisher(
-            DiagnosticArray, str(self.parameter("diagnostics_topic")), 10
-        )
-        camera_qos = QoSProfile(
-            reliability=ReliabilityPolicy.BEST_EFFORT,
-            history=HistoryPolicy.KEEP_LAST,
-            depth=1,
-        )
-        self.create_subscription(
-            CameraInfo,
-            str(self.parameter("camera_info_topic")),
-            self._camera_info,
-            camera_qos,
-        )
-        self.create_subscription(
-            JointState,
-            str(self.parameter("joint_state_topic")),
-            self._joint_state,
-            qos_profile_sensor_data,
-        )
-        self.create_subscription(
-            Image,
-            str(self.parameter("camera_topic")),
-            self._image,
-            camera_qos,
-        )
-        latched_qos = QoSProfile(
-            reliability=ReliabilityPolicy.RELIABLE,
-            durability=DurabilityPolicy.TRANSIENT_LOCAL,
-            history=HistoryPolicy.KEEP_LAST,
-            depth=1,
-        )
-        # The latched subscription receives the last state from transient-local
-        # publishers; the volatile one also matches default-QoS publishers
-        # (e.g. a plain `ros2 topic pub`), which a transient-local reader cannot.
-        for qos in (latched_qos, 10):
-            self.create_subscription(
-                Bool,
-                str(self.parameter("emergency_stop_topic")),
-                self._emergency_stop,
-                qos,
-            )
-        self.create_subscription(
-            Bool,
-            str(self.parameter("actuator_ready_topic")),
-            self._actuator_ready,
-            latched_qos,
-        )
+        # Selection: "startup" follows target_class from initial_selection as
+        # configured; "track" follows the detection ID chosen by a command.
+        self.mode = "auto" if bool(self.parameter("auto_start")) else "idle"
+        self.selection = "startup" if self.mode == "auto" else ""
+        self.target_track = ""
+        self.lock_class = ""
+        self.tracks = DetectionTracks(timeout_s=float(self.parameter("track_timeout_s")))
+        self.last_detections: list[dict[str, Any]] = []
+        self.last_frame: dict[str, Any] | None = None
+        self.manual_rates = (0.0, 0.0)
+        self.manual_time = -math.inf
+        self.manual_timeout_s = float(self.parameter("manual_timeout_s"))
+        self.manual_last: tuple[tuple[float, float], float] | None = None
+        self.goto: tuple[float, float] | None = None
+        self.notice = ("", -math.inf)
+        self.control_period_s = 1.0 / max(1.0, float(self.parameter("control_rate_hz")))
 
-        self.get_logger().info(
-            f"Loading Ultralytics checkpoint {self.model_path} on {self.device}"
+        self.base_compensation = bool(self.parameter("base_compensation"))
+        self.base_imu_topic = str(self.parameter("base_imu_topic"))
+        self.base_imu_frame = str(self.parameter("base_imu_frame"))
+        self.base_frame = str(self.parameter("base_frame"))
+        self.imu_timeout_s = float(self.parameter("imu_timeout_s"))
+        self.base_rotation = BaseRotation(timeout_s=self.imu_timeout_s)
+        self.tf_buffer: Any = None
+        self.imu_rotations: dict[str, np.ndarray] = {}
+        self.imu_lookup_time = -math.inf
+        self.imu_problem = ""
+        self.target_lead = bool(self.parameter("target_lead"))
+        self.lead = BearingRate(
+            window_s=float(self.parameter("lead_window_s")),
+            max_rate_rad_s=self.controller.max_rate,
         )
-        self.model = YOLO(self.model_path)
-        if "yoloe-" in Path(self.model_path).name.lower():
-            self.model.set_classes(self.class_prompts)
-        if bool(self.parameter("warmup")):
-            self.model.predict(
-                np.zeros((self.image_size, self.image_size, 3), dtype=np.uint8),
-                conf=self.confidence,
-                imgsz=self.image_size,
-                device=self.device,
-                verbose=False,
-            )
-        self.ready_file.parent.mkdir(parents=True, exist_ok=True)
-        self.ready_file.write_text("ready\n")
-        self.get_logger().info(
-            f"PanTiltROS YOLO ready: target={self.target_class!r}, "
-            f"camera={self.parameter('camera_topic')}"
-        )
+        self.lead_rate: np.ndarray | None = None
+        self.lead_world = False
 
     def parameter(self, name: str) -> Any:
         return self.get_parameter(name).value
@@ -464,12 +942,68 @@ class PanTiltYoloTracker(Node):
             return
         stamp = stamp_seconds(msg.header.stamp)
         now = self._now()
+        if now <= 0.0:
+            return  # use_sim_time and no /clock yet
         if stamp <= 0.0 or abs(stamp - now) > 2.0:
             stamp = now
         if not self.controller.add_measured(stamp, pan, tilt):
             self.get_logger().warning(
                 "ignoring non-finite joint state", throttle_duration_sec=5.0
             )
+
+    def _imu(self, msg: Imu) -> None:
+        now = self._now()
+        if now <= 0.0:
+            return
+        rotation = self._imu_rotation(self.base_imu_frame or msg.header.frame_id, now)
+        if rotation is None:
+            return
+        rate = msg.angular_velocity
+        stamp = stamp_seconds(msg.header.stamp)
+        if stamp <= 0.0 or abs(stamp - now) > 2.0:
+            stamp = now
+        if not self.base_rotation.add(stamp, rotation @ np.array([rate.x, rate.y, rate.z])):
+            self.get_logger().warning(
+                "ignoring non-finite or implausible IMU rate", throttle_duration_sec=5.0
+            )
+
+    def _imu_rotation(self, frame: str, now: float) -> np.ndarray | None:
+        """Rotation from the IMU's frame into base_frame (a static transform)."""
+        if frame == self.base_frame:
+            return IDENTITY
+        if not frame:
+            self.imu_problem = "IMU messages have no frame_id: set base_imu_frame"
+            return None
+        if frame in self.imu_rotations:
+            return self.imu_rotations[frame]
+        if 0.0 <= now - self.imu_lookup_time < 1.0:
+            return None
+        self.imu_lookup_time = now
+        if self.tf_buffer is None:
+            self.imu_problem = "tf2_ros is not available"
+            return None
+        try:
+            transform = self.tf_buffer.lookup_transform(
+                self.base_frame, frame, rclpy.time.Time()
+            )
+        except Exception:  # tf2's lookup, connectivity and extrapolation errors
+            self.imu_problem = f"no transform from {frame} to {self.base_frame}"
+            return None
+        q = transform.transform.rotation
+        self.imu_rotations[frame] = quaternion_matrix(q.x, q.y, q.z, q.w)
+        self.imu_problem = ""
+        return self.imu_rotations[frame]
+
+    def _attitude(self) -> Attitude | None:
+        """The base's attitude, or None for the fixed-base controller. Once
+        rates have arrived it freezes when they stop (fixed-base aiming)
+        without changing frames under the aim."""
+        if self.base_compensation and self.base_rotation.samples:
+            return self.base_rotation.attitude
+        return None
+
+    def _compensating(self, now: float) -> bool:
+        return self.base_compensation and self.base_rotation.fresh(now)
 
     def _emergency_stop(self, msg: Bool) -> None:
         engaged = bool(msg.data)
@@ -511,11 +1045,6 @@ class PanTiltYoloTracker(Node):
             self.get_logger().error(str(exc))
             return
         height, width = frame.shape[:2]
-        if self.target_centroid is None:
-            self.target_centroid = (
-                self.initial_selection[0] * width,
-                self.initial_selection[1] * height,
-            )
 
         started = time.perf_counter()
         result = self.model.predict(
@@ -527,11 +1056,29 @@ class PanTiltYoloTracker(Node):
         )[0]
         latency_ms = (time.perf_counter() - started) * 1000.0
         detections = self._detections(result, width, height)
+        self._process_frame(msg, frame, detections, latency_ms, capture_time)
+        self.frame_count += 1
+
+    def _process_frame(
+        self,
+        source: Image,
+        frame: np.ndarray | None,
+        detections: list[dict[str, Any]],
+        latency_ms: float,
+        capture_time: float,
+    ) -> None:
+        height, width = int(source.height), int(source.width)
+        if self.target_centroid is None:
+            self.target_centroid = (
+                self.initial_selection[0] * width,
+                self.initial_selection[1] * height,
+            )
+        self.tracks.update(capture_time, detections)
+        self.last_detections = detections
         target = self._associate_target(detections, width, height)
         self._publish_outputs(
-            msg, frame, target, detections, latency_ms, width, height, capture_time
+            source, frame, target, detections, latency_ms, width, height, capture_time
         )
-        self.frame_count += 1
 
     def _detections(self, result: Any, width: int, height: int) -> list[dict[str, Any]]:
         if result.boxes is None:
@@ -568,14 +1115,17 @@ class PanTiltYoloTracker(Node):
             )
             detections.append(
                 {
+                    "id": "",  # set by DetectionTracks
                     "class": str(result.names[int(class_index)]),
                     "confidence": float(confidence),
+                    # Box centre x, y and size, in pixels
                     "bbox_xywh": [
                         (x1 + x2) * 0.5,
                         (y1 + y2) * 0.5,
                         x2 - x1,
                         y2 - y1,
                     ],
+                    "bbox_xyxy": [x1, y1, x2, y2],
                     "centroid_px": [centroid[0], centroid[1]],
                     "mask_area_px": int((mask > 0).sum()),
                     "mask": mask,
@@ -586,30 +1136,46 @@ class PanTiltYoloTracker(Node):
     def _associate_target(
         self, detections: list[dict[str, Any]], width: int, height: int
     ) -> dict[str, Any] | None:
-        candidates = [
-            detection
-            for detection in detections
-            if detection["class"] in (self.target_class, self.target_id)
-        ]
-        if not candidates:
+        if self.mode != "auto":
             return None
-        assert self.target_centroid is not None
-        target = min(
-            candidates,
-            key=lambda detection: math.dist(
-                detection["centroid_px"], self.target_centroid
-            ),
-        )
-        gate = self.association_gate_fraction * max(width, height)
-        if math.dist(target["centroid_px"], self.target_centroid) > gate:
-            return None
+        target = None
+        if self.selection == "track":
+            target = next(
+                (d for d in detections if d["id"] == self.target_track), None
+            )
+        if target is None:
+            # Start-up selection, or the locked track was lost: the detection
+            # of the class nearest the last target position.
+            classes = (
+                (self.lock_class,)
+                if self.selection == "track"
+                else (self.target_class, self.target_id)
+            )
+            candidates = [
+                detection for detection in detections if detection["class"] in classes
+            ]
+            if not candidates:
+                return None
+            assert self.target_centroid is not None
+            target = min(
+                candidates,
+                key=lambda detection: math.dist(
+                    detection["centroid_px"], self.target_centroid
+                ),
+            )
+            gate = self.association_gate_fraction * max(width, height)
+            if math.dist(target["centroid_px"], self.target_centroid) > gate:
+                return None
+        if target["id"] != self.target_track:
+            self.lead.reset()
+        self.target_track = target["id"]
         self.target_centroid = tuple(target["centroid_px"])
         return target
 
     def _publish_outputs(
         self,
         source: Image,
-        frame: np.ndarray,
+        frame: np.ndarray | None,
         target: dict[str, Any] | None,
         detections: list[dict[str, Any]],
         latency_ms: float,
@@ -617,8 +1183,17 @@ class PanTiltYoloTracker(Node):
         height: int,
         capture_time: float,
     ) -> None:
+        # Per detection: the image it came from, so a UI can draw and pick
+        # boxes on the matching camera frame.
+        stamp = stamp_seconds(source.header.stamp)
         public_detections = [
-            {key: value for key, value in detection.items() if key != "mask"}
+            {
+                **{key: value for key, value in detection.items() if key != "mask"},
+                "selected": detection is target,
+                "stamp": stamp,
+                "image_width": width,
+                "image_height": height,
+            }
             for detection in detections
         ]
         self.segments_pub.publish(String(data=json.dumps(public_detections)))
@@ -626,6 +1201,7 @@ class PanTiltYoloTracker(Node):
         pixel_x = pixel_y = angular_x = angular_y = confidence = 0.0
         locked = False
         selected_id = ""
+        aim_error_deg = None
         bbox: list[float] = []
         mask = np.zeros((height, width), dtype=np.uint8)
         if target is not None:
@@ -636,9 +1212,21 @@ class PanTiltYoloTracker(Node):
             confidence = float(target["confidence"])
             bbox = [float(value) for value in target["bbox_xywh"]]
             mask = target["mask"]
-            selected_id = self.target_id
+            selected_id = self.target_id if self.selection == "startup" else target["id"]
             locked = math.hypot(pixel_x, pixel_y) <= self.lock_tolerance
+            aim_error_deg = math.degrees(math.atan(math.hypot(pixel_x / fx, pixel_y / fy)))
             self._publish_command(angular_x, angular_y, capture_time)
+        else:
+            self.lead_rate = None
+        self.last_frame = {
+            "time": self._now(),
+            "width": width,
+            "height": height,
+            "detections": len(detections),
+            "target": target is not None,
+            "locked": locked,
+            "aim_error_deg": aim_error_deg,
+        }
 
         self.mask_pub.publish(mask_message(mask, source))
         self.bbox_pub.publish(Float32MultiArray(data=bbox))
@@ -649,7 +1237,7 @@ class PanTiltYoloTracker(Node):
         )
         self.selected_id_pub.publish(String(data=selected_id))
         self.locked_pub.publish(Bool(data=locked))
-        if self.publish_annotated_image or self.show_window:
+        if frame is not None and (self.publish_annotated_image or self.show_window):
             annotated = self._annotate(
                 frame, detections, target, latency_ms, locked, cx, cy
             )
@@ -694,7 +1282,7 @@ class PanTiltYoloTracker(Node):
             )
             label_prefix = "TARGET " if is_target else ""
             label = (
-                f"{label_prefix}{detection['class']} "
+                f"{label_prefix}#{detection['id']} {detection['class']} "
                 f"{detection['confidence']:.2f}"
             )
             cv2.putText(
@@ -758,6 +1346,8 @@ class PanTiltYoloTracker(Node):
             return "disabled"
         if self.estop_engaged:
             return "emergency_stop"
+        if now <= 0.0:
+            return "waiting_for_clock"  # use_sim_time and no /clock yet
         if self.controller.has_feedback(now):
             return "measured"
         if (
@@ -769,25 +1359,277 @@ class PanTiltYoloTracker(Node):
         # commands that are never executed would wind the turret to a limit.
         return "actuator_not_ready"
 
+    def _lead(
+        self,
+        capture_time: float,
+        angular_x: float,
+        angular_y: float,
+        now: float,
+        attitude: Attitude | None,
+    ) -> np.ndarray | None:
+        """Add the target's line of sight and return its rate, if usable."""
+        _, source = self.controller.reference(capture_time, now)
+        if (
+            not self.target_lead
+            or source != "measured"
+            or not finite(capture_time, angular_x, angular_y)
+        ):
+            # Without measured joints the line of sight would include the
+            # turret's own estimated motion, and its rate would feed back.
+            self.lead.reset()
+            return None
+        if (attitude is not None) != self.lead_world:
+            self.lead.reset()  # its samples were in the other frame
+            self.lead_world = attitude is not None
+        self.lead.add(
+            capture_time,
+            self.controller.sight(capture_time, angular_x, angular_y, now, attitude),
+        )
+        return self.lead.rate(now)
+
     def _publish_command(
         self, angular_x: float, angular_y: float, capture_time: float
     ) -> None:
         now = self._now()
+        attitude = self._attitude()
+        self.lead_rate = self._lead(capture_time, angular_x, angular_y, now, attitude)
         self.command_state = self._command_gate(now)
-        if self.command_state not in ("measured", "commanded"):
+        if self.command_state not in COMMANDING:
             return
         command_position = self.controller.update(
-            capture_time, angular_x, angular_y, now
+            capture_time, angular_x, angular_y, now, attitude, self.lead_rate
         )
         if command_position is None:
             self.command_state = "invalid_error"
             return
-        pan, tilt = command_position
+        self._send(now, command_position, record=False)  # update() recorded it
+
+    def _send(
+        self, now: float, position: tuple[float, float], record: bool = True
+    ) -> None:
+        pan, tilt = position
         command = JointState()
         command.header.stamp = self.get_clock().now().to_msg()
         command.name = ["pan_joint", "tilt_joint"]
         command.position = [pan, tilt]
         self.command_pub.publish(command)
+        if record:
+            self.controller.record(now, pan, tilt)
+
+    def _control_tick(self) -> None:
+        """Between camera frames: manual rates, centring, and keeping the
+        moving-base aim on the target."""
+        now = self._now()
+        if self.mode == "idle" and self.goto is None:
+            return
+        if self.mode == "auto" and self.controller.aim is None:
+            return
+        gate = self._command_gate(now)
+        if gate not in COMMANDING:
+            self.command_state = gate
+            self.manual_last = None
+            return
+        if self.mode == "manual":
+            position = self._manual_step(now)
+        elif self.mode == "auto":
+            position = self._hold_step(now)
+        else:
+            position = self._center_step(now)
+        last = self.controller.last_command
+        if position is None or (
+            last is not None
+            and max(abs(position[0] - last[1]), abs(position[1] - last[2])) < 1e-4
+        ):
+            return
+        self.command_state = gate
+        self._send(now, position)
+
+    def _manual_step(self, now: float) -> tuple[float, float] | None:
+        if not 0.0 <= now - self.manual_time <= self.manual_timeout_s:
+            self.manual_last = None  # deadman: hold where the turret is
+            return None
+        if self.manual_last is None:
+            start, dt = self.controller.position(now)[1:], self.control_period_s
+        else:
+            start, last = self.manual_last
+            dt = min(max(now - last, 0.0), 0.1)
+        position = tuple(
+            clamp(value + rate * dt, low, high)
+            for value, rate, (low, high) in zip(
+                start, self.manual_rates, self.controller.limits
+            )
+        )
+        self.manual_last = (position, now)
+        return position
+
+    def _center_step(self, now: float) -> tuple[float, float] | None:
+        assert self.goto is not None
+        start = self.controller.position(now)[1:]
+        step = self.controller.max_rate * self.control_period_s
+        position = tuple(
+            value + max(-step, min(step, goal - value))
+            for value, goal in zip(start, self.goto)
+        )
+        if position == self.goto:
+            self.goto = None
+            self._notify(now, "centred")
+        return position
+
+    def _hold_step(self, now: float) -> tuple[float, float] | None:
+        if not self.controller.continuing(now):
+            return None  # after a pause the next frame re-aims gradually
+        return self.controller.hold(
+            now + self.controller.actuation_delay(now), self._attitude()
+        )
+
+    def _turret_command(self, msg: String) -> None:
+        now = self._now()
+        try:
+            command = json.loads(msg.data)
+        except (TypeError, ValueError):
+            command = None
+        action = command.get("action") if isinstance(command, dict) else None
+        if action == "lock":
+            self._lock(command, now)
+        elif action == "release":
+            self._set_mode("idle")
+            self._notify(now, "released")
+        elif action == "manual":
+            self._manual(command, now)
+        elif action == "center":
+            self._set_mode("idle")
+            self.goto = (
+                clamp(0.0, *self.controller.limits[0]),
+                clamp(0.0, *self.controller.limits[1]),
+            )
+            self._notify(now, "centring")
+        else:
+            self._notify(now, f"ignored command {str(msg.data)[:80]!r}")
+        self._publish_status()
+
+    def _set_mode(self, mode: str) -> None:
+        self.mode = mode
+        self.goto = None
+        self.manual_last = None
+        self.lead.reset()
+        if mode != "auto":
+            self.selection = ""
+            self.target_track = ""
+            self.controller.aim = None
+
+    def _lock(self, command: dict[str, Any], now: float) -> None:
+        if "target_id" in command:
+            track_id = str(command["target_id"])
+            track = self.tracks.get(track_id)
+            if track is None:
+                self._notify(now, f"no detection with id {track_id}")
+                return
+            self._select(now, track_id, track["class"], track["centroid_px"])
+            return
+        point = command.get("point")
+        if (
+            not isinstance(point, (list, tuple))
+            or len(point) != 2
+            or not finite(*point)
+            or not all(0.0 <= float(value) <= 1.0 for value in point)
+        ):
+            self._notify(now, "lock needs target_id or point [u, v] in [0, 1]")
+            return
+        if self.last_frame is None:
+            self._notify(now, "no camera image yet")
+            return
+        u, v = float(point[0]), float(point[1])
+        x, y = u * self.last_frame["width"], v * self.last_frame["height"]
+        containing = [
+            detection
+            for detection in self.last_detections
+            if abs(x - detection["bbox_xywh"][0]) <= detection["bbox_xywh"][2] * 0.5
+            and abs(y - detection["bbox_xywh"][1]) <= detection["bbox_xywh"][3] * 0.5
+        ]
+        if not containing:
+            self._notify(now, f"no detection at ({u:.2f}, {v:.2f})")
+            return
+        detection = min(
+            containing, key=lambda d: math.dist(d["bbox_xywh"][:2], (x, y))
+        )
+        self._select(now, detection["id"], detection["class"], detection["centroid_px"])
+
+    def _select(
+        self, now: float, track_id: str, target_class: str, centroid: list[float]
+    ) -> None:
+        self._set_mode("auto")
+        self.selection = "track"
+        self.target_track = track_id
+        self.lock_class = target_class
+        self.target_centroid = (float(centroid[0]), float(centroid[1]))
+        self._notify(now, f"locked on {target_class} {track_id}")
+
+    def _manual(self, command: dict[str, Any], now: float) -> None:
+        try:
+            rates = (float(command.get("pan_rate", 0.0)), float(command.get("tilt_rate", 0.0)))
+        except (TypeError, ValueError):
+            rates = (math.nan, math.nan)
+        if not finite(*rates):
+            self._notify(now, "manual needs numeric pan_rate and tilt_rate")
+            return
+        if self.mode != "manual":
+            self._set_mode("manual")
+            self._notify(now, "manual control")
+        limit = self.controller.max_rate
+        self.manual_rates = tuple(clamp(rate, -limit, limit) for rate in rates)
+        self.manual_time = now
+
+    def _notify(self, now: float, text: str) -> None:
+        self.notice = (text, now)
+        self.get_logger().info(text)
+
+    def _status(self, now: float) -> dict[str, Any]:
+        frame = self.last_frame
+        recent = frame is not None and 0.0 <= now - frame["time"] <= 1.0
+        auto = self.mode == "auto"
+        gate = self._command_gate(now)
+        messages = []
+        text, noticed = self.notice
+        if text and 0.0 <= now - noticed <= 3.0:
+            messages.append(text)
+        if gate == "disabled":
+            messages.append("commands disabled")
+        elif gate == "emergency_stop":
+            messages.append("emergency stop engaged")
+        elif gate == "waiting_for_clock":
+            messages.append("waiting for /clock")
+        elif gate == "actuator_not_ready" and (self.mode != "idle" or self.goto):
+            messages.append("actuator not ready: no joint states or actuator_ready")
+        if not recent:
+            messages.append("no camera images")
+        elif auto and not frame["target"]:
+            messages.append(f"searching for {self._selected_class() or 'the target'}")
+        if self.base_compensation and not self._compensating(now):
+            problem = self.imu_problem or (
+                f"no IMU on {self.base_imu_topic} for {self.imu_timeout_s:g} s"
+            )
+            messages.append(f"{problem}: fixed-base aiming")
+        return {
+            "mode": "estop" if self.estop_engaged else self.mode,
+            "target_id": self.target_track if auto else "",
+            "target_class": self._selected_class() if auto else "",
+            "locked": bool(auto and recent and frame["locked"]),
+            "aim_error_deg": frame["aim_error_deg"] if auto and recent else None,
+            "base_compensation": self._compensating(now),
+            "target_lead": bool(self.target_lead and self.lead_rate is not None),
+            "detections": frame["detections"] if recent else 0,
+            "message": "; ".join(messages),
+            "stamp": now,
+            "command_state": self.command_state,
+        }
+
+    def _selected_class(self) -> str:
+        if self.selection == "track":
+            return self.lock_class
+        return self.target_class if self.selection == "startup" else ""
+
+    def _publish_status(self) -> None:
+        self.status_pub.publish(String(data=json.dumps(self._status(self._now()))))
 
     def _publish_diagnostics(
         self, latency_ms: float, detection_count: int, target_detected: bool
@@ -805,6 +1647,10 @@ class PanTiltYoloTracker(Node):
             KeyValue(key="detection_count", value=str(detection_count)),
             KeyValue(key="frame_count", value=str(self.frame_count)),
             KeyValue(key="command_state", value=self.command_state),
+            KeyValue(
+                key="actuation_delay_s",
+                value=f"{self.controller.actuation_delay(self._now()):.3f}",
+            ),
             KeyValue(key="emergency_stop", value=str(self.estop_engaged).lower()),
         ]
         message = DiagnosticArray()

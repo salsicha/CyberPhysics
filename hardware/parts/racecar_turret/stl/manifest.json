@@ -1,0 +1,349 @@
+{
+ "platform": "racecar_turret",
+ "generator": "tools/build_printable_parts.py",
+ "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+ "usable_volume_mm": [
+  250.0,
+  250.0,
+  250.0
+ ],
+ "stl_tolerance_mm": 0.05,
+ "stl_angular_tolerance_rad": 0.3,
+ "parts": [
+  {
+   "id": "plate_post",
+   "name": "Plate post",
+   "quantity": 4,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "outdoors in the sun; carries the turret",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 5,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 60,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "upright: the flange on the plate",
+    "rotate": []
+   },
+   "stl": "hardware/parts/racecar_turret/stl/plate_post.stl",
+   "step": "generated/parts/racecar_turret/plate_post.step",
+   "volume_cm3": 11.75,
+   "area_cm2": 48.7,
+   "print_size_mm": [
+    30.0,
+    12.0,
+    108.0
+   ],
+   "footprint_mm": [
+    30.0,
+    12.0
+   ],
+   "triangles": 1294,
+   "estimate": {
+    "mass_g": 11.5,
+    "time_min": 38,
+    "mass_g_all": 46.0,
+    "time_min_all": 152
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 3.3,
+    "min_wall_p1_mm": 3.99,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 334,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "racecarneo deck_rear (printed)",
+     "dimensions": "two M3 x 3 inserts 20 mm apart along x at each post position",
+     "source": "hardware/parts/racecarneo/_frame.py",
+     "verified": true
+    },
+    {
+     "part": "turret_plate (printed)",
+     "dimensions": "M3 insert in the top end",
+     "source": "hardware/parts/racecar_turret/_frame.py",
+     "verified": true
+    }
+   ],
+   "inserts": [
+    {
+     "size": "M3",
+     "qty": 1,
+     "where": "top end (plate screw)"
+    }
+   ],
+   "fasteners": [
+    {
+     "item": "M3 x 8 socket head cap screw",
+     "qty": 2,
+     "use": "plate post flange to the deck inserts"
+    }
+   ],
+   "notes": [
+    "Print upright with five walls: the waist is the thinnest section, but the posts are fixed at both ends, so the bending moment from the plate swaying is smallest there."
+   ]
+  },
+  {
+   "id": "post_clip",
+   "name": "Post cable clip",
+   "quantity": 4,
+   "material": "PETG",
+   "material_fallback": null,
+   "material_reason": "flexes to snap on without cracking",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu PETG Basic",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 100,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "flat: the clip profile on the plate",
+    "rotate": []
+   },
+   "stl": "hardware/parts/racecar_turret/stl/post_clip.stl",
+   "step": "generated/parts/racecar_turret/post_clip.step",
+   "volume_cm3": 0.86,
+   "area_cm2": 10.9,
+   "print_size_mm": [
+    22.4,
+    16.1,
+    8.0
+   ],
+   "footprint_mm": [
+    22.4,
+    16.1
+   ],
+   "triangles": 476,
+   "estimate": {
+    "mass_g": 1.1,
+    "time_min": 3,
+    "mass_g_all": 4.4,
+    "time_min_all": 13
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 1.79,
+    "min_wall_p1_mm": 1.79,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 107,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "plate_post (printed)",
+     "dimensions": "11.7 mm grip on the 12 mm post",
+     "source": "hardware/parts/racecar_turret/_frame.py",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [],
+   "notes": [
+    "Snap onto the posts' thick sections (above or below the waist), ring facing inboard; one or two per post that carries cables."
+   ]
+  },
+  {
+   "id": "turret_plate",
+   "name": "Turret plate (with the servo adapter mount)",
+   "quantity": 1,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "the top of the car, in the sun",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 40,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "upside down: the top face on the plate, adapter standoffs up",
+    "rotate": [
+     [
+      "X",
+      180
+     ]
+    ]
+   },
+   "stl": "hardware/parts/racecar_turret/stl/turret_plate.stl",
+   "step": "generated/parts/racecar_turret/turret_plate.step",
+   "volume_cm3": 61.99,
+   "area_cm2": 282.5,
+   "print_size_mm": [
+    110.0,
+    116.0,
+    9.0
+   ],
+   "footprint_mm": [
+    110.0,
+    116.0
+   ],
+   "triangles": 3300,
+   "estimate": {
+    "mass_g": 44.6,
+    "time_min": 79,
+    "mass_g_all": 44.6,
+    "time_min_all": 79
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 1.4,
+    "min_wall_p1_mm": 1.4,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 12334,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "turret pan_base (printed)",
+     "dimensions": "four M3 x 3 inserts on a 50 mm square",
+     "source": "hardware/parts/turret/_frame.py",
+     "verified": true
+    },
+    {
+     "part": "plate_post (printed)",
+     "dimensions": "four M3 screws into the posts' top inserts",
+     "source": "hardware/parts/racecar_turret/_frame.py",
+     "verified": true
+    },
+    {
+     "part": "Waveshare Bus Servo Adapter (A)",
+     "dimensions": "42 x 33 mm, dia. 2.5 holes on 37 x 28 mm",
+     "source": "Waveshare Bus Servo Adapter (A) product page (https://www.waveshare.com/bus-servo-adapter-a.htm), wiki (https://www.waveshare.com/wiki/Bus_Servo_Adapter_(A)) and schematic",
+     "verified": true
+    }
+   ],
+   "inserts": [
+    {
+     "size": "M3-short",
+     "qty": 4,
+     "where": "pan base screws, from the top, through holes pressed flush"
+    },
+    {
+     "size": "M2",
+     "qty": 4,
+     "where": "adapter standoffs under the plate"
+    }
+   ],
+   "fasteners": [
+    {
+     "item": "M3 x 10 socket head cap screw",
+     "qty": 4,
+     "use": "turret plate onto the posts' top inserts"
+    },
+    {
+     "item": "M3 washer",
+     "qty": 4,
+     "use": "turret plate screws"
+    },
+    {
+     "item": "M2 x 5 socket head cap screw",
+     "qty": 4,
+     "use": "Bus Servo Adapter (A) to the plate's standoffs"
+    },
+    {
+     "item": "zip tie 2.5 mm",
+     "qty": 2,
+     "use": "servo bus and camera cable at the plate's pass-throughs"
+    }
+   ],
+   "notes": [
+    "The turret's pan base bolts on with the same four M3 x 10 as on its own base plate.",
+    "The adapter hangs under the plate with its components down: set its jumper (A, UART) before fitting it."
+   ]
+  }
+ ],
+ "plates": [
+  {
+   "name": "A",
+   "material": "ASA",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "turret_plate",
+     "qty": 1
+    },
+    {
+     "id": "plate_post",
+     "qty": 4
+    }
+   ],
+   "time_min": 237,
+   "mass_g": 91
+  },
+  {
+   "name": "B",
+   "material": "PETG",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "post_clip",
+     "qty": 4
+    }
+   ],
+   "time_min": 18,
+   "mass_g": 4
+  }
+ ],
+ "assembly": {
+  "bodies": 166,
+  "interferences": "none",
+  "intended_press_fits": 14,
+  "scan_plane_blind_sectors": [
+   "camera_arm: 157.2 to -157.2 deg (45.5 deg wide), 31-46 mm (inside the C1's blind range)"
+  ],
+  "post_sectors": [
+   "plate_post_0: 159.1 to 162.3 deg (3.2 deg wide), 141-149 mm from the lidar axis, in the fin's shadow",
+   "plate_post_1: -162.3 to -159.1 deg (3.2 deg wide), 141-149 mm from the lidar axis, in the fin's shadow",
+   "plate_post_2: 166.8 to 168.9 deg (2.0 deg wide), 224-232 mm from the lidar axis, in the fin's shadow",
+   "plate_post_3: -168.9 to -166.8 deg (2.0 deg wide), 224-232 mm from the lidar axis, in the fin's shadow"
+  ],
+  "scan_plane_measured": "none",
+  "posts_in_scan_filter_box": "yes: box x -170..-30, y -70..70 mm; posts at (-57, 48), (-57, -48), (-143, 48), (-143, -48)",
+  "pan_sweep": "clear over +-90 deg; smallest gap 0.6 mm (hub_screw_0_7 / turret_pan_servo_case at -90 deg)",
+  "turret_camera_view": "at pan 0 the car enters the view below about -3 deg of tilt (realsense)",
+  "turret_camera_view_clear_level": true,
+  "cable_runs_mm": "UART jumpers Jetson header to adapter about 375; turret camera USB about 815 (with 120 mm of pan loop and 150 mm on the tilt stage)",
+  "added_mass_g": 370,
+  "passed": true
+ }
+}

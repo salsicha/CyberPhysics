@@ -4,7 +4,9 @@ Both the simulator and the hardware compositions run this, so
 urdf/racecarneo.urdf.xacro is the only place sensor extrinsics are defined.
 Set camera_optical_frames:=false when a camera driver (the RealSense node)
 publishes racecarneo/camera_link -> optical frames itself, and
-sim_geometry:=true for the (smaller) RacecarSim car's sensor mounts.
+sim_geometry:=true for the (smaller) RacecarSim car's sensor mounts. The
+RACECAR Turret passes its own URDF (urdf:=) and reads the turret joints
+from joint_states_topic:=/turret/joint_states.
 """
 import os
 
@@ -31,10 +33,14 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'sim_geometry', default_value='false',
             description='Use the RacecarSim car sensor mounts instead of the hardware ones'),
+        DeclareLaunchArgument(
+            'joint_states_topic', default_value='joint_states',
+            description='sensor_msgs/JointState of the movable joints, if any'),
         Node(
             package='robot_state_publisher',
             executable='robot_state_publisher',
             parameters=[{'robot_description': robot_description}],
+            remappings=[('joint_states', LaunchConfiguration('joint_states_topic'))],
             output='screen',
         ),
     ])

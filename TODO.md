@@ -1,7 +1,8 @@
 TODO:
 
 Complete simulation validation plan for the hardware configurations in
-`hardware/`: `racecarneo`, `so101`, `aerodrone`, and `turret`.
+`hardware/`: `racecarneo`, `so101`, `aerodrone`, `turret`, and `racecar_turret`
+(the RACECAR Neo carrying the turret, `systems/racecar_turret`).
 
 ## Cross-platform simulation foundation
 
@@ -286,7 +287,7 @@ view.
 
 ## Deliverables
 
-1. Scenario assets and launch files for all four platforms.
+1. Scenario assets and launch files for all five platforms.
 2. Sensor model configuration files matching every item in the `hardware/`
    platform entries.
 3. Mission/waypoint/task definitions and scoring scripts.

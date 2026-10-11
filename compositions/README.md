@@ -38,6 +38,7 @@ docker compose -f compositions/spaceros.yaml up                 # Space ROS Curi
 docker compose -f compositions/airplane_sim.yaml up
 docker compose -f compositions/airplane_hardware.yaml up
 docker compose -f compositions/turret_hardware.yaml up
+docker compose -f compositions/racecar_turret_hardware.yaml up -d  # RACECAR Turret on the car (systems/racecar_turret/README.md)
 docker compose -f compositions/turret_uno_q.yaml --profile board up    # turret bridge on an Arduino UNO Q (host: --profile host)
 docker compose -f compositions/arduino_uno_q.yaml up            # UNO Q LED demo (Linux side; run on the board)
 docker compose -f compositions/lunar_rover_hardware.yaml up
@@ -58,6 +59,15 @@ docker compose -f compositions/racecarneo.yaml up
 ```
 
 NiceGUI is served on `http://localhost:8080`.
+
+## RACECAR Turret
+
+`racecar_turret_hardware.yaml` runs the RACECAR Neo hardware services (extended from `racecarneo_hardware.yaml`) with the PanTiltROS turret: the USB turret camera (`usb_cam`), the ST3215 servos on the Jetson's header UART (`turret_arduino_bridge.py`, direct STS transport), the YOLO tracker with `systems/racecar_turret/config/turret_tracker.yaml`, and the web UI with the turret page (`UI_TURRET=1`). Bring-up order and safety: `systems/racecar_turret/README.md`; simulation: `applications/isaac/RACECAR_TURRET.md`.
+
+```bash
+TURRET_CAMERA_DEVICE=/dev/v4l/by-id/<camera>-video-index0 \
+  docker compose -f compositions/racecar_turret_hardware.yaml up -d
+```
 
 ## Guidelines
 

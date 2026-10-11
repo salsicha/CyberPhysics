@@ -1,0 +1,226 @@
+# Physical RACECAR Turret (systems/racecar_turret): the RACECAR Neo hardware
+# stack of racecarneo_hardware.yaml (RealSense, Depth Anything, nvblox, SLAM
+# Toolbox, Nav2, cmd_vel_to_ackermann, the web UI, Foxglove), extended from
+# that file, plus the PanTiltROS turret on its plate behind the lidar:
+#
+#   turret_camera   USB (UVC) turret camera -> /turret/camera/image_raw and
+#                   camera_info, frame turret/camera_optical_frame
+#   turret_servos   turret_arduino_bridge.py with its direct Feetech STS
+#                   transport (no Arduino): the Jetson's 40-pin header UART
+#                   (/dev/ttyTHS1) -> Waveshare Bus Servo Adapter (A) -> the
+#                   two ST3215
+#   turret_tracker  the YOLO tracker with systems/racecar_turret/config/
+#                   turret_tracker.yaml (lock/release/manual from the UI,
+#                   base-rotation compensation from /imu/data_raw)
+#
+# robot_state_publisher runs the combined URDF (racecar_turret.urdf.xacro,
+# which includes the RACECAR's) and reads the turret joints from
+# /turret/joint_states. The web UI (port 8080) runs with UI_TURRET=1: car
+# and turret on one page. Interfaces: systems/racecar_turret/interfaces.md.
+# Bring-up order and safety: systems/racecar_turret/README.md.
+#
+# The car's drivers outside this file are those of racecarneo_hardware.yaml
+# (lidar on /scan_raw here, masked into /scan below; IMU on /imu/data_raw, odometry, the motor bridge on
+# /ackermann_cmd). Nothing on the turret moves until the UI's Arm (a false
+# on /turret/emergency_stop); the hardware safety is the physical e-stop
+# that cuts servo power, since no microcontroller watchdog sits between the
+# Jetson and the servos.
+#
+# cmd_vel_to_ackermann and the web UI run this checkout's scripts (mounted),
+# so the teleop/stop mux and the turret page are there without rebuilding
+# the racecarneo and nicegui images. arm64/Jetson: not supported as is (see
+# racecarneo_hardware.yaml; the pantiltros image installs x86_64 PyTorch).
+#
+# The turret camera's 640x480 frames go to the tracker and the UI over UDP:
+# every service uses 4 MiB socket buffers, which the 208 KiB default drops
+# frames without (applications/racecarneo/README.md).
+
+x-dds: &dds FASTDDS_BUILTIN_TRANSPORTS=UDPv4?sockets_size=4194304
+
+x-pantiltros-image: &pantiltros-image
+  image: salsicha/cyberphysics:pantiltros-${CYBERPHYSICS_TAG:-latest}
+  pull_policy: build
+  build:
+    context: ../applications/pantiltros
+
+# Docker on some hosts gives containers an open-file limit of about 2^30,
+# and LTTng-UST in every ROS 2 Jazzy process then zeroes a 128 MiB
+# descriptor bitmap (racecarneo_hardware.yaml). The extended car services
+# inherit the same limits.
+x-ros-ulimits: &ros-ulimits
+  nofile:
+    soft: 1024
+    hard: 524288
+
+services:
+  # --- Car (racecarneo_hardware.yaml) ---------------------------------------
+  racecarneo_camera:
+    extends: {file: racecarneo_hardware.yaml, service: racecarneo_camera}
+    environment:
+      - *dds
+
+  racecarneo_robot_state_publisher:
+    extends: {file: racecarneo_hardware.yaml, service: racecarneo_robot_state_publisher}
+    environment:
+      - *dds
+    # The whole systems/ folder: the turret xacro includes the RACECAR's
+    # relatively. The RealSense driver publishes its own optical frames.
+    volumes:
+      - ../systems:/workspace/systems:ro
+    command: >
+      ros2 launch /workspace/systems/racecarneo/launch/racecarneo_description.launch.py
+        urdf:=/workspace/systems/racecar_turret/urdf/racecar_turret.urdf.xacro
+        camera_optical_frames:=false
+        joint_states_topic:=/turret/joint_states
+
+  # The turret plate's four posts cross the lidar's scan plane inside Nav2's
+  # robot radius: run the lidar driver on /scan_raw and this chain masks
+  # them into /scan for SLAM Toolbox, Nav2 and the collision monitor
+  # (systems/racecar_turret/config/scan_filter.yaml).
+  racecar_turret_scan_filter:
+    network_mode: host
+    pull_policy: if_not_present
+    image: salsicha/cyberphysics:racecarneo-${CYBERPHYSICS_TAG:-latest}
+    container_name: racecar_turret_scan_filter
+    restart: unless-stopped
+    ulimits: *ros-ulimits
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - *dds
+    volumes:
+      - ../systems/racecar_turret/config/scan_filter.yaml:/workspace/scan_filter.yaml:ro
+    command: >
+      ros2 run laser_filters scan_to_scan_filter_chain
+        --ros-args --params-file /workspace/scan_filter.yaml
+        -r scan:=/scan_raw -r scan_filtered:=/scan
+
+  racecarneo_cmd_vel_to_ackermann:
+    extends: {file: racecarneo_hardware.yaml, service: racecarneo_cmd_vel_to_ackermann}
+    environment:
+      - *dds
+    volumes:
+      - ../applications/racecarneo/scripts/cmd_vel_to_ackermann.py:/workspace/cmd_vel_to_ackermann.py:ro
+
+  racecarneo_depthanything:
+    extends: {file: racecarneo_hardware.yaml, service: racecarneo_depthanything}
+    environment:
+      - *dds
+
+  racecarneo_nvblox:
+    extends: {file: racecarneo_hardware.yaml, service: racecarneo_nvblox}
+    environment:
+      - *dds
+
+  racecarneo_slam:
+    extends: {file: racecarneo_hardware.yaml, service: racecarneo_slam}
+    environment:
+      - *dds
+
+  racecarneo_nav2:
+    extends: {file: racecarneo_hardware.yaml, service: racecarneo_nav2}
+    environment:
+      - *dds
+
+  racecarneo_nicegui:
+    extends: {file: racecarneo_hardware.yaml, service: racecarneo_nicegui}
+    environment:
+      - *dds
+      - UI_TURRET=1
+    volumes:
+      - ../applications/nicegui/scripts:/workspace/scripts:ro
+
+  racecarneo_foxglove_bridge:
+    extends: {file: racecarneo_hardware.yaml, service: racecarneo_foxglove_bridge}
+    environment:
+      - *dds
+
+  # --- Turret ---------------------------------------------------------------
+  # Set TURRET_CAMERA_DEVICE to the camera's stable path
+  # (/dev/v4l/by-id/usb-...-video-index0): with the RealSense plugged in,
+  # /dev/video0 is usually one of the RealSense's nodes.
+  turret_camera:
+    <<: *pantiltros-image
+    container_name: racecar_turret_camera
+    ulimits: *ros-ulimits
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - *dds
+    devices:
+      - ${TURRET_CAMERA_DEVICE:-/dev/video0}:/dev/turret_camera
+    volumes:
+      - ../systems/racecar_turret/calibration:/workspace/calibration:ro
+    command: >
+      ros2 run usb_cam usb_cam_node_exe
+        --ros-args
+        -r __node:=turret_camera
+        -r __ns:=/turret/camera
+        -p video_device:=/dev/turret_camera
+        -p image_width:=640
+        -p image_height:=480
+        -p framerate:=30.0
+        -p pixel_format:=mjpeg2rgb
+        -p frame_id:=turret/camera_optical_frame
+        -p camera_name:=turret_camera
+        -p camera_info_url:=file:///workspace/calibration/turret_camera.yaml
+
+  # The ST3215 bus on the Jetson's header UART (pins 8/10, enabled as UART
+  # with jetson-io; jetson_uart.env: sts transport at 1 Mbps). Only that
+  # device is passed in, not /dev or privileged. Fallback when the header
+  # UART does not transmit: the same adapter on USB (jumper on B), with
+  # TURRET_ARDUINO_PORT=/dev/serial/by-id/usb-... set in the shell (it sets
+  # both the device passed in and the bridge's port).
+  turret_servos:
+    <<: *pantiltros-image
+    container_name: racecar_turret_servos
+    ulimits: *ros-ulimits
+    network_mode: host
+    restart: unless-stopped
+    env_file:
+      - ../applications/pantiltros/config/jetson_uart.env
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - *dds
+      - TURRET_ARDUINO_PORT=${TURRET_ARDUINO_PORT:-/dev/ttyTHS1}
+    devices:
+      - ${TURRET_ARDUINO_PORT:-/dev/ttyTHS1}:${TURRET_ARDUINO_PORT:-/dev/ttyTHS1}
+    volumes:
+      - ../applications/pantiltros/config:/workspace/pantiltros/config:ro
+    command: >
+      python3 /scripts/turret_arduino_bridge.py
+      --ros-args
+      --params-file /workspace/pantiltros/config/arduino_bridge.yaml
+
+  turret_tracker:
+    <<: *pantiltros-image
+    container_name: racecar_turret_tracker
+    ulimits: *ros-ulimits
+    network_mode: host
+    ipc: host
+    gpus: all
+    restart: unless-stopped
+    depends_on:
+      - turret_camera
+      - turret_servos
+      - racecarneo_robot_state_publisher
+    working_dir: /workspace/cache/models
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - *dds
+      - YOLO_CONFIG_DIR=/workspace/cache/ultralytics
+      - TORCH_HOME=/workspace/cache/torch
+      - PANTILT_MODEL_DIR=/workspace/cache/models
+    volumes:
+      - ../systems/racecar_turret/config:/workspace/config:ro
+      - ../cache/turret:/workspace/cache
+    command: >
+      python3 /scripts/pantilt_yolo_tracker.py
+      --ros-args
+      --params-file /workspace/config/turret_tracker.yaml
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /tmp/pantilt_yolo_ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 90
+      start_period: 10m

@@ -6,12 +6,18 @@ simulation and on the physical robot.  The scene renderer is deliberately kept
 in `applications/turret_sim`; ground truth never enters the controller.
 
 The YOLO node consumes a ROS camera image, camera intrinsics, and pan/tilt joint
-state.  It runs Ultralytics YOLOE segmentation, associates the configured target,
-and publishes masks, target errors, diagnostics, and closed-loop `JointState`
-commands.  Configuration is in `config/yolo_tracker.yaml` (simulator scene) and
+state.  It runs Ultralytics YOLOE segmentation, gives every detection an ID that
+persists across frames, follows the selected target, and publishes masks, target
+errors, status, diagnostics, and closed-loop `JointState` commands. The target is
+chosen at start-up from the configuration or at run time on `/turret/command`.
+Configuration is in `config/yolo_tracker.yaml` (simulator scene) and
 `config/yolo_tracker_hardware.yaml` (physical turret: generic `person` prompt,
 confidence 0.25, narrow association gate, commands only after the emergency
-stop is released).
+stop is released). On a moving base (the RACECAR Turret,
+`systems/racecar_turret`) the tracker also compensates the base's rotation
+from its IMU; that platform's profiles are
+`systems/racecar_turret/config/turret_tracker.yaml` (car) and
+`turret_tracker_isaac.yaml` (Isaac Sim, `use_sim_time`).
 
 The image is built on the repository's ROS 2 Jazzy base (`ros2`, Python 3.12;
 build it first with `make -C applications build_ros2`) and pins Ultralytics
@@ -45,6 +51,124 @@ Commands are published only while all of these hold:
   would wind the turret to a joint limit.
 
 Non-finite errors and joint states are rejected.
+
+### Moving base and target lead
+
+With `base_compensation` the tracker integrates the base's angular velocity
+(`sensor_msgs/Imu` on `base_imu_topic`, default `/imu/data_raw`) into the
+base's attitude, after rotating it into `base_frame` (`turret/base_link`)
+with the static TF transform from the messages' `frame_id` (or
+`base_imu_frame` when the driver's is wrong or empty). The aim then lives in
+that world-fixed frame: each frame's target direction (the turret position at
+capture plus the image error, as above) and the previous aim are carried to
+the time the command will take effect and turned back into joint angles
+through the base's attitude at that time. That is a full rotation, so base yaw
+maps to pan one to one at any tilt, and roll or pitch reaches pan and tilt
+through the pan angle. Between frames a `control_rate_hz` (50 Hz) timer keeps
+the aim on its world direction, so a still target stays still in the image
+while the car turns. The time a command takes to move the turret is fitted to
+the measured joint states twice a second while the turret moves
+(`actuation_delay_s` in the diagnostics; `actuator_latency_s` until then or
+without measured joint states). Joint states must therefore be stamped when
+the position was measured.
+
+With `target_lead` the tracker fits the target's line-of-sight rate (in the
+same world-fixed frame) over the last `lead_window_s` of detections and feeds
+it forward, which removes the lag of the aim filter for a walking target or
+one the car drives past. It is used only with measured joint states, and it
+coasts for at most 0.5 s after the target is lost.
+
+Without an IMU message for `imu_timeout_s` (0.5 s), or without the IMU's
+transform, the attitude freezes and aiming falls back to a fixed base;
+`/turret/status` says so. With neither feature active the update is exactly
+the fixed-base loop above. The fixed-turret profiles switch both off: lead
+cut the error on the turret_sim plant, but with the simulator's noisy YOLOE
+detections, coasting through an occlusion once carried the aim onto a
+same-class decoy inside the start-up association gate.
+
+`tests/test_turret_moving_base.py` runs the node against the turret_sim servo
+model on a car (camera at 15 Hz, 70 ms inference, a servo 120 ms behind its
+commands, gyro noise and bias, the hardware profile). Mean (p95) aim error:
+
+| Run | Off | On |
+|---|---|---|
+| Slalom, yaw rate up to 0.94 rad/s, base compensation | 12.3 (19.9) deg | 0.8 (1.2) deg |
+| The same with a 40 ms servo (profile assumes 150 ms) | 9.8 (15.7) deg | 0.8 (1.3) deg |
+| Yaw and roll, target 0.3-0.4 rad above, IMU mounted turned | 11.3 (18.2) deg | 1.0 (1.7) deg |
+| Person crossing at 1.5 m/s, 5 m away, target lead | 6.1 (6.8) deg | 0.2 (0.5) deg |
+| Driving past a person 2.5 m away at 2 m/s, target lead | 6.5 (11.3) deg | 1.6 (3.2) deg |
+
+### Simulation time
+
+Every timing decision uses the node clock, so the tracker runs with
+`use_sim_time` (Isaac publishes `/clock` and stamps images and joint states
+with it), also when simulation time runs slower than real time: latency
+compensation, the IMU and joint-state timeouts, the manual deadman and the
+control timer all follow the stamps. Until the first `/clock` message nothing
+is commanded (status "waiting for /clock"). Only `/turret/status` is published
+on a wall-clock timer (`status_rate_hz`, 5 Hz), so a UI sees it however fast
+the simulation runs; its `stamp` is node time. Inference latency in the
+diagnostics is wall time.
+
+## Runtime commands and status
+
+`/turret/command` (`std_msgs/String`, JSON) selects and drives the turret at
+run time:
+
+- `{"action": "lock", "target_id": "3"}`: follow the detection with that ID.
+- `{"action": "lock", "point": [u, v]}`: `u`, `v` in [0, 1] of the image;
+  follow the detection whose box contains the point (the nearest box centre
+  if several do). A lock that matches nothing keeps the current mode and
+  says so in the status message.
+- `{"action": "release"}`: stop tracking and hold the current aim (`idle`).
+- `{"action": "manual", "pan_rate": r, "tilt_rate": r}`: rad/s, clamped to
+  `max_rate_rad_s`, positions clamped to the joint limits; implies `release`.
+  Repeat it (the UI does at 10 Hz): after `manual_timeout_s` (0.5 s) without
+  one the turret holds.
+- `{"action": "center"}`: release and move to pan 0, tilt 0 at
+  `max_rate_rad_s`.
+
+The safety gates above apply to all of them. A locked track that disappears
+is picked up again by class within the association gate (it then gets the new
+ID). With `auto_start` (default, the simulator and fixed-turret profiles) the
+tracker starts by following `target_class` from `initial_selection_normalized`
+as before; the RACECAR Turret profiles start `idle` and wait for a lock.
+
+`/turret/status` (`std_msgs/String`, JSON, reliable and transient-local, 5 Hz
+and after every command):
+
+```json
+{"mode": "auto", "target_id": "3", "target_class": "person", "locked": true,
+ "aim_error_deg": 1.2, "base_compensation": true, "detections": 2,
+ "message": "", "target_lead": true, "stamp": 1234.5,
+ "command_state": "measured"}
+```
+
+`mode` is `idle`, `auto`, `manual` or `estop` (the emergency stop is
+engaged); `target_id` is the followed detection's ID (`""` when not
+tracking); `locked` means detected within `lock_tolerance_px` of the image
+centre in the last second; `aim_error_deg` is the angle from the optical axis
+to the target in the last frame (`null` when not detected);
+`base_compensation` and `target_lead` say whether they are in use;
+`command_state` is the safety gate (`measured`/`commanded` allow commands).
+`message` joins the last command's result and what limits tracking (emergency
+stop, actuator not ready, no camera images, no IMU, searching).
+
+`/turret/yolo/segments` stays a JSON list with one object per detection; each
+now also carries a stable `id` (string), `bbox_xyxy` (corners), `selected`
+(the followed target), and the image's `stamp` (seconds), `image_width` and
+`image_height`:
+
+```json
+[{"id": "3", "class": "person", "confidence": 0.87,
+  "bbox_xywh": [412.0, 240.5, 96.0, 260.0], "bbox_xyxy": [364.0, 110.5, 460.0, 370.5],
+  "centroid_px": [410.2, 236.8], "mask_area_px": 15873, "selected": true,
+  "stamp": 1234.567, "image_width": 640, "image_height": 480}]
+```
+
+`bbox_xywh` is the box centre and size in pixels. IDs persist while a
+detection of the same class continues within one box diagonal of the last
+position, and through gaps up to `track_timeout_s` (1 s).
 
 ## Run
 
@@ -118,13 +242,16 @@ startup and persists in `cache/turret/models/`.  Override it with
 - Input: `/turret/camera/image_raw`, `/turret/camera/camera_info`,
   `/turret/joint_states` (measured positions only),
   `/turret/emergency_stop` and `/turret/actuator_ready` (`std_msgs/msg/Bool`,
-  transient-local; the e-stop also accepts default-QoS publishers)
+  transient-local; the e-stop also accepts default-QoS publishers),
+  `/turret/command` (JSON, above), and with `base_compensation` the base IMU
+  (`/imu/data_raw`) and TF
 - Perception: `/turret/yolo/segments`, `/turret/yolo/target_mask`,
   `/turret/yolo/target_bbox`, `/turret/yolo/target_confidence`,
   `/turret/yolo/annotated_image`
 - Tracking: `/turret/target/pixel_error`, `/turret/target/angular_error`,
-  `/turret/target/selected_id`, `/turret/target/locked`
-- Output: `/turret/joint_commands`, `/turret/diagnostics`
+  `/turret/target/selected_id` (the configured `target_id` while following the
+  start-up selection, the detection ID after a lock), `/turret/target/locked`
+- Output: `/turret/joint_commands`, `/turret/status`, `/turret/diagnostics`
 
 The Arduino bridge (`scripts/turret_arduino_bridge.py`) uses
 `config/arduino.env` and `config/arduino_bridge.yaml`. It writes

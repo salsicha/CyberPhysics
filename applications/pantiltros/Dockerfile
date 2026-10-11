@@ -72,6 +72,13 @@ RUN cd /opt/pantiltros_ws/src/pan_tilt_ros && \
 # TODO:
 # https://github.com/adityakamath/pan_tilt_ros
 
+# The RACECAR Turret's USB (UVC) turret camera driver
+# (compositions/racecar_turret_hardware.yaml). A layer of its own after the
+# PyTorch one, so adding it did not invalidate the multi-GB wheel layer.
+RUN apt-get update && apt-get install -q -y --no-install-recommends \
+    ros-${ROS_DISTRO}-usb-cam && \
+    rm -rf /var/lib/apt/lists/*
+
 COPY scripts/ /scripts/
 RUN chmod +x /scripts/*.py
 

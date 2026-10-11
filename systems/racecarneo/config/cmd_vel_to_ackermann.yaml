@@ -5,6 +5,13 @@
 # 24 deg (0.42 rad) steering lock, i.e. a 0.74 m tightest turn. Measure the
 # lock on your car (full-lock turning circle) and update both values. The
 # simulator stack overrides them with the smaller simulated car's geometry.
+#
+# Manual driving (the web UI's joystick) publishes on teleop_topic and takes
+# priority over cmd_vel_topic (Nav2) while it keeps arriving; when it stops
+# for teleop_timeout_s the car is commanded to zero speed. A true on
+# stop_request_topic (std_msgs/Bool, transient-local) holds zero speed until
+# a false releases it. control_status_topic reports the source, the stop and
+# the last command as JSON (systems/racecar_turret/interfaces.md).
 racecarneo_cmd_vel_to_ackermann:
   ros__parameters:
     wheelbase: 0.33
@@ -12,3 +19,8 @@ racecarneo_cmd_vel_to_ackermann:
     max_steering_angle: 0.42
     cmd_vel_topic: cmd_vel
     ackermann_topic: ackermann_cmd
+    teleop_topic: cmd_vel_teleop
+    teleop_timeout_s: 0.5
+    stop_request_topic: racecarneo/stop_request
+    control_status_topic: racecarneo/control_status
+    status_rate_hz: 2.0
