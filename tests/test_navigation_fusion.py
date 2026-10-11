@@ -690,3 +690,43 @@ def test_propagation_counts_simulated_time(module):
     _, north = latlon_to_local(sent.latitude, sent.longitude, ORIGIN[0], ORIGIN[1])
     assert north == pytest.approx(10.0 + 4.0 * 0.2 * 5.0, abs=0.1)
     assert sent.position_covariance[0] == pytest.approx(4.0 + (0.3 * 1.0) ** 2, rel=0.01)
+
+
+def test_corrections_thin_out_rather_than_exceed_the_ekf_accuracy_clip(module):
+    """ArduPilot's EKF3 clips the GPS accuracy it fuses at 100 m: a sample
+    sent with more would count as a 100 m one, more than its share. A
+    correction whose inflated sigma would exceed max_correction_sigma_m is
+    held back and not counted, so the stream thins out to the rate at which
+    its sigma stays under the clip."""
+    h = Harness(module, correction_correlation_s=5.1, max_correction_sigma_m=10.0)
+    h.origin()
+    sent = []
+    for step in range(60):  # DemNav at 5 Hz, sigma 4 m, for 12 s
+        t = WALL_S + 0.2 * step
+        h.raw(t)
+        before = len(h.published('/navigation/correction_fix'))
+        h.source('demnav', fix_at(t, 3.0, 0.0, sigma=4.0))
+        if len(h.published('/navigation/correction_fix')) > before:
+            sent.append(round(t - WALL_S, 1))
+    variances = [fix.position_covariance[0]
+                 for fix in h.published('/navigation/correction_fix')]
+    # 16 m^2 x n stays within 10^2: six per correlation time, the first
+    # six as before, then one more as each leaves the window.
+    assert variances[:6] == pytest.approx([16.0 * n for n in range(1, 7)])
+    assert max(variances) <= 100.0
+    assert sent[:7] == [0.0, 0.2, 0.4, 0.6, 0.8, 1.0, 5.2]
+    assert all(sum(1 for s in sent if t - 5.1 < s <= t) <= 6 for t in sent)
+    assert len(sent) == 18
+
+
+def test_a_correction_beyond_the_clip_on_its_own_is_not_sent(harness):
+    """A fix whose own sigma exceeds the clip is never sent (EKF3 would fuse
+    it as a 100 m one), and does not count against the next."""
+    harness.origin()
+    harness.raw(WALL_S)
+    harness.source('demnav', fix_at(WALL_S, 3.0, 0.0, sigma=120.0))
+    assert not harness.published('/navigation/correction_fix')
+    harness.raw(WALL_S + 0.5)
+    harness.source('demnav', fix_at(WALL_S + 0.5, 3.0, 0.0, sigma=4.0))
+    assert harness.last('/navigation/correction_fix').position_covariance[0] == \
+        pytest.approx(16.0)

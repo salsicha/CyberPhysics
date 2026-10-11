@@ -79,18 +79,29 @@ more than ``correction_consistency_sigma`` (5) of their combined sigma are
 not combined: the one farther from the fused position is left out (a false
 match, diluted by the combination and sent with the inflated variance
 below, would pass the EKF's innovation gate). The variance sent is that
-of the combination times the number of corrections sent within
-``correction_correlation_s`` (60 s): the fixes' errors are biases that
-persist for tens of seconds (the same terrain or map mismatch while the
-footprints overlap, the autopilot's own attitude error), while the EKF
-fuses every sample as independent, so a stream conveys about one sample's
-worth of information per correlation time whatever its rate. That also
-keeps the EKF's response to the corrections slow (about 10 s): the camera
-fixes move with the EKF's own attitude error (height x tilt), and a faster
-response closes that loop. This is what the autopilot
-bridge forwards to ArduPilot as GPS_INPUT. It is never the fused estimate:
-that is the autopilot's own odometry plus an offset, and feeding it back
-would make the EKF chase its own offset forever.
+of the combination times n, the number of corrections sent within
+``correction_correlation_s`` (60 s) including this one. The fixes' errors
+are correlated and the EKF fuses every sample as independent, so n (the
+rate times the correlation time) is the number of samples per independent
+one: the stream conveys one sample's information per correlation time
+whatever its rate. 60 s is the fixes' measured integral correlation time
+(twice the area under the autocorrelation of their errors against
+simulator truth): DemNav's errors are terrain-fixed biases (the same error
+at the same place with and without GPS) that fade over about a footprint
+flown, 44-47 s in the lite SITL stack (1/e after 27-29 s, GPS on or
+denied) and 62-66 s in Genesis; Gazebo's persist longer (4-7 m biases,
+82-126 s), Isaac's less (14-48 s). In Gazebo, where the camera fixes also
+move with the EKF's own attitude error (height x tilt) and a faster EKF
+response closes that loop, the corrections' errors averaged over 60 s are
+already 0.9-1.7 times the variance the EKF is told; a shorter window would
+make them overconfident (tools/gps_denied_sitl_test.md). A correction
+whose inflated sigma would exceed ``max_correction_sigma_m`` (100 m, where
+EKF3 clips the GPS accuracy it fuses) is held back and not counted, so the
+stream thins out instead of being fused as more accurate than it is. This
+is what the autopilot bridge forwards to ArduPilot as GPS_INPUT. It is
+never the fused estimate: that is the autopilot's own odometry plus an
+offset, and feeding it back would make the EKF chase its own offset
+forever.
 
 The sources are combined here because ArduPilot's EKF3 cannot weight them:
 it applies one GPS accuracy to every GPS_INPUT sample, the largest reported
@@ -242,6 +253,7 @@ class NavigationFusionNode(Node):
             'minimum_wildnav_confidence': 0.20,
             'correction_timeout_s': 30.0,
             'correction_correlation_s': 60.0,
+            'max_correction_sigma_m': 100.0,
             'correction_consistency_sigma': 5.0,
             'correction_time_constant_s': 2.0,
             'maximum_correction_m': 300.0,
@@ -703,12 +715,9 @@ class NavigationFusionNode(Node):
             total += weight
         if not total > 0.0:
             return
-        correlation_s = float(
-            self.get_parameter('correction_correlation_s').value)
-        self.correction_fix_times = [
-            sent for sent in self.correction_fix_times
-            if self._elapsed_s(sent) < correlation_s] + [self._now()]
-        variance = len(self.correction_fix_times) / total
+        variance = self._inflated_variance(1.0 / total)
+        if variance is None:
+            return
         lat, lon = local_to_latlon(
             east / total, north / total, self.origin[0], self.origin[1])
         fix = NavSatFix()
@@ -727,6 +736,42 @@ class NavigationFusionNode(Node):
         ]
         fix.position_covariance_type = NavSatFix.COVARIANCE_TYPE_DIAGONAL_KNOWN
         self.correction_pub.publish(fix)
+
+    def _inflated_variance(self, variance):
+        """The variance to send for a correction whose own (combined)
+        variance is ``variance``, or None to hold it back.
+
+        The fixes' errors are correlated: 1 / correction_correlation_s
+        independent samples per second whatever the rate, while EKF3 fuses
+        every sample as independent. So the n-th correction sent within
+        correction_correlation_s goes out with n times its variance (n = rate
+        x the correlation time = samples per independent one), and the EKF
+        accumulates one sample's information per correlation time.
+
+        EKF3 clips the GPS accuracy it uses at 100 m (readGpsData,
+        FuseVelPosNED): a sample sent with more would be fused as if it had
+        100 m, outweighing the rest. A correction whose inflated sigma would
+        exceed max_correction_sigma_m is therefore held back and not
+        counted: the stream thins out to the rate at which its sigma stays
+        under the clip instead of being clipped."""
+        correlation_s = float(
+            self.get_parameter('correction_correlation_s').value)
+        recent = [sent for sent in self.correction_fix_times
+                  if self._elapsed_s(sent) < correlation_s]
+        inflated = (len(recent) + 1) * variance
+        max_sigma = float(self.get_parameter('max_correction_sigma_m').value)
+        self.correction_fix_times = recent
+        if max_sigma > 0.0 and inflated > max_sigma ** 2:
+            self.get_logger().info(
+                f'Holding back a correction: {math.sqrt(variance):.1f} m, the '
+                f'{len(recent) + 1}th within correction_correlation_s, would go '
+                f'out as {math.sqrt(inflated):.0f} m, beyond '
+                f'max_correction_sigma_m ({max_sigma:.0f} m, where '
+                "ArduPilot's EKF3 clips GPS accuracy)",
+                throttle_duration_sec=10.0)
+            return None
+        self.correction_fix_times.append(self._now())
+        return inflated
 
     def _consistent(self, candidates):
         """The (east, north, variance) fixes that agree: while two differ by

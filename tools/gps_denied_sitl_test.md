@@ -100,15 +100,24 @@ navigation fusion and the ArduPilot navigation bridge together:
    (the denser DemNav would outvote the more accurate WildNav); sending only
    the more accurate source instead starves it (position every few seconds:
    3 deg of tilt drift in Gazebo, which moves every camera fix). The
-   variance sent is the combination's times the number of corrections sent
-   in the last `correction_correlation_s` (60 s): the fixes' errors are
-   biases lasting tens of seconds, and at their own variance the EKF jumps
-   at every sample, the controller answers with tens of degrees of tilt and
-   the camera fixes, which use the EKF's attitude, degrade with it (Gazebo:
-   20-70 m autopilot error). Fixes more than `correction_consistency_sigma`
-   (5) combined sigma apart are not combined; the one farther from the
-   fused position is left out (a false WildNav match, halved and sent with
-   that variance, passed the EKF's gate and pulled it 50 m in this test).
+   variance sent is the combination's times n, the number of corrections
+   sent in the last `correction_correlation_s` (60 s, the fixes' measured
+   integral correlation time: see "Correction correlation time" below).
+   The EKF fuses every sample as independent, and n = rate x correlation
+   time samples carry one independent sample's information. At their own
+   variance the EKF jumps at every sample, the controller answers with tens
+   of degrees of tilt and the camera fixes, which use the EKF's attitude,
+   degrade with it (Gazebo: 20-70 m autopilot error). A correction whose
+   inflated sigma would exceed `max_correction_sigma_m` (100 m, where EKF3
+   clips the GPS accuracy it fuses) is held back and not counted, so the
+   stream thins out instead of being fused as more accurate than it is
+   (up to 0.9 % of the corrections recorded in Isaac, Gazebo and Genesis
+   went out at 100-175 m before; in Isaac it now holds back DemNav-only
+   corrections that would go out at 117-122 m). Fixes more than
+   `correction_consistency_sigma` (5) combined sigma apart are not
+   combined; the one farther from the fused position is left out (a false
+   WildNav match, halved and sent with that variance, passed the EKF's gate
+   and pulled it 50 m in this test).
 3. **GPS 2 = GPS_INPUT.** The bridge sends each one through the MAVROS
    gps_input plugin with fix type 3D, GPS week/ms from the stamp, honest
    horizontal accuracy (fix sigma, HDOP = sigma / 5 m), 6 satellites (the
@@ -171,15 +180,60 @@ Full stack (`tools/gps_denied_sitl_test.sh`, DemNav corrections at 2 Hz):
 | control (`GPS_INPUT_CORRECTIONS=false`) | 128 s | 51.4 / 83.1 / 86.1 m | 57.2 m | 6 % (EKF failsafe -> LAND after 8 s) | 100 % |
 | on by default with the FC parameter check (forwarding armed 15 s after start) | 299 s | 8.1 / 17.7 / 20.5 m | 8.0 m | 100 %, no failsafe text | 98 % |
 | combined corrections, variance x corrections in 60 s (item 2) | 298 s | 19.5 / 29.4 / 34.6 m | 19.4 m | 100 %, no failsafe text | 100 % |
+| same, with the 100 m clip guard (item 2), two runs | 298 s | 15.5 / 29.7 / 30.0 and 14.3 / 28.3 / 28.6 m | 15.4 and 14.2 m | 100 %, no failsafe text | 100 % |
+| experiment: `correction_correlation_s` 20 s (corrections at ~25 m) | 298 s | 14.4 / 22.7 / 28.2 m | 14.3 m | 100 %, no failsafe text | 100 % |
 
-The last run's DemNav fixes were 2.2 m median off (p95 15.5 m) with a
-3.9 m sigma, but each correction went out with ~42 m (the variance scaling
-of item 2), so the EKF follows them more slowly than the earlier runs'
-per-fix ~22 m (then inflated by SITL's noisy gyro rate, which a stabilised
-camera does not see): ~28 m off within 25 s of the GPS loss, recovering
-over the next minute. The scaling is what keeps the Gazebo and Isaac
-stacks, whose body-fixed cameras close a loop through the EKF attitude,
-from diverging.
+With the variance scaling the corrections go out at ~42 m (DemNav's 3.9 m
+sigma, 120 corrections per 60 s). Run to run the result spreads by 5 m of
+RMSE at the same setting; one run with a 20 s window landed inside that
+spread (with a 6 m lower p95). What sets the error in every run, before
+and after the scaling: within 10-30 s of the GPS loss the EKF's velocity
+runs away from the truth by up to 3 m/s while the DemNav fixes are 1-3 m
+off (the vehicle slows from 5 to under 3 m/s, MAVROS odometry still
+reports 5 and later 8 m/s while the EKF position advances at 5 m/s),
+putting it 16-30 m off; position-only GPS_INPUT corrects position, not
+that velocity, so it converges over one to two minutes. Later in the
+denial DemNav's terrain-fixed biases (up to 10-16 m on parts of the
+square) add to it. The earlier 8 m runs had a per-fix sigma of ~22 m
+(SITL's noisy gyro rate, which a stabilised camera does not see), about a
+16 s window: three times as confident as this stack's measured correlation
+supports.
+
+### Correction correlation time
+
+`correction_correlation_s` is the integral correlation time of the fixes'
+errors against simulator truth: twice the area under their
+autocorrelation up to its first zero (for an exponential, twice the 1/e
+lag), on the simulator clock. n = rate x that time samples then carry one
+independent sample's information, which is what the variance scaling
+tells the EKF. Measured in the recorded runs (lag 1/e / integral time):
+
+| Stack, recording | DemNav | WildNav | Corrections sent |
+| --- | --- | --- | --- |
+| this test, GPS on throughout (336 s) | 27 / 44 s (rms 5.0 m, sigma 3.9 m) | too few matches | 27 / 44 s |
+| this test, denied (3 runs x 300 s, windows 60 and 20 s) | 28-29 / 45-47 s | too few matches | 28-29 / 44-47 s |
+| Genesis, GPS on (2 x 820-850 s) | 33-38 / 62-66 s | 19 / 30-36 s | 30-37 / 52-55 s |
+| Gazebo, GPS on after a denial (8 x 250 s) | 52-69 / 82-126 s (4-7 m biases) | 59-94 s or longer / 93-184 s (1-2 m bias) | 57-94 / 86-177 s |
+| Gazebo, denied (8 x 150 s) | 17-70 / 36-113 s | sparse (0.2/s) | 14-68 / 21-92 s |
+| Isaac, denied (4 x 150 s) | 9-22 / 14-48 s | 7 s once its 1-2 m bias is removed | 22-54 / 66-91 s |
+
+DemNav's error is a terrain-fixed bias: binned by position over this
+test's square it is the same with GPS on and denied (+10.1 and +11.0 m
+east in one 75 m cell, (+4.0, -3.5) and (+4.1, -3.5) m in another), and it
+fades over about a footprint flown (1/e after 130-140 m at 5 m/s here).
+The integral time does not change with the window (45-47 s here at 60 and
+at 20 s), so it is a property of the fixes, not of the loop. The same
+follows without an exponential model: the error of the inverse-variance
+mean of the corrections over 60 s, against what it would be for
+independent samples, was 0.3-0.9 of the 120-fold inflation the window
+applies here, 0.9-1.7 of it in Gazebo (eight runs: its corrections are as
+confident as their errors support, or more), 0.2-0.4 in Isaac and 0.15 in
+Genesis. So 60 s is the measured value for this stack and Genesis and a
+lower bound for Gazebo; no single shorter window is supported, and lite's
+slower recovery is the honest cost of position-only corrections whose
+errors persist for most of a minute. Separate windows per source are not
+either: WildNav's errors are small against its sigma but carry a steady
+1-2 m bias, and in Gazebo the combined stream is already overconfident.
 
 Normal flight with the corrections enabled (`GPS_DENIED_DENIED_S=0
 GPS_DENIED_DENY_AFTER_S=300`, plus `ARMING_CHECK=1` layered through

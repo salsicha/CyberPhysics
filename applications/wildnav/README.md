@@ -17,10 +17,19 @@ ArduPilot's EKF3 gives every GPS_INPUT sample the largest accuracy of the
 last few seconds and fuses each as independent, so it cannot weight
 interleaved sources itself, and it needs the dense stream (position-only
 aiding every few seconds lets its tilt drift). Each sample's variance is
-multiplied by the number sent in the last `correction_correlation_s` (60
-s): the fixes' errors are biases lasting tens of seconds, and a faster EKF
-response closes a loop through its own attitude, which the camera fixes
-use. Sources whose fixes disagree by more than
+multiplied by n, the number sent in the last `correction_correlation_s`
+(60 s): the fixes' errors are correlated and the EKF fuses every sample as
+independent, so n (rate x correlation time) samples carry one independent
+sample's information, whatever the rate. 60 s is the fixes' measured
+integral correlation time against simulator truth: DemNav's errors are
+terrain-fixed biases that fade over about a footprint flown (44-47 s in the
+lite SITL stack, 62-66 s in Genesis, longer in Gazebo, shorter in Isaac;
+tools/gps_denied_sitl_test.md has the measurements), and a faster EKF
+response also closes a loop through its own attitude, which body-fixed
+cameras use. A correction whose inflated sigma would exceed
+`max_correction_sigma_m` (100 m, where EKF3 clips GPS accuracy) is held
+back and not counted, so the stream thins out rather than being fused as
+more accurate than it is. Sources whose fixes disagree by more than
 `correction_consistency_sigma` (5) combined sigma are not combined: the one
 farther from the fused position is left out, since a false match diluted
 by the combination and sent with that variance would pass the EKF's
