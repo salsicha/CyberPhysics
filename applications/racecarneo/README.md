@@ -214,22 +214,67 @@ The ROS containers do not share `/dev/shm`, so FastDDS runs over UDP only, with 
 
 Closed-loop status: the stack comes up unattended and Nav2 reaches goals in
 Demo World. `NavigateToPose` goals relative to the start pose, each on a
-freshly started stack (SLAM, Depth Anything and nvblox running):
+freshly started stack (SLAM, Depth Anything and nvblox running), measured on
+2026-10-10 with this composition and its images:
 
-| Goal (x, y, yaw) | Runs | Succeeded | Recoveries | Final error (SLAM map) |
-| --- | --- | --- | --- | --- |
-| 3.0, -1.5, -30 deg | 6 | 6 | 0 | 0.23-0.24 m, 0.7-4.1 deg |
-| 1.0, -3.0, -90 deg (right turn) | 3 | 3 | 0 | 0.23 m, 2-10 deg |
-| 5.0, -1.5, 0 deg | 3 | 3 | 0 | 0.22-0.23 m, 3-6 deg |
+| Goal (x, y, yaw) | Runs | Succeeded | Recoveries | Time to goal | Final error (SLAM map) | Final error (scan match) |
+| --- | --- | --- | --- | --- | --- | --- |
+| 3.0, -1.5, -30 deg | 5 | 5 | 0 | 15.3-16.3 s | 0.23-0.30 m, 3-5 deg | 0.17-0.30 m |
+| 1.0, -3.0, -90 deg (right turn) | 3 | 3 | 0 | 16.6-17.4 s | 0.23 m, 2-10 deg | 0.27-0.32 m |
+| 5.0, -1.5, 0 deg | 3 | 3 | 0 | 24.4-24.6 s | 0.23-0.27 m, 2-6 deg | 0.21-0.23 m |
 
-The goal checker's tolerance is 0.25 m / 0.35 rad. Matching the final scan
-against the SLAM map put the car within 0.07 m of the pose the stack
-reported. `/odom` still over-reports distance by 7-10% against the SLAM map
-on these routes, which SLAM corrects. Before the speed loop, the first goal
-succeeded once in two runs after five recoveries; the other run stopped
-against a wall ~1 m from where the stack believed it was. SLAM only maps
-where the lidar hits something, so in the open Demo World a goal outside
-the mapped area is rejected as `GOAL_OUTSIDE_MAP` (204).
+The goal checker's tolerance is 0.25 m / 0.35 rad. The scan-match column
+locates the car by matching its final scan against the SLAM map, without
+odometry; that put it 0-0.11 m from the pose the stack reported. The
+controller held its 15 Hz in every run (`/cmd_vel_nav` every 66.7 ms,
+longest gap 69 ms, no "missed its desired rate" warnings).
+
+Three runs stopped 0.27-0.30 m from the goal although Nav2 reported success.
+`/odom` over-reports distance by 7-10% against the SLAM map, and SLAM Toolbox
+corrects `map -> odom` only about every 0.9 m of travel (every 3.6-4.1 s
+here), in steps of 0.04-0.21 m, mostly 0.06-0.12 m. The controller checks
+the goal in `odom` through the `map -> odom` at its current plan's
+timestamp, and the plan is refreshed once a second, so a correction in the
+last second before arrival leaves the car up to one correction outside the
+tolerance. In the run that recorded the corrections and ended 0.27 m out, a
+0.08 m correction landed 0.4 s before success; the runs whose last
+correction came 1.5 s or more before arrival ended 0.23-0.24 m out. Smaller
+SLAM steps (`minimum_travel_distance`, 0.5 m by default) or less biased
+odometry would narrow this.
+
+Before the speed loop, the first goal succeeded once in two runs after five
+recoveries; the other run stopped against a wall ~1 m from where the stack
+believed it was. SLAM only maps where the lidar hits something, so in the
+open Demo World a goal outside the mapped area is rejected as
+`GOAL_OUTSIDE_MAP` (204).
+
+Measured with the full stack while these goals ran (three stacks; 40 s
+before the goal and 12 s while driving):
+
+| Topic | Rate | Age at receipt, median / p95 |
+| --- | --- | --- |
+| Bridge camera, depth, scan, IMU and odometry | 19.1-19.5 Hz, 18.4-18.6 Hz while driving | colour 25-27 / 31-35 ms |
+| `/depth_anything/depth/image` | 16.1-17.6 Hz | 105-111 / 131-138 ms |
+| `/nvblox_node/static_map_slice` | 9.1-9.4 Hz (`update_esdf_rate_hz: 10`) | 118-122 / 137-140 ms |
+| `/local_costmap/costmap` | 1.6-1.7 Hz (2 Hz publishing on the 5 Hz update loop) | |
+
+The stack used 1.6-1.8 GiB of GPU memory at 73-90% utilization.
+
+**2026-10-10:** re-measured after the 4 MiB DDS socket buffers and Depth
+Anything's one-frame queue. The earlier table, with the 208 KiB default
+buffers and a five-frame queue, had 12 of 12 goals reached without
+recoveries and 0.22-0.24 m final error (6, 3 and 3 runs). Rerunning that
+configuration the same day (3 runs each of the first and last goal) gave
+6 of 6, no recoveries, 0.22-0.23 m, the same 15 Hz controller and the same
+times to goal (15.3-15.7 s and 23.9-24.5 s). In that configuration Depth
+Anything also ran at 16.8-17.3 Hz with the full stack (the 3.8 Hz above was
+measured with two extra camera subscribers on the bridge, one of them
+reliable), but its depth was 0.30 s old while driving instead of 0.11 s.
+No run in either configuration logged an nvblox, costmap or controller
+warning after start-up. The wider final-error range comes from the SLAM
+correction timing above, which does not depend on the depth pipeline: both
+configurations corrected in the same steps every 3.6-4.3 s, and in the six
+reruns the last correction before arrival happened to come 1.5-3.7 s early.
 
 ## Stack Validation
 
