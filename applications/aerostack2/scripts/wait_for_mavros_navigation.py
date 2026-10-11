@@ -1,16 +1,28 @@
 #!/usr/bin/env python3
-"""Configure telemetry and gate autonomy until ArduPilot has usable position."""
+"""Configure telemetry and gate autonomy until the vehicle is ready to fly.
+
+Ready means MAVROS is connected with a GPS fix and finite local odometry
+and, with --behavior-tree, that every Aerostack2 server the mission tree
+calls can be discovered. as2_behavior_tree builds every node of the tree
+before its first tick, and each action node then waits only 1 s for its
+action server (BtActionNode::createActionClient in as2_behavior_tree 1.1.3;
+server_timeout does not apply to that wait). A tree started before the
+behaviour servers are up aborts.
+"""
 
 from __future__ import annotations
 
 import argparse
+import importlib
 import math
 import time
+from xml.etree import ElementTree
 
 import rclpy
 from mavros_msgs.msg import State
 from mavros_msgs.srv import MessageInterval
 from nav_msgs.msg import Odometry
+from rclpy.action import ActionClient
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import NavSatFix, NavSatStatus
@@ -28,9 +40,58 @@ MESSAGE_RATES_HZ = {
     245: 2.0,  # EXTENDED_SYS_STATE
 }
 
+# as2_behavior_tree 1.1.3 action nodes: their action server (as2_names,
+# relative to the tree's namespace; a server_name port replaces it) and type.
+BEHAVIOR_ACTIONS = {
+    "TakeOff": ("TakeoffBehavior", "as2_msgs/action/Takeoff"),
+    "GoTo": ("GoToBehavior", "as2_msgs/action/GoToWaypoint"),
+    "Land": ("LandBehavior", "as2_msgs/action/Land"),
+    "FollowPath": ("FollowPathBehavior", "as2_msgs/action/FollowPath"),
+}
+# Service nodes: the service is the node's service_name port.
+BEHAVIOR_SERVICES = {
+    "Arm": "std_srvs/srv/SetBool",
+    "Disarm": "std_srvs/srv/SetBool",
+    "Offboard": "std_srvs/srv/SetBool",
+}
+
+
+def resolve_name(name, namespace):
+    """A ROS name as a node in `namespace` resolves it."""
+    if name.startswith("/"):
+        return name
+    namespace = "/" + namespace.strip("/")
+    return f"{namespace.rstrip('/')}/{name}"
+
+
+def behavior_tree_servers(tree_xml, namespace):
+    """Action servers and services the tree's nodes connect to, as
+    ({name: action type}, {name: service type}). Only the trees count, not
+    a Groot TreeNodesModel; blackboard-remapped names cannot be known here."""
+    actions, services = {}, {}
+    for tree in ElementTree.fromstring(tree_xml).iter("BehaviorTree"):
+        for element in tree.iter():
+            node_id = element.get("ID") if element.tag == "Action" else element.tag
+            if node_id in BEHAVIOR_ACTIONS:
+                default_name, type_name = BEHAVIOR_ACTIONS[node_id]
+                name = element.get("server_name", default_name)
+                if not name.startswith("{"):
+                    actions[resolve_name(name, namespace)] = type_name
+            elif node_id in BEHAVIOR_SERVICES:
+                name = element.get("service_name", "")
+                if name and not name.startswith("{"):
+                    services[resolve_name(name, namespace)] = BEHAVIOR_SERVICES[node_id]
+    return actions, services
+
+
+def interface_type(type_name):
+    """The Python class of a ROS interface such as 'std_srvs/srv/SetBool'."""
+    package, kind, name = type_name.split("/")
+    return getattr(importlib.import_module(f"{package}.{kind}"), name)
+
 
 class NavigationReadiness(Node):
-    def __init__(self, namespace):
+    def __init__(self, namespace, actions=None, services=None):
         super().__init__("navigator_navigation_readiness")
         self.state = None
         self.fix = None
@@ -45,6 +106,15 @@ class NavigationReadiness(Node):
             qos_profile_sensor_data)
         self.interval_client = self.create_client(
             MessageInterval, f"{namespace}/set_message_interval")
+        # The same checks the tree makes: rcl_action_server_is_available
+        # (goal, cancel and result services plus feedback and status
+        # publishers) and service availability.
+        self.action_clients = {
+            name: ActionClient(self, interface_type(type_name), name)
+            for name, type_name in sorted((actions or {}).items())}
+        self.service_clients = {
+            name: self.create_client(interface_type(type_name), name)
+            for name, type_name in sorted((services or {}).items())}
 
     def _state(self, message):
         self.state = message
@@ -76,44 +146,89 @@ class NavigationReadiness(Node):
         self.get_logger().info("Configured required MAVLink telemetry intervals")
         return True
 
+    def missing_servers(self):
+        missing = [name for name, client in self.action_clients.items()
+                   if not client.server_is_ready()]
+        missing += [name for name, client in self.service_clients.items()
+                    if not client.service_is_ready()]
+        return missing
+
+    def waiting_for(self):
+        """What is not ready yet; empty once the vehicle is ready to fly."""
+        waiting = []
+        if not (self.state and self.state.connected):
+            waiting.append("MAVROS connection")
+        elif not self.intervals_configured:
+            waiting.append("MAVLink telemetry intervals")
+        if not (self.fix is not None and
+                self.fix.status.status >= NavSatStatus.STATUS_FIX and
+                math.isfinite(self.fix.latitude) and math.isfinite(self.fix.longitude)):
+            waiting.append("GPS fix")
+        if not (self.odom is not None and all(math.isfinite(value) for value in (
+                self.odom.pose.pose.position.x,
+                self.odom.pose.pose.position.y,
+                self.odom.pose.pose.position.z))):
+            waiting.append("local odometry")
+        return waiting + self.missing_servers()
+
     def ready(self):
-        fix_valid = (
-            self.fix is not None and
-            self.fix.status.status >= NavSatStatus.STATUS_FIX and
-            math.isfinite(self.fix.latitude) and math.isfinite(self.fix.longitude))
-        odom_valid = self.odom is not None and all(math.isfinite(value) for value in (
-            self.odom.pose.pose.position.x,
-            self.odom.pose.pose.position.y,
-            self.odom.pose.pose.position.z,
-        ))
-        return bool(self.state and self.state.connected and fix_valid and odom_valid)
+        return not self.waiting_for()
 
 
-def main():
+def parse_args(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--namespace", default="/mavros")
     parser.add_argument("--timeout", type=float, default=180.0)
     parser.add_argument("--settle-seconds", type=float, default=3.0)
-    args = parser.parse_args()
+    parser.add_argument(
+        "--behavior-tree",
+        help="Aerostack2 mission tree: also wait for every server its nodes call")
+    parser.add_argument(
+        "--behavior-namespace", default="/",
+        help="namespace the tree runs in (behavior_trees.launch.py drone_id)")
+    parser.add_argument("--report-seconds", type=float, default=30.0)
+    return parser.parse_args(argv)
+
+
+def main(argv=None):
+    args = parse_args(argv)
+
+    actions, services = {}, {}
+    if args.behavior_tree:
+        with open(args.behavior_tree, encoding="utf-8") as tree:
+            actions, services = behavior_tree_servers(tree.read(), args.behavior_namespace)
 
     rclpy.init()
-    node = NavigationReadiness(args.namespace.rstrip("/"))
-    deadline = time.monotonic() + args.timeout
+    node = NavigationReadiness(args.namespace.rstrip("/"), actions, services)
+    if actions or services:
+        node.get_logger().info(
+            "Mission tree needs " + ", ".join(sorted(actions) + sorted(services)))
+    start = time.monotonic()
+    deadline = start + args.timeout
+    next_report = start + args.report_seconds
     ready_since = None
     try:
         while rclpy.ok() and time.monotonic() < deadline:
             rclpy.spin_once(node, timeout_sec=0.2)
             node.configure_intervals()
-            if node.intervals_configured and node.ready():
+            if node.ready():
                 ready_since = ready_since or time.monotonic()
                 if time.monotonic() - ready_since >= args.settle_seconds:
                     node.get_logger().info(
-                        "Navigator ready: MAVROS connected with GPS and local odometry")
+                        "Navigator ready: MAVROS connected with GPS and local odometry"
+                        + (f"; {len(actions) + len(services)} mission servers available"
+                           f" after {time.monotonic() - start:.0f} s"
+                           if actions or services else ""))
                     return
             else:
                 ready_since = None
+                if time.monotonic() >= next_report:
+                    next_report = time.monotonic() + args.report_seconds
+                    node.get_logger().info(
+                        "Waiting for " + ", ".join(node.waiting_for()))
         raise RuntimeError(
-            "Navigator did not produce stable GPS and local odometry before timeout")
+            "Navigator not ready before timeout; still waiting for "
+            + ", ".join(node.waiting_for()))
     finally:
         node.destroy_node()
         if rclpy.ok():

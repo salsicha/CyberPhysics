@@ -227,10 +227,17 @@ services:
         navigation_odom_topic:=/navigation/odometry takeoff_altitude:=35.0
 
   flight_ready:
+    # Ready to fly: MAVROS has a GPS fix and local odometry, and every
+    # Aerostack2 server the mission tree calls can be discovered; the tree
+    # gives each action server only 1 s while it is being built
+    # (applications/aerostack2/README.md, "Mission start").
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
     network_mode: host
     ipc: host
-    depends_on: [mavros, aerostack2_autonomy]
+    depends_on:
+      mavros: {condition: service_started}
+      aerostack2_autonomy: {condition: service_started}
+      terrain_assets: {condition: service_completed_successfully}
     environment:
       ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
       FASTRTPS_DEFAULT_PROFILES_FILE: *fastdds-profile
@@ -238,14 +245,22 @@ services:
       - /dev/shm:/dev/shm
       - *fastdds-mount
       - ../applications/aerostack2/scripts:/workspace/applications/aerostack2/scripts:ro
+      - navsim_genesis_assets:/data/navsim_assets:ro
     command: >
       python3 /workspace/applications/aerostack2/scripts/wait_for_mavros_navigation.py
         --namespace /mavros --timeout 900 --settle-seconds 3
+        --behavior-tree /data/navsim_assets/wilderness_mission.xml
+        --behavior-namespace /aerodrone
     restart: "no"
 
   wilderness_mission:
+    # run_behavior_tree.py starts the tree again only when it aborted while
+    # being built, before its first tick: the new process can take more
+    # than the tree's 1 s to discover a behaviour server. Stopping the stack
+    # mid-mission logs "Failed to cancel action server for GoToBehavior"
+    # although the goal is cancelled (README, "Mission start").
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
-    stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
+    stop_signal: SIGINT  # passed on to ros2 launch (which ignores SIGTERM)
     network_mode: host
     ipc: host
     depends_on:
@@ -255,9 +270,15 @@ services:
     environment:
       ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
       FASTRTPS_DEFAULT_PROFILES_FILE: *fastdds-profile
-    volumes: [/dev/shm:/dev/shm, *fastdds-mount, navsim_genesis_assets:/data/navsim_assets:ro]
+    volumes:
+      - /dev/shm:/dev/shm
+      - *fastdds-mount
+      - ../applications/aerostack2/scripts:/workspace/applications/aerostack2/scripts:ro
+      - navsim_genesis_assets:/data/navsim_assets:ro
     command: >
-      ros2 launch as2_behavior_tree behavior_trees.launch.py
+      python3 /workspace/applications/aerostack2/scripts/run_behavior_tree.py
+        --attempts 5 --retry-delay 5 --
+        ros2 launch as2_behavior_tree behavior_trees.launch.py
         drone_id:=aerodrone use_sim_time:=false
         tree:=/data/navsim_assets/wilderness_mission.xml server_timeout:=120000
 
