@@ -144,8 +144,10 @@ earlier fusion settings) and the three work-in-progress runs below. The
 beyond-3-sigma share is 1.1 % for a consistent Gaussian, but over one 150 s
 window it is noisy, since the errors stay correlated for about a minute;
 10 % catches a fused covariance several times too confident. Gazebo's limit
-is 15 %: its fused sigma stays at the fixes' 5-6 m while the autopilot
-drifts up to 22 m, 8.4 % beyond 3 sigma in one committed-code run. Mission
+is 15 %: before the fused covariance followed the autopilot's lag, its
+fused sigma stayed at the fixes' 5-6 m while the autopilot drifted up to
+22 m, 8.4 % beyond 3 sigma in one run; with it (below) a Gazebo run was
+6.8 m and 0 % beyond 3 sigma, so this limit can tighten after more runs. Mission
 progress (waypoints reached while denied) is reported, not checked: see the
 Isaac run below. Every limit is a scorer option (`--max-fused-p95-m`, ...),
 and the limits are for the default 150 s window: score a longer or shorter
@@ -215,10 +217,15 @@ rebuilt wildnav image's fusion, which sent velocities): all three fail.
   flight; in Gazebo 3 it reached 20 m 20 s after the loss and 42 m at 30 s,
   following 8 s on source set 3, and the camera fixes, which use the EKF's
   attitude, degraded with it.
-- **Fused covariance.** The fused sigma follows the fixes (3-7 m) rather
-  than the autopilot's drift: in Gazebo up to 8.4 % of the fused fixes were
-  beyond 3 sigma with the committed code (17 % in work-in-progress run 2);
-  Genesis and Isaac stayed under 1 %.
+- **Fused covariance.** The runs in the tables above predate the fused
+  covariance that includes the lag between the fixes and the fused estimate
+  (`tools/gps_denied_sitl_test.md`, "Fused fix uncertainty"). Before it the
+  fused sigma followed the fixes (3-7 m) rather than the autopilot's drift:
+  in Gazebo up to 8.4 % of the fused fixes were beyond 3 sigma (17 % in
+  work-in-progress run 2), Genesis and Isaac under 1 %. With it, while
+  denied: Gazebo 7.2 / 12.5 / 13.5 m at a 6.8 m sigma, 4.0 / 0 % beyond 2 /
+  3 sigma; Genesis 2.0 / 2.5 / 2.7 m, 0 / 0 %; Isaac 3.2 / 5.4 / 5.9 m,
+  0 / 0 %. All pass.
 - **Mission progress in Isaac.** A GoTo completes when Aerostack2's state is
   within `go_to_threshold` (0.2 m, the as2 default) of the target. While GPS 1
   was denied, ArduPilot held 0.3-0.4 m from the ridge-entry waypoint in its

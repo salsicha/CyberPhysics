@@ -183,22 +183,156 @@ Full stack (`tools/gps_denied_sitl_test.sh`, DemNav corrections at 2 Hz):
 | combined corrections, variance x corrections in 60 s (item 2) | 298 s | 19.5 / 29.4 / 34.6 m | 19.4 m | 100 %, no failsafe text | 100 % |
 | same, with the 100 m clip guard (item 2), two runs | 298 s | 15.5 / 29.7 / 30.0 and 14.3 / 28.3 / 28.6 m | 15.4 and 14.2 m | 100 %, no failsafe text | 100 % |
 | experiment: `correction_correlation_s` 20 s (corrections at ~25 m) | 298 s | 14.4 / 22.7 / 28.2 m | 14.3 m | 100 %, no failsafe text | 100 % |
+| fused covariance from the distance to the fixes ("Fused fix uncertainty"), two runs | 298 s | 14.1 / 28.5 / 29.0 and 14.1 / 28.3 / 29.0 m | 14.0 and 14.0 m | 100 %, no failsafe text | 100 % |
 
 With the variance scaling the corrections go out at ~42 m (DemNav's 3.9 m
 sigma, 120 corrections per 60 s). Run to run the result spreads by 5 m of
 RMSE at the same setting; one run with a 20 s window landed inside that
 spread (with a 6 m lower p95). What sets the error in every run, before
 and after the scaling: within 10-30 s of the GPS loss the EKF's velocity
-runs away from the truth by up to 3 m/s while the DemNav fixes are 1-3 m
-off (the vehicle slows from 5 to under 3 m/s, MAVROS odometry still
-reports 5 and later 8 m/s while the EKF position advances at 5 m/s),
-putting it 16-30 m off; position-only GPS_INPUT corrects position, not
-that velocity, so it converges over one to two minutes. Later in the
-denial DemNav's terrain-fixed biases (up to 10-16 m on parts of the
-square) add to it. The earlier 8 m runs had a per-fix sigma of ~22 m
-(SITL's noisy gyro rate, which a stabilised camera does not see), about a
-16 s window: three times as confident as this stack's measured correlation
-supports.
+runs away from the truth by up to 3.4 m/s (median 2.9 m/s over the first
+minute) while the DemNav fixes are 1-3 m off (the vehicle slows from 5 to
+under 3 m/s, MAVROS odometry still reports 5 and later 8 m/s while the EKF
+position advances at 5 m/s), putting it 16-30 m off; position-only
+GPS_INPUT corrects position, not that velocity, so it converges over one
+to two minutes ("EKF velocity after GPS loss" below has the cause and the
+fixes tried). Later in the denial DemNav's terrain-fixed biases (up to
+10-16 m on parts of the square) add to it. The earlier 8 m runs had a
+per-fix sigma of ~22 m (SITL's noisy gyro rate, which a stabilised camera
+does not see), about a 16 s window: three times as confident as this
+stack's measured correlation supports.
+
+### EKF velocity after GPS loss
+
+**Cause.** With source set 2 the EKF has no velocity measurement, and the
+corrections, sent at ~42 m, barely observe its tilt. ArduCopter's default
+`EK3_MAG_CAL=3` fuses all three magnetometer axes in flight, and they act
+on roll and pitch too. In this SITL model a residual of 20-40 mGauss (on
+the body Z axis, which the EKF had been absorbing into its compass bias
+state while GPS velocity pinned the tilt) tilted the attitude by 1.0-1.4
+deg within 15 s of the GPS loss. A degree of tilt error is 0.17 m/s^2 of
+acceleration the EKF does not see, and the position controller, flying on
+that attitude, accelerates the vehicle the other way: 3 m/s in 15-20 s.
+It is not the bridge or the switch: the GPS_INPUT fields, flags and times
+are as intended, ArduPilot fuses no velocity in set 2 (the absent GPS 2
+velocity is only used by an EKF velocity reset, and none happens), GPS 2
+is fused within 1.5 s of the loss with no EKF reset or lane switch, and
+the MAV driver's 0.2 s lag misdates a correction by under 0.2 s. Nor is it
+the corrections (perfect positions do the same) or SITL's gyro drift (it
+happens without it).
+
+Standalone ArduCopter 4.6.3 SITL (built-in quad, pymavlink, no ROS), the
+same 300 m square at 150 m and 5 m/s, GPS 1 disabled, GPS 2 = GPS_INPUT at
+2 Hz from SIM_STATE truth plus an error, sent at 42 m horizontal accuracy
+as the stack does; EKF velocity and position against SIM_STATE while
+denied:
+
+| Run (error added to truth) | EKF velocity error median / p95 / max | Position RMSE / max | Max tilt error |
+| --- | --- | --- | --- |
+| stack parameters, 2 m white + 4 m bias, 120 s | 1.7 / 3.3 / 3.3 m/s | 17.9 / 30.9 m | 1.2 deg |
+| same without SITL's gyro drift (`SIM_DRIFT_SPEED=0`) | 1.1 / 3.4 / 3.4 m/s | 17.3 / 31.2 m | 1.4 deg |
+| same, perfect positions | 1.5 / 2.8 / 2.9 m/s | 15.3 / 24.7 m | 1.2 deg |
+| same, positions sent at 99 m (unaided) | 2.6 / 4.4 / 4.4 m/s | 33.7 / 53.1 m | 1.4 deg |
+| same with `EK3_MAG_CAL=2` (compass heading only) | 0.5 / 0.9 / 0.9 m/s | 6.6 / 10.4 m | 0.3 deg |
+| this test's recorded DemNav errors replayed, 150 s / 300 s | 1.7 / 2.8 / 2.9 and 1.8 / 2.4 / 2.5 m/s | 13.5 / 25.1 and 13.3 / 20.6 m | |
+| same with `EK3_MAG_CAL=2` | 0.9 / 1.4 / 1.5 and 1.0 / 1.5 / 1.6 m/s | 4.9 / 7.5 and 7.2 / 16.2 m | |
+| replayed errors, velocity from the fixes (3 s fit) also sent, at the fit's time | "GPS Glitch", EKF variance failsafe -> LAND | up to 18 m | |
+| same, carried to the send time with the EKF's own velocity change (2 s / 4 s window) | 0.15 / 0.5 / 0.8 and 1.1 / 2.4 / 2.7 m/s; 4 s at 4 Hz: EKF failsafe | 1.8 / 4.0 and 3.3 / 6.7 m; 72 m | |
+| same, carried with the IMU's accelerations (RAW_IMU, attitude) | 0.17-0.23 / 0.45-0.68 / 0.67-1.11 m/s | 2.1-2.6 / 4.6 m | |
+
+**Fixes tried in the full stacks; none ships.**
+
+- `EK3_MAG_CAL=2` (with the velocity below, sent at ~0.84 m/s): this test
+  2.5 / 4.1 / 4.3 and 2.3 / 3.7 / 3.8 m (RMSE / p95 / max), the EKF's
+  velocity within 0.20 m/s (median) and 0.55 m/s of the truth. But
+  Gazebo's and Genesis' compasses (SITL's JSON backend) agree with the
+  attitude, and there three-axis fusion is what holds the tilt: 150 s of
+  denial ended 13.4 / 22.8 / 25.3 and 20.9 / 45.1 / 51.9 m off in Gazebo
+  (median / p95 / max, the second denied 30 s after the validation rather
+  than 60 s after cruise; committed code 5.7-7.5 / 11.2-19.8 / 12.3-22.4 m,
+  the EKF's velocity 2.2 m/s off instead of 0.4-0.9) and 6.0 / 6.7 / 6.9 m
+  in Genesis (2.0 / 2.5 / 2.6 m): `tools/gps_denied_sim_test.md`.
+- A velocity from successive camera fixes, sent in the same GPS_INPUT with
+  a third source set (GPS position and velocity): per source a 3 s
+  straight-line fit to the accepted fixes, carried from the window's mean
+  time to the correction's with the IMU's accelerations (never the EKF's
+  velocity: its change contains the corrections it already fused, counted
+  again), its accuracy the fit's standard error or the measured scatter of
+  non-overlapping fits, whichever is larger. ArduPilot complicates it: it
+  gates GPS velocity at five times `EK3_VELNE_M_NSE` (0.3 m/s) plus its
+  own uncertainty, not at the reported accuracy, reports "GPS Glitch" above
+  1-1.5 m/s of filtered speed accuracy, reuses the previous GPS_INPUT's
+  velocity for one without (so corrections without a velocity must be
+  held back while it fuses them), and drops GPS 2 after 4 s without a
+  message. With the default compass it did not hold here: sent
+  conservatively (0.9 m/s) the run ended at 14.3 / 24.6 / 25.9 m, as
+  before; sent at its own accuracy (0.35 m/s), the fits through a turn
+  erred by up to 1.7 m/s (p95), the EKF's velocity ran 2-9 m/s off within
+  20 s and the EKF failsafe landed the vehicle in both runs (79 and 84 m
+  off; in one, corrections held back for 4 s also made ArduPilot drop
+  GPS 2). In the heavy stacks the camera rides the vehicle and the fixes
+  are projected with the EKF's attitude: in Gazebo the fits scatter by
+  0.7-1.2 m/s,
+  none qualified and the test passed as with the committed code (Isaac's
+  recordings scatter as much); in Genesis they qualified (0.45 m/s) but
+  grew to 0.54 / 1.49 m/s off
+  (median / p95, 27 % beyond 2 sigma) once the EKF lost GPS, and the
+  denial ended 4.5 / 13.4 / 17.3 m off, failing the test. With
+  `EK3_MAG_CAL=2` but the fit's own standard error as accuracy Gazebo
+  went 34.9 / 75.7 / 84.9 m off.
+
+So the lite stack's runaway comes from this SITL model's compass and
+position-only aiding, and both remedies regress the heavier simulators.
+A fix that holds everywhere needs a velocity whose errors do not follow
+the EKF (optical flow, which no stack has, or visual odometry), or a
+compass model and calibration the EKF agrees with. The lite numbers above
+stay what they are.
+
+### Fused fix uncertainty
+
+`/navigation/fix` (and `/navigation/odometry`) is ArduPilot's odometry plus
+the fusion's offset, none while ArduPilot absorbs the corrections, so its
+error is how far the EKF is from the truth. Its covariance used to be the
+latest fix's variance plus dead-reckoning growth: about 4 m sigma here
+while the EKF was 12-30 m off, 70-75 % of the denied samples beyond 2 sigma
+and 44-55 % beyond 3. It is now, per axis, the exponentially weighted mean
+square of (accepted fix - fused estimate at the fix's time) over
+`fix_error_time_constant_s` (5 s), plus `fix_variance_weight` (0.5) times
+the fixes' variance, plus the 0.5 m/s dead-reckoning growth since the last
+fix. The distance measures how far the estimate lags the corrections; the
+fixes' own error enters with a weight because an EKF that follows the
+fixes shares it (Gazebo, Isaac) while one that dead-reckons between them
+does not, and the fixes' sigma is conservative in some stacks. The weight
+and time constant were chosen by replaying the model on recordings of
+every stack (simulator truth; share beyond 2 / 3 sigma while denied, a
+consistent 2D Gaussian puts 13.5 / 1.1 % there):
+
+| Recordings | weight 0 | 0.25 | 0.5 (chosen) | 1 |
+| --- | --- | --- | --- | --- |
+| this test, two runs (committed navigation) | 24 / 9, 16 / 3 % | 21 / 6, 13 / 0 % | 17 / 3, 10 / 0 % | 11 / 0, 4 / 0 % |
+| Gazebo, three runs (`tools/gps_denied_sim_test.sh`) | 10-31 / 0-2 % | 5-19 / 0 % | 1.5-3.7 / 0 % | 0-2 / 0 % |
+| Genesis, two runs | 34-42 / 0 % | 0 / 0 % | 0 / 0 % | 0 / 0 % |
+| Isaac | 69 / 51 % | 30 / 0 % | 0 / 0 % | 0 / 0 % |
+
+0.5 keeps every stack at or under 3.2 % beyond 3 sigma (0.25 leaves 6 %
+here) and is conservative in Genesis and Isaac (their errors are 2-3 m,
+the sigma 2.3-2.8 m). A 10 s time constant lagged the error's growth after the GPS
+loss here (19 / 3 and 13 / 0 % at 0.5). Live, on the final code:
+
+| Run | Fused error while denied (median / p95 / max) | Fused sigma (median) | Beyond 2 / 3 sigma | Before (committed) |
+| --- | --- | --- | --- | --- |
+| this test, two runs | 11.0 / 28.4 / 29.4 and 11.0 / 28.3 / 29.1 m (RMSE 14.1) | 7.4-7.6 m | 6.1-6.8 / 0 % | 3.9 m, 70-75 / 44-55 % |
+| Gazebo | 7.2 / 12.5 / 13.5 m | 6.8 m | 4.0 / 0 % | 5.9-6.1 m, 10-17.5 / 3.3-8.4 % |
+| Genesis | 2.0 / 2.5 / 2.7 m | 2.8 m | 0 / 0 % | 3.7 m, 0 / 0 % |
+| Isaac | 3.2 / 5.4 / 5.9 m | 2.3 m | 0 / 0 % | 3.1 m, 0.1 / 0 % |
+
+Navigation is unchanged (the fused covariance does not reach ArduPilot;
+DemNav and WildNav size their searches with it): DemNav still matched
+every frame here
+(2.0 fixes/s while denied), and the search radius, the configured radius
+plus three sigma, changed by about 10 m at most (312 -> 322 m median here,
+within 3 m in the simulators). With GPS the sigma stays conservative (2-4 m
+against 0.1-0.2 m of error): the fixes' own error dominates it.
 
 ### Correction correlation time
 

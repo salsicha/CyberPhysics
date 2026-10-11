@@ -255,7 +255,10 @@ def test_propagation_ignores_position_jumps_from_the_autopilot(harness):
 
 
 def test_uncertainty_grows_and_status_degrades_without_corrections(module):
-    h = Harness(module, dead_reckoning_drift_mps=1.0, dead_reckoning_limit_s=60.0)
+    # fix_variance_weight 1: a fix the estimate agrees with leaves its own
+    # variance.
+    h = Harness(module, dead_reckoning_drift_mps=1.0, dead_reckoning_limit_s=60.0,
+                fix_variance_weight=1.0)
     h.origin()
     h.raw(WALL_S + 0.0)
     h.raw(WALL_S + 0.1)
@@ -277,7 +280,8 @@ def test_uncertainty_grows_and_status_degrades_without_corrections(module):
 def test_dead_reckoning_ages_on_the_simulator_clock(module):
     """Genesis and Isaac run slower than real time; the uncertainty and the
     NO_FIX limit follow their /clock, not wall time."""
-    h = Harness(module, dead_reckoning_drift_mps=1.0, dead_reckoning_limit_s=60.0)
+    h = Harness(module, dead_reckoning_drift_mps=1.0, dead_reckoning_limit_s=60.0,
+                fix_variance_weight=1.0)
 
     def at(wall_s):  # the simulator runs at a tenth of real time
         h.node.now_ns = int((WALL_S + wall_s) * 1e9)
@@ -730,3 +734,35 @@ def test_a_correction_beyond_the_clip_on_its_own_is_not_sent(harness):
     harness.source('demnav', fix_at(WALL_S + 0.5, 3.0, 0.0, sigma=4.0))
     assert harness.last('/navigation/correction_fix').position_covariance[0] == \
         pytest.approx(16.0)
+
+
+def test_fused_uncertainty_is_the_distance_to_the_fixes_plus_part_of_their_own(module):
+    """While the autopilot absorbs the corrections the fused estimate is its
+    odometry, which can lag the fixes by tens of metres (the lite SITL test:
+    12-30 m off while claiming the fixes' 4 m). Its variance per axis: the
+    weighted mean square of (fix - estimate) at the accepted fixes, plus
+    fix_variance_weight (0.5) times their variance, decaying over
+    fix_error_time_constant_s (5 s)."""
+    h = Harness(module)
+    h.origin()
+    h.send('/navigation/autopilot_corrections_active', NS(data=True))
+    for step in range(201):  # 20 s, the EKF 20 m west of every fix
+        t = WALL_S + 0.1 * step
+        h.raw(t)
+        if step % 5 == 0:
+            h.source('demnav', fix_at(t, 20.0, 0.0, sigma=4.0))
+    assert h.last('/navigation/fix').position_covariance[0] == pytest.approx(
+        200.0 + 0.5 * 16.0, rel=0.01)
+    for step in range(201, 301):  # 10 s, the fixes now agree with the EKF
+        t = WALL_S + 0.1 * step
+        h.raw(t)
+        if step % 5 == 0:
+            h.source('demnav', fix_at(t, 0.0, 0.0, sigma=4.0))
+    # The last fix published follows 19 agreeing fixes over 9.5 s, 0.5 s
+    # after the last of them (0.5 m/s of dead-reckoning growth).
+    variance = h.last('/navigation/fix').position_covariance[0]
+    assert variance == pytest.approx(8.0 + 200.0 * math.exp(-1.9) + 0.25 ** 2, rel=1e-3)
+    assert h.last('/navigation/odometry').pose.covariance[0] == variance
+    # A different origin starts the statistics again.
+    h.origin(lat=ORIGIN[0] + 0.001)
+    assert h.node.fix_error is None

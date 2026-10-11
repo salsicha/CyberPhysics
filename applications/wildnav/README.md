@@ -33,7 +33,18 @@ more accurate than it is. Sources whose fixes disagree by more than
 `correction_consistency_sigma` (5) combined sigma are not combined: the one
 farther from the fused position is left out, since a false match diluted
 by the combination and sent with that variance would pass the EKF's
-innovation gate. Fusion rejects non-finite odometry and corrections,
+innovation gate.
+
+`/navigation/fix` and `/navigation/odometry` carry the fused estimate's
+uncertainty: per axis, the exponentially weighted (`fix_error_time_constant_s`,
+5 s) mean square of the distance between each accepted fix and the estimate
+at its time, plus `fix_variance_weight` (0.5) times the fixes' variance,
+plus `dead_reckoning_drift_mps` growth since the last one. While the
+autopilot absorbs the corrections the estimate is its odometry, which can
+lag the fixes by tens of metres: the fixes' sigma alone was 3-4 times too
+small in the lite SITL test (tools/gps_denied_sitl_test.md, "Fused fix
+uncertainty"). DemNav and WildNav widen their search by three times this
+sigma. Fusion rejects non-finite odometry and corrections,
 invalid covariance, and confidence values outside 0–1. An invalid correction cannot update the fused
 offset. If an existing offset becomes non-finite, the next valid raw sample
 resets it and allows valid corrections to resume without restarting the node.

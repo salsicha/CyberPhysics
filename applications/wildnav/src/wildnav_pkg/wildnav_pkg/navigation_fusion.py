@@ -36,10 +36,21 @@ Outputs
 ``output_topic``: raw odometry plus the smoothed horizontal correction
 offset (no offset while the autopilot itself absorbs the corrections, see
 below). Horizontal position variance is the larger of the raw variance and
-``correction variance + (dead_reckoning_drift_mps * age)^2``, where *age* is
-the time since the last accepted correction (since the origin arrived when
-there has been none), so consumers such as the DemNav/WildNav search window
-see the uncertainty grow while no correction arrives.
+``fix error + (dead_reckoning_drift_mps * age)^2``, where *age* is the time
+since the last accepted correction (since the origin arrived when there has
+been none), so consumers such as the DemNav/WildNav search window see the
+uncertainty grow while no correction arrives. The fix error is how far the
+estimate is from the fixes plus part of their own error: per axis, the mean
+square of (accepted fix - estimate at its time), exponentially weighted
+over ``fix_error_time_constant_s`` (5 s), plus ``fix_variance_weight``
+(0.5) times the fixes' variance, likewise weighted. The fixes' variance
+alone ignored how far the estimate lags them: while the autopilot absorbs
+the corrections the estimate is the EKF's odometry, which in the lite SITL
+test ran 12-30 m off while claiming 4 m (70-75 % of samples beyond 2
+sigma). The weight is calibrated on recordings of every stack
+(tools/gps_denied_sitl_test.md, "Fused fix uncertainty"): an EKF that
+follows the fixes shares their error, one that dead-reckons between them
+does not, and the fixes' own sigma is conservative in some stacks.
 
 ``<prefix>/fix`` (``fix_output_topic``): the same estimate as a NavSatFix in
 the origin's altitude datum with a known diagonal covariance (m^2), at the
@@ -266,6 +277,9 @@ class NavigationFusionNode(Node):
             'dead_reckoning_limit_s': 300.0,
             'propagation_velocity_sigma_mps': 0.3,
             'sim_clock_topic': '/clock',
+            # Fused fix uncertainty: how far the estimate is from the fixes.
+            'fix_error_time_constant_s': 5.0,
+            'fix_variance_weight': 0.5,
         }
         for name, value in defaults.items():
             self.declare_parameter(name, value)
@@ -285,6 +299,9 @@ class NavigationFusionNode(Node):
         self.last_correction_variance = None
         self.correction_fix_times = []
         self.autopilot_absorbs = False
+        # Exponentially weighted per-axis mean square of (fix - fused
+        # estimate) at accepted fixes, of the fixes' own variance, and when.
+        self.fix_error = None
 
         output_topic = self.get_parameter('output_topic').value
         self.output_pub = self.create_publisher(Odometry, output_topic, 10)
@@ -419,6 +436,7 @@ class NavigationFusionNode(Node):
         self.last_publish_ns = None
         self.last_correction_time = None
         self.last_correction_variance = None
+        self.fix_error = None
 
     def _now(self):
         """(wall ns, simulator ns or None when no /clock has arrived)."""
@@ -623,7 +641,26 @@ class NavigationFusionNode(Node):
         self.last_correction_variance = state.variance
         state.fix_east, state.fix_north = fix_east, fix_north
         state.fix_stamp_ns = message_stamp
+        self._update_fix_error(
+            east - self.offset_east, north - self.offset_north, state.variance)
         self._publish_correction_fix()
+
+    def _update_fix_error(self, d_east, d_north, variance):
+        """Fold one accepted fix into the exponentially weighted per-axis mean
+        square of (fix - fused estimate at its time) and of the fixes' own
+        variance, on the flight clock."""
+        now = self._now()
+        d2 = 0.5 * (d_east * d_east + d_north * d_north)
+        if not math.isfinite(d2):
+            return
+        if self.fix_error is None:
+            self.fix_error = [d2, variance, now]
+            return
+        tau = max(0.01, float(self.get_parameter('fix_error_time_constant_s').value))
+        alpha = 1.0 - math.exp(-self._elapsed_s(self.fix_error[2]) / tau)
+        self.fix_error[0] += alpha * (d2 - self.fix_error[0])
+        self.fix_error[1] += alpha * (variance - self.fix_error[1])
+        self.fix_error[2] = now
 
     def _raw_at(self, target_ns):
         """Raw (east, north) at target_ns, interpolated between bracketing
@@ -825,8 +862,18 @@ class NavigationFusionNode(Node):
     # Outputs
     # ------------------------------------------------------------------
     def _horizontal_variance(self, raw):
-        """(variance m^2, seconds since the last accepted correction)."""
-        if self.last_correction_time is not None:
+        """(variance m^2, seconds since the last accepted correction).
+
+        The estimate is the autopilot's odometry plus an offset, so its error
+        is how far it is from the fixes plus (part of) the fixes' own error:
+        per axis, the weighted mean square of (fix - estimate) at the
+        accepted fixes plus fix_variance_weight times their variance, plus
+        dead-reckoning growth since the last one."""
+        if self.last_correction_time is not None and self.fix_error is not None:
+            weight = float(self.get_parameter('fix_variance_weight').value)
+            base = max(self.fix_error[0] + weight * self.fix_error[1], 1.0)
+            since = self.last_correction_time
+        elif self.last_correction_time is not None:
             base = self.last_correction_variance
             since = self.last_correction_time
         else:
