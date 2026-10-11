@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Configure telemetry and gate autonomy until the vehicle is ready to fly.
 
-Ready means MAVROS is connected with a GPS fix and finite local odometry
-and, with --behavior-tree, that every Aerostack2 server the mission tree
+Ready means MAVROS is connected with a GPS fix (unless --no-require-gps,
+for a vehicle that may start GPS-denied) and finite local odometry and,
+with --behavior-tree, that every Aerostack2 server the mission tree
 calls can be discovered. as2_behavior_tree builds every node of the tree
 before its first tick, and each action node then waits only 1 s for its
 action server (BtActionNode::createActionClient in as2_behavior_tree 1.1.3;
@@ -91,8 +92,9 @@ def interface_type(type_name):
 
 
 class NavigationReadiness(Node):
-    def __init__(self, namespace, actions=None, services=None):
+    def __init__(self, namespace, actions=None, services=None, require_gps=True):
         super().__init__("navigator_navigation_readiness")
+        self.require_gps = require_gps
         self.state = None
         self.fix = None
         self.odom = None
@@ -160,7 +162,8 @@ class NavigationReadiness(Node):
             waiting.append("MAVROS connection")
         elif not self.intervals_configured:
             waiting.append("MAVLink telemetry intervals")
-        if not (self.fix is not None and
+        if self.require_gps and not (
+                self.fix is not None and
                 self.fix.status.status >= NavSatStatus.STATUS_FIX and
                 math.isfinite(self.fix.latitude) and math.isfinite(self.fix.longitude)):
             waiting.append("GPS fix")
@@ -178,7 +181,12 @@ class NavigationReadiness(Node):
 def parse_args(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--namespace", default="/mavros")
-    parser.add_argument("--timeout", type=float, default=180.0)
+    parser.add_argument(
+        "--timeout", type=float, default=180.0,
+        help="seconds to wait before failing; 0 waits indefinitely")
+    parser.add_argument(
+        "--require-gps", action=argparse.BooleanOptionalAction, default=True,
+        help="wait for a GPS fix (--no-require-gps: local odometry is enough)")
     parser.add_argument("--settle-seconds", type=float, default=3.0)
     parser.add_argument(
         "--behavior-tree",
@@ -199,12 +207,13 @@ def main(argv=None):
             actions, services = behavior_tree_servers(tree.read(), args.behavior_namespace)
 
     rclpy.init()
-    node = NavigationReadiness(args.namespace.rstrip("/"), actions, services)
+    node = NavigationReadiness(
+        args.namespace.rstrip("/"), actions, services, require_gps=args.require_gps)
     if actions or services:
         node.get_logger().info(
             "Mission tree needs " + ", ".join(sorted(actions) + sorted(services)))
     start = time.monotonic()
-    deadline = start + args.timeout
+    deadline = start + args.timeout if args.timeout > 0 else math.inf
     next_report = start + args.report_seconds
     ready_since = None
     try:
@@ -215,7 +224,9 @@ def main(argv=None):
                 ready_since = ready_since or time.monotonic()
                 if time.monotonic() - ready_since >= args.settle_seconds:
                     node.get_logger().info(
-                        "Navigator ready: MAVROS connected with GPS and local odometry"
+                        "Navigator ready: MAVROS connected with "
+                        + ("GPS and " if args.require_gps else "")
+                        + "local odometry"
                         + (f"; {len(actions) + len(services)} mission servers available"
                            f" after {time.monotonic() - start:.0f} s"
                            if actions or services else ""))

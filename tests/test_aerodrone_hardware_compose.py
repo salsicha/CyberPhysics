@@ -28,10 +28,13 @@ def test_hardware_commands_use_consistent_vehicle_identity(namespace):
     )
     services = json.loads(rendered.stdout)['services']
     vehicle = namespace or 'aerodrone'
-    assert len(services) == 10
+    assert len(services) == 11
     assert all(service.get('image') for service in services.values())
     assert f'namespace:={vehicle}' in services['aerostack']['command']
     assert f'drone_id:={vehicle}' in services['behavior_tree']['command']
+    # flight_ready waits for the tree's servers in the same namespace
+    ready = services['flight_ready']['command']
+    assert ready[ready.index('--behavior-namespace') + 1] == f'/{vehicle}'
     for name, odom_arg in [('demnav', 'odom_topic'), ('wildnav', 'raw_odom_topic')]:
         assert f'gps_topic:=/{vehicle}/sensor_measurements/gps' in services[name]['command']
         assert f'{odom_arg}:=/{vehicle}/sensor_measurements/odom' in services[name]['command']

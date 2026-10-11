@@ -29,24 +29,58 @@ services:
         navigation_odom_topic:=/navigation/odometry
         takeoff_altitude:=${TAKEOFF_ALTITUDE:-2.0}
 
+  flight_ready:
+    # Ready to fly: MAVROS has local odometry and every Aerostack2 server the
+    # tree calls can be discovered; the tree gives each action server only
+    # 1 s while it is being built (applications/aerostack2/README.md,
+    # "Mission start"). No GPS fix is required (the drone may start
+    # GPS-denied) and there is no timeout: the tree just starts later.
+    image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-arm64}
+    container_name: aerostack_flight_ready
+    network_mode: host
+    ipc: host
+    depends_on:
+      - mavros
+      - aerostack
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    volumes:
+      - /dev/shm:/dev/shm
+      - ../applications/aerostack2/scripts:/workspace/applications/aerostack2/scripts:ro
+    command: >
+      python3 /workspace/applications/aerostack2/scripts/wait_for_mavros_navigation.py
+        --namespace /mavros --timeout 0 --no-require-gps --settle-seconds 3
+        --behavior-tree /workspace/install/share/as2_platform_blueos/resource/map_goal.xml
+        --behavior-namespace /${DRONE_NAMESPACE:-drone0}
+    restart: "no"
+
   behavior_tree:
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-arm64}
     container_name: aerostack_behavior_tree
-    stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
+    # run_behavior_tree.py passes SIGINT on to ros2 launch (which ignores
+    # SIGTERM) and starts the tree again only when it aborted while being
+    # built, before its first tick. The tree ends after each map goal, and
+    # restart: always starts it for the next one.
+    stop_signal: SIGINT
     network_mode: host
     ipc: host
     restart: always
     depends_on:
-      - aerostack
-      - demnav
-      - wildnav
+      flight_ready: {condition: service_completed_successfully}
+      aerostack: {condition: service_started}
+      demnav: {condition: service_started}
+      wildnav: {condition: service_started}
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    volumes:
+      - ../applications/aerostack2/scripts:/workspace/applications/aerostack2/scripts:ro
     command: >
-      ros2 launch as2_behavior_tree behavior_trees.launch.py
-        drone_id:=${DRONE_NAMESPACE:-drone0}
-        tree:=/workspace/install/share/as2_platform_blueos/resource/map_goal.xml
-        use_sim_time:=false
+      python3 /workspace/applications/aerostack2/scripts/run_behavior_tree.py
+        --attempts 5 --retry-delay 5 --
+        ros2 launch as2_behavior_tree behavior_trees.launch.py
+          drone_id:=${DRONE_NAMESPACE:-drone0}
+          tree:=/workspace/install/share/as2_platform_blueos/resource/map_goal.xml
+          use_sim_time:=false
 
   aerostack_gui:
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-arm64}
