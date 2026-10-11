@@ -16,6 +16,10 @@
 #   smolvla, lerobot (so101)      CUDA PyTorch/LeRobot stacks
 #   matlab                        needs a MathWorks download and license
 #   vinsmono                      built and smoke-tested by ci.yml
+#
+# The arm64 images the hardware compositions run (CYBERPHYSICS_TAG=arm64:
+# the aerostack2 family, rangefinder and unoq) are built natively on GitHub's
+# ubuntu-24.04-arm runners, tagged <app>-arm64 as `make target_arm64` does.
 name: Images
 
 on:
@@ -166,9 +170,20 @@ jobs:
           df -h
 
   aerostack2-family:
-    name: aerostack2 family
-    runs-on: ubuntu-latest
+    name: aerostack2 family (${{ matrix.platform }})
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: amd64
+            runner: ubuntu-latest
+          # The BlueOS hardware stacks run these images on a Raspberry Pi 5
+          - platform: arm64
+            runner: ubuntu-24.04-arm
+    env:
+      PLATFORM: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
 
@@ -238,6 +253,48 @@ jobs:
         if: ${{ !cancelled() && steps.aerostack2.outcome == 'success' }}
         timeout-minutes: 60
         run: .github/workflows/scripts/ci_build_image.sh submarine
+
+      - name: Disk usage
+        if: ${{ !cancelled() }}
+        run: |
+          docker system df
+          df -h
+
+  arm64-hardware:
+    name: arm64 hardware images (ros2, rangefinder, unoq)
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 330
+    env:
+      PLATFORM: arm64
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Google's Docker Hub mirror
+        run: .github/workflows/scripts/use_docker_hub_mirror.sh
+
+      - name: Free runner disk
+        id: prep
+        run: |
+          df -h
+          docker system prune --all --force
+          docker info --format 'Docker {{.ServerVersion}}, storage driver {{.Driver}}, {{.Architecture}}'
+          df -h
+
+      - name: ros2 (base of rangefinder)
+        id: ros2
+        if: ${{ !cancelled() && steps.prep.outcome == 'success' }}
+        timeout-minutes: 180
+        run: .github/workflows/scripts/ci_build_image.sh ros2 --keep
+      # The rangefinder hardware composition runs rangefinder-arm64
+      - name: rangefinder
+        if: ${{ !cancelled() && steps.ros2.outcome == 'success' }}
+        timeout-minutes: 60
+        run: .github/workflows/scripts/ci_build_image.sh rangefinder
+      # The Arduino UNO Q's Linux side (turret_uno_q.yaml, arduino_uno_q.yaml)
+      - name: unoq
+        if: ${{ !cancelled() && steps.prep.outcome == 'success' }}
+        timeout-minutes: 30
+        run: .github/workflows/scripts/ci_build_image.sh unoq
 
       - name: Disk usage
         if: ${{ !cancelled() }}

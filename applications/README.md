@@ -32,7 +32,7 @@ Builds do not modify the working tree: `.gitattributes` keeps scripts and Docker
 
 ## CI
 
-`.github/workflows/images.yml` builds the images that fit on a GitHub-hosted runner with `_build_it.sh`, the same script the Makefile targets run. It runs on pushes to `main` and pull requests that touch `applications/`, weekly, and on demand. There is one job per base image (`ros2`, `aerostack2`, and the standalone images), with one step per image, so a failing step names the broken Dockerfile. Nothing is pushed. The CUDA/PyTorch images (nvblox, isaac, groot, genesis, depthanything, pantiltros, turret_sim, smolvla, lerobot) and matlab are not built there; vinsmono is built and smoke-tested by `ci.yml`. A new app needs its own step in `images.yml`.
+`.github/workflows/images.yml` builds the images that fit on a GitHub-hosted runner with `_build_it.sh`, the same script the Makefile targets run. It runs on pushes to `main` and pull requests that touch `applications/`, weekly, and on demand. There is one job per base image (`ros2`, `aerostack2`, and the standalone images), with one step per image, so a failing step names the broken Dockerfile. Nothing is pushed. The CUDA/PyTorch images (nvblox, isaac, groot, genesis, depthanything, pantiltros, turret_sim, smolvla, lerobot) and matlab are not built there; vinsmono is built and smoke-tested by `ci.yml`. The arm64 images the hardware compositions run (`CYBERPHYSICS_TAG=arm64`: the aerostack2 family, rangefinder and unoq) are also built, natively on GitHub's `ubuntu-24.04-arm` runners. A new app needs its own step in `images.yml`.
 
 ## Add An Application
 
