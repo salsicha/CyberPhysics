@@ -100,7 +100,7 @@ in a realistic tabletop picking scenario.
    - Add object sets with simple primitives, common household parts, deformable
      or reflective edge cases where the simulator supports them, and known
      ground-truth poses.
-2. Simulate all hardware sensors and interfaces from `hardware/so101.txt`.
+2. Simulate all hardware sensors and interfaces from `hardware/so101.md`.
    - Joint states on `/joint_states` with servo limits, quantization, backlash,
      latency, thermal/current saturation, and command clipping.
    - Joint command interface on `/so101/joint_commands` with trajectory and

@@ -1,0 +1,2094 @@
+{
+ "platform": "lunar_rover",
+ "generator": "tools/build_printable_parts.py",
+ "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+ "usable_volume_mm": [
+  250.0,
+  250.0,
+  250.0
+ ],
+ "stl_tolerance_mm": 0.05,
+ "stl_angular_tolerance_rad": 0.3,
+ "parts": [
+  {
+   "id": "actuator_mount",
+   "name": "Actuator mount (AK70-10 cup on the leg)",
+   "quantity": 6,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "carries the wheel load next to a warm actuator, outdoors; ASA keeps its strength in the heat",
+   "flight_critical": true,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 6,
+    "top_shell_layers": 6,
+    "bottom_shell_layers": 6,
+    "sparse_infill_density_pct": 50,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "upright, as on the rover: keel on the plate, leg socket up (teardrop bores, no supports)",
+    "rotate": []
+   },
+   "stl": "hardware/parts/lunar_rover/stl/actuator_mount.stl",
+   "step": "generated/parts/lunar_rover/actuator_mount.step",
+   "volume_cm3": 197.25,
+   "area_cm2": 559.8,
+   "print_size_mm": [
+    99.6,
+    48.0,
+    154.8
+   ],
+   "footprint_mm": [
+    99.6,
+    48.0
+   ],
+   "triangles": 3696,
+   "estimate": {
+    "mass_g": 171.0,
+    "time_min": 322,
+    "mass_g_all": 1026.2,
+    "time_min_all": 1931
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 1.7,
+    "min_wall_p1_mm": 2.64,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 3460,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "CubeMars AK70-10 front face",
+     "dimensions": "8 x M3 (10 mm deep) on 83 mm, 89 mm body, 71 mm boss",
+     "source": "CubeMars AK70-10 KV100 product page (https://www.cubemars.com/product/ak70-10-kv100-robotic-actuator.html): 24/48 V, rated 8.3 N m, peak 24.8 N m, 148/310 rpm rated and 240/480 rpm no-load at 24/48 V, 621 g, cross-roller bearing 2000 N dynamic / 2520 N static, CAN, 14-bit encoder, NTC, -20 to 50 C; 2D drawing (https://www.cubemars.com/data/cms/202602/ak70-10-robotic-actuator-2d-drawing.pdf): 89 x 50.25 mm, front boss 71 mm x 11.2 mm, rear step 77 mm x 6.5 mm, 8 x M3 x 10 deep on 83 mm and 6 x M3 x 7 deep on 25 mm with a 20 H7 x 2 mm recess on the front, 8 x M3 x 3.5 deep on 83 mm at the rear",
+     "verified": true
+    },
+    {
+     "part": "CubeMars AK70-10 hole phase",
+     "dimensions": "the 8 x M3 ring's angle is not dimensioned (holes at k 45 deg from x here)",
+     "source": "CubeMars AK70-10 KV100 product page (https://www.cubemars.com/product/ak70-10-kv100-robotic-actuator.html): 24/48 V, rated 8.3 N m, peak 24.8 N m, 148/310 rpm rated and 240/480 rpm no-load at 24/48 V, 621 g, cross-roller bearing 2000 N dynamic / 2520 N static, CAN, 14-bit encoder, NTC, -20 to 50 C; 2D drawing (https://www.cubemars.com/data/cms/202602/ak70-10-robotic-actuator-2d-drawing.pdf): 89 x 50.25 mm, front boss 71 mm x 11.2 mm, rear step 77 mm x 6.5 mm, 8 x M3 x 10 deep on 83 mm and 6 x M3 x 7 deep on 25 mm with a 20 H7 x 2 mm recess on the front, 8 x M3 x 3.5 deep on 83 mm at the rear",
+     "verified": false
+    },
+    {
+     "part": "2040 leg",
+     "dimensions": "20.4 x 40.4 mm socket, four M5 into drop-in T-nuts in the inboard face's two slots",
+     "source": "Misumi HFS5 series 20 mm, 2040 profile (https://us.misumi-ec.com/pdf/fa/2012/p2_0511.pdf): 20 x 40 mm, slot width 6 mm, two slots on each 40 mm face, one on each 20 mm face",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M3 x 10 socket head cap screw, class 12.9",
+     "qty": 8,
+     "use": "actuator to the cup's front ring (7 mm into the 10 mm threads), medium thread locker"
+    },
+    {
+     "item": "M5 x 10 button head screw + M5 drop-in T-nut (slot 6)",
+     "qty": 4,
+     "use": "cup to the leg"
+    }
+   ],
+   "notes": [
+    "One part for all six wheels: the right-hand mounts are the same part turned 180 deg.",
+    "The actuator slides in from the rear; its cable leaves through the actuator_shroud at the back."
+   ]
+  },
+  {
+   "id": "actuator_shroud",
+   "name": "Actuator shroud (TPU dust cap)",
+   "quantity": 6,
+   "material": "TPU95A",
+   "material_fallback": null,
+   "material_reason": "flexible: presses into the cup and pulls out for service",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu TPU 95A HF (or Bambu TPU 95A)",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 3,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 30,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "cap face on the plate, plug up",
+    "rotate": [
+     [
+      "X",
+      -90
+     ]
+    ]
+   },
+   "stl": "hardware/parts/lunar_rover/stl/actuator_shroud.stl",
+   "step": "generated/parts/lunar_rover/actuator_shroud.step",
+   "volume_cm3": 27.87,
+   "area_cm2": 194.7,
+   "print_size_mm": [
+    99.5,
+    99.1,
+    9.0
+   ],
+   "footprint_mm": [
+    99.5,
+    99.1
+   ],
+   "triangles": 358,
+   "estimate": {
+    "mass_g": 26.5,
+    "time_min": 105,
+    "mass_g_all": 158.8,
+    "time_min_all": 629
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 3.0,
+    "min_wall_p1_mm": 3.0,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 838,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "actuator_mount (printed)",
+     "dimensions": "teardrop bore 89.6 mm, 0.15 mm press fit",
+     "source": "hardware/parts/lunar_rover/actuator_mount.py",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "zip tie 3.6 mm",
+     "qty": 1,
+     "use": "actuator cable to the leg, below the shroud slot"
+    }
+   ],
+   "notes": [
+    "Seal the cable slot with a wrap of tape around the cable for regolith runs."
+   ]
+  },
+  {
+   "id": "battery_end",
+   "name": "Battery end block",
+   "quantity": 2,
+   "material": "PETG",
+   "material_fallback": null,
+   "material_reason": "inside the body; tough enough to take the pack's inertia in a bump",
+   "flight_critical": true,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu PETG Basic",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 40,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "base on the plate",
+    "rotate": []
+   },
+   "stl": "hardware/parts/lunar_rover/stl/battery_end.stl",
+   "step": "generated/parts/lunar_rover/battery_end.step",
+   "volume_cm3": 122.86,
+   "area_cm2": 454.4,
+   "print_size_mm": [
+    38.0,
+    194.0,
+    70.0
+   ],
+   "footprint_mm": [
+    38.0,
+    194.0
+   ],
+   "triangles": 600,
+   "estimate": {
+    "mass_g": 111.6,
+    "time_min": 195,
+    "mass_g_all": 223.2,
+    "time_min_all": 389
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 6.0,
+    "min_wall_p1_mm": 6.0,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 7301,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "24 V LiFePO4 pack (envelope)",
+     "dimensions": "260 x 180 x 140 mm at most",
+     "source": "Requirement of this design: 8S LiFePO4, 25.6 V nominal, 25 Ah (640 Wh, the simulator's 650 Wh), with BMS, at most 260 x 180 x 140 mm and 7 kg",
+     "verified": true
+    },
+    {
+     "part": "body floor panel",
+     "dimensions": "three M5 through the floor, nyloc nuts below",
+     "source": "hardware/parts/lunar_rover/_frame.py (body layout)",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M5 x 20 socket head cap screw + M5 nyloc nut + M5 washer",
+     "qty": 3,
+     "use": "end block to the floor panel"
+    },
+    {
+     "item": "battery strap, 20 mm, 700 mm, cam buckle",
+     "qty": 1,
+     "use": "over the top of the pack, through a slot in each end block (two straps in all)"
+    },
+    {
+     "item": "closed-cell foam pad, 3 mm",
+     "qty": 1,
+     "use": "between the pack and the end block"
+    },
+    {
+     "item": "closed-cell foam pad, 6 mm, 130 x 180 mm",
+     "qty": 1,
+     "use": "under the pack (two pads side by side)"
+    }
+   ],
+   "notes": [
+    "Pad a pack smaller than the envelope with foam so it cannot slide."
+   ]
+  },
+  {
+   "id": "cable_clip",
+   "name": "Extrusion cable clip",
+   "quantity": 24,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "outdoors in the sun; flexes enough for the cable to snap in",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 100,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "on its side: the clip profile flat on the plate",
+    "rotate": [
+     [
+      "X",
+      90
+     ]
+    ]
+   },
+   "stl": "hardware/parts/lunar_rover/stl/cable_clip.stl",
+   "step": "generated/parts/lunar_rover/cable_clip.step",
+   "volume_cm3": 1.43,
+   "area_cm2": 13.2,
+   "print_size_mm": [
+    24.0,
+    12.6,
+    12.0
+   ],
+   "footprint_mm": [
+    24.0,
+    12.6
+   ],
+   "triangles": 440,
+   "estimate": {
+    "mass_g": 1.5,
+    "time_min": 5,
+    "mass_g_all": 36.7,
+    "time_min_all": 111
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 1.99,
+    "min_wall_p1_mm": 1.99,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 132,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "20-series extrusion slot",
+     "dimensions": "5.6 mm keys in the 6 mm slot, M5 into a drop-in T-nut",
+     "source": "Misumi HFS5 series 20 mm, 2040 profile (https://us.misumi-ec.com/pdf/fa/2012/p2_0511.pdf): 20 x 40 mm, slot width 6 mm, two slots on each 40 mm face, one on each 20 mm face",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M5 x 10 button head screw + M5 drop-in T-nut (slot 6)",
+     "qty": 1,
+     "use": "cable clip to an extrusion"
+    }
+   ],
+   "notes": [
+    "Four per side along the rocker and bogie (actuator cables), the rest on the masts."
+   ]
+  },
+  {
+   "id": "compute_tray",
+   "name": "Compute tray (VESA 75/100)",
+   "quantity": 1,
+   "material": "PETG",
+   "material_fallback": null,
+   "material_reason": "inside the closed body, out of the sun",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu PETG Basic",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 3,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 25,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "upside down: the top face on the plate, feet up",
+    "rotate": [
+     [
+      "X",
+      180
+     ]
+    ]
+   },
+   "stl": "hardware/parts/lunar_rover/stl/compute_tray.stl",
+   "step": "generated/parts/lunar_rover/compute_tray.step",
+   "volume_cm3": 156.91,
+   "area_cm2": 705.2,
+   "print_size_mm": [
+    130.0,
+    250.0,
+    13.0
+   ],
+   "footprint_mm": [
+    130.0,
+    250.0
+   ],
+   "triangles": 3564,
+   "estimate": {
+    "mass_g": 114.2,
+    "time_min": 190,
+    "mass_g_all": 114.2,
+    "time_min_all": 190
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 2.76,
+    "min_wall_p1_mm": 3.8,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 29366,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "mini PC VESA mount",
+     "dimensions": "4 x M4 on 75 x 75 and on 100 x 100 mm",
+     "source": "VESA Flat Display Mounting Interface Standard (FDMI), MIS-D: four M4 screws on a 75 x 75 or 100 x 100 mm square (https://vesa.org/vesa-standards/)",
+     "verified": true
+    },
+    {
+     "part": "body floor panel",
+     "dimensions": "four M4 through the floor, nyloc nuts below",
+     "source": "hardware/parts/lunar_rover/_frame.py (body layout)",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M4 x 10 socket head cap screw",
+     "qty": 4,
+     "use": "mini PC to the tray (VESA holes, from below)"
+    },
+    {
+     "item": "M4 x 25 socket head cap screw + M4 nyloc nut + M4 washer",
+     "qty": 4,
+     "use": "tray to the floor panel"
+    },
+    {
+     "item": "hook-and-loop strap, 20 mm, 400 mm",
+     "qty": 1,
+     "use": "mini PC over the tray, through the strap slots"
+    }
+   ],
+   "notes": [
+    "Ventilation: the windows in the tray let air under the PC; keep its fan intakes clear."
+   ]
+  },
+  {
+   "id": "diff_clevis",
+   "name": "Differential clevis (M6 rod end)",
+   "quantity": 4,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "outdoors on the top of the rover, in the sun",
+   "flight_critical": true,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 5,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 50,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "base on the plate, cheeks up",
+    "rotate": []
+   },
+   "stl": "hardware/parts/lunar_rover/stl/diff_clevis.stl",
+   "step": "generated/parts/lunar_rover/diff_clevis.step",
+   "volume_cm3": 14.27,
+   "area_cm2": 62.6,
+   "print_size_mm": [
+    50.0,
+    21.5,
+    34.0
+   ],
+   "footprint_mm": [
+    50.0,
+    21.5
+   ],
+   "triangles": 908,
+   "estimate": {
+    "mass_g": 13.1,
+    "time_min": 28,
+    "mass_g_all": 52.5,
+    "time_min_all": 114
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 4.25,
+    "min_wall_p1_mm": 4.47,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 989,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "2040 rocker beam top face / 2020 differential bar",
+     "dimensions": "two M5 into drop-in T-nuts in a 6 mm slot",
+     "source": "Misumi HFS5 series 20 mm, 2040 profile (https://us.misumi-ec.com/pdf/fa/2012/p2_0511.pdf): 20 x 40 mm, slot width 6 mm, two slots on each 40 mm face, one on each 20 mm face",
+     "verified": true
+    },
+    {
+     "part": "M6 rod end (DIN ISO 12240-4 type E, female thread)",
+     "dimensions": "ball width up to 9 mm, M6 bolt",
+     "source": "ISO 12240-4 dimension series E: d = 6 mm, ball width B = 6.75 mm (typical rod-end listings 6.75-9 mm)",
+     "verified": false
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M5 x 12 socket head cap screw + M5 drop-in T-nut (slot 6)",
+     "qty": 2,
+     "use": "clevis to the beam"
+    },
+    {
+     "item": "M6 x 30 socket head cap screw + M6 nyloc nut + 2 M6 washers",
+     "qty": 1,
+     "use": "rod end in the clevis"
+    }
+   ],
+   "notes": [
+    "Use a rod end with a PTFE liner; shim with M6 washers if the ball is narrower than the gap."
+   ]
+  },
+  {
+   "id": "estop_housing",
+   "name": "E-stop housing",
+   "quantity": 1,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "outdoors, in the sun",
+   "flight_critical": true,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 30,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "upside down: the top (button) face on the plate",
+    "rotate": [
+     [
+      "X",
+      180
+     ]
+    ]
+   },
+   "stl": "hardware/parts/lunar_rover/stl/estop_housing.stl",
+   "step": "generated/parts/lunar_rover/estop_housing.step",
+   "volume_cm3": 52.47,
+   "area_cm2": 344.2,
+   "print_size_mm": [
+    56.0,
+    70.0,
+    60.0
+   ],
+   "footprint_mm": [
+    56.0,
+    70.0
+   ],
+   "triangles": 736,
+   "estimate": {
+    "mass_g": 55.8,
+    "time_min": 107,
+    "mass_g_all": 55.8,
+    "time_min_all": 107
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 3.0,
+    "min_wall_p1_mm": 3.0,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 3524,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "Schneider Harmony XB5AS8442 emergency stop",
+     "dimensions": "22.5 mm hole in a 4 mm top",
+     "source": "Schneider Electric XB5AS8442 product page (https://www.se.com/us/en/product/XB5AS8442/): 22 mm cut-out, 40 mm head, IP66/67/69K",
+     "verified": true
+    },
+    {
+     "part": "22 mm operator panel thickness and depth",
+     "dimensions": "panel 1-6 mm, 45 mm behind it",
+     "source": "Schneider Electric XB5AS8442 product page (https://www.se.com/us/en/product/XB5AS8442/): 22 mm cut-out, 40 mm head, IP66/67/69K",
+     "verified": false
+    },
+    {
+     "part": "2040 rear top cross rail",
+     "dimensions": "two M5 into drop-in T-nuts in the rear face's upper slot",
+     "source": "Misumi HFS5 series 20 mm, 2040 profile (https://us.misumi-ec.com/pdf/fa/2012/p2_0511.pdf): 20 x 40 mm, slot width 6 mm, two slots on each 40 mm face, one on each 20 mm face",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M5 x 12 button head screw + M5 drop-in T-nut (slot 6)",
+     "qty": 2,
+     "use": "housing to the rear top cross rail"
+    },
+    {
+     "item": "M16 x 1.5 cable gland (4-8 mm cable)",
+     "qty": 1,
+     "use": "e-stop cable, right side"
+    }
+   ],
+   "notes": [
+    "The e-stop opens the contactor coil circuit: wire it as described in the README, never through software."
+   ]
+  },
+  {
+   "id": "gnss_head",
+   "name": "GNSS and lux head (rear mast)",
+   "quantity": 1,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "outdoors at the top of the mast, in the sun",
+   "flight_critical": false,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 30,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "upside down: the disc's top face on the plate, cone and socket up",
+    "rotate": [
+     [
+      "X",
+      180
+     ]
+    ]
+   },
+   "stl": "hardware/parts/lunar_rover/stl/gnss_head.stl",
+   "step": "generated/parts/lunar_rover/gnss_head.step",
+   "volume_cm3": 99.41,
+   "area_cm2": 279.7,
+   "print_size_mm": [
+    138.0,
+    103.8,
+    36.0
+   ],
+   "footprint_mm": [
+    138.0,
+    103.8
+   ],
+   "triangles": 886,
+   "estimate": {
+    "mass_g": 55.4,
+    "time_min": 102,
+    "mass_g_all": 55.4,
+    "time_min_all": 102
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 2.49,
+    "min_wall_p1_mm": 2.49,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 8781,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "steel disc (antenna ground plane)",
+     "dimensions": "100 x 1.5 mm on the 104 mm top",
+     "source": "Requirement of this design: 100 mm diameter, 1.5 mm steel disc (magnet holds the antenna)",
+     "verified": true
+    },
+    {
+     "part": "Adafruit VEML7700 lux sensor board",
+     "dimensions": "pocket for a board up to 26 x 18 x 5 mm",
+     "source": "Adafruit VEML7700 Lux Sensor, product 4162 (https://www.adafruit.com/product/4162): 0 to about 120,000 lux, I2C, STEMMA QT",
+     "verified": false
+    },
+    {
+     "part": "2020 mast",
+     "dimensions": "20.4 mm socket, two M5 into drop-in T-nuts",
+     "source": "Misumi HFS5 series, 20 mm square (https://us.misumi-ec.com/pdf/fa/2012/p2_0511.pdf): 20 x 20 mm, slot width 6 mm, centre hole 4.2 mm",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M5 x 10 button head screw + M5 drop-in T-nut (slot 6)",
+     "qty": 2,
+     "use": "head to the mast"
+    },
+    {
+     "item": "double-sided foam tape (VHB), 100 mm disc",
+     "qty": 1,
+     "use": "steel disc on the head"
+    },
+    {
+     "item": "clear acrylic cover, 32 x 25 x 2 mm, and clear silicone",
+     "qty": 1,
+     "use": "over the lux sensor pocket"
+    }
+   ],
+   "notes": [
+    "Antenna arrow forward; its cable down the mast in two cable clips.",
+    "The lux sensor sits beside the antenna, toward the rear: the antenna shades it only for sun below about 40 deg ahead of the rover. Calibrate its reading through the cover against a lux meter."
+   ]
+  },
+  {
+   "id": "grouser",
+   "name": "Grouser (tread bar)",
+   "quantity": 96,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "outdoors, abrasive regolith simulant; replaceable wear part",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 60,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "base on the plate",
+    "rotate": []
+   },
+   "stl": "hardware/parts/lunar_rover/stl/grouser.stl",
+   "step": "generated/parts/lunar_rover/grouser.step",
+   "volume_cm3": 12.79,
+   "area_cm2": 55.1,
+   "print_size_mm": [
+    12.0,
+    120.0,
+    12.0
+   ],
+   "footprint_mm": [
+    12.0,
+    120.0
+   ],
+   "triangles": 348,
+   "estimate": {
+    "mass_g": 11.5,
+    "time_min": 22,
+    "mass_g_all": 1099.7,
+    "time_min_all": 2095
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 2.29,
+    "min_wall_p1_mm": 3.0,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 1415,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "wheel_segment rim (printed)",
+     "dimensions": "flat base on the 168 mm rim; two M3 inserts",
+     "source": "hardware/parts/lunar_rover/wheel_segment.py",
+     "verified": true
+    }
+   ],
+   "inserts": [
+    {
+     "size": "M3",
+     "qty": 2,
+     "where": "base, from below"
+    }
+   ],
+   "fasteners": [
+    {
+     "item": "M3 x 8 socket head cap screw",
+     "qty": 2,
+     "use": "from inside the rim into the grouser (3 mm rim, 5 mm into the 5.7 mm insert)"
+    }
+   ],
+   "notes": [
+    "Tip at 180 mm from the axle: the simulator's 0.18 m wheel radius."
+   ]
+  },
+  {
+   "id": "hazcam_mount",
+   "name": "Hazard camera mount (RealSense D455)",
+   "quantity": 1,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "outdoors on the front of the rover, in the sun",
+   "flight_critical": false,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 5,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 40,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "on its side: the profile flat on the plate",
+    "rotate": [
+     [
+      "X",
+      90
+     ]
+    ]
+   },
+   "stl": "hardware/parts/lunar_rover/stl/hazcam_mount.stl",
+   "step": "generated/parts/lunar_rover/hazcam_mount.step",
+   "volume_cm3": 67.11,
+   "area_cm2": 226.7,
+   "print_size_mm": [
+    49.4,
+    40.0,
+    110.0
+   ],
+   "footprint_mm": [
+    49.4,
+    40.0
+   ],
+   "triangles": 1160,
+   "estimate": {
+    "mass_g": 55.5,
+    "time_min": 114,
+    "mass_g_all": 55.5,
+    "time_min_all": 114
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 4.5,
+    "min_wall_p1_mm": 4.5,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 437,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "RealSense D455",
+     "dimensions": "two M4 on the back 95 mm apart, max insertion 4 mm",
+     "source": "RealSense D400 Series datasheet 337029-017 (Mar 2026) (https://www.realsenseai.com/wp-content/uploads/2026/03/RealSense-D400-Series-Datasheet-Mar-2026.pdf): Table 3-53 (124 x 29 x 26 mm, 116 g), Figure 10-12 (two M4 on the back 95 mm apart, max insertion 4 mm, 0.4 N m; 1/4\"-20 underneath, 9 mm), Table 3-49 (depth 87 x 58 deg, colour 90 x 65 deg), Table 4-12 (min-Z 350 mm at 848 x 480)",
+     "verified": true
+    },
+    {
+     "part": "RealSense D455 M4 pair height",
+     "dimensions": "assumed on the case's centre line; slotted +-1.0 mm",
+     "source": "RealSense D400 Series datasheet 337029-017 (Mar 2026) (https://www.realsenseai.com/wp-content/uploads/2026/03/RealSense-D400-Series-Datasheet-Mar-2026.pdf): Table 3-53 (124 x 29 x 26 mm, 116 g), Figure 10-12 (two M4 on the back 95 mm apart, max insertion 4 mm, 0.4 N m; 1/4\"-20 underneath, 9 mm), Table 3-49 (depth 87 x 58 deg, colour 90 x 65 deg), Table 4-12 (min-Z 350 mm at 848 x 480)",
+     "verified": false
+    },
+    {
+     "part": "2040 front top cross rail",
+     "dimensions": "four M5 into drop-in T-nuts in the front face's two slots",
+     "source": "Misumi HFS5 series 20 mm, 2040 profile (https://us.misumi-ec.com/pdf/fa/2012/p2_0511.pdf): 20 x 40 mm, slot width 6 mm, two slots on each 40 mm face, one on each 20 mm face",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M4 x 8 socket head cap screw",
+     "qty": 2,
+     "use": "D455 to the plate (3.5 mm into the camera; Intel's max 4 mm, 0.4 N m)"
+    },
+    {
+     "item": "M5 x 12 button head screw + M5 drop-in T-nut (slot 6)",
+     "qty": 4,
+     "use": "mount to the front top cross rail"
+    }
+   ],
+   "notes": [
+    "Never use screws longer than M4 x 8 in the camera: Intel allows 4 mm of thread."
+   ]
+  },
+  {
+   "id": "lidar_mount",
+   "name": "Lidar mount (Livox Mid-360 on the mast)",
+   "quantity": 1,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "outdoors at the top of the mast in the sun, under a 6.5 W lidar",
+   "flight_critical": false,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 5,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 40,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "upside down: the plate's top face on the plate, socket up",
+    "rotate": [
+     [
+      "X",
+      180
+     ]
+    ]
+   },
+   "stl": "hardware/parts/lunar_rover/stl/lidar_mount.stl",
+   "step": "generated/parts/lunar_rover/lidar_mount.step",
+   "volume_cm3": 84.71,
+   "area_cm2": 331.7,
+   "print_size_mm": [
+    110.0,
+    110.0,
+    38.0
+   ],
+   "footprint_mm": [
+    110.0,
+    110.0
+   ],
+   "triangles": 3396,
+   "estimate": {
+    "mass_g": 64.3,
+    "time_min": 118,
+    "mass_g_all": 64.3,
+    "time_min_all": 118
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 2.51,
+    "min_wall_p1_mm": 2.51,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 10704,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "Livox Mid-360",
+     "dimensions": "4 x M3 on 48 x 36 mm on its bottom, through the aluminium plate",
+     "source": "Livox Mid-360 User Manual v1.0 (2023.01), 'Dimensions', 'Mounting Notice' and 'Specifications' (https://terra-1-g.djicdn.com/65c028cd298f4669a7f0e40e50ba1131/Mid360/Livox_Mid-360_User_Manual_EN.pdf): 65 x 65 x 60 mm, 265 g, 4 x M3 x 5 deep on the bottom 48 x 36 mm apart, two 3.0 mm locating holes, FOV 360 x -7..52 deg, 9-27 V, 6.5 W (14 W at start-up in the cold), IP67; mount on a metal plate at least 3 mm thick and 10,000 mm2, 10 mm free around it; origin 47 mm above the bottom",
+     "verified": true
+    },
+    {
+     "part": "Livox Mid-360 hole pattern position",
+     "dimensions": "assumed centred on the body",
+     "source": "Livox Mid-360 User Manual v1.0 (2023.01), 'Dimensions', 'Mounting Notice' and 'Specifications' (https://terra-1-g.djicdn.com/65c028cd298f4669a7f0e40e50ba1131/Mid360/Livox_Mid-360_User_Manual_EN.pdf): 65 x 65 x 60 mm, 265 g, 4 x M3 x 5 deep on the bottom 48 x 36 mm apart, two 3.0 mm locating holes, FOV 360 x -7..52 deg, 9-27 V, 6.5 W (14 W at start-up in the cold), IP67; mount on a metal plate at least 3 mm thick and 10,000 mm2, 10 mm free around it; origin 47 mm above the bottom",
+     "verified": false
+    },
+    {
+     "part": "2020 mast",
+     "dimensions": "20.4 mm socket, two M5 into drop-in T-nuts",
+     "source": "Misumi HFS5 series, 20 mm square (https://us.misumi-ec.com/pdf/fa/2012/p2_0511.pdf): 20 x 20 mm, slot width 6 mm, centre hole 4.2 mm",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M3 x 10 socket head cap screw",
+     "qty": 4,
+     "use": "lidar through the printed and aluminium plates, heads recessed (4.5 mm into its 5 mm threads)"
+    },
+    {
+     "item": "M4 x 12 socket head cap screw + M4 nyloc nut",
+     "qty": 4,
+     "use": "aluminium plate to the mount"
+    },
+    {
+     "item": "M5 x 10 button head screw + M5 drop-in T-nut (slot 6)",
+     "qty": 2,
+     "use": "mount to the mast"
+    }
+   ],
+   "notes": [
+    "Drill the aluminium plate from this part (use it as the template): 4 x 3.4 mm for the lidar, 4 x 4.5 mm for the M4."
+   ]
+  },
+  {
+   "id": "mast_foot",
+   "name": "Mast foot (2020 on a 2040 side rail)",
+   "quantity": 2,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "outdoors on the top of the rover, in the sun",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 5,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 40,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "on its back: the apron's outer face on the plate",
+    "rotate": [
+     [
+      "Y",
+      90
+     ]
+    ]
+   },
+   "stl": "hardware/parts/lunar_rover/stl/mast_foot.stl",
+   "step": "generated/parts/lunar_rover/mast_foot.step",
+   "volume_cm3": 45.53,
+   "area_cm2": 171.5,
+   "print_size_mm": [
+    74.0,
+    60.0,
+    32.4
+   ],
+   "footprint_mm": [
+    74.0,
+    60.0
+   ],
+   "triangles": 1092,
+   "estimate": {
+    "mass_g": 36.2,
+    "time_min": 68,
+    "mass_g_all": 72.3,
+    "time_min_all": 136
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 5.26,
+    "min_wall_p1_mm": 5.67,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 3265,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "2020 mast",
+     "dimensions": "20.4 mm socket, two M5 into drop-in T-nuts",
+     "source": "Misumi HFS5 series, 20 mm square (https://us.misumi-ec.com/pdf/fa/2012/p2_0511.pdf): 20 x 20 mm, slot width 6 mm, centre hole 4.2 mm",
+     "verified": true
+    },
+    {
+     "part": "2040 top side rail",
+     "dimensions": "two M5 into the top slot, two through the apron into the outer face",
+     "source": "Misumi HFS5 series 20 mm, 2040 profile (https://us.misumi-ec.com/pdf/fa/2012/p2_0511.pdf): 20 x 40 mm, slot width 6 mm, two slots on each 40 mm face, one on each 20 mm face",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M5 x 10 button head screw + M5 drop-in T-nut (slot 6)",
+     "qty": 6,
+     "use": "foot to the rail (4) and mast to the foot (2)"
+    }
+   ],
+   "notes": [
+    "The same part at both ends: the front one carries the lidar mast, the rear one the GNSS mast."
+   ]
+  },
+  {
+   "id": "panel_clamp",
+   "name": "Solar panel post",
+   "quantity": 4,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "outdoors, in the sun under the panel's edge",
+   "flight_critical": false,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 5,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 40,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "on its side: the post's profile flat on the plate",
+    "rotate": [
+     [
+      "X",
+      90
+     ]
+    ]
+   },
+   "stl": "hardware/parts/lunar_rover/stl/panel_clamp.stl",
+   "step": "generated/parts/lunar_rover/panel_clamp.step",
+   "volume_cm3": 92.37,
+   "area_cm2": 183.3,
+   "print_size_mm": [
+    40.0,
+    80.0,
+    75.0
+   ],
+   "footprint_mm": [
+    40.0,
+    80.0
+   ],
+   "triangles": 782,
+   "estimate": {
+    "mass_g": 60.5,
+    "time_min": 117,
+    "mass_g_all": 242.1,
+    "time_min_all": 469
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 2.26,
+    "min_wall_p1_mm": 3.31,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 2144,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "2040 top side rail",
+     "dimensions": "two M5 into drop-in T-nuts in the 20 mm top face's slot",
+     "source": "Misumi HFS5 series 20 mm, 2040 profile (https://us.misumi-ec.com/pdf/fa/2012/p2_0511.pdf): 20 x 40 mm, slot width 6 mm, two slots on each 40 mm face, one on each 20 mm face",
+     "verified": true
+    },
+    {
+     "part": "solar panel frame bottom flange",
+     "dimensions": "one M5 through a flange hole, anywhere in the cross slot",
+     "source": "Requirement of this design: 40-50 W high-efficiency monocrystalline panel (the simulator charges at 38 W in full sun), at most 520 x 400 mm, aluminium frame 25-35 mm deep with mounting holes in its bottom flange, about 3 kg",
+     "verified": false
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M5 x 10 button head screw + M5 drop-in T-nut (slot 6)",
+     "qty": 2,
+     "use": "post to the top side rail"
+    },
+    {
+     "item": "M5 x 16 socket head cap screw + 2 M5 washers + M5 nyloc nut",
+     "qty": 1,
+     "use": "panel flange to the post"
+    }
+   ],
+   "notes": [
+    "Check the panel's flange holes fall in the four cross slots before printing all four."
+   ]
+  },
+  {
+   "id": "power_tray",
+   "name": "Power tray (two DIN rails)",
+   "quantity": 1,
+   "material": "PETG",
+   "material_fallback": null,
+   "material_reason": "inside the closed body, out of the sun",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu PETG Basic",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 3,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 25,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "upside down: the top face on the plate, feet up",
+    "rotate": [
+     [
+      "X",
+      180
+     ]
+    ]
+   },
+   "stl": "hardware/parts/lunar_rover/stl/power_tray.stl",
+   "step": "generated/parts/lunar_rover/power_tray.step",
+   "volume_cm3": 181.6,
+   "area_cm2": 754.2,
+   "print_size_mm": [
+    130.0,
+    250.0,
+    13.0
+   ],
+   "footprint_mm": [
+    130.0,
+    250.0
+   ],
+   "triangles": 3532,
+   "estimate": {
+    "mass_g": 126.8,
+    "time_min": 210,
+    "mass_g_all": 126.8,
+    "time_min_all": 210
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 2.76,
+    "min_wall_p1_mm": 3.18,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 31063,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "TS35 DIN rail, 240 mm",
+     "dimensions": "35 mm rails, M4 through the rail slots into inserts every 50 mm",
+     "source": "EN 60715 / IEC 60715 top-hat rail TS35, 35 x 7.5 mm (https://webstore.iec.ch/publication/3628)",
+     "verified": true
+    },
+    {
+     "part": "body floor panel",
+     "dimensions": "four M4 through the floor, nyloc nuts below",
+     "source": "hardware/parts/lunar_rover/_frame.py (body layout)",
+     "verified": true
+    }
+   ],
+   "inserts": [
+    {
+     "size": "M4",
+     "qty": 10,
+     "where": "top face, DIN rail screws"
+    }
+   ],
+   "fasteners": [
+    {
+     "item": "M4 x 8 pan head screw + M4 washer",
+     "qty": 10,
+     "use": "DIN rails to the tray"
+    },
+    {
+     "item": "M4 x 25 socket head cap screw + M4 nyloc nut + M4 washer",
+     "qty": 4,
+     "use": "tray to the floor panel"
+    }
+   ],
+   "notes": [
+    "Cut the two rails to 240 mm. The 24 V main fuse and the contactor go on the rail nearest the battery."
+   ]
+  },
+  {
+   "id": "terrain_cam_mount",
+   "name": "Terrain camera cradle (OAK-1, downward)",
+   "quantity": 1,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "outdoors under the body; ASA for the heat of a sunny test pit",
+   "flight_critical": false,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 40,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "upside down: the flange on the plate, cradle walls up",
+    "rotate": [
+     [
+      "X",
+      180
+     ]
+    ]
+   },
+   "stl": "hardware/parts/lunar_rover/stl/terrain_cam_mount.stl",
+   "step": "generated/parts/lunar_rover/terrain_cam_mount.step",
+   "volume_cm3": 22.77,
+   "area_cm2": 121.1,
+   "print_size_mm": [
+    80.1,
+    60.0,
+    17.0
+   ],
+   "footprint_mm": [
+    80.1,
+    60.0
+   ],
+   "triangles": 568,
+   "estimate": {
+    "mass_g": 19.1,
+    "time_min": 36,
+    "mass_g_all": 19.1,
+    "time_min_all": 36
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 3.0,
+    "min_wall_p1_mm": 3.0,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 3675,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "Luxonis OAK-1",
+     "dimensions": "36 mm wide between the walls; 1/4\"-20 thread 14.5 mm from the USB-C end, on the centre line",
+     "source": "Luxonis OAK-1 datasheet (docs.luxonis.com/projects/hardware/en/latest/pages/BW1093.html, PDF copy https://media.distrelec.com/Web/Downloads/_t/ds/OAK-1_eng_tds.pdf), dimension drawing and 'Dimensions and Weight'; FOV of the fixed-focus IMX378 variant from https://docs.luxonis.com/hardware/products/OAK-1 (auto-focus: 78/66/54 deg)",
+     "verified": false
+    },
+    {
+     "part": "2040 front bottom cross rail",
+     "dimensions": "two M5 into drop-in T-nuts in the 20 mm bottom face's slot",
+     "source": "Misumi HFS5 series 20 mm, 2040 profile (https://us.misumi-ec.com/pdf/fa/2012/p2_0511.pdf): 20 x 40 mm, slot width 6 mm, two slots on each 40 mm face, one on each 20 mm face",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "1/4\"-20 UNC x 3/8\" button head screw",
+     "qty": 1,
+     "use": "OAK-1 to the cradle (engages about 4.5 mm of the 10 mm thread)"
+    },
+    {
+     "item": "M5 x 10 button head screw + M5 drop-in T-nut (slot 6)",
+     "qty": 2,
+     "use": "cradle to the front bottom cross rail"
+    }
+   ],
+   "notes": [
+    "USB-C end toward the rear: the cable runs up into the body behind the rail."
+   ]
+  },
+  {
+   "id": "wheel_hub",
+   "name": "Wheel hub",
+   "quantity": 6,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "outdoors in the sun and on a warm actuator; ASA keeps its strength to about 90 C",
+   "flight_critical": true,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 5,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 5,
+    "sparse_infill_density_pct": 25,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "outer brim only, 5 mm",
+    "orientation": "outboard face on the plate, spigot up",
+    "rotate": [
+     [
+      "X",
+      -90
+     ]
+    ]
+   },
+   "stl": "hardware/parts/lunar_rover/stl/wheel_hub.stl",
+   "step": "generated/parts/lunar_rover/wheel_hub.step",
+   "volume_cm3": 430.16,
+   "area_cm2": 891.1,
+   "print_size_mm": [
+    225.4,
+    226.0,
+    15.8
+   ],
+   "footprint_mm": [
+    235.4,
+    236.0
+   ],
+   "triangles": 6436,
+   "estimate": {
+    "mass_g": 210.5,
+    "time_min": 367,
+    "mass_g_all": 1263.2,
+    "time_min_all": 2202
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 4.85,
+    "min_wall_p1_mm": 4.9,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 30321,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "CubeMars AK70-10 output flange",
+     "dimensions": "6 x M3 (7 mm deep) on 25 mm, 20 H7 x 2 mm recess",
+     "source": "CubeMars AK70-10 KV100 product page (https://www.cubemars.com/product/ak70-10-kv100-robotic-actuator.html): 24/48 V, rated 8.3 N m, peak 24.8 N m, 148/310 rpm rated and 240/480 rpm no-load at 24/48 V, 621 g, cross-roller bearing 2000 N dynamic / 2520 N static, CAN, 14-bit encoder, NTC, -20 to 50 C; 2D drawing (https://www.cubemars.com/data/cms/202602/ak70-10-robotic-actuator-2d-drawing.pdf): 89 x 50.25 mm, front boss 71 mm x 11.2 mm, rear step 77 mm x 6.5 mm, 8 x M3 x 10 deep on 83 mm and 6 x M3 x 7 deep on 25 mm with a 20 H7 x 2 mm recess on the front, 8 x M3 x 3.5 deep on 83 mm at the rear",
+     "verified": true
+    },
+    {
+     "part": "CubeMars AK70-10: which flange turns",
+     "dimensions": "the central 6 x M3 flange taken as the output; the 2D drawing does not label it",
+     "source": "CubeMars AK70-10 KV100 product page (https://www.cubemars.com/product/ak70-10-kv100-robotic-actuator.html): 24/48 V, rated 8.3 N m, peak 24.8 N m, 148/310 rpm rated and 240/480 rpm no-load at 24/48 V, 621 g, cross-roller bearing 2000 N dynamic / 2520 N static, CAN, 14-bit encoder, NTC, -20 to 50 C; 2D drawing (https://www.cubemars.com/data/cms/202602/ak70-10-robotic-actuator-2d-drawing.pdf): 89 x 50.25 mm, front boss 71 mm x 11.2 mm, rear step 77 mm x 6.5 mm, 8 x M3 x 10 deep on 83 mm and 6 x M3 x 7 deep on 25 mm with a 20 H7 x 2 mm recess on the front, 8 x M3 x 3.5 deep on 83 mm at the rear",
+     "verified": false
+    },
+    {
+     "part": "wheel_segment (printed)",
+     "dimensions": "16 M4 inserts on 210 mm",
+     "source": "hardware/parts/lunar_rover/wheel_segment.py",
+     "verified": true
+    }
+   ],
+   "inserts": [
+    {
+     "size": "M4",
+     "qty": 16,
+     "where": "outboard face, segment web bolts"
+    }
+   ],
+   "fasteners": [
+    {
+     "item": "M3 x 16 socket head cap screw, class 12.9",
+     "qty": 6,
+     "use": "hub to the actuator's output flange (5.5 mm into the 7 mm threads), medium thread locker"
+    }
+   ],
+   "notes": [
+    "Before printing the hub, check on the actuator which flange turns (power it and command a slow speed): the hub bolts to the central one.",
+    "Re-torque the six M3 after the first hour of driving, then check them every outing; printed plastic under a screw head settles."
+   ]
+  },
+  {
+   "id": "wheel_segment",
+   "name": "Wheel segment (1/8 of a wheel)",
+   "quantity": 48,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "outdoors in the sun and abraded by regolith simulant; ASA keeps its strength in the heat",
+   "flight_critical": true,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 25,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "on one end wall: the rim arcs up to 45 deg, no supports",
+    "rotate": [
+     [
+      "Y",
+      -22.5
+     ]
+    ]
+   },
+   "stl": "hardware/parts/lunar_rover/stl/wheel_segment.stl",
+   "step": "generated/parts/lunar_rover/wheel_segment.step",
+   "volume_cm3": 91.07,
+   "area_cm2": 517.2,
+   "print_size_mm": [
+    98.7,
+    120.0,
+    118.8
+   ],
+   "footprint_mm": [
+    98.7,
+    120.0
+   ],
+   "triangles": 2192,
+   "estimate": {
+    "mass_g": 89.0,
+    "time_min": 174,
+    "mass_g_all": 4273.5,
+    "time_min_all": 8346
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 2.3,
+    "min_wall_p1_mm": 2.34,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 2002,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "wheel_hub (printed)",
+     "dimensions": "two M4 at 105 mm radius, +-11.25 deg",
+     "source": "hardware/parts/lunar_rover/wheel_hub.py",
+     "verified": true
+    },
+    {
+     "part": "grouser (printed)",
+     "dimensions": "two M3 per grouser through the rim",
+     "source": "hardware/parts/lunar_rover/grouser.py",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M4 x 14 socket head cap screw + M4 washer",
+     "qty": 2,
+     "use": "segment web to the hub inserts (7 mm into the 8.1 mm insert)"
+    },
+    {
+     "item": "M4 x 16 socket head cap screw + M4 nyloc nut",
+     "qty": 2,
+     "use": "end wall to the next segment's end wall (one segment of each pair carries the screws)"
+    }
+   ],
+   "notes": [
+    "Layers lie across the rim's width: the rim's bending along the axle runs in the layers, not across them.",
+    "Wear part: carry two spare segments per wheel for regolith runs."
+   ]
+  }
+ ],
+ "plates": [
+  {
+   "name": "A",
+   "material": "ASA",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "wheel_hub",
+     "qty": 1
+    }
+   ],
+   "time_min": 373,
+   "mass_g": 210
+  },
+  {
+   "name": "B",
+   "material": "ASA",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "wheel_hub",
+     "qty": 1
+    }
+   ],
+   "time_min": 373,
+   "mass_g": 210
+  },
+  {
+   "name": "C",
+   "material": "ASA",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "wheel_hub",
+     "qty": 1
+    }
+   ],
+   "time_min": 373,
+   "mass_g": 210
+  },
+  {
+   "name": "D",
+   "material": "ASA",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "wheel_hub",
+     "qty": 1
+    }
+   ],
+   "time_min": 373,
+   "mass_g": 210
+  },
+  {
+   "name": "E",
+   "material": "ASA",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "wheel_hub",
+     "qty": 1
+    }
+   ],
+   "time_min": 373,
+   "mass_g": 210
+  },
+  {
+   "name": "F",
+   "material": "ASA",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "wheel_hub",
+     "qty": 1
+    }
+   ],
+   "time_min": 373,
+   "mass_g": 210
+  },
+  {
+   "name": "G",
+   "material": "ASA",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "gnss_head",
+     "qty": 1
+    },
+    {
+     "id": "lidar_mount",
+     "qty": 1
+    },
+    {
+     "id": "wheel_segment",
+     "qty": 1
+    },
+    {
+     "id": "terrain_cam_mount",
+     "qty": 1
+    },
+    {
+     "id": "grouser",
+     "qty": 2
+    },
+    {
+     "id": "diff_clevis",
+     "qty": 1
+    }
+   ],
+   "time_min": 508,
+   "mass_g": 264
+  },
+  {
+   "name": "H",
+   "material": "ASA",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "wheel_segment",
+     "qty": 4
+    },
+    {
+     "id": "panel_clamp",
+     "qty": 3
+    }
+   ],
+   "time_min": 1053,
+   "mass_g": 538
+  },
+  {
+   "name": "I",
+   "material": "ASA",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "wheel_segment",
+     "qty": 4
+    },
+    {
+     "id": "panel_clamp",
+     "qty": 1
+    },
+    {
+     "id": "hazcam_mount",
+     "qty": 1
+    },
+    {
+     "id": "diff_clevis",
+     "qty": 2
+    }
+   ],
+   "time_min": 989,
+   "mass_g": 498
+  },
+  {
+   "name": "J",
+   "material": "ASA",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "wheel_segment",
+     "qty": 4
+    },
+    {
+     "id": "grouser",
+     "qty": 4
+    }
+   ],
+   "time_min": 790,
+   "mass_g": 402
+  },
+  {
+   "name": "K",
+   "material": "ASA",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "wheel_segment",
+     "qty": 4
+    },
+    {
+     "id": "grouser",
+     "qty": 4
+    }
+   ],
+   "time_min": 790,
+   "mass_g": 402
+  },
+  {
+   "name": "L",
+   "material": "ASA",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "wheel_segment",
+     "qty": 4
+    },
+    {
+     "id": "grouser",
+     "qty": 4
+    }
+   ],
+   "time_min": 790,
+   "mass_g": 402
+  },
+  {
+   "name": "M",
+   "material": "ASA",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "wheel_segment",
+     "qty": 4
+    },
+    {
+     "id": "grouser",
+     "qty": 4
+    }
+   ],
+   "time_min": 790,
+   "mass_g": 402
+  },
+  {
+   "name": "N",
+   "material": "ASA",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "wheel_segment",
+     "qty": 4
+    },
+    {
+     "id": "grouser",
+     "qty": 4
+    }
+   ],
+   "time_min": 790,
+   "mass_g": 402
+  },
+  {
+   "name": "O",
+   "material": "ASA",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "wheel_segment",
+     "qty": 4
+    },
+    {
+     "id": "grouser",
+     "qty": 4
+    }
+   ],
+   "time_min": 790,
+   "mass_g": 402
+  },
+  {
+   "name": "P",
+   "material": "ASA",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "wheel_segment",
+     "qty": 4
+    },
+    {
+     "id": "grouser",
+     "qty": 4
+    }
+   ],
+   "time_min": 790,
+   "mass_g": 402
+  },
+  {
+   "name": "Q",
+   "material": "ASA",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "wheel_segment",
+     "qty": 4
+    },
+    {
+     "id": "grouser",
+     "qty": 4
+    }
+   ],
+   "time_min": 790,
+   "mass_g": 402
+  },
+  {
+   "name": "R",
+   "material": "ASA",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "wheel_segment",
+     "qty": 4
+    },
+    {
+     "id": "grouser",
+     "qty": 4
+    }
+   ],
+   "time_min": 790,
+   "mass_g": 402
+  },
+  {
+   "name": "S",
+   "material": "ASA",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "wheel_segment",
+     "qty": 3
+    },
+    {
+     "id": "actuator_mount",
+     "qty": 1
+    },
+    {
+     "id": "grouser",
+     "qty": 4
+    },
+    {
+     "id": "cable_clip",
+     "qty": 1
+    }
+   ],
+   "time_min": 943,
+   "mass_g": 486
+  },
+  {
+   "name": "T",
+   "material": "ASA",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "actuator_mount",
+     "qty": 5
+    },
+    {
+     "id": "mast_foot",
+     "qty": 2
+    },
+    {
+     "id": "estop_housing",
+     "qty": 1
+    },
+    {
+     "id": "grouser",
+     "qty": 3
+    },
+    {
+     "id": "cable_clip",
+     "qty": 4
+    }
+   ],
+   "time_min": 1945,
+   "mass_g": 1024
+  },
+  {
+   "name": "U",
+   "material": "ASA",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "grouser",
+     "qty": 30
+    }
+   ],
+   "time_min": 666,
+   "mass_g": 345
+  },
+  {
+   "name": "V",
+   "material": "ASA",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "grouser",
+     "qty": 21
+    },
+    {
+     "id": "diff_clevis",
+     "qty": 1
+    },
+    {
+     "id": "cable_clip",
+     "qty": 19
+    }
+   ],
+   "time_min": 591,
+   "mass_g": 283
+  },
+  {
+   "name": "W",
+   "material": "PETG",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "compute_tray",
+     "qty": 1
+    },
+    {
+     "id": "battery_end",
+     "qty": 2
+    }
+   ],
+   "time_min": 586,
+   "mass_g": 337
+  },
+  {
+   "name": "X",
+   "material": "PETG",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "power_tray",
+     "qty": 1
+    }
+   ],
+   "time_min": 216,
+   "mass_g": 127
+  },
+  {
+   "name": "Y",
+   "material": "TPU95A",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "actuator_shroud",
+     "qty": 4
+    }
+   ],
+   "time_min": 426,
+   "mass_g": 106
+  },
+  {
+   "name": "Z",
+   "material": "TPU95A",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "actuator_shroud",
+     "qty": 2
+    }
+   ],
+   "time_min": 216,
+   "mass_g": 53
+  }
+ ],
+ "assembly": {
+  "bodies": 234,
+  "interferences": "none (screws are not modelled on the rover)",
+  "intended_press_fits": 6,
+  "wheel_radius_mm": 180.0,
+  "wheel_gaps_mm": [
+   40.0,
+   40.0
+  ],
+  "ground_clearance_mm": "220 (diff_bar)",
+  "mass_kg": "38.0 + 10 payload on the deck",
+  "centre_of_gravity_mm": [
+   0,
+   1,
+   392
+  ],
+  "tip_over_deg": "sideways 36, nose down 46, nose up 46",
+  "wheel_torque_nm": "7.0 needed on 21 deg in loose regolith (rolling resistance 0.15), 8.3 rated, 24.8 peak",
+  "max_payload_at_rated_torque_kg": 18.6,
+  "wheel_speed_rpm": "58 at 0.38 m/s and 0.65 slip; 148 rated at 24 V",
+  "battery_wh": "640 (650 in the simulator)",
+  "hazcam_view_clear": "yes (87 x 58 deg depth view, pitched 20 deg down); the tops of the front_left and front_right wheels show in the lower corners: mask them",
+  "terrain_camera_view_clear": "yes (69 x 55 deg, straight down)",
+  "lidar_view_clear": "yes (nothing above the Mid-360's -7 deg lowest ray)",
+  "lux_sky_view": "clear above 30 deg (the GNSS antenna beside it excepted)",
+  "passed": true
+ }
+}

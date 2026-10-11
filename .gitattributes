@@ -44,3 +44,4 @@ Dockerfile* text eol=lf
 # overrides the *.stl and *.png LFS rules above.
 hardware/parts/*/stl/*.stl -filter binary
 hardware/parts/*/images/*.png -filter binary
+hardware/parts/*/upstream/*.stl -filter binary

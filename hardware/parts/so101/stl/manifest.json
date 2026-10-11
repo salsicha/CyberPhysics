@@ -1,0 +1,2606 @@
+{
+ "platform": "so101",
+ "generator": "tools/build_printable_parts.py",
+ "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+ "usable_volume_mm": [
+  250.0,
+  250.0,
+  250.0
+ ],
+ "stl_tolerance_mm": 0.05,
+ "stl_angular_tolerance_rad": 0.3,
+ "parts": [
+  {
+   "id": "base_motor_holder_so101",
+   "name": "Base motor holder (SO-101, upstream)",
+   "quantity": 2,
+   "material": "PETG",
+   "material_fallback": null,
+   "material_reason": "indoors, but next to servos that run warm under load: PETG keeps its shape well above the 55-60 C where PLA (upstream's PLA+) starts to soften",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu PETG Basic",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 3,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 15,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "tree(auto), everywhere",
+    "brim": "auto",
+    "orientation": "on its back: the large flat face on the plate",
+    "rotate": [
+     [
+      "X",
+      90
+     ]
+    ]
+   },
+   "stl": "hardware/parts/so101/stl/base_motor_holder_so101.stl",
+   "step": null,
+   "vendored": {
+    "author": "TheRobotStudio with Hugging Face (SO-ARM100 CITATION.cff: R. Knight, P. Kooijmans, R. Cadene, S. Alibert et al.)",
+    "file": "upstream/Base_motor_holder_SO101.stl",
+    "licence": "Apache-2.0",
+    "licence_file": "upstream/LICENSE",
+    "sha256": "e10eb1296560bc00dca91af5f35d9be637be026a5b544c0ebfcac51501aa3c70",
+    "source": "https://github.com/TheRobotStudio/SO-ARM100/blob/a758567c3978dfeefe282ede0500085a48fe8f78/STL/SO101/Individual/Base_motor_holder_SO101.stl"
+   },
+   "volume_cm3": 23.71,
+   "area_cm2": 133.0,
+   "print_size_mm": [
+    47.6,
+    80.2,
+    31.4
+   ],
+   "footprint_mm": [
+    47.6,
+    80.2
+   ],
+   "triangles": 6816,
+   "estimate": {
+    "mass_g": 21.8,
+    "time_min": 41,
+    "mass_g_all": 43.5,
+    "time_min_all": 82
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": null,
+    "closed_manifold": true,
+    "bodies": 1,
+    "voids": 0,
+    "fits_bed": true,
+    "min_wall_mm": 1.02,
+    "min_wall_p1_mm": 1.02,
+    "min_wall_required_mm": 1.0,
+    "min_wall_rule": "percentile 1 (vendored mesh)",
+    "thinner_than_required_pct": 0.0,
+    "bed_contact_mm2": 568,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "Feetech STS3215 servo (and its horns)",
+     "dimensions": "servo pockets, horn screw circles and M2/M3 screw holes of the upstream design",
+     "source": "upstream design, https://github.com/TheRobotStudio/SO-ARM100/blob/a758567c3978dfeefe282ede0500085a48fe8f78/README.md; assembly guide https://huggingface.co/docs/lerobot/so101",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M2 x 6 screw (STS3215 accessory bag)",
+     "qty": 2,
+     "use": "base motor holder, one each side"
+    }
+   ],
+   "notes": [
+    "Upstream design, vendored unchanged and only turned to this print orientation; upstream prints it in PLA+ at 0.2 mm, 15 % infill, supports on overhangs over 45 deg, none in horizontal screw holes.",
+    "Two: one for the follower and one for the leader arm.",
+    "The published design has 1.0 mm walls (two 0.42 mm lines and gap fill), so its minimum wall is 1.0 mm, not the default 1.2 mm."
+   ]
+  },
+  {
+   "id": "base_so101",
+   "name": "Base (SO-101, upstream)",
+   "quantity": 2,
+   "material": "PETG",
+   "material_fallback": null,
+   "material_reason": "indoors, but next to servos that run warm under load: PETG keeps its shape well above the 55-60 C where PLA (upstream's PLA+) starts to soften",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu PETG Basic",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 3,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 15,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "tree(auto), everywhere",
+    "brim": "auto",
+    "orientation": "as published: standing on its rear face, the two lattice clamp lobes upright (their teardrop screw holes need no support)",
+    "rotate": []
+   },
+   "stl": "hardware/parts/so101/stl/base_so101.stl",
+   "step": null,
+   "vendored": {
+    "author": "TheRobotStudio with Hugging Face (SO-ARM100 CITATION.cff: R. Knight, P. Kooijmans, R. Cadene, S. Alibert et al.)",
+    "file": "upstream/Base_SO101.stl",
+    "licence": "Apache-2.0",
+    "licence_file": "upstream/LICENSE",
+    "sha256": "19f3c6baafc23a3bc92805762e906df9514d1008be84d490a90a9096ffdcf3c8",
+    "source": "https://github.com/TheRobotStudio/SO-ARM100/blob/a758567c3978dfeefe282ede0500085a48fe8f78/STL/SO101/Individual/Base_SO101.stl"
+   },
+   "volume_cm3": 122.69,
+   "area_cm2": 493.0,
+   "print_size_mm": [
+    110.9,
+    72.0,
+    87.0
+   ],
+   "footprint_mm": [
+    110.9,
+    72.0
+   ],
+   "triangles": 9558,
+   "estimate": {
+    "mass_g": 88.6,
+    "time_min": 160,
+    "mass_g_all": 177.3,
+    "time_min_all": 320
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": null,
+    "closed_manifold": true,
+    "bodies": 1,
+    "voids": 0,
+    "fits_bed": true,
+    "min_wall_mm": 0.05,
+    "min_wall_p1_mm": 1.4,
+    "min_wall_required_mm": 1.2,
+    "min_wall_rule": "percentile 1 (vendored mesh)",
+    "thinner_than_required_pct": 0.65,
+    "bed_contact_mm2": 1545,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "Feetech STS3215 servo (and its horns)",
+     "dimensions": "servo pockets, horn screw circles and M2/M3 screw holes of the upstream design",
+     "source": "upstream design, https://github.com/TheRobotStudio/SO-ARM100/blob/a758567c3978dfeefe282ede0500085a48fe8f78/README.md; assembly guide https://huggingface.co/docs/lerobot/so101",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M2 x 6 screw (STS3215 accessory bag)",
+     "qty": 4,
+     "use": "shoulder-pan servo into the base, two from the top and two from the bottom"
+    }
+   ],
+   "notes": [
+    "Upstream design, vendored unchanged and only turned to this print orientation; upstream prints it in PLA+ at 0.2 mm, 15 % infill, supports on overhangs over 45 deg, none in horizontal screw holes.",
+    "Two: one for the follower and one for the leader arm.",
+    "Four 5 mm through holes in the clamp lobes take the M4 bolts of station_base_plate (follower only)."
+   ]
+  },
+  {
+   "id": "block_green",
+   "name": "Green block (distractor, 40 x 55 x 40 mm)",
+   "quantity": 1,
+   "material": "PETG",
+   "material_fallback": null,
+   "material_reason": "green PETG, matte if available",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu PETG Basic",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 3,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 25,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "flat on a 40 x 55 mm face",
+    "rotate": []
+   },
+   "stl": "hardware/parts/so101/stl/block_green.stl",
+   "step": "generated/parts/so101/block_green.step",
+   "volume_cm3": 87.74,
+   "area_cm2": 116.8,
+   "print_size_mm": [
+    40.0,
+    55.0,
+    40.0
+   ],
+   "footprint_mm": [
+    40.0,
+    55.0
+   ],
+   "triangles": 44,
+   "estimate": {
+    "mass_g": 40.3,
+    "time_min": 73,
+    "mass_g_all": 40.3,
+    "time_min_all": 73
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 40.0,
+    "min_wall_p1_mm": 40.0,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 2014,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "scene object green_block_distractor",
+     "dimensions": "40 x 55 x 40 mm, 40 g",
+     "source": "systems/so101/scenarios/picking_table.json",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [],
+   "notes": [
+    "Weigh it: 30-54 g is inside the scene's randomised mass range (0.75-1.35x)."
+   ]
+  },
+  {
+   "id": "block_red",
+   "name": "Red block (task target, 45 mm cube)",
+   "quantity": 1,
+   "material": "PETG",
+   "material_fallback": null,
+   "material_reason": "red PETG, matte if available (glossy prints reflect the RealSense projector)",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu PETG Basic",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 3,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 30,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "flat on one face",
+    "rotate": []
+   },
+   "stl": "hardware/parts/so101/stl/block_red.stl",
+   "step": "generated/parts/so101/block_red.step",
+   "volume_cm3": 90.86,
+   "area_cm2": 118.3,
+   "print_size_mm": [
+    45.0,
+    45.0,
+    45.0
+   ],
+   "footprint_mm": [
+    45.0,
+    45.0
+   ],
+   "triangles": 44,
+   "estimate": {
+    "mass_g": 46.5,
+    "time_min": 84,
+    "mass_g_all": 46.5,
+    "time_min_all": 84
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 45.0,
+    "min_wall_p1_mm": 45.0,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 1849,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "scene object red_block_target",
+     "dimensions": "45 x 45 x 45 mm, 45 g",
+     "source": "systems/so101/scenarios/picking_table.json",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [],
+   "notes": [
+    "Weigh it: the scene randomises object mass by 0.75-1.35x, so 34-61 g is inside the simulated range."
+   ]
+  },
+  {
+   "id": "cable_clip",
+   "name": "Post cable clip",
+   "quantity": 3,
+   "material": "PETG",
+   "material_fallback": null,
+   "material_reason": "flexes so the cable snaps in without cracking",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu PETG Basic",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 100,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "on its side: the clip profile flat on the plate",
+    "rotate": [
+     [
+      "X",
+      90
+     ]
+    ]
+   },
+   "stl": "hardware/parts/so101/stl/cable_clip.stl",
+   "step": "generated/parts/so101/cable_clip.step",
+   "volume_cm3": 1.41,
+   "area_cm2": 13.0,
+   "print_size_mm": [
+    24.0,
+    12.3,
+    12.0
+   ],
+   "footprint_mm": [
+    24.0,
+    12.3
+   ],
+   "triangles": 440,
+   "estimate": {
+    "mass_g": 1.8,
+    "time_min": 5,
+    "mass_g_all": 5.4,
+    "time_min_all": 15
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 1.99,
+    "min_wall_p1_mm": 1.99,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 130,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "2020 aluminium extrusion (camera post)",
+     "dimensions": "5.6 mm key in the 6 mm slot, M5 into a drop-in T-nut",
+     "source": "Misumi HFS5 series, 20 mm square, 1 slot (https://us.misumi-ec.com/pdf/fa/2012/p2_0511.pdf): 20 x 20 mm, slot width 6 mm, centre hole 4.2 mm (M5 tap), I = 0.742e4 mm4",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M5 x 10 button head screw + M5 drop-in T-nut (slot 6)",
+     "qty": 1,
+     "use": "cable clip to the post"
+    }
+   ],
+   "notes": [
+    "Three on the post: the camera's USB cable runs down the post's rear slot to the board."
+   ]
+  },
+  {
+   "id": "calib_board_foot",
+   "name": "Calibration board foot",
+   "quantity": 2,
+   "material": "PETG",
+   "material_fallback": null,
+   "material_reason": "indoors; any filament works",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu PETG Basic",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 3,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 20,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "upright: the base on the plate",
+    "rotate": []
+   },
+   "stl": "hardware/parts/so101/stl/calib_board_foot.stl",
+   "step": "generated/parts/so101/calib_board_foot.step",
+   "volume_cm3": 37.62,
+   "area_cm2": 149.8,
+   "print_size_mm": [
+    70.0,
+    50.0,
+    28.0
+   ],
+   "footprint_mm": [
+    70.0,
+    50.0
+   ],
+   "triangles": 220,
+   "estimate": {
+    "mass_g": 26.2,
+    "time_min": 48,
+    "mass_g_all": 52.4,
+    "time_min_all": 95
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 4.0,
+    "min_wall_p1_mm": 4.0,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 3469,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "calibration board (AprilGrid on a rigid panel)",
+     "dimensions": "280 x 200 mm, up to 6 mm thick",
+     "source": "systems/so101/scenarios/picking_table.json (calibration_board)",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [],
+   "notes": [
+    "Push the board's 280 mm edge into both slots, about 200 mm apart; add a strip of tape if the board is thinner than 6 mm."
+   ]
+  },
+  {
+   "id": "camera_cradle",
+   "name": "Camera cradle (RealSense D435i)",
+   "quantity": 1,
+   "material": "PETG",
+   "material_fallback": null,
+   "material_reason": "indoors; stiff and does not creep under the camera screws",
+   "flight_critical": false,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu PETG Basic",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 40,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "camera face on the plate, ears up",
+    "rotate": [
+     [
+      "Z",
+      -83.0215845144563
+     ],
+     [
+      "Y",
+      45.02281308223038
+     ]
+    ]
+   },
+   "stl": "hardware/parts/so101/stl/camera_cradle.stl",
+   "step": "generated/parts/so101/camera_cradle.step",
+   "volume_cm3": 13.28,
+   "area_cm2": 81.1,
+   "print_size_mm": [
+    32.5,
+    80.0,
+    31.0
+   ],
+   "footprint_mm": [
+    32.5,
+    80.0
+   ],
+   "triangles": 1548,
+   "estimate": {
+    "mass_g": 14.8,
+    "time_min": 29,
+    "mass_g_all": 14.8,
+    "time_min_all": 29
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 1.68,
+    "min_wall_p1_mm": 2.01,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 1877,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "RealSense D435i",
+     "dimensions": "two M3 on the back 45 mm apart, max insertion 3 mm: 3.5 mm plate and M3 x 6",
+     "source": "RealSense D400 Series datasheet 337029-017 (Mar 2026) (https://www.realsenseai.com/wp-content/uploads/2026/03/RealSense-D400-Series-Datasheet-Mar-2026.pdf): Table 3-52 (90 x 25 x 25 mm, 75 g), Figure 10-9 (two M3 on the back 45 mm apart, max insertion 3 mm, 0.4 N m; 1/4\"-20 underneath), Figure 4-7 and Table 4-20 (left imager 17.5 mm from the 1/4\"-20 centre line, 50 mm baseline, RGB 15 mm beyond the left imager), Table 3-18/3-49 (OV2740 colour, 1920 x 1080, 69.4 x 42.5 deg), Table 4-17 (zero depth 4.2 mm behind the front glass), Table 4-12 (min-Z 195 mm at 848 x 480); realsense-ros _d435.urdf.xacro for the side of the RGB camera",
+     "verified": true
+    },
+    {
+     "part": "RealSense D435i M3 pair position",
+     "dimensions": "assumed centred on the back; holes slotted +-0.8 mm up and down",
+     "source": "RealSense D400 Series datasheet 337029-017 (Mar 2026) (https://www.realsenseai.com/wp-content/uploads/2026/03/RealSense-D400-Series-Datasheet-Mar-2026.pdf): Table 3-52 (90 x 25 x 25 mm, 75 g), Figure 10-9 (two M3 on the back 45 mm apart, max insertion 3 mm, 0.4 N m; 1/4\"-20 underneath), Figure 4-7 and Table 4-20 (left imager 17.5 mm from the 1/4\"-20 centre line, 50 mm baseline, RGB 15 mm beyond the left imager), Table 3-18/3-49 (OV2740 colour, 1920 x 1080, 69.4 x 42.5 deg), Table 4-17 (zero depth 4.2 mm behind the front glass), Table 4-12 (min-Z 195 mm at 848 x 480); realsense-ros _d435.urdf.xacro for the side of the RGB camera",
+     "verified": false
+    },
+    {
+     "part": "camera_head (printed)",
+     "dimensions": "6.0 mm clevis around the 5.6 mm tongue",
+     "source": "hardware/parts/so101/camera_head.py",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M3 x 6 socket head cap screw",
+     "qty": 2,
+     "use": "D435i to the cradle (2.5 mm into the camera; Intel's max 3 mm, 0.4 N m)"
+    },
+    {
+     "item": "M3 x 20 socket head cap screw",
+     "qty": 2,
+     "use": "pivot and pitch lock, through the clevis and the tongue"
+    },
+    {
+     "item": "M3 nyloc nut",
+     "qty": 2,
+     "use": "pivot and pitch lock, in the hex pockets"
+    },
+    {
+     "item": "M3 washer",
+     "qty": 2,
+     "use": "under the pivot and lock screw heads"
+    }
+   ],
+   "notes": [
+    "Never use screws longer than M3 x 6 in the camera: Intel allows 3 mm of thread.",
+    "USB-C on the camera's left end (seen from behind): the cable leaves sideways, clear of the cradle."
+   ]
+  },
+  {
+   "id": "camera_head",
+   "name": "Camera head (post top, pitch pivot)",
+   "quantity": 1,
+   "material": "PETG",
+   "material_fallback": null,
+   "material_reason": "indoors; PETG's toughness for the thin tongue",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu PETG Basic",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 40,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "upright: the open end of the sleeve on the plate, tongue up",
+    "rotate": []
+   },
+   "stl": "hardware/parts/so101/stl/camera_head.stl",
+   "step": "generated/parts/so101/camera_head.step",
+   "volume_cm3": 28.67,
+   "area_cm2": 123.8,
+   "print_size_mm": [
+    30.4,
+    34.4,
+    83.0
+   ],
+   "footprint_mm": [
+    30.4,
+    34.4
+   ],
+   "triangles": 1112,
+   "estimate": {
+    "mass_g": 29.1,
+    "time_min": 62,
+    "mass_g_all": 29.1,
+    "time_min_all": 62
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 4.26,
+    "min_wall_p1_mm": 5.0,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 508,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "2020 aluminium extrusion (camera post)",
+     "dimensions": "20.4 mm square sleeve, 36 mm deep, two M5 into drop-in T-nuts (slot 6); optional M5 into the tapped 4.2 mm centre hole",
+     "source": "Misumi HFS5 series, 20 mm square, 1 slot (https://us.misumi-ec.com/pdf/fa/2012/p2_0511.pdf): 20 x 20 mm, slot width 6 mm, centre hole 4.2 mm (M5 tap), I = 0.742e4 mm4",
+     "verified": true
+    },
+    {
+     "part": "camera_cradle (printed)",
+     "dimensions": "5.6 mm tongue in its 6.0 mm clevis",
+     "source": "hardware/parts/so101/camera_cradle.py",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M5 x 10 button head screw + M5 drop-in T-nut (slot 6)",
+     "qty": 2,
+     "use": "head to the camera post"
+    }
+   ],
+   "notes": [
+    "The pivot and lock screws are listed on camera_cradle.",
+    "Optional: tap the post's centre hole M5 and add an M5 x 12 through the cap."
+   ]
+  },
+  {
+   "id": "cylinder_blue",
+   "name": "Blue cylinder (distractor, 54 x 60 mm)",
+   "quantity": 1,
+   "material": "PETG",
+   "material_fallback": null,
+   "material_reason": "blue PETG, matte if available",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu PETG Basic",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 2,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 12,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "standing on an end face",
+    "rotate": []
+   },
+   "stl": "hardware/parts/so101/stl/cylinder_blue.stl",
+   "step": "generated/parts/so101/cylinder_blue.step",
+   "volume_cm3": 137.25,
+   "area_cm2": 145.6,
+   "print_size_mm": [
+    54.0,
+    53.8,
+    60.0
+   ],
+   "footprint_mm": [
+    54.0,
+    53.8
+   ],
+   "triangles": 332,
+   "estimate": {
+    "mass_g": 34.9,
+    "time_min": 67,
+    "mass_g_all": 34.9,
+    "time_min_all": 67
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 53.85,
+    "min_wall_p1_mm": 53.85,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 2116,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "scene object blue_cylinder_distractor",
+     "dimensions": "54 mm diameter, 60 mm tall, 35 g",
+     "source": "systems/so101/scenarios/picking_table.json",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [],
+   "notes": [
+    "Weigh it: 26-47 g is inside the scene's randomised mass range (0.75-1.35x)."
+   ]
+  },
+  {
+   "id": "gauge_0",
+   "name": "STS3215 fit gauge, zero clearance (upstream)",
+   "quantity": 1,
+   "material": "PETG",
+   "material_fallback": null,
+   "material_reason": "the same filament and settings as the arm parts it checks",
+   "flight_critical": false,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu PETG Basic",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 3,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 15,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "as published: flat on the plate",
+    "rotate": []
+   },
+   "stl": "hardware/parts/so101/stl/gauge_0.stl",
+   "step": null,
+   "vendored": {
+    "author": "TheRobotStudio with Hugging Face (SO-ARM100 CITATION.cff: R. Knight, P. Kooijmans, R. Cadene, S. Alibert et al.)",
+    "file": "upstream/Gauge_0.stl",
+    "licence": "Apache-2.0",
+    "licence_file": "upstream/LICENSE",
+    "sha256": "ba5b60f80ac9a47b1ba92c8c7d28e3128717e9497f6cc289f8d1e31a0243eb41",
+    "source": "https://github.com/TheRobotStudio/SO-ARM100/blob/a758567c3978dfeefe282ede0500085a48fe8f78/STL/Gauges/Gauge_0.STL"
+   },
+   "volume_cm3": 6.8,
+   "area_cm2": 40.4,
+   "print_size_mm": [
+    51.2,
+    34.7,
+    10.0
+   ],
+   "footprint_mm": [
+    51.2,
+    34.7
+   ],
+   "triangles": 1766,
+   "estimate": {
+    "mass_g": 6.5,
+    "time_min": 12,
+    "mass_g_all": 6.5,
+    "time_min_all": 12
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": null,
+    "closed_manifold": true,
+    "bodies": 1,
+    "voids": 0,
+    "fits_bed": true,
+    "min_wall_mm": 1.25,
+    "min_wall_p1_mm": 2.34,
+    "min_wall_required_mm": 1.2,
+    "min_wall_rule": "percentile 1 (vendored mesh)",
+    "thinner_than_required_pct": 0.0,
+    "bed_contact_mm2": 380,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "Feetech STS3215 servo body",
+     "dimensions": "the servo slides into the gauge as into the arm's pockets",
+     "source": "upstream README, Printing the Parts, step 3: https://github.com/TheRobotStudio/SO-ARM100/blob/a758567c3978dfeefe282ede0500085a48fe8f78/README.md",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [],
+   "notes": [
+    "Upstream design, vendored unchanged and only turned to this print orientation; upstream prints it in PLA+ at 0.2 mm, 15 % infill, supports on overhangs over 45 deg, none in horizontal screw holes.",
+    "Fit test, with gauge_0 and gauge_tight_1 printed together: an STS3215 should slide into gauge_0 with light friction and be clearly tighter in gauge_tight_1 (upstream README, step 3). If it is loose in gauge_0 or will not enter it, tune the filament flow or XY compensation before printing the arm."
+   ]
+  },
+  {
+   "id": "gauge_tight_1",
+   "name": "STS3215 fit gauge, tight (upstream)",
+   "quantity": 1,
+   "material": "PETG",
+   "material_fallback": null,
+   "material_reason": "the same filament and settings as the arm parts it checks",
+   "flight_critical": false,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu PETG Basic",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 3,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 15,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "as published: flat on the plate",
+    "rotate": []
+   },
+   "stl": "hardware/parts/so101/stl/gauge_tight_1.stl",
+   "step": null,
+   "vendored": {
+    "author": "TheRobotStudio with Hugging Face (SO-ARM100 CITATION.cff: R. Knight, P. Kooijmans, R. Cadene, S. Alibert et al.)",
+    "file": "upstream/Gauge_tight_1.stl",
+    "licence": "Apache-2.0",
+    "licence_file": "upstream/LICENSE",
+    "sha256": "8cc075ed3ead3a7de08fbfd15e44e9be0fae61798b8672ebff1df2005ff918dc",
+    "source": "https://github.com/TheRobotStudio/SO-ARM100/blob/a758567c3978dfeefe282ede0500085a48fe8f78/STL/Gauges/Gauge_tight_1.STL"
+   },
+   "volume_cm3": 6.79,
+   "area_cm2": 40.1,
+   "print_size_mm": [
+    51.1,
+    34.6,
+    10.0
+   ],
+   "footprint_mm": [
+    51.1,
+    34.6
+   ],
+   "triangles": 416,
+   "estimate": {
+    "mass_g": 6.5,
+    "time_min": 12,
+    "mass_g_all": 6.5,
+    "time_min_all": 12
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": null,
+    "closed_manifold": true,
+    "bodies": 1,
+    "voids": 0,
+    "fits_bed": true,
+    "min_wall_mm": 1.25,
+    "min_wall_p1_mm": 2.75,
+    "min_wall_required_mm": 1.2,
+    "min_wall_rule": "percentile 1 (vendored mesh)",
+    "thinner_than_required_pct": 0.0,
+    "bed_contact_mm2": 387,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "Feetech STS3215 servo body",
+     "dimensions": "the servo slides into the gauge as into the arm's pockets",
+     "source": "upstream README, Printing the Parts, step 3: https://github.com/TheRobotStudio/SO-ARM100/blob/a758567c3978dfeefe282ede0500085a48fe8f78/README.md",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [],
+   "notes": [
+    "Upstream design, vendored unchanged and only turned to this print orientation; upstream prints it in PLA+ at 0.2 mm, 15 % infill, supports on overhangs over 45 deg, none in horizontal screw holes.",
+    "Fit test, with gauge_0 and gauge_tight_1 printed together: an STS3215 should slide into gauge_0 with light friction and be clearly tighter in gauge_tight_1 (upstream README, step 3). If it is loose in gauge_0 or will not enter it, tune the filament flow or XY compensation before printing the arm."
+   ]
+  },
+  {
+   "id": "handle_so101",
+   "name": "Leader handle (SO-101 leader, upstream)",
+   "quantity": 1,
+   "material": "PETG",
+   "material_fallback": null,
+   "material_reason": "indoors, but next to servos that run warm under load: PETG keeps its shape well above the 55-60 C where PLA (upstream's PLA+) starts to soften",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu PETG Basic",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 3,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 15,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "tree(auto), everywhere",
+    "brim": "auto",
+    "orientation": "lying flat: the flat side on the plate",
+    "rotate": [
+     [
+      "X",
+      -90
+     ]
+    ]
+   },
+   "stl": "hardware/parts/so101/stl/handle_so101.stl",
+   "step": null,
+   "vendored": {
+    "author": "TheRobotStudio with Hugging Face (SO-ARM100 CITATION.cff: R. Knight, P. Kooijmans, R. Cadene, S. Alibert et al.)",
+    "file": "upstream/Handle_SO101.stl",
+    "licence": "Apache-2.0",
+    "licence_file": "upstream/LICENSE",
+    "sha256": "fb8757bdff009c04c207481dd664813ccdac2ad989acea6057df780b52327281",
+    "source": "https://github.com/TheRobotStudio/SO-ARM100/blob/a758567c3978dfeefe282ede0500085a48fe8f78/STL/SO101/Individual/Handle_SO101.stl"
+   },
+   "volume_cm3": 69.63,
+   "area_cm2": 108.3,
+   "print_size_mm": [
+    88.1,
+    60.1,
+    25.0
+   ],
+   "footprint_mm": [
+    88.1,
+    60.1
+   ],
+   "triangles": 11220,
+   "estimate": {
+    "mass_g": 25.8,
+    "time_min": 47,
+    "mass_g_all": 25.8,
+    "time_min_all": 47
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": null,
+    "closed_manifold": true,
+    "bodies": 1,
+    "voids": 0,
+    "fits_bed": true,
+    "min_wall_mm": 0.69,
+    "min_wall_p1_mm": 6.94,
+    "min_wall_required_mm": 1.2,
+    "min_wall_rule": "percentile 1 (vendored mesh)",
+    "thinner_than_required_pct": 0.1,
+    "bed_contact_mm2": 1476,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "Feetech STS3215 servo (and its horns)",
+     "dimensions": "servo pockets, horn screw circles and M2/M3 screw holes of the upstream design",
+     "source": "upstream design, https://github.com/TheRobotStudio/SO-ARM100/blob/a758567c3978dfeefe282ede0500085a48fe8f78/README.md; assembly guide https://huggingface.co/docs/lerobot/so101",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M2 x 6 screw (STS3215 accessory bag)",
+     "qty": 1,
+     "use": "handle to the leader holder"
+    }
+   ],
+   "notes": [
+    "Upstream design, vendored unchanged and only turned to this print orientation; upstream prints it in PLA+ at 0.2 mm, 15 % infill, supports on overhangs over 45 deg, none in horizontal screw holes.",
+    "Leader arm only."
+   ]
+  },
+  {
+   "id": "motor_holder_so101_base",
+   "name": "Shoulder motor holder (SO-101, upstream)",
+   "quantity": 2,
+   "material": "PETG",
+   "material_fallback": null,
+   "material_reason": "indoors, but next to servos that run warm under load: PETG keeps its shape well above the 55-60 C where PLA (upstream's PLA+) starts to soften",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu PETG Basic",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 3,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 15,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "tree(auto), everywhere",
+    "brim": "auto",
+    "orientation": "on its side: the flat end face on the plate",
+    "rotate": [
+     [
+      "Y",
+      90
+     ]
+    ]
+   },
+   "stl": "hardware/parts/so101/stl/motor_holder_so101_base.stl",
+   "step": null,
+   "vendored": {
+    "author": "TheRobotStudio with Hugging Face (SO-ARM100 CITATION.cff: R. Knight, P. Kooijmans, R. Cadene, S. Alibert et al.)",
+    "file": "upstream/Motor_holder_SO101_Base.stl",
+    "licence": "Apache-2.0",
+    "licence_file": "upstream/LICENSE",
+    "sha256": "f9971aa805e2d6fb61726d2787e752a6fe0ff21d3c66023296ee4c57a2b100a4",
+    "source": "https://github.com/TheRobotStudio/SO-ARM100/blob/a758567c3978dfeefe282ede0500085a48fe8f78/STL/SO101/Individual/Motor_holder_SO101_Base.stl"
+   },
+   "volume_cm3": 13.31,
+   "area_cm2": 100.4,
+   "print_size_mm": [
+    55.1,
+    38.1,
+    28.0
+   ],
+   "footprint_mm": [
+    55.1,
+    38.1
+   ],
+   "triangles": 5854,
+   "estimate": {
+    "mass_g": 15.7,
+    "time_min": 30,
+    "mass_g_all": 31.5,
+    "time_min_all": 61
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": null,
+    "closed_manifold": true,
+    "bodies": 1,
+    "voids": 0,
+    "fits_bed": true,
+    "min_wall_mm": 0.03,
+    "min_wall_p1_mm": 1.77,
+    "min_wall_required_mm": 1.2,
+    "min_wall_rule": "percentile 1 (vendored mesh)",
+    "thinner_than_required_pct": 0.3,
+    "bed_contact_mm2": 228,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "Feetech STS3215 servo (and its horns)",
+     "dimensions": "servo pockets, horn screw circles and M2/M3 screw holes of the upstream design",
+     "source": "upstream design, https://github.com/TheRobotStudio/SO-ARM100/blob/a758567c3978dfeefe282ede0500085a48fe8f78/README.md; assembly guide https://huggingface.co/docs/lerobot/so101",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M2 x 6 screw (STS3215 accessory bag)",
+     "qty": 4,
+     "use": "shoulder-lift servo"
+    }
+   ],
+   "notes": [
+    "Upstream design, vendored unchanged and only turned to this print orientation; upstream prints it in PLA+ at 0.2 mm, 15 % infill, supports on overhangs over 45 deg, none in horizontal screw holes.",
+    "Two: one for the follower and one for the leader arm."
+   ]
+  },
+  {
+   "id": "motor_holder_so101_wrist",
+   "name": "Wrist motor holder (SO-101, upstream)",
+   "quantity": 2,
+   "material": "PETG",
+   "material_fallback": null,
+   "material_reason": "indoors, but next to servos that run warm under load: PETG keeps its shape well above the 55-60 C where PLA (upstream's PLA+) starts to soften",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu PETG Basic",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 3,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 15,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "tree(auto), everywhere",
+    "brim": "auto",
+    "orientation": "on its side: the flat end face on the plate",
+    "rotate": [
+     [
+      "Y",
+      90
+     ]
+    ]
+   },
+   "stl": "hardware/parts/so101/stl/motor_holder_so101_wrist.stl",
+   "step": null,
+   "vendored": {
+    "author": "TheRobotStudio with Hugging Face (SO-ARM100 CITATION.cff: R. Knight, P. Kooijmans, R. Cadene, S. Alibert et al.)",
+    "file": "upstream/Motor_holder_SO101_Wrist.stl",
+    "licence": "Apache-2.0",
+    "licence_file": "upstream/LICENSE",
+    "sha256": "936c84ed2c918b3ec14e2c3ec3f742f47bed10a4e3d0a2c9bf7869d0a2a55149",
+    "source": "https://github.com/TheRobotStudio/SO-ARM100/blob/a758567c3978dfeefe282ede0500085a48fe8f78/STL/SO101/Individual/Motor_holder_SO101_Wrist.stl"
+   },
+   "volume_cm3": 13.87,
+   "area_cm2": 101.9,
+   "print_size_mm": [
+    56.4,
+    36.9,
+    28.0
+   ],
+   "footprint_mm": [
+    56.4,
+    36.9
+   ],
+   "triangles": 8010,
+   "estimate": {
+    "mass_g": 16.0,
+    "time_min": 31,
+    "mass_g_all": 32.1,
+    "time_min_all": 62
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": null,
+    "closed_manifold": true,
+    "bodies": 1,
+    "voids": 0,
+    "fits_bed": true,
+    "min_wall_mm": 0.3,
+    "min_wall_p1_mm": 1.84,
+    "min_wall_required_mm": 1.2,
+    "min_wall_rule": "percentile 1 (vendored mesh)",
+    "thinner_than_required_pct": 0.21,
+    "bed_contact_mm2": 244,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "Feetech STS3215 servo (and its horns)",
+     "dimensions": "servo pockets, horn screw circles and M2/M3 screw holes of the upstream design",
+     "source": "upstream design, https://github.com/TheRobotStudio/SO-ARM100/blob/a758567c3978dfeefe282ede0500085a48fe8f78/README.md; assembly guide https://huggingface.co/docs/lerobot/so101",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M2 x 6 screw (STS3215 accessory bag)",
+     "qty": 4,
+     "use": "wrist-flex servo"
+    }
+   ],
+   "notes": [
+    "Upstream design, vendored unchanged and only turned to this print orientation; upstream prints it in PLA+ at 0.2 mm, 15 % infill, supports on overhangs over 45 deg, none in horizontal screw holes.",
+    "Two: one for the follower and one for the leader arm."
+   ]
+  },
+  {
+   "id": "moving_jaw_so101",
+   "name": "Moving jaw (SO-101 follower, upstream)",
+   "quantity": 1,
+   "material": "PETG",
+   "material_fallback": null,
+   "material_reason": "indoors, but next to servos that run warm under load: PETG keeps its shape well above the 55-60 C where PLA (upstream's PLA+) starts to soften",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu PETG Basic",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 3,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 15,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "tree(auto), everywhere",
+    "brim": "auto",
+    "orientation": "upside down: the published top face on the plate (supports under the curved finger)",
+    "rotate": [
+     [
+      "X",
+      180
+     ]
+    ]
+   },
+   "stl": "hardware/parts/so101/stl/moving_jaw_so101.stl",
+   "step": null,
+   "vendored": {
+    "author": "TheRobotStudio with Hugging Face (SO-ARM100 CITATION.cff: R. Knight, P. Kooijmans, R. Cadene, S. Alibert et al.)",
+    "file": "upstream/Moving_Jaw_SO101.stl",
+    "licence": "Apache-2.0",
+    "licence_file": "upstream/LICENSE",
+    "sha256": "403763bbab8656cc7ce5ea6374741d0860bd19426b5b4b0041de3a2c1275f90b",
+    "source": "https://github.com/TheRobotStudio/SO-ARM100/blob/a758567c3978dfeefe282ede0500085a48fe8f78/STL/SO101/Individual/Moving_Jaw_SO101.stl"
+   },
+   "volume_cm3": 20.69,
+   "area_cm2": 86.3,
+   "print_size_mm": [
+    22.3,
+    92.0,
+    48.0
+   ],
+   "footprint_mm": [
+    22.3,
+    92.0
+   ],
+   "triangles": 11260,
+   "estimate": {
+    "mass_g": 14.4,
+    "time_min": 32,
+    "mass_g_all": 14.4,
+    "time_min_all": 32
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": null,
+    "closed_manifold": true,
+    "bodies": 1,
+    "voids": 1,
+    "fits_bed": true,
+    "min_wall_mm": 0.53,
+    "min_wall_p1_mm": 1.41,
+    "min_wall_required_mm": 1.2,
+    "min_wall_rule": "percentile 1 (vendored mesh)",
+    "thinner_than_required_pct": 0.69,
+    "bed_contact_mm2": 154,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "Feetech STS3215 servo (and its horns)",
+     "dimensions": "servo pockets, horn screw circles and M2/M3 screw holes of the upstream design",
+     "source": "upstream design, https://github.com/TheRobotStudio/SO-ARM100/blob/a758567c3978dfeefe282ede0500085a48fe8f78/README.md; assembly guide https://huggingface.co/docs/lerobot/so101",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M3 x 6 screw (STS3215 accessory bag)",
+     "qty": 8,
+     "use": "moving jaw to the gripper horns, four each side"
+    }
+   ],
+   "notes": [
+    "Upstream design, vendored unchanged and only turned to this print orientation; upstream prints it in PLA+ at 0.2 mm, 15 % infill, supports on overhangs over 45 deg, none in horizontal screw holes.",
+    "Follower arm only.",
+    "The mesh has one small enclosed void (76 mm3), part of the published design."
+   ]
+  },
+  {
+   "id": "occluder_box",
+   "name": "Occluder box (50 x 160 x 70 mm)",
+   "quantity": 1,
+   "material": "PETG",
+   "material_fallback": null,
+   "material_reason": "matte grey PETG (the scene's matte grey cardboard; a cardboard box of the same size also works)",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu PETG Basic",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 2,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 8,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "flat on its 50 x 160 mm face",
+    "rotate": []
+   },
+   "stl": "hardware/parts/so101/stl/occluder_box.stl",
+   "step": "generated/parts/so101/occluder_box.step",
+   "volume_cm3": 559.45,
+   "area_cm2": 447.4,
+   "print_size_mm": [
+    50.0,
+    160.0,
+    70.0
+   ],
+   "footprint_mm": [
+    50.0,
+    160.0
+   ],
+   "triangles": 44,
+   "estimate": {
+    "mass_g": 101.9,
+    "time_min": 179,
+    "mass_g_all": 101.9,
+    "time_min_all": 179
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 50.0,
+    "min_wall_p1_mm": 50.0,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 7584,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "scene asset occluder_box",
+     "dimensions": "50 x 160 x 70 mm",
+     "source": "systems/so101/scenarios/picking_table.json",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "double-sided tape pad, 20 mm",
+     "qty": 2,
+     "use": "occluder to the board at its scene pose"
+    }
+   ],
+   "notes": [
+    "Scene pose: centre at station (460, -20) mm, turned 0.12 rad (6.9 deg) about z."
+   ]
+  },
+  {
+   "id": "post_foot",
+   "name": "Camera post foot",
+   "quantity": 1,
+   "material": "PETG",
+   "material_fallback": null,
+   "material_reason": "indoors; stiff socket for the 500 mm post",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu PETG Basic",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 40,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "upright: the base plate on the plate, socket up",
+    "rotate": []
+   },
+   "stl": "hardware/parts/so101/stl/post_foot.stl",
+   "step": "generated/parts/so101/post_foot.step",
+   "volume_cm3": 140.77,
+   "area_cm2": 448.2,
+   "print_size_mm": [
+    110.0,
+    110.0,
+    51.7
+   ],
+   "footprint_mm": [
+    110.0,
+    110.0
+   ],
+   "triangles": 2052,
+   "estimate": {
+    "mass_g": 114.9,
+    "time_min": 197,
+    "mass_g_all": 114.9,
+    "time_min_all": 197
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 4.0,
+    "min_wall_p1_mm": 4.0,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 11981,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "2020 aluminium extrusion (camera post)",
+     "dimensions": "20.4 mm square socket, 40 mm deep, two M5 into drop-in T-nuts",
+     "source": "Misumi HFS5 series, 20 mm square, 1 slot (https://us.misumi-ec.com/pdf/fa/2012/p2_0511.pdf): 20 x 20 mm, slot width 6 mm, centre hole 4.2 mm (M5 tap), I = 0.742e4 mm4",
+     "verified": true
+    },
+    {
+     "part": "station board",
+     "dimensions": "four 4 mm wood screws on an 84 mm square",
+     "source": "Requirement of this design: 18 mm plywood or MDF, at least 1200 x 800 mm; the arm 250 mm from the back edge as on the scenario's workbench",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M5 x 10 button head screw + M5 drop-in T-nut (slot 6)",
+     "qty": 2,
+     "use": "post to the foot"
+    },
+    {
+     "item": "4 x 16 mm pan-head wood screw",
+     "qty": 4,
+     "use": "foot to the station board"
+    }
+   ],
+   "notes": [
+    "The post stands 11.7 mm above the board on the socket floor; with a 500 mm post that puts the camera head where the scene's camera is."
+   ]
+  },
+  {
+   "id": "rotation_pitch_so101",
+   "name": "Shoulder (rotation-pitch) (SO-101, upstream)",
+   "quantity": 2,
+   "material": "PETG",
+   "material_fallback": null,
+   "material_reason": "indoors, but next to servos that run warm under load: PETG keeps its shape well above the 55-60 C where PLA (upstream's PLA+) starts to soften",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu PETG Basic",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 3,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 15,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "tree(auto), everywhere",
+    "brim": "auto",
+    "orientation": "on its side: the large flat face on the plate",
+    "rotate": [
+     [
+      "Y",
+      -90
+     ]
+    ]
+   },
+   "stl": "hardware/parts/so101/stl/rotation_pitch_so101.stl",
+   "step": null,
+   "vendored": {
+    "author": "TheRobotStudio with Hugging Face (SO-ARM100 CITATION.cff: R. Knight, P. Kooijmans, R. Cadene, S. Alibert et al.)",
+    "file": "upstream/Rotation_Pitch_SO101.stl",
+    "licence": "Apache-2.0",
+    "licence_file": "upstream/LICENSE",
+    "sha256": "5ef34a5420071627d01323be13e80b7ac8af0760c72d8382c0664c914f281800",
+    "source": "https://github.com/TheRobotStudio/SO-ARM100/blob/a758567c3978dfeefe282ede0500085a48fe8f78/STL/SO101/Individual/Rotation_Pitch_SO101.stl"
+   },
+   "volume_cm3": 68.79,
+   "area_cm2": 181.8,
+   "print_size_mm": [
+    46.0,
+    84.2,
+    59.8
+   ],
+   "footprint_mm": [
+    46.0,
+    84.2
+   ],
+   "triangles": 6696,
+   "estimate": {
+    "mass_g": 35.2,
+    "time_min": 68,
+    "mass_g_all": 70.3,
+    "time_min_all": 135
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": null,
+    "closed_manifold": true,
+    "bodies": 1,
+    "voids": 0,
+    "fits_bed": true,
+    "min_wall_mm": 0.75,
+    "min_wall_p1_mm": 2.2,
+    "min_wall_required_mm": 1.2,
+    "min_wall_rule": "percentile 1 (vendored mesh)",
+    "thinner_than_required_pct": 0.12,
+    "bed_contact_mm2": 2257,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "Feetech STS3215 servo (and its horns)",
+     "dimensions": "servo pockets, horn screw circles and M2/M3 screw holes of the upstream design",
+     "source": "upstream design, https://github.com/TheRobotStudio/SO-ARM100/blob/a758567c3978dfeefe282ede0500085a48fe8f78/README.md; assembly guide https://huggingface.co/docs/lerobot/so101",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M3 x 6 screw (STS3215 accessory bag)",
+     "qty": 8,
+     "use": "shoulder to the shoulder-pan horns, four on top and four underneath"
+    }
+   ],
+   "notes": [
+    "Upstream design, vendored unchanged and only turned to this print orientation; upstream prints it in PLA+ at 0.2 mm, 15 % infill, supports on overhangs over 45 deg, none in horizontal screw holes.",
+    "Two: one for the follower and one for the leader arm."
+   ]
+  },
+  {
+   "id": "station_base_plate",
+   "name": "Station base plate (31 mm riser under the follower)",
+   "quantity": 1,
+   "material": "PETG",
+   "material_fallback": null,
+   "material_reason": "indoors, stiff enough as a ribbed box; PETG does not creep under the bolt preload like PLA",
+   "flight_critical": false,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu PETG Basic",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 3,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 15,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "outer brim only, 5 mm",
+    "orientation": "upside down: the top face on the plate, ribs up",
+    "rotate": [
+     [
+      "X",
+      180
+     ]
+    ]
+   },
+   "stl": "hardware/parts/so101/stl/station_base_plate.stl",
+   "step": "generated/parts/so101/station_base_plate.step",
+   "volume_cm3": 231.73,
+   "area_cm2": 1718.9,
+   "print_size_mm": [
+    220.0,
+    220.0,
+    31.0
+   ],
+   "footprint_mm": [
+    230.0,
+    230.0
+   ],
+   "triangles": 5972,
+   "estimate": {
+    "mass_g": 247.8,
+    "time_min": 412,
+    "mass_g_all": 247.8,
+    "time_min_all": 412
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 1.6,
+    "min_wall_p1_mm": 1.6,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 38505,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "SO-101 base (upstream Base_SO101.stl)",
+     "dimensions": "four 5 mm wing holes at ((16.5, 27.3), (16.5, -27.3), (-52.7, 31.75), (-52.7, -31.75)) mm (station frame)",
+     "source": "measured on the vendored mesh upstream/Base_SO101.stl (https://github.com/TheRobotStudio/SO-ARM100 at a758567); pan axis from upstream Simulation/SO101/so101_new_calib.urdf (shoulder_pan at x 38.84 mm and the base mesh placement), which assumes that mesh is in the same frame as the published STL",
+     "verified": false
+    },
+    {
+     "part": "station board",
+     "dimensions": "four wood screws on a 190 x 190 mm square",
+     "source": "Requirement of this design: 18 mm plywood or MDF, at least 1200 x 800 mm; the arm 250 mm from the back edge as on the scenario's workbench",
+     "verified": true
+    }
+   ],
+   "inserts": [
+    {
+     "size": "M4",
+     "qty": 4,
+     "where": "top face, under the arm base's four wing holes"
+    }
+   ],
+   "fasteners": [
+    {
+     "item": "M4 x 25 socket head cap screw",
+     "qty": 4,
+     "use": "follower base to the riser inserts (heads on the base's wings, follower only)"
+    },
+    {
+     "item": "4 x 25 mm pan-head wood screw (or M4 bolt and washer through the board)",
+     "qty": 4,
+     "use": "base plate to the station board"
+    },
+    {
+     "item": "zip tie 3.6 mm",
+     "qty": 2,
+     "use": "arm USB-C and power leads to the rear slots"
+    }
+   ],
+   "notes": [
+    "The arm base's wing holes are measured on the vendored mesh; print this plate and the base first and check the four bolts drop in.",
+    "The arm's x axis (toward the bins) is the plate's +x: the zip-tie slots are at the rear (-x)."
+   ]
+  },
+  {
+   "id": "task_bin",
+   "name": "Task bin (left blue, right red)",
+   "quantity": 2,
+   "material": "PETG",
+   "material_fallback": null,
+   "material_reason": "indoors; print one in blue and one in red PETG to match the scene's materials",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu PETG Basic",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 2,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 15,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "upright: the floor on the plate",
+    "rotate": []
+   },
+   "stl": "hardware/parts/so101/stl/task_bin.stl",
+   "step": "generated/parts/so101/task_bin.step",
+   "volume_cm3": 81.37,
+   "area_cm2": 825.4,
+   "print_size_mm": [
+    180.0,
+    120.0,
+    35.0
+   ],
+   "footprint_mm": [
+    180.0,
+    120.0
+   ],
+   "triangles": 380,
+   "estimate": {
+    "mass_g": 93.1,
+    "time_min": 159,
+    "mass_g_all": 186.3,
+    "time_min_all": 317
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 1.99,
+    "min_wall_p1_mm": 1.99,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 21544,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "scene bins left_bin and right_bin",
+     "dimensions": "180 x 120 x 35 mm outside",
+     "source": "systems/so101/scenarios/picking_table.json",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "double-sided tape pad, 20 mm",
+     "qty": 2,
+     "use": "bin to the board at its scene position"
+    }
+   ],
+   "notes": [
+    "The scene models each bin as a solid box; the physical bins are trays of the same outside size.",
+    "Left bin centre at station (300, 250) mm, right bin at (300, -250) mm."
+   ]
+  },
+  {
+   "id": "trigger_so101",
+   "name": "Leader trigger (SO-101 leader, upstream)",
+   "quantity": 1,
+   "material": "PETG",
+   "material_fallback": null,
+   "material_reason": "indoors, but next to servos that run warm under load: PETG keeps its shape well above the 55-60 C where PLA (upstream's PLA+) starts to soften",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu PETG Basic",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 3,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 15,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "tree(auto), everywhere",
+    "brim": "auto",
+    "orientation": "upside down: the published top face on the plate",
+    "rotate": [
+     [
+      "X",
+      180
+     ]
+    ]
+   },
+   "stl": "hardware/parts/so101/stl/trigger_so101.stl",
+   "step": null,
+   "vendored": {
+    "author": "TheRobotStudio with Hugging Face (SO-ARM100 CITATION.cff: R. Knight, P. Kooijmans, R. Cadene, S. Alibert et al.)",
+    "file": "upstream/Trigger_SO101.stl",
+    "licence": "Apache-2.0",
+    "licence_file": "upstream/LICENSE",
+    "sha256": "48ecec3a3710cffdc0ae96d28547e49ddf4cbc93ccd915be7549f78e00ad2850",
+    "source": "https://github.com/TheRobotStudio/SO-ARM100/blob/a758567c3978dfeefe282ede0500085a48fe8f78/STL/SO101/Individual/Trigger_SO101.stl"
+   },
+   "volume_cm3": 11.16,
+   "area_cm2": 57.4,
+   "print_size_mm": [
+    42.0,
+    61.0,
+    32.0
+   ],
+   "footprint_mm": [
+    42.0,
+    61.0
+   ],
+   "triangles": 8960,
+   "estimate": {
+    "mass_g": 9.1,
+    "time_min": 20,
+    "mass_g_all": 9.1,
+    "time_min_all": 20
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": null,
+    "closed_manifold": true,
+    "bodies": 1,
+    "voids": 0,
+    "fits_bed": true,
+    "min_wall_mm": 0.06,
+    "min_wall_p1_mm": 1.69,
+    "min_wall_required_mm": 1.2,
+    "min_wall_rule": "percentile 1 (vendored mesh)",
+    "thinner_than_required_pct": 0.72,
+    "bed_contact_mm2": 458,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "Feetech STS3215 servo (and its horns)",
+     "dimensions": "servo pockets, horn screw circles and M2/M3 screw holes of the upstream design",
+     "source": "upstream design, https://github.com/TheRobotStudio/SO-ARM100/blob/a758567c3978dfeefe282ede0500085a48fe8f78/README.md; assembly guide https://huggingface.co/docs/lerobot/so101",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M3 x 6 screw (STS3215 accessory bag)",
+     "qty": 4,
+     "use": "trigger to the gripper-servo horn"
+    }
+   ],
+   "notes": [
+    "Upstream design, vendored unchanged and only turned to this print orientation; upstream prints it in PLA+ at 0.2 mm, 15 % infill, supports on overhangs over 45 deg, none in horizontal screw holes.",
+    "Leader arm only."
+   ]
+  },
+  {
+   "id": "under_arm_so101",
+   "name": "Forearm (under arm) (SO-101, upstream)",
+   "quantity": 2,
+   "material": "PETG",
+   "material_fallback": null,
+   "material_reason": "indoors, but next to servos that run warm under load: PETG keeps its shape well above the 55-60 C where PLA (upstream's PLA+) starts to soften",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu PETG Basic",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 3,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 15,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "tree(auto), everywhere",
+    "brim": "auto",
+    "orientation": "lying flat: the large flat face on the plate",
+    "rotate": [
+     [
+      "X",
+      -90
+     ]
+    ]
+   },
+   "stl": "hardware/parts/so101/stl/under_arm_so101.stl",
+   "step": null,
+   "vendored": {
+    "author": "TheRobotStudio with Hugging Face (SO-ARM100 CITATION.cff: R. Knight, P. Kooijmans, R. Cadene, S. Alibert et al.)",
+    "file": "upstream/Under_arm_SO101.stl",
+    "licence": "Apache-2.0",
+    "licence_file": "upstream/LICENSE",
+    "sha256": "537b03e68ff7c061da4cc70bf0b5a61018a76c00bccc72d61f022d1644230db5",
+    "source": "https://github.com/TheRobotStudio/SO-ARM100/blob/a758567c3978dfeefe282ede0500085a48fe8f78/STL/SO101/Individual/Under_arm_SO101.stl"
+   },
+   "volume_cm3": 92.9,
+   "area_cm2": 226.8,
+   "print_size_mm": [
+    130.7,
+    64.4,
+    24.0
+   ],
+   "footprint_mm": [
+    130.7,
+    64.4
+   ],
+   "triangles": 10508,
+   "estimate": {
+    "mass_g": 44.9,
+    "time_min": 78,
+    "mass_g_all": 89.9,
+    "time_min_all": 155
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": null,
+    "closed_manifold": true,
+    "bodies": 1,
+    "voids": 0,
+    "fits_bed": true,
+    "min_wall_mm": 0.75,
+    "min_wall_p1_mm": 2.2,
+    "min_wall_required_mm": 1.2,
+    "min_wall_rule": "percentile 1 (vendored mesh)",
+    "thinner_than_required_pct": 0.32,
+    "bed_contact_mm2": 2287,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "Feetech STS3215 servo (and its horns)",
+     "dimensions": "servo pockets, horn screw circles and M2/M3 screw holes of the upstream design",
+     "source": "upstream design, https://github.com/TheRobotStudio/SO-ARM100/blob/a758567c3978dfeefe282ede0500085a48fe8f78/README.md; assembly guide https://huggingface.co/docs/lerobot/so101",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M3 x 6 screw (STS3215 accessory bag)",
+     "qty": 8,
+     "use": "forearm to the elbow horns, four each side"
+    }
+   ],
+   "notes": [
+    "Upstream design, vendored unchanged and only turned to this print orientation; upstream prints it in PLA+ at 0.2 mm, 15 % infill, supports on overhangs over 45 deg, none in horizontal screw holes.",
+    "Two: one for the follower and one for the leader arm."
+   ]
+  },
+  {
+   "id": "upper_arm_so101",
+   "name": "Upper arm (SO-101, upstream)",
+   "quantity": 2,
+   "material": "PETG",
+   "material_fallback": null,
+   "material_reason": "indoors, but next to servos that run warm under load: PETG keeps its shape well above the 55-60 C where PLA (upstream's PLA+) starts to soften",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu PETG Basic",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 3,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 15,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "tree(auto), everywhere",
+    "brim": "auto",
+    "orientation": "lying flat: the large flat face on the plate",
+    "rotate": [
+     [
+      "X",
+      90
+     ]
+    ]
+   },
+   "stl": "hardware/parts/so101/stl/upper_arm_so101.stl",
+   "step": null,
+   "vendored": {
+    "author": "TheRobotStudio with Hugging Face (SO-ARM100 CITATION.cff: R. Knight, P. Kooijmans, R. Cadene, S. Alibert et al.)",
+    "file": "upstream/Upper_arm_SO101.stl",
+    "licence": "Apache-2.0",
+    "licence_file": "upstream/LICENSE",
+    "sha256": "96333913c296b13ecb1c81e63e57e4352fb6b5dea7722c84ec1fbd5073e23865",
+    "source": "https://github.com/TheRobotStudio/SO-ARM100/blob/a758567c3978dfeefe282ede0500085a48fe8f78/STL/SO101/Individual/Upper_arm_SO101.stl"
+   },
+   "volume_cm3": 117.33,
+   "area_cm2": 279.0,
+   "print_size_mm": [
+    142.1,
+    67.3,
+    24.5
+   ],
+   "footprint_mm": [
+    142.1,
+    67.3
+   ],
+   "triangles": 8038,
+   "estimate": {
+    "mass_g": 55.8,
+    "time_min": 96,
+    "mass_g_all": 111.6,
+    "time_min_all": 191
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": null,
+    "closed_manifold": true,
+    "bodies": 1,
+    "voids": 0,
+    "fits_bed": true,
+    "min_wall_mm": 0.6,
+    "min_wall_p1_mm": 2.05,
+    "min_wall_required_mm": 1.2,
+    "min_wall_rule": "percentile 1 (vendored mesh)",
+    "thinner_than_required_pct": 0.34,
+    "bed_contact_mm2": 3463,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "Feetech STS3215 servo (and its horns)",
+     "dimensions": "servo pockets, horn screw circles and M2/M3 screw holes of the upstream design",
+     "source": "upstream design, https://github.com/TheRobotStudio/SO-ARM100/blob/a758567c3978dfeefe282ede0500085a48fe8f78/README.md; assembly guide https://huggingface.co/docs/lerobot/so101",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M3 x 6 screw (STS3215 accessory bag)",
+     "qty": 8,
+     "use": "upper arm to the shoulder-lift horns, four each side"
+    },
+    {
+     "item": "M2 x 6 screw (STS3215 accessory bag)",
+     "qty": 4,
+     "use": "elbow servo"
+    }
+   ],
+   "notes": [
+    "Upstream design, vendored unchanged and only turned to this print orientation; upstream prints it in PLA+ at 0.2 mm, 15 % infill, supports on overhangs over 45 deg, none in horizontal screw holes.",
+    "Two: one for the follower and one for the leader arm."
+   ]
+  },
+  {
+   "id": "waveshare_mounting_plate_so101",
+   "name": "Waveshare board mounting plate (SO-101, upstream)",
+   "quantity": 2,
+   "material": "PETG",
+   "material_fallback": null,
+   "material_reason": "indoors, but next to servos that run warm under load: PETG keeps its shape well above the 55-60 C where PLA (upstream's PLA+) starts to soften",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu PETG Basic",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 3,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 15,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "tree(auto), everywhere",
+    "brim": "auto",
+    "orientation": "as published: flat on the plate",
+    "rotate": []
+   },
+   "stl": "hardware/parts/so101/stl/waveshare_mounting_plate_so101.stl",
+   "step": null,
+   "vendored": {
+    "author": "TheRobotStudio with Hugging Face (SO-ARM100 CITATION.cff: R. Knight, P. Kooijmans, R. Cadene, S. Alibert et al.)",
+    "file": "upstream/WaveShare_Mounting_Plate_SO101.stl",
+    "licence": "Apache-2.0",
+    "licence_file": "upstream/LICENSE",
+    "sha256": "6275f05ef28cd407be13ea882735282c4a8b2ef64930c77a9e7b5a3811740be1",
+    "source": "https://github.com/TheRobotStudio/SO-ARM100/blob/a758567c3978dfeefe282ede0500085a48fe8f78/STL/SO101/Individual/WaveShare_Mounting_Plate_SO101.stl"
+   },
+   "volume_cm3": 9.09,
+   "area_cm2": 53.5,
+   "print_size_mm": [
+    51.0,
+    42.0,
+    7.6
+   ],
+   "footprint_mm": [
+    51.0,
+    42.0
+   ],
+   "triangles": 752,
+   "estimate": {
+    "mass_g": 7.4,
+    "time_min": 13,
+    "mass_g_all": 14.8,
+    "time_min_all": 27
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": null,
+    "closed_manifold": true,
+    "bodies": 1,
+    "voids": 0,
+    "fits_bed": true,
+    "min_wall_mm": 3.48,
+    "min_wall_p1_mm": 4.0,
+    "min_wall_required_mm": 1.2,
+    "min_wall_rule": "percentile 1 (vendored mesh)",
+    "thinner_than_required_pct": 0.0,
+    "bed_contact_mm2": 2016,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "Feetech STS3215 servo (and its horns)",
+     "dimensions": "servo pockets, horn screw circles and M2/M3 screw holes of the upstream design",
+     "source": "upstream design, https://github.com/TheRobotStudio/SO-ARM100/blob/a758567c3978dfeefe282ede0500085a48fe8f78/README.md; assembly guide https://huggingface.co/docs/lerobot/so101",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [],
+   "notes": [
+    "Upstream design, vendored unchanged and only turned to this print orientation; upstream prints it in PLA+ at 0.2 mm, 15 % infill, supports on overhangs over 45 deg, none in horizontal screw holes.",
+    "Two: one for the follower and one for the leader arm.",
+    "Fix the board with the spare screws of the servo accessory bags."
+   ]
+  },
+  {
+   "id": "wrist_roll_follower_so101",
+   "name": "Gripper body / fixed jaw (SO-101 follower, upstream)",
+   "quantity": 1,
+   "material": "PETG",
+   "material_fallback": null,
+   "material_reason": "indoors, but next to servos that run warm under load: PETG keeps its shape well above the 55-60 C where PLA (upstream's PLA+) starts to soften",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu PETG Basic",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 3,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 15,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "tree(auto), everywhere",
+    "brim": "auto",
+    "orientation": "on its side: the flat face on the plate",
+    "rotate": [
+     [
+      "Y",
+      -90
+     ]
+    ]
+   },
+   "stl": "hardware/parts/so101/stl/wrist_roll_follower_so101.stl",
+   "step": null,
+   "vendored": {
+    "author": "TheRobotStudio with Hugging Face (SO-ARM100 CITATION.cff: R. Knight, P. Kooijmans, R. Cadene, S. Alibert et al.)",
+    "file": "upstream/Wrist_Roll_Follower_SO101.stl",
+    "licence": "Apache-2.0",
+    "licence_file": "upstream/LICENSE",
+    "sha256": "3f47a4b889b95a4c71046bda9ddfc9399d96d80a57ad7fc079700e240323a302",
+    "source": "https://github.com/TheRobotStudio/SO-ARM100/blob/a758567c3978dfeefe282ede0500085a48fe8f78/STL/SO101/Individual/Wrist_Roll_Follower_SO101.stl"
+   },
+   "volume_cm3": 56.62,
+   "area_cm2": 186.8,
+   "print_size_mm": [
+    105.4,
+    52.0,
+    65.2
+   ],
+   "footprint_mm": [
+    105.4,
+    52.0
+   ],
+   "triangles": 12056,
+   "estimate": {
+    "mass_g": 34.2,
+    "time_min": 67,
+    "mass_g_all": 34.2,
+    "time_min_all": 67
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": null,
+    "closed_manifold": true,
+    "bodies": 1,
+    "voids": 0,
+    "fits_bed": true,
+    "min_wall_mm": 0.48,
+    "min_wall_p1_mm": 1.3,
+    "min_wall_required_mm": 1.2,
+    "min_wall_rule": "percentile 1 (vendored mesh)",
+    "thinner_than_required_pct": 0.55,
+    "bed_contact_mm2": 775,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "Feetech STS3215 servo (and its horns)",
+     "dimensions": "servo pockets, horn screw circles and M2/M3 screw holes of the upstream design",
+     "source": "upstream design, https://github.com/TheRobotStudio/SO-ARM100/blob/a758567c3978dfeefe282ede0500085a48fe8f78/README.md; assembly guide https://huggingface.co/docs/lerobot/so101",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M3 x 6 screw (STS3215 accessory bag)",
+     "qty": 4,
+     "use": "gripper to the wrist-roll horn"
+    },
+    {
+     "item": "M2 x 6 screw (STS3215 accessory bag)",
+     "qty": 4,
+     "use": "gripper servo, two each side"
+    }
+   ],
+   "notes": [
+    "Upstream design, vendored unchanged and only turned to this print orientation; upstream prints it in PLA+ at 0.2 mm, 15 % infill, supports on overhangs over 45 deg, none in horizontal screw holes.",
+    "Follower arm only."
+   ]
+  },
+  {
+   "id": "wrist_roll_pitch_so101",
+   "name": "Wrist (roll-pitch) (SO-101, upstream)",
+   "quantity": 2,
+   "material": "PETG",
+   "material_fallback": null,
+   "material_reason": "indoors, but next to servos that run warm under load: PETG keeps its shape well above the 55-60 C where PLA (upstream's PLA+) starts to soften",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu PETG Basic",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 3,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 15,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "tree(auto), everywhere",
+    "brim": "auto",
+    "orientation": "on its side: the flat face on the plate",
+    "rotate": [
+     [
+      "Y",
+      -90
+     ]
+    ]
+   },
+   "stl": "hardware/parts/so101/stl/wrist_roll_pitch_so101.stl",
+   "step": null,
+   "vendored": {
+    "author": "TheRobotStudio with Hugging Face (SO-ARM100 CITATION.cff: R. Knight, P. Kooijmans, R. Cadene, S. Alibert et al.)",
+    "file": "upstream/Wrist_Roll_Pitch_SO101.stl",
+    "licence": "Apache-2.0",
+    "licence_file": "upstream/LICENSE",
+    "sha256": "14eb2f45ab1b279025ed2aea358f0091aad6aff967faef58527fd216f28fb6e5",
+    "source": "https://github.com/TheRobotStudio/SO-ARM100/blob/a758567c3978dfeefe282ede0500085a48fe8f78/STL/SO101/Individual/Wrist_Roll_Pitch_SO101.stl"
+   },
+   "volume_cm3": 32.3,
+   "area_cm2": 180.3,
+   "print_size_mm": [
+    77.8,
+    35.7,
+    62.3
+   ],
+   "footprint_mm": [
+    77.8,
+    35.7
+   ],
+   "triangles": 17036,
+   "estimate": {
+    "mass_g": 29.1,
+    "time_min": 58,
+    "mass_g_all": 58.2,
+    "time_min_all": 116
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": null,
+    "closed_manifold": true,
+    "bodies": 1,
+    "voids": 0,
+    "fits_bed": true,
+    "min_wall_mm": 0.03,
+    "min_wall_p1_mm": 1.32,
+    "min_wall_required_mm": 1.2,
+    "min_wall_rule": "percentile 1 (vendored mesh)",
+    "thinner_than_required_pct": 0.73,
+    "bed_contact_mm2": 537,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "Feetech STS3215 servo (and its horns)",
+     "dimensions": "servo pockets, horn screw circles and M2/M3 screw holes of the upstream design",
+     "source": "upstream design, https://github.com/TheRobotStudio/SO-ARM100/blob/a758567c3978dfeefe282ede0500085a48fe8f78/README.md; assembly guide https://huggingface.co/docs/lerobot/so101",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M3 x 6 screw (STS3215 accessory bag)",
+     "qty": 8,
+     "use": "wrist to the wrist-flex horns, four each side"
+    },
+    {
+     "item": "M2 x 6 screw (STS3215 accessory bag)",
+     "qty": 2,
+     "use": "wrist-roll servo, front screws"
+    }
+   ],
+   "notes": [
+    "Upstream design, vendored unchanged and only turned to this print orientation; upstream prints it in PLA+ at 0.2 mm, 15 % infill, supports on overhangs over 45 deg, none in horizontal screw holes.",
+    "Two: one for the follower and one for the leader arm."
+   ]
+  },
+  {
+   "id": "wrist_roll_so101",
+   "name": "Leader holder (wrist roll) (SO-101 leader, upstream)",
+   "quantity": 1,
+   "material": "PETG",
+   "material_fallback": null,
+   "material_reason": "indoors, but next to servos that run warm under load: PETG keeps its shape well above the 55-60 C where PLA (upstream's PLA+) starts to soften",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu PETG Basic",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 3,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 15,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "tree(auto), everywhere",
+    "brim": "auto",
+    "orientation": "on its side: the flat face on the plate",
+    "rotate": [
+     [
+      "Y",
+      -90
+     ]
+    ]
+   },
+   "stl": "hardware/parts/so101/stl/wrist_roll_so101.stl",
+   "step": null,
+   "vendored": {
+    "author": "TheRobotStudio with Hugging Face (SO-ARM100 CITATION.cff: R. Knight, P. Kooijmans, R. Cadene, S. Alibert et al.)",
+    "file": "upstream/Wrist_Roll_SO101.stl",
+    "licence": "Apache-2.0",
+    "licence_file": "upstream/LICENSE",
+    "sha256": "de3a65044dd4ae8bcb9659d8ca2b49598e3f5571edf89f45ad975e9776a7ffee",
+    "source": "https://github.com/TheRobotStudio/SO-ARM100/blob/a758567c3978dfeefe282ede0500085a48fe8f78/STL/SO101/Individual/Wrist_Roll_SO101.stl"
+   },
+   "volume_cm3": 39.82,
+   "area_cm2": 141.8,
+   "print_size_mm": [
+    42.8,
+    52.0,
+    65.2
+   ],
+   "footprint_mm": [
+    42.8,
+    52.0
+   ],
+   "triangles": 6158,
+   "estimate": {
+    "mass_g": 25.9,
+    "time_min": 53,
+    "mass_g_all": 25.9,
+    "time_min_all": 53
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": null,
+    "closed_manifold": true,
+    "bodies": 1,
+    "voids": 0,
+    "fits_bed": true,
+    "min_wall_mm": 0.87,
+    "min_wall_p1_mm": 1.46,
+    "min_wall_required_mm": 1.2,
+    "min_wall_rule": "percentile 1 (vendored mesh)",
+    "thinner_than_required_pct": 0.22,
+    "bed_contact_mm2": 196,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "Feetech STS3215 servo (and its horns)",
+     "dimensions": "servo pockets, horn screw circles and M2/M3 screw holes of the upstream design",
+     "source": "upstream design, https://github.com/TheRobotStudio/SO-ARM100/blob/a758567c3978dfeefe282ede0500085a48fe8f78/README.md; assembly guide https://huggingface.co/docs/lerobot/so101",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M3 x 6 screw (STS3215 accessory bag)",
+     "qty": 4,
+     "use": "leader holder to the wrist-roll horn"
+    },
+    {
+     "item": "M2 x 6 screw (STS3215 accessory bag)",
+     "qty": 4,
+     "use": "trigger servo, two each side"
+    }
+   ],
+   "notes": [
+    "Upstream design, vendored unchanged and only turned to this print orientation; upstream prints it in PLA+ at 0.2 mm, 15 % infill, supports on overhangs over 45 deg, none in horizontal screw holes.",
+    "Leader arm only."
+   ]
+  }
+ ],
+ "plates": [
+  {
+   "name": "A",
+   "material": "PETG",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "station_base_plate",
+     "qty": 1
+    },
+    {
+     "id": "cable_clip",
+     "qty": 3
+    }
+   ],
+   "time_min": 433,
+   "mass_g": 253
+  },
+  {
+   "name": "B",
+   "material": "PETG",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "task_bin",
+     "qty": 2
+    },
+    {
+     "id": "wrist_roll_follower_so101",
+     "qty": 1
+    },
+    {
+     "id": "handle_so101",
+     "qty": 1
+    }
+   ],
+   "time_min": 438,
+   "mass_g": 246
+  },
+  {
+   "name": "C",
+   "material": "PETG",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "post_foot",
+     "qty": 1
+    },
+    {
+     "id": "upper_arm_so101",
+     "qty": 1
+    },
+    {
+     "id": "under_arm_so101",
+     "qty": 1
+    },
+    {
+     "id": "occluder_box",
+     "qty": 1
+    },
+    {
+     "id": "rotation_pitch_so101",
+     "qty": 2
+    }
+   ],
+   "time_min": 692,
+   "mass_g": 388
+  },
+  {
+   "name": "D",
+   "material": "PETG",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "upper_arm_so101",
+     "qty": 1
+    },
+    {
+     "id": "under_arm_so101",
+     "qty": 1
+    },
+    {
+     "id": "base_so101",
+     "qty": 2
+    },
+    {
+     "id": "base_motor_holder_so101",
+     "qty": 2
+    },
+    {
+     "id": "moving_jaw_so101",
+     "qty": 1
+    }
+   ],
+   "time_min": 614,
+   "mass_g": 336
+  },
+  {
+   "name": "E",
+   "material": "PETG",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "calib_board_foot",
+     "qty": 2
+    },
+    {
+     "id": "cylinder_blue",
+     "qty": 1
+    },
+    {
+     "id": "wrist_roll_pitch_so101",
+     "qty": 2
+    },
+    {
+     "id": "camera_cradle",
+     "qty": 1
+    },
+    {
+     "id": "trigger_so101",
+     "qty": 1
+    },
+    {
+     "id": "wrist_roll_so101",
+     "qty": 1
+    },
+    {
+     "id": "block_green",
+     "qty": 1
+    },
+    {
+     "id": "waveshare_mounting_plate_so101",
+     "qty": 2
+    },
+    {
+     "id": "motor_holder_so101_base",
+     "qty": 2
+    },
+    {
+     "id": "motor_holder_so101_wrist",
+     "qty": 2
+    },
+    {
+     "id": "gauge_0",
+     "qty": 1
+    },
+    {
+     "id": "gauge_tight_1",
+     "qty": 1
+    },
+    {
+     "id": "camera_head",
+     "qty": 1
+    }
+   ],
+   "time_min": 694,
+   "mass_g": 356
+  },
+  {
+   "name": "F",
+   "material": "PETG",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "block_red",
+     "qty": 1
+    }
+   ],
+   "time_min": 90,
+   "mass_g": 46
+  }
+ ],
+ "assembly": {
+  "bodies": 31,
+  "interferences": "none",
+  "intended_press_fits": 2,
+  "pitch_sweep": "clear from 38 to 57 deg",
+  "task_area_in_view_at_scene_pitch": "no at 45.0 deg: right_bin (1.08) partly outside the D435i's 42.5 deg vertical view",
+  "recommended_pitch_deg": 48.5,
+  "task_area_in_view_at_recommended_pitch": "yes (worst 0.88 of the half-image; nearest item 504 mm, min-Z 195 mm)",
+  "camera_view_clear_of_station": "yes (cradle, head, post, foot and clips out of the image)",
+  "out_of_arm_reach": "yes (nearest: post_foot, 543 mm from the shoulder-lift axis; reach 450 mm)",
+  "on_the_station_board": "yes (1200 x 800 mm board, arm 250 mm from its back edge, 640 mm from its right edge)",
+  "camera_rgb_at_recommended_pitch_mm": [
+   169.8,
+   -522.0,
+   464.6
+  ],
+  "passed": true
+ }
+}

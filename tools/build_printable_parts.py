@@ -19,6 +19,12 @@ generated blocks of hardware/<platform>.md (printed-parts and fastener
 tables) and hardware/parts/<platform>/README.md (build plates), and runs
 the platform's assembly checks (assembly.py) when there is one.
 
+A vendored part (PART["vendored"], no build()) is a published STL committed
+under hardware/parts/<platform>/upstream/ and pinned by SHA-256: the script
+checks the hash, turns the mesh into its print orientation and runs the
+same mesh checks (closed, one outer body, fits the bed with its brim, wall
+thickness on the 1st percentile, bed contact). It has no B-rep or STEP.
+
   build_printable_parts.py                    every platform, into the repository
   build_printable_parts.py aerodrone          one platform
   build_printable_parts.py --out DIR          scratch output; the repository is not touched
@@ -34,10 +40,12 @@ Needs CadQuery, trimesh and rtree: run it in the cad image
 (applications/cad/README.md).
 """
 import argparse
+import hashlib
 import importlib
 import json
 import re
 import shutil
+import struct
 import sys
 import tempfile
 import time
@@ -65,6 +73,14 @@ FRESH_BBOX_MM = 0.05
 FRESH_TRIANGLES_REL = 0.02
 
 NOT_PARTS = {"assembly"}
+
+# Vendored meshes: a published design has features the wall check reports
+# that are not walls (edge chamfers meeting a face, embossed text, slivers
+# where two faces nearly touch) and that cannot be changed here. Its walls
+# are checked on this percentile of the sampled thicknesses instead of the
+# minimum: features thinner than the minimum wall may cover at most 1 % of
+# the sampled surface.
+VENDORED_WALL_PERCENTILE = 1
 
 
 # --------------------------------------------------------------------- discovery
@@ -163,6 +179,169 @@ def bed_contact_area(mesh):
     return float(mesh.area_faces[on_bed].sum())
 
 
+# --------------------------------------------------------------------- vendored meshes
+
+def is_vendored(part):
+    return isinstance(part, dict) and "vendored" in part
+
+
+def vendored_path(platform, part):
+    """The pinned file of a vendored part (relative to its platform folder)."""
+    return PARTS / platform / part["vendored"]["file"]
+
+
+def sha256_file(path):
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for block in iter(lambda: f.read(1 << 20), b""):
+            h.update(block)
+    return h.hexdigest()
+
+
+def mesh_print_oriented(mesh, rotations):
+    """Mesh counterpart of print_oriented(): rotate about the global axes in
+    order (right-handed, degrees), then sit on z = 0 centred in x/y."""
+    import numpy as np
+    import trimesh
+    m = mesh.copy()
+    axes = {"X": (1.0, 0.0, 0.0), "Y": (0.0, 1.0, 0.0), "Z": (0.0, 0.0, 1.0)}
+    for axis, deg in rotations:
+        m.apply_transform(trimesh.transformations.rotation_matrix(np.radians(deg), axes[axis]))
+    lo, hi = m.bounds
+    m.apply_translation((-(lo[0] + hi[0]) / 2, -(lo[1] + hi[1]) / 2, -lo[2]))
+    return m
+
+
+def write_binary_stl(mesh, path, header=""):
+    """Binary STL with an ASCII header (at most 80 characters)."""
+    import numpy as np
+    path.parent.mkdir(parents=True, exist_ok=True)
+    rec = np.zeros(len(mesh.faces), dtype=[("n", "<f4", (3,)), ("v", "<f4", (3, 3)), ("attr", "<u2")])
+    rec["n"] = mesh.face_normals
+    rec["v"] = mesh.triangles
+    head = header.encode("ascii", "replace")[:80].ljust(80, b" ")
+    with open(path, "wb") as f:
+        f.write(head)
+        f.write(struct.pack("<I", len(rec)))
+        f.write(rec.tobytes())
+
+
+def mesh_face_areas(mesh):
+    """Mesh area split like face_areas() for a mesh already in its print
+    orientation: faces facing up or down (shells) and the rest (walls)."""
+    import numpy as np
+    flat = np.abs(mesh.face_normals[:, 2]) > 0.7
+    return float(mesh.area_faces[flat].sum()), float(mesh.area_faces[~flat].sum())
+
+
+def mesh_shells(mesh):
+    """(outer bodies, enclosed voids) of a closed mesh: its connected shells
+    with positive and with negative volume."""
+    shells = mesh.split(only_watertight=False)
+    outer = sum(1 for s in shells if s.volume > 0)
+    return outer, len(shells) - outer
+
+
+def build_vendored_part(platform, stem, module, stl_path):
+    """Check, orient and validate one vendored part. Returns its manifest
+    entry and mesh, like build_part()."""
+    import numpy as np
+    part = module.PART
+    errors = schema.validate_part(part, stem)
+    t0 = time.time()
+    result = {"id": stem, "name": part.get("name", stem) if isinstance(part, dict) else stem}
+    if errors:
+        result["validation"] = {"passed": False, "errors": errors}
+        return result, None
+    v = part["vendored"]
+    src = vendored_path(platform, part)
+    if not src.exists():
+        result["validation"] = {"passed": False, "errors": [f"{stem}: vendored file {v['file']} is missing"]}
+        return result, None
+    digest = sha256_file(src)
+    if digest != v["sha256"]:
+        result["validation"] = {"passed": False, "errors": [
+            f"{stem}: {v['file']} has SHA-256 {digest}, not the pinned {v['sha256']}"]}
+        return result, None
+    oriented = mesh_print_oriented(load_mesh(src), part["print"]["rotate"])
+    write_binary_stl(oriented, stl_path,
+                     f"{v['file'].rsplit('/', 1)[-1]} ({v['licence']}), turned to print orientation")
+    mesh = load_mesh(stl_path)
+
+    ext = [float(e) for e in mesh.extents]
+    watertight = bool(mesh.is_watertight and mesh.is_winding_consistent and mesh.is_volume)
+    if not watertight:
+        errors.append(f"{stem}: mesh is not closed and manifold")
+    bodies, voids = mesh_shells(mesh) if watertight else (int(mesh.body_count), 0)
+    if bodies != 1:
+        errors.append(f"{stem}: mesh has {bodies} bodies")
+    brim = brim_width(part["print"]["brim"])
+    footprint = [ext[0] + 2 * brim, ext[1] + 2 * brim, ext[2]]
+    fits = all(e <= b for e, b in zip(footprint, printing.BED_MM))
+    if not fits:
+        errors.append(f"{stem}: {footprint[0]:.1f} x {footprint[1]:.1f} x {ext[2]:.1f} mm (with brim) does not fit "
+                      f"{printing.BED_MM} mm")
+    required = part.get("min_wall_mm", printing.DEFAULT_MIN_WALL_MM)
+    _, d = wall_samples(mesh)
+    wall_min = float(d.min()) if len(d) else float("inf")
+    wall_p1 = float(np.percentile(d, VENDORED_WALL_PERCENTILE)) if len(d) else float("inf")
+    thin_pct = float((d < required).mean() * 100.0) if len(d) else 0.0
+    if wall_p1 + WALL_TOLERANCE_MM < required:
+        errors.append(f"{stem}: {thin_pct:.1f} % of the sampled walls are thinner than {required} mm "
+                      f"(1st percentile {wall_p1:.2f} mm)")
+    contact = bed_contact_area(mesh)
+    if contact < MIN_BED_CONTACT_MM2:
+        errors.append(f"{stem}: only {contact:.0f} mm2 on the build plate; check the print orientation")
+
+    volume, area = float(mesh.volume), float(mesh.area)
+    mass, minutes = estimate(volume, mesh_face_areas(mesh), ext[2], part)
+    qty = part["quantity"]
+    result.update({
+        "quantity": qty,
+        "material": part["material"],
+        "material_fallback": part.get("material_fallback"),
+        "material_reason": part["material_reason"],
+        "flight_critical": part["flight_critical"],
+        "fit_test": part["fit_test"],
+        "print": part["print"],
+        "stl": None,
+        "step": None,
+        "vendored": {key: v[key] for key in sorted(v)},
+        "volume_cm3": round(volume / 1000.0, 2),
+        "area_cm2": round(area / 100.0, 1),
+        "print_size_mm": [round(e, 1) for e in ext],
+        "footprint_mm": [round(e, 1) for e in footprint[:2]],
+        "triangles": len(mesh.faces),
+        "estimate": {
+            "mass_g": round(mass, 1),
+            "time_min": round(minutes),
+            "mass_g_all": round(mass * qty, 1),
+            "time_min_all": round(minutes * qty),
+        },
+        "validation": {
+            "passed": not errors,
+            "valid_brep": None,
+            "closed_manifold": watertight,
+            "bodies": bodies,
+            "voids": voids,
+            "fits_bed": fits,
+            "min_wall_mm": round(wall_min, 2),
+            "min_wall_p1_mm": round(wall_p1, 2),
+            "min_wall_required_mm": required,
+            "min_wall_rule": f"percentile {VENDORED_WALL_PERCENTILE} (vendored mesh)",
+            "thinner_than_required_pct": round(thin_pct, 2),
+            "bed_contact_mm2": round(contact),
+            "errors": errors,
+        },
+        "mates_with": part["mates_with"],
+        "inserts": part["inserts"],
+        "fasteners": part["fasteners"],
+        "notes": part["notes"],
+    })
+    result["_build_s"] = round(time.time() - t0, 1)
+    return result, mesh
+
+
 def face_areas(solid, up=(0.0, 0.0, 1.0)):
     """B-rep area split into faces facing up/down in the print orientation
     (top and bottom shells) and the rest (walls), in mm2."""
@@ -222,6 +401,8 @@ def estimate(volume_mm3, areas_mm2, height_mm, part):
 
 def build_part(platform, stem, module, stl_path, step_path):
     """Build and validate one part. Returns its manifest entry and mesh."""
+    if is_vendored(getattr(module, "PART", None)):
+        return build_vendored_part(platform, stem, module, stl_path)
     from hardware.parts.common import cad
     part = module.PART
     errors = schema.validate_part(part, stem)
@@ -492,6 +673,30 @@ def assembly_block(report):
         "cg_mm": "Centre of gravity with the battery there (x, y, z mm from the hub centre)",
         "takeoff_mass_g": "Estimated take-off mass (g)",
         "bodies": "Bodies in the check",
+        # so101 station
+        "pitch_sweep": "Camera cradle swept through its pitch range against the head",
+        "task_area_in_view_at_scene_pitch": "Bins and objects in the D435i's image at the scene's pitch",
+        "recommended_pitch_deg": "Recommended camera pitch (deg down)",
+        "task_area_in_view_at_recommended_pitch": "Bins and objects in the image at the recommended pitch",
+        "camera_view_clear_of_station": "Camera's view clear of the station's own parts",
+        "out_of_arm_reach": "Camera, head and post out of the arm's reach",
+        "on_the_station_board": "Everything on the station board",
+        "camera_rgb_at_recommended_pitch_mm": "RGB optical centre at the recommended pitch (x, y, z mm from base_link)",
+        # lunar rover
+        "wheel_radius_mm": "Wheel radius at the grouser tips (mm)",
+        "wheel_gaps_mm": "Gaps between neighbouring wheels (mm)",
+        "ground_clearance_mm": "Ground clearance under the body (mm, lowest part)",
+        "mass_kg": "Estimated mass (kg)",
+        "centre_of_gravity_mm": "Centre of gravity (x, y, z mm; z above the ground)",
+        "tip_over_deg": "Static tip-over angles (deg)",
+        "wheel_torque_nm": "Wheel torque (N m per wheel)",
+        "max_payload_at_rated_torque_kg": "Largest payload on the steepest slope at rated torque (kg)",
+        "wheel_speed_rpm": "Wheel speed",
+        "battery_wh": "Battery energy (Wh)",
+        "hazcam_view_clear": "Hazard camera's depth view clear of the rover",
+        "terrain_camera_view_clear": "Terrain camera's view clear of the rover",
+        "lidar_view_clear": "Lidar's field of view clear of the rover",
+        "lux_sky_view": "Lux sensor's view of the sky",
         "passed": "All assembly checks passed",
     }
     lines = ["Generated by the assembly check (`assembly.py`), from the CAD and datasheet masses:", ""]
@@ -594,10 +799,11 @@ def run_platform(platform, args, report):
     entries, meshes, ok = [], {}, True
     for stem, mod in mods.items():
         stl_path = stl_dir / f"{stem}.stl"
-        step_path = step_dir / f"{stem}.step" if step_dir else None
+        vendored = is_vendored(getattr(mod, "PART", None))
+        step_path = step_dir / f"{stem}.step" if step_dir and not vendored else None
         entry, mesh = build_part(platform, stem, mod, stl_path, step_path)
         entry["stl"] = str((PARTS / platform / "stl" / f"{stem}.stl").relative_to(REPO))
-        entry["step"] = str((REPO / "generated" / "parts" / platform / f"{stem}.step").relative_to(REPO))
+        entry["step"] = None if vendored else str((REPO / "generated" / "parts" / platform / f"{stem}.step").relative_to(REPO))
         entries.append(entry)
         meshes[stem] = mesh
         v = entry["validation"]
@@ -666,6 +872,10 @@ def run_platform(platform, args, report):
         committed_dir = PARTS / platform / "stl"
         for extra in sorted({p.stem for p in committed_dir.glob("*.stl")} - set(mods)):
             stale.append(f"{(committed_dir / extra).relative_to(REPO)}.stl has no source module")
+        pinned = {vendored_path(platform, m.PART).resolve() for m in mods.values() if is_vendored(m.PART)}
+        for extra in sorted((PARTS / platform / "upstream").glob("*.stl")):
+            if extra.resolve() not in pinned:
+                stale.append(f"{extra.relative_to(REPO)} is vendored but no part uses it")
         for path, text in docs.items():
             if path.read_text() != text:
                 stale.append(f"{path.relative_to(REPO)}: generated blocks are out of date")

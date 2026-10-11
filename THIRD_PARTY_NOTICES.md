@@ -19,3 +19,16 @@ its license is the one published by its upstream.
 Because GPL-3.0 and AGPL-3.0 code is included, distributing a combined work
 (for example a Docker image containing VINS-Mono or whereami) must follow those
 licenses for that part.
+
+## Vendored 3D-printable designs
+
+These published hardware designs are committed byte for byte under
+`hardware/parts/<platform>/upstream/`, with their licence beside them, and
+pinned by commit and SHA-256 in the part modules
+(`hardware/parts/README.md`, "Vendored parts"). The build turns each mesh
+into a print orientation and writes it to `hardware/parts/<platform>/stl/`
+(a modified copy: the STL header says so); the geometry is unchanged.
+
+| Path | Design | License |
+|---|---|---|
+| `hardware/parts/so101/upstream/*.stl` (14 SO-101 follower and leader parts, two STS3215 fit gauges) and the rotated copies in `hardware/parts/so101/stl/*_so101.stl`, `gauge_*.stl` | [SO-ARM100](https://github.com/TheRobotStudio/SO-ARM100) Standard Open SO-100 & SO-101 Arms by TheRobotStudio with Hugging Face (R. Knight, P. Kooijmans, R. Cadene, S. Alibert et al., per its `CITATION.cff`), commit `a758567c3978dfeefe282ede0500085a48fe8f78`, `STL/SO101/Individual/` and `STL/Gauges/` | Apache-2.0 (`hardware/parts/so101/upstream/LICENSE`, the repository's licence file at that commit) |

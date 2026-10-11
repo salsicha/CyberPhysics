@@ -4,6 +4,7 @@ Pure Python (no CadQuery): runs in every test environment.
 """
 import importlib
 import inspect
+import re
 import sys
 from pathlib import Path
 
@@ -48,7 +49,8 @@ def test_there_are_parts():
 def test_every_part_metadata_is_valid(platform, stem):
     mod = importlib.import_module(f"hardware.parts.{platform}.{stem}")
     assert schema.validate_part(mod.PART, stem) == []
-    assert callable(mod.build)
+    # a CadQuery part has build(); a vendored one has a pinned file instead
+    assert callable(getattr(mod, "build", None)) != ("vendored" in mod.PART)
     # CadQuery must be imported inside build(), not at module level.
     assert not any(obj.__name__.startswith("cadquery") or obj.__name__.endswith("common.cad")
                    for obj in vars(mod).values() if inspect.ismodule(obj))
@@ -80,6 +82,108 @@ def test_schema_accepts_a_valid_part():
 def test_schema_rejects(change, needle):
     errors = schema.validate_part(valid_part(**change))
     assert any(needle in e for e in errors), errors
+
+
+VENDORED_PARTS = [(p, s) for p, s in PLATFORM_PARTS
+                  if "vendored" in importlib.import_module(f"hardware.parts.{p}.{s}").PART]
+
+
+@pytest.mark.parametrize("platform,stem", VENDORED_PARTS)
+def test_vendored_parts_are_pinned(platform, stem):
+    """The committed upstream file is the pinned one, its licence is beside
+    it, and the source URL names a commit, not a branch."""
+    import hashlib
+    v = importlib.import_module(f"hardware.parts.{platform}.{stem}").PART["vendored"]
+    path = bpp.vendored_path(platform, {"vendored": v})
+    assert path.exists(), path
+    assert hashlib.sha256(path.read_bytes()).hexdigest() == v["sha256"]
+    data = path.read_bytes()
+    assert not data.startswith(b"version https://git-lfs"), f"{path} is a Git LFS pointer"
+    assert (bpp.PARTS / platform / v["licence_file"]).exists()
+    assert re.search(r"/blob/[0-9a-f]{40}/", v["source"]), v["source"]
+
+
+def test_vendored_parts_exist():
+    assert ("so101", "base_so101") in VENDORED_PARTS
+
+
+VENDORED = {"file": "upstream/a.stl", "sha256": "0" * 64, "source": "https://example.org/blob/" + "a" * 40 + "/a.stl",
+            "licence": "Apache-2.0", "licence_file": "upstream/LICENSE", "author": "someone"}
+
+
+@pytest.mark.parametrize("change,needle", [
+    ({"sha256": "abc"}, "sha256"),
+    ({"file": "../elsewhere.stl"}, "inside the platform folder"),
+    ({"file": "upstream/a.step"}, "must be an STL"),
+    ({"source": "http://example.org/a.stl"}, "https URL"),
+    ({"licence": ""}, "misses 'licence'"),
+    ({"licence_file": ""}, "misses 'licence_file'"),
+])
+def test_schema_rejects_bad_vendored_entries(change, needle):
+    errors = schema.validate_part(valid_part(vendored={**VENDORED, **change}))
+    assert any(needle in e for e in errors), errors
+
+
+def test_schema_accepts_a_vendored_part():
+    assert schema.validate_part(valid_part(vendored=dict(VENDORED))) == []
+
+
+def test_so101_footprints_cite_sources():
+    from hardware.parts.so101 import _footprints
+    for fp in _footprints.ALL:
+        assert "http" in fp.SOURCE or "Requirement" in fp.SOURCE or "measured" in fp.SOURCE, fp
+        for name in fp.UNVERIFIED:
+            assert hasattr(fp, name), (fp.__name__, name)
+
+
+def test_so101_station_matches_the_scene():
+    """The station is built from the scene: riser height from the spawn, and
+    the camera RGB centre at the scene camera's position at its pitch."""
+    from hardware.parts.so101 import _station as S
+    assert S.TABLE_Z == pytest.approx(-53.5)
+    assert S.PLATE_TOP - S.PLATE_BOTTOM == pytest.approx(31.0)
+    assert S.CAM_XYZ == pytest.approx((170.0, -520.0, 466.5))
+    assert S.rgb_centre(S.PITCH_DEG) == pytest.approx(S.CAM_XYZ)
+    lo, hi = S.PITCH_RANGE_DEG
+    assert lo < S.PITCH_DEG < hi
+    # turning about the pivot keeps the RGB centre's distance to it
+    d0 = sum((a - b) ** 2 for a, b in zip(S.rgb_centre(lo), S.PIVOT))
+    d1 = sum((a - b) ** 2 for a, b in zip(S.rgb_centre(hi), S.PIVOT))
+    assert d0 == pytest.approx(d1)
+
+
+def test_lunar_rover_footprints_cite_sources():
+    from hardware.parts.lunar_rover import _footprints
+    for fp in _footprints.ALL:
+        assert "http" in fp.SOURCE or "Requirement" in fp.SOURCE, fp
+        for name in fp.UNVERIFIED:
+            assert hasattr(fp, name), (fp.__name__, name)
+
+
+def test_lunar_rover_matches_the_simulator():
+    """Wheel radius, top speed and battery of the rover are the simulator's."""
+    from hardware.parts.lunar_rover import _frame as F
+    from hardware.parts.lunar_rover._footprints import CubeMarsAK70_10, LiFePO4Pack24V
+    sim = (REPO / "systems" / "lunar_rover" / "config" / "simulation.yaml").read_text()
+
+    def value(key):
+        return float(re.search(rf"^\s*{key}:\s*([0-9.]+)", sim, re.MULTILINE).group(1))
+    assert F.SIM_WHEEL_RADIUS == pytest.approx(1000.0 * value("wheel_radius_m"))
+    assert F.GROUSER_TIP_R == F.SIM_WHEEL_RADIUS
+    assert F.SIM_MAX_SPEED == pytest.approx(value("max_speed_mps"))
+    assert F.SIM_BATTERY_WH == pytest.approx(value("battery_capacity_wh"))
+    assert abs(LiFePO4Pack24V.CAPACITY_WH - F.SIM_BATTERY_WH) / F.SIM_BATTERY_WH < 0.05
+    # the six wheels, their names and equal loads from the pivot positions
+    assert [n for n, _, _ in F.wheel_positions()] == [
+        "front_left", "front_right", "middle_left", "middle_right", "rear_left", "rear_right"]
+    front, middle, rear = F.WHEEL_X
+    assert F.BOGIE_PIVOT[0] == pytest.approx((middle + rear) / 2)
+    # rocker: front load * arm = bogie (two wheels) load * arm
+    assert (front - F.ROCKER_PIVOT[0]) == pytest.approx(2 * (F.ROCKER_PIVOT[0] - F.BOGIE_PIVOT[0]))
+    # the AK70-10 at the simulator's top speed and its worst slip (0.65)
+    import math
+    rpm = F.SIM_MAX_SPEED / (1 - 0.65) / (F.SIM_WHEEL_RADIUS / 1000.0) * 60 / (2 * math.pi)
+    assert rpm < CubeMarsAK70_10.RATED_RPM_24V
 
 
 def test_cf_part_with_fallback_is_valid():

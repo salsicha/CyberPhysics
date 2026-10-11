@@ -3,6 +3,9 @@
 This directory contains configuration for the SO-101 hardware setup used by the
 SO-101 Gazebo, Genesis, and Isaac Sim adapters.
 
+Hardware (bill of materials, printed parts, printing and assembly):
+[hardware/so101.md](../../hardware/so101.md).
+
 - `urdf/so101.urdf.xacro`: canonical robot description.
 - `urdf/so101.urdf`: generated plain URDF for simulators that do not read Xacro.
 - `config/joint_limits.json`: the joint position limits (single source of truth; see below).

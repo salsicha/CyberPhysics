@@ -8,6 +8,9 @@ The platform is a terrestrial prototype workflow. It validates rover autonomy,
 topic contracts, and operations logic against lunar-relevant constraints, but it
 does not claim flight qualification.
 
+Hardware (bill of materials, printed parts, printing and assembly):
+[hardware/lunar_rover.md](../../hardware/lunar_rover.md).
+
 ## Expected Space ROS Setup
 
 - `salsicha/cyberphysics:spaceros-latest` built from `applications/spaceros`.

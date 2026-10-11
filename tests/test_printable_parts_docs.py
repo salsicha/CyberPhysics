@@ -102,6 +102,7 @@ def test_parts_outputs_are_not_in_git_lfs():
     rules = [ln for ln in lines if ln.startswith("hardware/parts/")]
     assert "hardware/parts/*/stl/*.stl -filter binary" in rules
     assert "hardware/parts/*/images/*.png -filter binary" in rules
+    assert "hardware/parts/*/upstream/*.stl -filter binary" in rules   # vendored design files
     # after the repository-wide LFS rules, so they win
     assert lines.index(rules[0]) > lines.index("*.stl filter=lfs diff=lfs merge=lfs -text")
     assert lines.index(rules[0]) > lines.index("*.png filter=lfs diff=lfs merge=lfs -text")
@@ -119,6 +120,14 @@ def test_bom_has_purchased_and_printed_sections(platform):
     # links from the BOM to the parts resolve
     for rel in re.findall(r"\]\((parts/[^)#]+)", bom):
         assert (REPO / "hardware" / rel).exists(), rel
+
+
+def test_no_stale_links_to_the_old_so101_and_lunar_rover_lists():
+    assert not (REPO / "hardware" / "so101.txt").exists()
+    for path in ("TODO.md", "applications/so101/README.md", "systems/so101/README.md",
+                 "systems/lunar_rover/README.md", "applications/spaceros/README.md"):
+        text = (REPO / path).read_text()
+        assert "hardware/so101.txt" not in text and "hardware/lunar_rover.txt" not in text, path
 
 
 def test_no_stale_links_to_the_old_aerodrone_list():

@@ -10,13 +10,13 @@ committed so they can be downloaded straight from GitHub.
 | aerodrone | [`aerodrone/`](aerodrone/) | [aerodrone/README.md](aerodrone/README.md) | [../aerodrone.md](../aerodrone.md) |
 | airplane | [`airplane/`](airplane/) | [airplane/README.md](airplane/README.md) | [../airplane.md](../airplane.md) |
 | boat | [`boat/`](boat/) | [boat/README.md](boat/README.md) | [../boat.md](../boat.md) |
+| lunar_rover | [`lunar_rover/`](lunar_rover/) | [lunar_rover/README.md](lunar_rover/README.md) | [../lunar_rover.md](../lunar_rover.md) |
 | racecar_turret | [`racecar_turret/`](racecar_turret/) | [racecar_turret/README.md](racecar_turret/README.md) | [../racecar_turret.md](../racecar_turret.md) |
 | racecarneo | [`racecarneo/`](racecarneo/) | [racecarneo/README.md](racecarneo/README.md) | [../racecarneo.md](../racecarneo.md) |
+| so101 | [`so101/`](so101/) | [so101/README.md](so101/README.md) | [../so101.md](../so101.md) |
 | submarine | [`submarine/`](submarine/) | [submarine/README.md](submarine/README.md) | [../submarine.md](../submarine.md) |
 | turret | [`turret/`](turret/) | [turret/README.md](turret/README.md) | [../turret.md](../turret.md) |
 
-The other platforms (lunar_rover, so101) follow the same layout when their
-parts are added.
 The RACECAR Turret's own parts are its plate, posts and clips;
 it is built from the racecarneo and turret parts as well.
 
@@ -88,6 +88,7 @@ hardware/
       README.md                  printing and assembly instructions (template below)
       _frame.py, _*.py           shared layout numbers and helpers (not parts)
       <part>.py                  one printed part per module
+      upstream/                  vendored design files (pinned STLs and their licence), if any
       assembly.py                optional: placement, interference and platform checks, figures
       stl/<part>.stl             generated, committed (binary STL)
       stl/manifest.json, .md     generated, committed
@@ -161,6 +162,52 @@ Rules:
 - Shared numbers (bolt positions, heights) live in the platform's
   `_frame.py` so mating parts cannot drift apart.
 
+## Vendored parts
+
+When a proven open design already exists (the SO-101 arm), its published
+STLs are reused instead of redrawn. A vendored part module has no
+`build()` and instead of it a `"vendored"` entry:
+
+```python
+from hardware.parts.common import printing
+
+PART = {
+    "name": "Upper arm (SO-101, upstream)",
+    ...                                   # the same keys as any part
+    "print": printing.settings("PETG", "lying flat", rotate=[("X", 90)]),
+    "vendored": {
+        "file": "upstream/Upper_arm_SO101.stl",            # committed, relative to the platform folder
+        "sha256": "96333913...",                           # of that file
+        "source": "https://github.com/TheRobotStudio/SO-ARM100/blob/<commit>/STL/SO101/Individual/Upper_arm_SO101.stl",
+        "licence": "Apache-2.0",                           # SPDX identifier
+        "licence_file": "upstream/LICENSE",                # the licence text, committed beside it
+        "author": "TheRobotStudio with Hugging Face",
+    },
+}
+```
+
+Rules:
+
+- **Vendor the file byte for byte** from a commit, never a branch: the
+  `source` URL names the commit, `sha256` pins the file, and the build
+  fails if the committed file changes. Keep the upstream file name in
+  `upstream/`; nothing is downloaded at build time.
+- **Commit the licence** next to the files and add the design to
+  `THIRD_PARTY_NOTICES.md`. Only reuse designs whose licence allows
+  redistribution and modification: the STL in `stl/` is the mesh turned to
+  a print orientation, and its STL header says so.
+- `mates_with` cites the upstream design and `fasteners` follow the upstream
+  assembly guide; `print.rotate` turns the published mesh into the print
+  orientation (published files are often in assembly orientation).
+- The checks are the mesh checks of any part, with three differences: there
+  is no B-rep or STEP; the mesh must have one outer body (enclosed voids,
+  which some published designs have, are reported, not failed); and walls
+  are checked on the 1st percentile of the sampled thicknesses instead of
+  the minimum, because a published mesh has features the ray-cast reports as
+  thin walls (chamfers meeting a face, embossed text, slivers) that cannot be
+  changed here. `min_wall_mm` can be lowered, with a note, for a design
+  that has thinner walls on purpose.
+
 ## Validation
 
 For each part `tools/build_printable_parts.py` checks:
@@ -220,6 +267,8 @@ parts**, the latter holding the generated blocks `printed-parts` and
 
 ## Licences
 
-The parts here are original designs under the repository's MIT licence. If
+The parts here are original designs under the repository's MIT licence,
+except the vendored ones in `<platform>/upstream/`, which keep their own
+licence (committed beside them and listed in `THIRD_PARTY_NOTICES.md`). If
 you adapt a published design, check its licence allows it and add it to
 `THIRD_PARTY_NOTICES.md`.

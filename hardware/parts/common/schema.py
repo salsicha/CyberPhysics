@@ -30,8 +30,25 @@ Pure Python, so tests can check metadata without CadQuery. A part module
         return shape                           # one solid, in the part's design frame
 
 Quantities in ``inserts`` and ``fasteners`` are per printed piece.
+
+A vendored part reuses a published STL instead of a CadQuery model: it has
+no ``build()`` and instead of it a ``"vendored"`` entry naming the pinned
+file and where it comes from::
+
+        "vendored": {
+            "file": "upstream/Base_SO101.stl",     # relative to the platform folder
+            "sha256": "19f3c6ba...",               # of that file, checked at every build
+            "source": "https://github.com/<owner>/<repo>/blob/<commit>/<path>",
+            "licence": "Apache-2.0",               # SPDX identifier
+            "licence_file": "upstream/LICENSE",    # the licence text, committed beside it
+            "author": "TheRobotStudio and Hugging Face",
+        },
 """
+import re
+
 from . import fasteners, printing
+
+VENDORED_KEYS = ("file", "sha256", "source", "licence", "licence_file", "author")
 
 REQUIRED = {
     "name": str,
@@ -145,4 +162,25 @@ def validate_part(part, stem="part"):
     for n in part["notes"]:
         if not isinstance(n, str):
             err("notes must be strings")
+    if "vendored" in part:
+        errors += validate_vendored(part["vendored"], stem)
+    return errors
+
+
+def validate_vendored(v, stem="part"):
+    """Problems with a PART's "vendored" entry (empty when valid)."""
+    if not isinstance(v, dict):
+        return [f"{stem}: 'vendored' must be a dict"]
+    errors = [f"{stem}: vendored entry misses '{k}'" for k in VENDORED_KEYS if not str(v.get(k, "")).strip()]
+    if errors:
+        return errors
+    for key in ("file", "licence_file"):
+        if v[key].startswith("/") or ".." in v[key].split("/"):
+            errors.append(f"{stem}: vendored '{key}' must be a path inside the platform folder")
+    if not v["file"].lower().endswith(".stl"):
+        errors.append(f"{stem}: vendored file must be an STL")
+    if not re.fullmatch(r"[0-9a-f]{64}", v["sha256"]):
+        errors.append(f"{stem}: vendored sha256 must be 64 lower-case hex digits")
+    if not v["source"].startswith("https://"):
+        errors.append(f"{stem}: vendored source must be an https URL (pinned to a commit)")
     return errors

@@ -111,6 +111,76 @@ def test_min_wall_finds_thin_ribs_and_knife_edges_but_not_corners(tmp_path):
     assert any("thinnest wall" in e for e in entry["validation"]["errors"])
 
 
+# --------------------------------------------------------------------- vendored parts
+
+def vendored_fixture(tmp_path, monkeypatch, build, rotate=(), **part_changes):
+    """A vendored part whose pinned STL is ``build()`` exported in its
+    design frame under a temporary platform folder."""
+    import hashlib
+    monkeypatch.setattr(bpp, "PARTS", tmp_path)
+    src = tmp_path / "fixture" / "upstream" / "part.stl"
+    src.parent.mkdir(parents=True)
+    bpp.export_stl(build(), src)
+    (src.parent / "LICENSE").write_text("test")
+    vendored = {"file": "upstream/part.stl", "sha256": hashlib.sha256(src.read_bytes()).hexdigest(),
+                "source": "https://example.org/blob/" + "a" * 40 + "/part.stl", "licence": "MIT",
+                "licence_file": "upstream/LICENSE", "author": "test"}
+    mod = fixture_module(None, vendored=vendored,
+                         print=printing.settings("PETG", "as published", rotate=list(rotate)), **part_changes)
+    del mod.build
+    return mod
+
+
+def test_vendored_part_builds_and_validates(tmp_path, monkeypatch):
+    mod = vendored_fixture(tmp_path, monkeypatch, plate_with_hole(), rotate=[("Y", 90)])
+    entry, mesh = bpp.build_part("fixture", "fixture", mod, tmp_path / "out" / "fixture.stl", None)
+    v = entry["validation"]
+    assert v["passed"], v["errors"]
+    assert v["valid_brep"] is None and v["voids"] == 0 and entry["step"] is None
+    assert entry["print_size_mm"] == [4.0, 30.0, 40.0]          # turned to its print orientation
+    assert entry["vendored"]["licence"] == "MIT"
+    data = (tmp_path / "out" / "fixture.stl").read_bytes()
+    assert data[:8] == b"part.stl" and b"MIT" in data[:80]      # notice in the STL header
+    assert mesh.bounds[0][2] == pytest.approx(0.0, abs=1e-6)
+
+
+def test_vendored_part_with_a_changed_file_fails(tmp_path, monkeypatch):
+    mod = vendored_fixture(tmp_path, monkeypatch, plate_with_hole())
+    (tmp_path / "fixture" / "upstream" / "part.stl").write_bytes(b"x" * 84)
+    entry, _ = bpp.build_part("fixture", "fixture", mod, tmp_path / "out" / "fixture.stl", None)
+    assert not entry["validation"]["passed"]
+    assert "not the pinned" in entry["validation"]["errors"][0]
+
+
+def test_vendored_mesh_checks(tmp_path, monkeypatch):
+    def two_bodies():
+        return cad.box(0, 10, 0, 10, 0, 10).fuse(cad.box(20, 30, 0, 10, 0, 10))
+
+    mod = vendored_fixture(tmp_path, monkeypatch, two_bodies)
+    entry, _ = bpp.build_part("fixture", "fixture", mod, tmp_path / "out" / "a.stl", None)
+    assert any("2 bodies" in e for e in entry["validation"]["errors"])
+
+
+def test_vendored_mesh_with_a_void_is_one_body(tmp_path, monkeypatch):
+    def hollow():
+        return cad.box(0, 30, 0, 30, 0, 30).cut(cad.box(10, 20, 10, 20, 10, 20))
+
+    mod = vendored_fixture(tmp_path, monkeypatch, hollow)
+    entry, _ = bpp.build_part("fixture", "fixture", mod, tmp_path / "out" / "a.stl", None)
+    v = entry["validation"]
+    assert v["passed"], v["errors"]
+    assert v["bodies"] == 1 and v["voids"] == 1
+
+
+def test_vendored_wall_check_uses_the_percentile(tmp_path, monkeypatch):
+    def thin():               # a 3 mm plate is fine; a 0.6 mm fin on it is a real thin wall
+        return cad.box(0, 40, 0, 40, 0, 3).fuse(cad.box(10, 10.6, 0, 40, 3, 23))
+
+    mod = vendored_fixture(tmp_path, monkeypatch, thin)
+    entry, _ = bpp.build_part("fixture", "fixture", mod, tmp_path / "out" / "a.stl", None)
+    assert any("thinner than" in e for e in entry["validation"]["errors"]), entry["validation"]
+
+
 def test_stl_comparison_detects_changes(tmp_path):
     run(tmp_path, fixture_module(plate_with_hole()), "a")
     run(tmp_path, fixture_module(plate_with_hole()), "b")
