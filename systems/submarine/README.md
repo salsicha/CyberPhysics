@@ -3,6 +3,9 @@
 This system describes a BlueROV2-class submarine using Raspberry Pi 5, BlueOS,
 Navigator, ArduSub, and the reusable `applications/submarine` bridge.
 
+Hardware (bill of materials, printed parts, printing and assembly):
+[hardware/submarine.md](../../hardware/submarine.md).
+
 The application does not replace BlueOS, ArduSub, QGroundControl, or Cockpit.
 Those remain responsible for vehicle setup, calibration, arming, leak handling,
 depth failsafes, manual operation, and mission control. CyberPhysics consumes

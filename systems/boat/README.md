@@ -3,6 +3,9 @@
 This system describes a BlueBoat-class uncrewed surface vessel using Raspberry
 Pi 5, BlueOS, Navigator, ArduRover, and the reusable `applications/boat` bridge.
 
+Hardware (bill of materials, printed parts, printing and assembly):
+[hardware/boat.md](../../hardware/boat.md).
+
 The application does not replace BlueOS, ArduRover, QGroundControl, or Cockpit.
 Those remain responsible for vehicle setup, calibration, arming, manual
 operation, failsafes, geofencing, and mission control. CyberPhysics consumes the

@@ -1,4 +1,4 @@
-# Physical ArduPlane/BlueOS fixed-wing stack.
+# Physical ArduPlane/BlueOS fixed-wing stack (hardware/airplane.md).
 #
 # Reuses the shared BlueOS navigation core (MAVROS, OAK-1 MegaDepth,
 # DemNav, WildNav, rosbridge) with airplane container names, topics, and

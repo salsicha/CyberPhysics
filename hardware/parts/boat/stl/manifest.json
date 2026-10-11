@@ -1,0 +1,246 @@
+{
+ "platform": "boat",
+ "generator": "tools/build_printable_parts.py",
+ "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+ "usable_volume_mm": [
+  250.0,
+  250.0,
+  250.0
+ ],
+ "stl_tolerance_mm": 0.05,
+ "stl_angular_tolerance_rad": 0.3,
+ "parts": [
+  {
+   "id": "camera_mast",
+   "name": "Camera mast",
+   "quantity": 1,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "on deck in sun and salt spray; ASA is UV-stable",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 30,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "outer brim only, 5 mm",
+    "orientation": "upright: flange on the plate; the nut slot roof bridges 11 mm",
+    "rotate": []
+   },
+   "stl": "hardware/parts/boat/stl/camera_mast.stl",
+   "step": "generated/parts/boat/camera_mast.step",
+   "volume_cm3": 128.31,
+   "area_cm2": 427.4,
+   "print_size_mm": [
+    70.0,
+    70.0,
+    200.0
+   ],
+   "footprint_mm": [
+    80.0,
+    80.0
+   ],
+   "triangles": 2056,
+   "estimate": {
+    "mass_g": 88.6,
+    "time_min": 187,
+    "mass_g_all": 88.6,
+    "time_min_all": 187
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 4.06,
+    "min_wall_p1_mm": 4.14,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 4492,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "crossbar_plate (printed)",
+     "dimensions": "four M4 screws into the 50 mm insert grid",
+     "source": "hardware/parts/boat/_frame.py",
+     "verified": true
+    },
+    {
+     "part": "1/4\"-20 hex nut and stud (camera thread)",
+     "dimensions": "11.11 mm across flats, 5.56 mm thick, captive in a side slot; 6.35 mm stud through the top",
+     "source": "ISO 1222 / ASME B1.1: camera tripod screw 1/4\"-20 UNC, 6.35 mm major diameter (hardware/parts/common/fasteners.py); ASME B18.2.2 hex nut 1/4\": 7/16 in AF, 7/32 in thick",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M4 x 12 socket head cap screw, A4 (316) stainless",
+     "qty": 4,
+     "use": "camera mast to the crossbar plate inserts"
+    },
+    {
+     "item": "1/4\"-20 UNC hex nut, stainless",
+     "qty": 1,
+     "use": "captive in the mast head"
+    },
+    {
+     "item": "1/4\"-20 UNC x 1\" stud (set screw), stainless",
+     "qty": 1,
+     "use": "mast head to the ball head (thread locker on the nut side)"
+    },
+    {
+     "item": "mini ball head with a 1/4\"-20 female base",
+     "qty": 1,
+     "use": "camera or light on the mast"
+    }
+   ],
+   "notes": [
+    "Slide the nut into the side slot, screw the stud down through the top into it until it bottoms, then the ball head onto the stud.",
+    "The camera cable enters the hole under the head and leaves through the slot at the base (facing aft), then runs along the crossbar to the starboard hatch penetrator; zip-tie it through the crossbar holes."
+   ]
+  },
+  {
+   "id": "crossbar_plate",
+   "name": "Crossbar plate (accessory deck)",
+   "quantity": 1,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "on deck in sun and salt spray; ASA is UV-stable",
+   "flight_critical": false,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 25,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "outer brim only, 5 mm",
+    "orientation": "flat underside on the plate",
+    "rotate": []
+   },
+   "stl": "hardware/parts/boat/stl/crossbar_plate.stl",
+   "step": "generated/parts/boat/crossbar_plate.step",
+   "volume_cm3": 263.8,
+   "area_cm2": 552.0,
+   "print_size_mm": [
+    100.0,
+    225.0,
+    12.0
+   ],
+   "footprint_mm": [
+    110.0,
+    235.0
+   ],
+   "triangles": 3228,
+   "estimate": {
+    "mass_g": 117.1,
+    "time_min": 205,
+    "mass_g_all": 117.1,
+    "time_min_all": 205
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 2.89,
+    "min_wall_p1_mm": 2.89,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 22308,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "BlueBoat crossbar",
+     "dimensions": "four M6 screws through 8 mm holes 50 mm apart (every second 25 mm hole), in Blue Robotics' frame bushings",
+     "source": "Blue Robotics BlueBoat (https://bluerobotics.com/store/boat/blueboat/blueboat/): 120 x 93 x 46 cm deployed, 14.5 kg without batteries, 15 kg payload (batteries included), 320 mm max draft, LDPE hulls, two M200 motors, 8.2 kgf static thrust, 3 m/s, 4S-6S, Raspberry Pi 4 (2 GB) + Navigator, mRobotics M9N GPS; BlueBoat General Integration Guide (https://bluerobotics.com/learn/blueboat-general-integration-guide/) and BlueBoat Crossbars and Brackets (https://bluerobotics.com/store/boat/blueboat-components-spares/blueboat-frame-and-crossbars/): crossbars 6061-T6 with 8 mm holes 25 mm apart on all four sides, M6 hardware through the included plastic frame bushings; hatch lids with eight molded M6 inserts",
+     "verified": true
+    },
+    {
+     "part": "BlueBoat crossbar height (screw length)",
+     "dimensions": "M6 x 60 for a 40 mm crossbar: plate, washers, bar and nyloc nut",
+     "source": "not in the BlueBoat documents: measure the bar",
+     "verified": false
+    },
+    {
+     "part": "camera_mast (printed) and other accessories",
+     "dimensions": "M4 inserts on a 50 mm grid",
+     "source": "hardware/parts/boat/_frame.py",
+     "verified": true
+    }
+   ],
+   "inserts": [
+    {
+     "size": "M4",
+     "qty": 10,
+     "where": "top face, 50 mm accessory grid"
+    }
+   ],
+   "fasteners": [
+    {
+     "item": "M6 x 60 socket head cap screw, A4 (316) stainless",
+     "qty": 4,
+     "use": "crossbar plate through the crossbar"
+    },
+    {
+     "item": "M6 washer, A4 (316) stainless",
+     "qty": 8,
+     "use": "under the crossbar plate screw heads and nuts"
+    },
+    {
+     "item": "M6 nyloc nut, A4 (316) stainless",
+     "qty": 4,
+     "use": "under the crossbar"
+    }
+   ],
+   "notes": [
+    "Use the plastic frame bushings that come with the BlueBoat in the crossbar holes (they keep stainless off the aluminium and take M6).",
+    "Measure the crossbar height first: screw length = bar height + 20 mm (rounded up to a stock length).",
+    "Rinse with fresh water after salt-water runs; brass inserts tarnish but hold for years above the waterline."
+   ]
+  }
+ ],
+ "plates": [
+  {
+   "name": "A",
+   "material": "ASA",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "crossbar_plate",
+     "qty": 1
+    },
+    {
+     "id": "camera_mast",
+     "qty": 1
+    }
+   ],
+   "time_min": 398,
+   "mass_g": 206
+  }
+ ],
+ "assembly": {
+  "bodies": 26,
+  "interferences": "none",
+  "crossbar_screws": "M6 x 60 passes 2.8 mm through the nyloc nut on a 40 mm crossbar (assumed height: measure yours)",
+  "camera_height_mm": "257 from the crossbar top to the top of the ball head",
+  "passed": true
+ }
+}

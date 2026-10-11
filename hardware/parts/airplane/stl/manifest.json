@@ -1,0 +1,1106 @@
+{
+ "platform": "airplane",
+ "generator": "tools/build_printable_parts.py",
+ "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+ "usable_volume_mm": [
+  250.0,
+  250.0,
+  250.0
+ ],
+ "stl_tolerance_mm": 0.05,
+ "stl_angular_tolerance_rad": 0.3,
+ "parts": [
+  {
+   "id": "antenna_mount",
+   "name": "Antenna mount (telemetry RP-SMA and RC receiver antennas)",
+   "quantity": 1,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "on the top skin in full sun",
+   "flight_critical": false,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 30,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "upright: pad on the plate; the sleeves lean at 45 deg and need no supports",
+    "rotate": []
+   },
+   "stl": "hardware/parts/airplane/stl/antenna_mount.stl",
+   "step": "generated/parts/airplane/antenna_mount.step",
+   "volume_cm3": 14.39,
+   "area_cm2": 103.3,
+   "print_size_mm": [
+    56.0,
+    63.8,
+    23.0
+   ],
+   "footprint_mm": [
+    56.0,
+    63.8
+   ],
+   "triangles": 1918,
+   "estimate": {
+    "mass_g": 13.4,
+    "time_min": 27,
+    "mass_g_all": 13.4,
+    "time_min_all": 27
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 1.68,
+    "min_wall_p1_mm": 2.0,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 2374,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "RP-SMA bulkhead extension (telemetry antenna)",
+     "dimensions": "dia. 6.6 mm hole through a 4 mm plate for the 1/4\"-36 thread",
+     "source": "IEC 61169-15 / MIL-STD-348 SMA interface: coupling thread 1/4\"-36 UNS-2 (6.35 mm major diameter); RP-SMA uses the same body and thread",
+     "verified": true
+    },
+    {
+     "part": "RP-SMA bulkhead panel range",
+     "dimensions": "4 mm plate (bulkheads typically take up to 5 mm)",
+     "source": "IEC 61169-15 / MIL-STD-348 SMA interface: coupling thread 1/4\"-36 UNS-2 (6.35 mm major diameter); RP-SMA uses the same body and thread",
+     "verified": false
+    },
+    {
+     "part": "RC receiver antenna tubes",
+     "dimensions": "4.2 mm sleeves at +-45 deg from vertical",
+     "source": "No manufacturer drawing: typical receiver antenna tubes are 2.5-4 mm in diameter",
+     "verified": false
+    },
+    {
+     "part": "Skywalker X8 top skin",
+     "dimensions": "56 x 50 mm pad bonded to the foam",
+     "source": "Skywalker X8 kit listings: RMRC (https://www.readymaderc.com/products/details/skywalker-model-x8-wing) and UAV Garage (https://uavgarage.com/shop/skywalker-x8-2122mm-uav-fixed-wing-drone/): 2120-2122 mm span, 790 mm fuselage, 80 dm2, flying weight 2500-3000 g, payload 1000-2000 g, CG 430-440 mm from the nose, 65-70 km/h, catapult or bungee launch; RMRC: 6S 5000-6000 mAh, 12x6E prop, 60-100 A ESC, 2 x 17 g servos",
+     "verified": false
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "RP-SMA bulkhead extension cable, 150-200 mm (to suit the telemetry radio)",
+     "qty": 1,
+     "use": "telemetry antenna through the antenna mount"
+    }
+   ],
+   "notes": [
+    "Drill matching holes through the skin under the bridge (RP-SMA cable) and under each sleeve (receiver antennas) before bonding.",
+    "Antenna tips at least 150 mm from the GPS puck; never coil spare coax next to the GPS."
+   ]
+  },
+  {
+   "id": "avionics_deck",
+   "name": "Avionics deck",
+   "quantity": 1,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "inside a closed foam fuselage with the Pi 5 running; ASA keeps its shape where PETG could creep in a hot bay",
+   "flight_critical": true,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 3,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 20,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "outer brim only, 5 mm",
+    "orientation": "flat underside (the bonding face) on the plate, bosses up",
+    "rotate": []
+   },
+   "stl": "hardware/parts/airplane/stl/avionics_deck.stl",
+   "step": "generated/parts/airplane/avionics_deck.step",
+   "volume_cm3": 58.78,
+   "area_cm2": 416.7,
+   "print_size_mm": [
+    180.0,
+    104.0,
+    8.0
+   ],
+   "footprint_mm": [
+    190.0,
+    114.0
+   ],
+   "triangles": 1976,
+   "estimate": {
+    "mass_g": 45.9,
+    "time_min": 81,
+    "mass_g_all": 45.9,
+    "time_min_all": 81
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 1.29,
+    "min_wall_p1_mm": 1.29,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 18646,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "Skywalker X8 payload-bay floor",
+     "dimensions": "180 x 104 mm flat face bonded to the foam; needs a floor about 110 mm wide",
+     "source": "Skywalker X8 kit listings: RMRC (https://www.readymaderc.com/products/details/skywalker-model-x8-wing) and UAV Garage (https://uavgarage.com/shop/skywalker-x8-2122mm-uav-fixed-wing-drone/): 2120-2122 mm span, 790 mm fuselage, 80 dm2, flying weight 2500-3000 g, payload 1000-2000 g, CG 430-440 mm from the nose, 65-70 km/h, catapult or bungee launch; RMRC: 6S 5000-6000 mAh, 12x6E prop, 60-100 A ESC, 2 x 17 g servos",
+     "verified": false
+    },
+    {
+     "part": "stack_grommet (printed TPU) under the stack tray",
+     "dimensions": "four M3 inserts in 11 mm bosses at the Pi 5 + Navigator stack corners",
+     "source": "hardware/parts/airplane/_frame.py",
+     "verified": true
+    },
+    {
+     "part": "Blue Robotics Power Sense Module and 5 V 6 A supply",
+     "dimensions": "24 x 19 mm and 37 x 18 mm bays between tie bridges",
+     "source": "Blue Robotics Power Sense Module (https://bluerobotics.com/store/comm-control-power/control/psm-asm-r2-rp/): 25.2 V (6S) max, 100 A non-continuous, 24 x 19 x 7 mm, 5.5 mm bullet in, #6 spades out; Blue Robotics 5V 6A Power Supply (https://bluerobotics.com/store/comm-control-power/control/bec-5v6a-r1/): 7-26 V in, 5 V 6 A out, 37 x 18 x 6 mm",
+     "verified": true
+    },
+    {
+     "part": "Holybro MS4525DO airspeed module",
+     "dimensions": "17 x 23 mm bay",
+     "source": "Holybro Digital Air Speed Sensor - MS4525DO (https://holybro.com/products/digital-air-speed-sensor-ms4525do): module 17 x 23 x 13 mm, 4.1 g, 4.75-5.25 V, I2C, GH 4P cable, PT40/PT60 pitot tube with 40/100 cm tubing",
+     "verified": true
+    },
+    {
+     "part": "servo BEC, RC receiver, telemetry radio",
+     "dimensions": "36 x 22, 40 x 24 and 30 x 56 mm bays (envelopes: these vary by model)",
+     "source": "envelopes of this design, not datasheets",
+     "verified": false
+    }
+   ],
+   "inserts": [
+    {
+     "size": "M3",
+     "qty": 4,
+     "where": "stack grommet bosses, from the top"
+    }
+   ],
+   "fasteners": [
+    {
+     "item": "zip tie 2.5 mm, 150 mm",
+     "qty": 6,
+     "use": "power modules and radios to the deck's tie bridges"
+    }
+   ],
+   "notes": [
+    "Hold the deck in the bay before bonding: it must lie flat on the floor, the V-notch toward the nose, with the stack clear of the hatch when closed.",
+    "Bond with a foam-safe adhesive over the whole face (5-minute epoxy or UHU Por); scuff the foam's skin first. Never cyanoacrylate without foam-safe primer: it dissolves EPO."
+   ]
+  },
+  {
+   "id": "battery_tray",
+   "name": "Battery tray",
+   "quantity": 1,
+   "material": "PETG",
+   "material_fallback": null,
+   "material_reason": "tough in a nose-in landing; the pack stays under 60 C, well inside PETG's range",
+   "flight_critical": true,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu PETG Basic",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 3,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 25,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "outer brim only, 5 mm",
+    "orientation": "flat underside (the bonding face) on the plate, rails up; the strap tunnels bridge",
+    "rotate": []
+   },
+   "stl": "hardware/parts/airplane/stl/battery_tray.stl",
+   "step": "generated/parts/airplane/battery_tray.step",
+   "volume_cm3": 58.51,
+   "area_cm2": 405.6,
+   "print_size_mm": [
+    225.0,
+    66.0,
+    15.0
+   ],
+   "footprint_mm": [
+    235.0,
+    76.0
+   ],
+   "triangles": 520,
+   "estimate": {
+    "mass_g": 58.1,
+    "time_min": 98,
+    "mass_g_all": 58.1,
+    "time_min_all": 98
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 3.0,
+    "min_wall_p1_mm": 3.0,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 12467,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "6S LiPo pack",
+     "dimensions": "up to 52 mm wide between rails 58 mm apart, 225 mm of travel for packs up to 170 mm long",
+     "source": "Requirement of this design: 6S 5000-6000 mAh LiPo (the X8 listing's recommendation), at most 170 x 52 x 62 mm, about 900 g",
+     "verified": true
+    },
+    {
+     "part": "Skywalker X8 payload-bay floor ahead of the CG",
+     "dimensions": "225 x 66 mm bonded face",
+     "source": "Skywalker X8 kit listings: RMRC (https://www.readymaderc.com/products/details/skywalker-model-x8-wing) and UAV Garage (https://uavgarage.com/shop/skywalker-x8-2122mm-uav-fixed-wing-drone/): 2120-2122 mm span, 790 mm fuselage, 80 dm2, flying weight 2500-3000 g, payload 1000-2000 g, CG 430-440 mm from the nose, 65-70 km/h, catapult or bungee launch; RMRC: 6S 5000-6000 mAh, 12x6E prop, 60-100 A ESC, 2 x 17 g servos",
+     "verified": false
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "battery strap, 20 mm hook-and-loop, 300-350 mm, with rubberised face",
+     "qty": 2,
+     "use": "battery to tray"
+    },
+    {
+     "item": "anti-slip foam pad, 160 x 50 mm",
+     "qty": 1,
+     "use": "between the battery and the tray"
+    }
+   ],
+   "notes": [
+    "A loose battery moves the CG and ends the flight: two straps, each through its own pair of tunnels at least 15 mm inside the pack's ends, checked before every flight.",
+    "The front stop takes the pack in a nose-in landing; the battery lead leaves at the rear, toward the power sense module."
+   ]
+  },
+  {
+   "id": "cable_clip",
+   "name": "Cable clip (bonded)",
+   "quantity": 8,
+   "material": "PETG",
+   "material_fallback": null,
+   "material_reason": "inside the bay; PETG bonds well with epoxy and does not crack when the tie is pulled",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu PETG Basic",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 3,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 100,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "pad on the plate, bridge up",
+    "rotate": []
+   },
+   "stl": "hardware/parts/airplane/stl/cable_clip.stl",
+   "step": "generated/parts/airplane/cable_clip.step",
+   "volume_cm3": 0.91,
+   "area_cm2": 10.4,
+   "print_size_mm": [
+    22.0,
+    16.0,
+    5.6
+   ],
+   "footprint_mm": [
+    22.0,
+    16.0
+   ],
+   "triangles": 224,
+   "estimate": {
+    "mass_g": 1.2,
+    "time_min": 3,
+    "mass_g_all": 9.3,
+    "time_min_all": 23
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 1.59,
+    "min_wall_p1_mm": 1.59,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 344,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "EPO foam (any flat or gently curved spot)",
+     "dimensions": "22 x 16 mm bonded pad",
+     "source": "requirement of this design",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "zip tie 3.6 mm, 150 mm",
+     "qty": 1,
+     "use": "cables to the cable clip"
+    }
+   ],
+   "notes": [
+    "Bond with foam-safe epoxy or hot glue; at least one clip within 50 mm of the camera frame so the USB cable cannot pull the camera off its dampers (leave a loose loop between the clip and the camera)."
+   ]
+  },
+  {
+   "id": "camera_deck",
+   "name": "Camera deck (OAK-1 damper deck)",
+   "quantity": 1,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "sits over the warm OAK-1 inside the bay; ASA keeps its shape",
+   "flight_critical": false,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 30,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "flat underside on the plate",
+    "rotate": []
+   },
+   "stl": "hardware/parts/airplane/stl/camera_deck.stl",
+   "step": "generated/parts/airplane/camera_deck.step",
+   "volume_cm3": 27.81,
+   "area_cm2": 171.8,
+   "print_size_mm": [
+    88.0,
+    104.0,
+    4.0
+   ],
+   "footprint_mm": [
+    88.0,
+    104.0
+   ],
+   "triangles": 2256,
+   "estimate": {
+    "mass_g": 22.2,
+    "time_min": 39,
+    "mass_g_all": 22.2,
+    "time_min_all": 39
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 1.46,
+    "min_wall_p1_mm": 1.71,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 7152,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "silicone gimbal damper balls (x4)",
+     "dimensions": "dia. 6.5 mm holes in 2 mm tabs, 11 mm between the tabs",
+     "source": "No manufacturer drawing: typical listing for 'gimbal damping ball, 6.5 mm mounting hole, for 1.5-2 mm plates'",
+     "verified": false
+    },
+    {
+     "part": "camera_frame (printed)",
+     "dimensions": "four M3 screws into the pillar inserts",
+     "source": "hardware/parts/airplane/_frame.py",
+     "verified": true
+    },
+    {
+     "part": "oak1_cradle (printed)",
+     "dimensions": "damper positions, 11 mm ball spacing",
+     "source": "hardware/parts/airplane/_frame.py",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M3 x 10 socket head cap screw",
+     "qty": 4,
+     "use": "camera deck to the frame pillars"
+    },
+    {
+     "item": "silicone gimbal damper ball, 6.5 mm neck",
+     "qty": 4,
+     "use": "camera cradle isolation"
+    }
+   ],
+   "notes": [
+    "Snap the balls into the deck from below, the cradle (with the camera on it) onto the balls, then screw the deck onto the pillars."
+   ]
+  },
+  {
+   "id": "camera_frame",
+   "name": "Camera frame (belly cut-out template and pillars)",
+   "quantity": 1,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "bonded to the belly skin, which heats in the sun; ASA keeps its shape",
+   "flight_critical": false,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 30,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "flange (bonding face) on the plate, pillars up",
+    "rotate": []
+   },
+   "stl": "hardware/parts/airplane/stl/camera_frame.stl",
+   "step": "generated/parts/airplane/camera_frame.step",
+   "volume_cm3": 33.03,
+   "area_cm2": 223.7,
+   "print_size_mm": [
+    88.0,
+    104.0,
+    47.8
+   ],
+   "footprint_mm": [
+    88.0,
+    104.0
+   ],
+   "triangles": 944,
+   "estimate": {
+    "mass_g": 30.2,
+    "time_min": 60,
+    "mass_g_all": 30.2,
+    "time_min_all": 60
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 2.0,
+    "min_wall_p1_mm": 2.04,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 7300,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "Skywalker X8 belly (bay floor)",
+     "dimensions": "88 x 104 mm flange bonded around the cut-out; the cut-out keeps the view clear for floors up to 14 mm thick",
+     "source": "Skywalker X8 kit listings: RMRC (https://www.readymaderc.com/products/details/skywalker-model-x8-wing) and UAV Garage (https://uavgarage.com/shop/skywalker-x8-2122mm-uav-fixed-wing-drone/): 2120-2122 mm span, 790 mm fuselage, 80 dm2, flying weight 2500-3000 g, payload 1000-2000 g, CG 430-440 mm from the nose, 65-70 km/h, catapult or bungee launch; RMRC: 6S 5000-6000 mAh, 12x6E prop, 60-100 A ESC, 2 x 17 g servos",
+     "verified": false
+    },
+    {
+     "part": "Luxonis OAK-1",
+     "dimensions": "55 deg (along x) by 69 deg (across) view, +2 deg, through the cut-out from the lens 5 mm above the floor",
+     "source": "Luxonis OAK-1 datasheet (docs.luxonis.com/projects/hardware/en/latest/pages/BW1093.html, PDF copy https://media.distrelec.com/Web/Downloads/_t/ds/OAK-1_eng_tds.pdf), dimension drawing and 'Dimensions and Weight'; FOV of the fixed-focus IMX378 variant from https://docs.luxonis.com/hardware/products/OAK-1 (auto-focus: 78/66/54 deg)",
+     "verified": true
+    },
+    {
+     "part": "camera_deck (printed)",
+     "dimensions": "four M3 inserts in the pillar tops",
+     "source": "hardware/parts/airplane/_frame.py",
+     "verified": true
+    }
+   ],
+   "inserts": [
+    {
+     "size": "M3",
+     "qty": 4,
+     "where": "pillar tops (camera deck screws)"
+    }
+   ],
+   "fasteners": [],
+   "notes": [
+    "Cut the belly foam along the inside of the flange with a sharp blade, then bond the flange around the hole (foam-safe epoxy), the long side of the opening across the fuselage.",
+    "The lens ends up recessed (belly thickness + 5 mm) above the belly skin, so belly landings do not touch it; clean grass and dust off the lens after each landing."
+   ]
+  },
+  {
+   "id": "gps_mount",
+   "name": "GPS mount",
+   "quantity": 1,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "on the wing in full sun",
+   "flight_critical": false,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 25,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "upright: base on the plate (the 45 deg cone under the seat needs no supports)",
+    "rotate": []
+   },
+   "stl": "hardware/parts/airplane/stl/gps_mount.stl",
+   "step": "generated/parts/airplane/gps_mount.step",
+   "volume_cm3": 43.7,
+   "area_cm2": 143.9,
+   "print_size_mm": [
+    64.0,
+    64.0,
+    23.0
+   ],
+   "footprint_mm": [
+    64.0,
+    64.0
+   ],
+   "triangles": 1066,
+   "estimate": {
+    "mass_g": 23.8,
+    "time_min": 45,
+    "mass_g_all": 23.8,
+    "time_min_all": 45
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 1.97,
+    "min_wall_p1_mm": 1.99,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 3977,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "Holybro M10/M9N GPS",
+     "dimensions": "puck dia. 51 mm (V2; V1 50 mm) in a 51.8 mm lip",
+     "source": "Holybro standard M10/M9N GPS overview (https://docs.holybro.com/gps-and-rtk-system/m8n-m9n-m10-gps/standard-m10-m9n-m8n-gps/overview.md)",
+     "verified": true
+    },
+    {
+     "part": "Skywalker X8 wing top skin",
+     "dimensions": "64 x 64 mm base bonded to the foam (the wing's curvature is not published)",
+     "source": "Skywalker X8 kit listings: RMRC (https://www.readymaderc.com/products/details/skywalker-model-x8-wing) and UAV Garage (https://uavgarage.com/shop/skywalker-x8-2122mm-uav-fixed-wing-drone/): 2120-2122 mm span, 790 mm fuselage, 80 dm2, flying weight 2500-3000 g, payload 1000-2000 g, CG 430-440 mm from the nose, 65-70 km/h, catapult or bungee launch; RMRC: 6S 5000-6000 mAh, 12x6E prop, 60-100 A ESC, 2 x 17 g servos",
+     "verified": false
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "double-sided foam tape (VHB), 50 mm disc",
+     "qty": 1,
+     "use": "GPS puck on the mount seat"
+    }
+   ],
+   "notes": [
+    "Arrow on the GPS puck toward the nose (or set COMPASS_ORIENT to match); the cable notch faces the tail.",
+    "Bond the base with foam-safe epoxy (it fills the gap to the curved wing); the cable runs from the lip notch down to the hole in the base, through a matching hole in the skin and inside the wing to the bay.",
+    "Keep it at least 150 mm from the ESC, the motor leads and the OAK-1 USB 3 cable: USB 3 radiates in the GNSS L1 band."
+   ]
+  },
+  {
+   "id": "oak1_cradle",
+   "name": "OAK-1 cradle",
+   "quantity": 1,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "touches the OAK-1 housing, which runs warm (up to ~4 W); ASA keeps its shape",
+   "flight_critical": false,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 40,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "upside down: flat top on the plate, walls up",
+    "rotate": [
+     [
+      "X",
+      180
+     ]
+    ]
+   },
+   "stl": "hardware/parts/airplane/stl/oak1_cradle.stl",
+   "step": "generated/parts/airplane/oak1_cradle.step",
+   "volume_cm3": 21.8,
+   "area_cm2": 144.5,
+   "print_size_mm": [
+    67.0,
+    81.0,
+    22.8
+   ],
+   "footprint_mm": [
+    67.0,
+    81.0
+   ],
+   "triangles": 2016,
+   "estimate": {
+    "mass_g": 20.8,
+    "time_min": 40,
+    "mass_g_all": 20.8,
+    "time_min_all": 40
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 1.99,
+    "min_wall_p1_mm": 1.99,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 4111,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "Luxonis OAK-1",
+     "dimensions": "36 mm wide body between walls 36.4 mm apart; 1/4\"-20 thread 14.5 mm from the USB-C end, 10 mm deep",
+     "source": "Luxonis OAK-1 datasheet (docs.luxonis.com/projects/hardware/en/latest/pages/BW1093.html, PDF copy https://media.distrelec.com/Web/Downloads/_t/ds/OAK-1_eng_tds.pdf), dimension drawing and 'Dimensions and Weight'; FOV of the fixed-focus IMX378 variant from https://docs.luxonis.com/hardware/products/OAK-1 (auto-focus: 78/66/54 deg)",
+     "verified": true
+    },
+    {
+     "part": "Luxonis OAK-1 tripod thread across the width",
+     "dimensions": "on the centre line (drawn, not dimensioned)",
+     "source": "Luxonis OAK-1 datasheet (docs.luxonis.com/projects/hardware/en/latest/pages/BW1093.html, PDF copy https://media.distrelec.com/Web/Downloads/_t/ds/OAK-1_eng_tds.pdf), dimension drawing and 'Dimensions and Weight'; FOV of the fixed-focus IMX378 variant from https://docs.luxonis.com/hardware/products/OAK-1 (auto-focus: 78/66/54 deg)",
+     "verified": false
+    },
+    {
+     "part": "silicone gimbal damper balls (x4)",
+     "dimensions": "dia. 6.5 mm holes in 2 mm tabs",
+     "source": "No manufacturer drawing: typical listing for 'gimbal damping ball, 6.5 mm mounting hole, for 1.5-2 mm plates'",
+     "verified": false
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "1/4\"-20 UNC x 1/2\" button or socket head screw",
+     "qty": 1,
+     "use": "OAK-1 to cradle (engages about 8 mm of the 10 mm thread)"
+    }
+   ],
+   "notes": [
+    "USB-C end of the OAK-1 toward the tail: with the lens down the image top then points to the nose, matching CAMERA_MOUNT_YAW_DEG = 0.0 in systems/airplane/config/blueos.env (check with a still image).",
+    "Screw the camera on before the cradle goes onto the balls; the screw is reached through the deck window later."
+   ]
+  },
+  {
+   "id": "pitot_mount",
+   "name": "Pitot mount",
+   "quantity": 1,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "on the nose in full sun",
+   "flight_critical": false,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 30,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "upright: bonding pad on the plate, channel open to the top",
+    "rotate": []
+   },
+   "stl": "hardware/parts/airplane/stl/pitot_mount.stl",
+   "step": "generated/parts/airplane/pitot_mount.step",
+   "volume_cm3": 15.48,
+   "area_cm2": 98.3,
+   "print_size_mm": [
+    60.0,
+    46.0,
+    28.0
+   ],
+   "footprint_mm": [
+    60.0,
+    46.0
+   ],
+   "triangles": 272,
+   "estimate": {
+    "mass_g": 14.0,
+    "time_min": 29,
+    "mass_g_all": 14.0,
+    "time_min_all": 29
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 1.6,
+    "min_wall_p1_mm": 1.6,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 2729,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "Holybro PT60 pitot tube",
+     "dimensions": "base about 28 x 30 mm in a 30.6 mm square channel, 76 mm probe ahead of it",
+     "source": "Holybro Digital Air Speed Sensor - MS4525DO (https://holybro.com/products/digital-air-speed-sensor-ms4525do): module 17 x 23 x 13 mm, 4.1 g, 4.75-5.25 V, I2C, GH 4P cable, PT40/PT60 pitot tube with 40/100 cm tubing",
+     "verified": false
+    },
+    {
+     "part": "Skywalker X8 nose",
+     "dimensions": "60 x 46 mm pad bonded on the nose, centre line, the probe level with the fuselage datum",
+     "source": "Skywalker X8 kit listings: RMRC (https://www.readymaderc.com/products/details/skywalker-model-x8-wing) and UAV Garage (https://uavgarage.com/shop/skywalker-x8-2122mm-uav-fixed-wing-drone/): 2120-2122 mm span, 790 mm fuselage, 80 dm2, flying weight 2500-3000 g, payload 1000-2000 g, CG 430-440 mm from the nose, 65-70 km/h, catapult or bungee launch; RMRC: 6S 5000-6000 mAh, 12x6E prop, 60-100 A ESC, 2 x 17 g servos",
+     "verified": false
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "zip tie 3.6 mm, 200 mm",
+     "qty": 1,
+     "use": "pitot base in the pitot mount, through the floor tunnel"
+    }
+   ],
+   "notes": [
+    "Probe parallel to the fuselage datum (the floor of the bay) and on the centre line; a probe tilted more than about 10 deg reads low.",
+    "Route the two silicone tubes back to the airspeed module without kinks; the tube from the tip (total pressure) goes to the sensor's port marked for it."
+   ]
+  },
+  {
+   "id": "stack_grommet",
+   "name": "Stack grommet (TPU top hat)",
+   "quantity": 8,
+   "material": "TPU95A",
+   "material_fallback": null,
+   "material_reason": "damper: no hard contact between the stack tray and the airframe",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu TPU 95A HF (or Bambu TPU 95A)",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 3,
+    "top_shell_layers": 4,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 100,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "flange down, sleeve up",
+    "rotate": []
+   },
+   "stl": "hardware/parts/airplane/stl/stack_grommet.stl",
+   "step": "generated/parts/airplane/stack_grommet.step",
+   "volume_cm3": 0.18,
+   "area_cm2": 2.8,
+   "print_size_mm": [
+    10.5,
+    10.5,
+    3.4
+   ],
+   "footprint_mm": [
+    10.5,
+    10.5
+   ],
+   "triangles": 504,
+   "estimate": {
+    "mass_g": 0.2,
+    "time_min": 1,
+    "mass_g_all": 1.8,
+    "time_min_all": 12
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 1.35,
+    "min_wall_p1_mm": 1.35,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 78,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "stack_tray (printed)",
+     "dimensions": "6.2 mm hole in a 3 mm tray",
+     "source": "hardware/parts/airplane/stack_tray.py",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [],
+   "notes": [
+    "Tighten the bolts only until the flanges start to bulge: crushed TPU passes vibration straight through.",
+    "A pusher single-motor airframe shakes far less than a quadrotor, so TPU 95A is enough here; if ArduPlane's VIBE shows clipping, fit softer silicone grommets in the same 6.2 mm holes."
+   ]
+  },
+  {
+   "id": "stack_tray",
+   "name": "Stack tray (Pi 5 + Navigator)",
+   "quantity": 1,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "carries the Pi 5 and its heatsink in a closed foam bay",
+   "flight_critical": true,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 3,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 30,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "flat underside on the plate, bosses up",
+    "rotate": []
+   },
+   "stl": "hardware/parts/airplane/stl/stack_tray.stl",
+   "step": "generated/parts/airplane/stack_tray.step",
+   "volume_cm3": 13.04,
+   "area_cm2": 111.3,
+   "print_size_mm": [
+    111.0,
+    59.0,
+    7.0
+   ],
+   "footprint_mm": [
+    111.0,
+    59.0
+   ],
+   "triangles": 3108,
+   "estimate": {
+    "mass_g": 12.4,
+    "time_min": 23,
+    "mass_g_all": 12.4,
+    "time_min_all": 23
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 2.04,
+    "min_wall_p1_mm": 2.04,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 4167,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "Raspberry Pi 5",
+     "dimensions": "58 x 49 mm holes, 3.5 mm from the edges, dia. 2.7 mm",
+     "source": "Raspberry Pi Ltd, 'Raspberry Pi 5' mechanical drawing RP-008347-DS-1 (https://datasheets.raspberrypi.com/rpi5/raspberry-pi-5-mechanical-drawing.pdf)",
+     "verified": true
+    },
+    {
+     "part": "Blue Robotics Navigator heatsink (M2.5 threads)",
+     "dimensions": "same 58 x 49 mm pattern",
+     "source": "Blue Robotics, Navigator Flight Controller technical details (https://bluerobotics.com/store/comm-control-power/control/navigator/) and Navigator Hardware Setup (https://bluerobotics.com/learn/navigator-hardware-setup/)",
+     "verified": true
+    },
+    {
+     "part": "Pi 5 underside clearance",
+     "dimensions": "4 mm bosses for the parts under the PCB (microSD socket)",
+     "source": "not on the Raspberry Pi 5 drawing",
+     "verified": false
+    },
+    {
+     "part": "stack_grommet (printed TPU)",
+     "dimensions": "6.2 mm holes, 3 mm tray",
+     "source": "hardware/parts/airplane/stack_grommet.py",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M3 x 12 socket head cap screw",
+     "qty": 4,
+     "use": "stack tray to the avionics deck, through a pair of stack grommets"
+    },
+    {
+     "item": "M3 washer",
+     "qty": 4,
+     "use": "on the upper stack grommets"
+    },
+    {
+     "item": "M2.5 x 12 socket head cap screw",
+     "qty": 2,
+     "use": "from under the tray through the Pi into the Navigator heatsink (the two holes the Navigator guide's standoff uses)"
+    }
+   ],
+   "notes": [
+    "Replaces the Raspberry Pi mounting standoff of the Navigator kit; heatsink and Navigator stack as in Blue Robotics' Navigator Hardware Setup.",
+    "USB/Ethernet end of the Pi toward the nose (the camera's USB 3 cable plugs in there), microSD toward the tail."
+   ]
+  }
+ ],
+ "plates": [
+  {
+   "name": "A",
+   "material": "ASA",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "avionics_deck",
+     "qty": 1
+    },
+    {
+     "id": "camera_deck",
+     "qty": 1
+    },
+    {
+     "id": "camera_frame",
+     "qty": 1
+    },
+    {
+     "id": "pitot_mount",
+     "qty": 1
+    }
+   ],
+   "time_min": 215,
+   "mass_g": 112
+  },
+  {
+   "name": "B",
+   "material": "ASA",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "stack_tray",
+     "qty": 1
+    },
+    {
+     "id": "oak1_cradle",
+     "qty": 1
+    },
+    {
+     "id": "gps_mount",
+     "qty": 1
+    },
+    {
+     "id": "antenna_mount",
+     "qty": 1
+    }
+   ],
+   "time_min": 141,
+   "mass_g": 70
+  },
+  {
+   "name": "C",
+   "material": "PETG",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "battery_tray",
+     "qty": 1
+    },
+    {
+     "id": "cable_clip",
+     "qty": 8
+    }
+   ],
+   "time_min": 128,
+   "mass_g": 68
+  },
+  {
+   "name": "D",
+   "material": "TPU95A",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "stack_grommet",
+     "qty": 8
+    }
+   ],
+   "time_min": 14,
+   "mass_g": 2
+  }
+ ],
+ "assembly": {
+  "battery_centre_ahead_of_cg_mark_mm": 173.9,
+  "battery_on_tray": true,
+  "cg_trim_authority_mm": "+-10 mm of CG for the pack's 61 mm travel at 2750 g",
+  "printed_mass_g": 252,
+  "payload_mass_g": "1586 (avionics, printed parts, wiring and the 6S pack; the X8 listing allows 1000-2000)",
+  "bodies": 49,
+  "interferences": "none",
+  "camera_view_clear": "yes (69 x 55 deg + 2 deg margin, through a 14 mm belly)",
+  "lens_recess_mm": "15 above the belly skin (10 mm belly)",
+  "gps_separation_mm": "261 from the USB 3 cable, 229 from the battery leads, 320 from the ESC/motor (need 150)",
+  "heights_above_floor_mm": "stack 49, camera deck 52, battery 62 (the bay must clear these with the hatch shut)",
+  "passed": true
+ }
+}

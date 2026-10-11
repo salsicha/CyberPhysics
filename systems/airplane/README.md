@@ -4,6 +4,9 @@ This system describes a fixed-wing mapping airplane using Raspberry Pi 5,
 BlueOS, Navigator, ArduPlane, GPS, and a downward camera for satellite-map and
 DEM-assisted navigation.
 
+Hardware (bill of materials, printed parts, printing and assembly):
+[hardware/airplane.md](../../hardware/airplane.md).
+
 The recommended physical stack is ArduPlane on BlueOS/Navigator for flight
 control, MAVROS for ROS telemetry, OAK-1 MegaDepth for nadir RGB/depth, DemNav
 for terrain correlation, and WildNav for satellite image matching. ArduPlane and

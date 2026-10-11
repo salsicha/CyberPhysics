@@ -1,0 +1,668 @@
+{
+ "platform": "submarine",
+ "generator": "tools/build_printable_parts.py",
+ "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+ "usable_volume_mm": [
+  250.0,
+  250.0,
+  250.0
+ ],
+ "stl_tolerance_mm": 0.05,
+ "stl_angular_tolerance_rad": 0.3,
+ "parts": [
+  {
+   "id": "dvl_mount",
+   "name": "DVL mount (Water Linked A50 collar)",
+   "quantity": 1,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "under water: ASA (about 1.05 g/cm3) is nearly neutral in sea water, so the ROV's trim hardly changes; printed solid so no air is trapped",
+   "flight_critical": false,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 5,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 5,
+    "sparse_infill_density_pct": 100,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "upside down: the flange's panel face on the plate, collar up",
+    "rotate": [
+     [
+      "X",
+      180
+     ]
+    ]
+   },
+   "stl": "hardware/parts/submarine/stl/dvl_mount.stl",
+   "step": "generated/parts/submarine/dvl_mount.step",
+   "volume_cm3": 66.65,
+   "area_cm2": 295.8,
+   "print_size_mm": [
+    100.0,
+    100.0,
+    22.0
+   ],
+   "footprint_mm": [
+    100.0,
+    100.0
+   ],
+   "triangles": 1876,
+   "estimate": {
+    "mass_g": 71.3,
+    "time_min": 127,
+    "mass_g_all": 71.3,
+    "time_min_all": 127
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 2.0,
+    "min_wall_p1_mm": 2.0,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 9771,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "Water Linked DVL A50",
+     "dimensions": "dia. 66 mm housing in a 66.6 mm slotted collar 16 mm tall, back plate on the flange, 25 mm tall housing",
+     "source": "Water Linked DVL A50 datasheet WL-21035-4 v5 (https://www.waterlinked.com/datasheets/dvl-a50): diameter 66 mm, height 25 mm, 0.17 kg in air, 0.105 kg in water, 300 or 600 m, 4-beam convex Janus array at 22.5 deg, 5 cm-50 m altitude, 10-30 V, 4 W, PEEK housing and 316 back plate, 3 m cable; half-power beam width 4.4 deg (https://docs.waterlinked.com/dvl/dvl-a50/)",
+     "verified": true
+    },
+    {
+     "part": "Water Linked DVL A50 cable exit",
+     "dimensions": "9.0 mm slot the full height of the collar for the 6.8 mm cable (where it leaves the housing is not dimensioned)",
+     "source": "Water Linked DVL A50 datasheet WL-21035-4 v5 (https://www.waterlinked.com/datasheets/dvl-a50): diameter 66 mm, height 25 mm, 0.17 kg in air, 0.105 kg in water, 300 or 600 m, 4-beam convex Janus array at 22.5 deg, 5 cm-50 m altitude, 10-30 V, 4 W, PEEK housing and 316 back plate, 3 m cable; half-power beam width 4.4 deg (https://docs.waterlinked.com/dvl/dvl-a50/)",
+     "verified": false
+    },
+    {
+     "part": "BlueROV2 bottom panel",
+     "dimensions": "12.7 mm (1/2 in) HDPE; four M5 holes drilled through it 80 x 80 mm apart with the flange as the template",
+     "source": "Blue Robotics BlueROV2 (https://bluerobotics.com/store/rov/bluerov2/): 457 x 338 x 254 mm, 11-12 kg in air with ballast and battery, acrylic enclosures 100 m / aluminium 300 m, 6 x T200 (4 vectored, 2 vertical), 4\" electronics and 3\" battery enclosures, Raspberry Pi 4 (2 GB) + Navigator, Bar30, low-light HD USB camera (110 deg horizontal), 9 x 200 g stainless ballast weights, R-3318 foam, payload 1.2-1.4 kg; BlueROV2 Frame (https://bluerobotics.com/store/rov/bluerov2-components-spares/brov2-asm-frame/): bottom panel 1/2 in HDPE, side panels 3/8 in HDPE, M5 x 20 frame screws and M5 slot nuts; BlueROV2 assembly guide (https://bluerobotics.com/learn/bluerov2-assembly/): ballast under the bottom panel, accessory holes drilled in the panels",
+     "verified": true
+    },
+    {
+     "part": "BlueROV2 bottom panel: clear area under its centre",
+     "dimensions": "100 x 100 mm, clear of the ballast weights",
+     "source": "Blue Robotics BlueROV2 (https://bluerobotics.com/store/rov/bluerov2/): 457 x 338 x 254 mm, 11-12 kg in air with ballast and battery, acrylic enclosures 100 m / aluminium 300 m, 6 x T200 (4 vectored, 2 vertical), 4\" electronics and 3\" battery enclosures, Raspberry Pi 4 (2 GB) + Navigator, Bar30, low-light HD USB camera (110 deg horizontal), 9 x 200 g stainless ballast weights, R-3318 foam, payload 1.2-1.4 kg; BlueROV2 Frame (https://bluerobotics.com/store/rov/bluerov2-components-spares/brov2-asm-frame/): bottom panel 1/2 in HDPE, side panels 3/8 in HDPE, M5 x 20 frame screws and M5 slot nuts; BlueROV2 assembly guide (https://bluerobotics.com/learn/bluerov2-assembly/): ballast under the bottom panel, accessory holes drilled in the panels",
+     "verified": false
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M5 x 30 socket head cap screw, A4 (316) stainless",
+     "qty": 4,
+     "use": "DVL mount through the bottom panel"
+    },
+    {
+     "item": "M5 washer, A4 (316) stainless",
+     "qty": 8,
+     "use": "under the DVL mount screw heads and nuts"
+    },
+    {
+     "item": "M5 nyloc nut, A4 (316) stainless",
+     "qty": 4,
+     "use": "DVL mount, on top of the bottom panel"
+    },
+    {
+     "item": "hose clamp, 9 mm band, 60-80 mm range, W5 (316) stainless",
+     "qty": 1,
+     "use": "DVL collar"
+    }
+   ],
+   "notes": [
+    "Print solid (100 % infill): sparse infill traps air that floods slowly or is crushed at depth, and the ROV's trim drifts.",
+    "No brass inserts under water: 316 screws, nuts and clamp only; rinse in fresh water after every salt-water dive.",
+    "Tighten the hose clamp until the DVL cannot turn by hand, no more: the PEEK housing does not need force.",
+    "Set the DVL's mounting rotation in the Water Linked DVL BlueOS extension to match the cable slot's direction (aft here)."
+   ]
+  },
+  {
+   "id": "skid",
+   "name": "Skid (DVL guard)",
+   "quantity": 2,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "under water and on a sunny deck: ASA is UV-stable and nearly neutral in sea water; printed solid so no air is trapped",
+   "flight_critical": false,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 5,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 5,
+    "sparse_infill_density_pct": 100,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "on its side: one 240 x 40 mm face on the plate (layers along the rail)",
+    "rotate": [
+     [
+      "X",
+      90
+     ]
+    ]
+   },
+   "stl": "hardware/parts/submarine/stl/skid.stl",
+   "step": "generated/parts/submarine/skid.step",
+   "volume_cm3": 115.96,
+   "area_cm2": 316.6,
+   "print_size_mm": [
+    240.0,
+    40.0,
+    16.0
+   ],
+   "footprint_mm": [
+    240.0,
+    40.0
+   ],
+   "triangles": 1080,
+   "estimate": {
+    "mass_g": 124.1,
+    "time_min": 217,
+    "mass_g_all": 248.2,
+    "time_min_all": 435
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 2.52,
+    "min_wall_p1_mm": 2.53,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 7800,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "BlueROV2 bottom panel",
+     "dimensions": "12.7 mm (1/2 in) HDPE; three M5 holes per skid drilled through it with the skid as the template",
+     "source": "Blue Robotics BlueROV2 (https://bluerobotics.com/store/rov/bluerov2/): 457 x 338 x 254 mm, 11-12 kg in air with ballast and battery, acrylic enclosures 100 m / aluminium 300 m, 6 x T200 (4 vectored, 2 vertical), 4\" electronics and 3\" battery enclosures, Raspberry Pi 4 (2 GB) + Navigator, Bar30, low-light HD USB camera (110 deg horizontal), 9 x 200 g stainless ballast weights, R-3318 foam, payload 1.2-1.4 kg; BlueROV2 Frame (https://bluerobotics.com/store/rov/bluerov2-components-spares/brov2-asm-frame/): bottom panel 1/2 in HDPE, side panels 3/8 in HDPE, M5 x 20 frame screws and M5 slot nuts; BlueROV2 assembly guide (https://bluerobotics.com/learn/bluerov2-assembly/): ballast under the bottom panel, accessory holes drilled in the panels",
+     "verified": true
+    },
+    {
+     "part": "BlueROV2 bottom panel: room for the skids",
+     "dimensions": "rails 240 mm long at y = +-100 mm, clear of the ballast weights",
+     "source": "Blue Robotics BlueROV2 (https://bluerobotics.com/store/rov/bluerov2/): 457 x 338 x 254 mm, 11-12 kg in air with ballast and battery, acrylic enclosures 100 m / aluminium 300 m, 6 x T200 (4 vectored, 2 vertical), 4\" electronics and 3\" battery enclosures, Raspberry Pi 4 (2 GB) + Navigator, Bar30, low-light HD USB camera (110 deg horizontal), 9 x 200 g stainless ballast weights, R-3318 foam, payload 1.2-1.4 kg; BlueROV2 Frame (https://bluerobotics.com/store/rov/bluerov2-components-spares/brov2-asm-frame/): bottom panel 1/2 in HDPE, side panels 3/8 in HDPE, M5 x 20 frame screws and M5 slot nuts; BlueROV2 assembly guide (https://bluerobotics.com/learn/bluerov2-assembly/): ballast under the bottom panel, accessory holes drilled in the panels",
+     "verified": false
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M5 x 35 socket head cap screw, A4 (316) stainless",
+     "qty": 3,
+     "use": "skid through the bottom panel (heads recessed)"
+    },
+    {
+     "item": "M5 washer, A4 (316) stainless",
+     "qty": 6,
+     "use": "under the skid screw heads and nuts"
+    },
+    {
+     "item": "M5 nyloc nut, A4 (316) stainless",
+     "qty": 3,
+     "use": "skid, on top of the bottom panel"
+    }
+   ],
+   "notes": [
+    "Lift the ROV by its frame, never by a skid alone; the skids carry it sitting on the deck.",
+    "Print solid: see the DVL mount; check the screws for tightness after the first few dives (HDPE and ASA settle)."
+   ]
+  },
+  {
+   "id": "spool_drum",
+   "name": "Tether spool drum",
+   "quantity": 1,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "on deck in the sun, wet from the tether",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 25,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "upright: one end on the plate",
+    "rotate": []
+   },
+   "stl": "hardware/parts/submarine/stl/spool_drum.stl",
+   "step": "generated/parts/submarine/spool_drum.step",
+   "volume_cm3": 304.85,
+   "area_cm2": 695.4,
+   "print_size_mm": [
+    100.0,
+    100.0,
+    110.0
+   ],
+   "footprint_mm": [
+    100.0,
+    100.0
+   ],
+   "triangles": 2200,
+   "estimate": {
+    "mass_g": 171.8,
+    "time_min": 316,
+    "mass_g_all": 171.8,
+    "time_min_all": 316
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 2.03,
+    "min_wall_p1_mm": 2.19,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 2572,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "spool_flange (printed, x2)",
+     "dimensions": "six M4 inserts in each end on a 90 mm circle",
+     "source": "hardware/parts/submarine/_frame.py",
+     "verified": true
+    },
+    {
+     "part": "Fathom tether",
+     "dimensions": "12 mm slot for the tether end (standard 7.6 mm, slim 4.0 mm)",
+     "source": "Blue Robotics BlueROV2 tether options (https://bluerobotics.com/store/rov/bluerov2/): standard 7.6 mm, slim 4.0 mm, 25-300 m",
+     "verified": true
+    }
+   ],
+   "inserts": [
+    {
+     "size": "M4",
+     "qty": 12,
+     "where": "both end faces, six each"
+    }
+   ],
+   "fasteners": [],
+   "notes": [
+    "The tether's topside end goes in through the slot and out through the flange's tether hole, so it can be plugged into the topside interface while the spool sits still; do not run the ROV with the tether wound tight on the drum.",
+    "Brass inserts on the topside spool: rinse the spool in fresh water after salt-water days."
+   ]
+  },
+  {
+   "id": "spool_flange",
+   "name": "Tether spool flange",
+   "quantity": 2,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "on deck in the sun, wet from the tether",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 25,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "inner face (against the drum) on the plate, hub and crank boss up",
+    "rotate": [
+     [
+      "X",
+      180
+     ]
+    ]
+   },
+   "stl": "hardware/parts/submarine/stl/spool_flange.stl",
+   "step": "generated/parts/submarine/spool_flange.step",
+   "volume_cm3": 212.61,
+   "area_cm2": 895.8,
+   "print_size_mm": [
+    240.0,
+    239.3,
+    17.0
+   ],
+   "footprint_mm": [
+    240.0,
+    239.3
+   ],
+   "triangles": 3104,
+   "estimate": {
+    "mass_g": 128.6,
+    "time_min": 225,
+    "mass_g_all": 257.2,
+    "time_min_all": 451
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 5.0,
+    "min_wall_p1_mm": 5.0,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 38990,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "spool_drum (printed)",
+     "dimensions": "six M4 screws on a 90 mm circle into its inserts",
+     "source": "hardware/parts/submarine/_frame.py",
+     "verified": true
+    },
+    {
+     "part": "20 mm axle (wooden dowel or aluminium tube)",
+     "dimensions": "21 mm hub bore",
+     "source": "requirement of this design",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M4 x 10 socket head cap screw, A4 (316) stainless",
+     "qty": 6,
+     "use": "spool flange to the drum inserts"
+    }
+   ],
+   "notes": [
+    "Both flanges are the same; the crank handle goes on one of them, the tether leaves through the other's tether hole."
+   ]
+  },
+  {
+   "id": "spool_handle",
+   "name": "Tether spool crank handle",
+   "quantity": 1,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "on deck in the sun",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 30,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "upright on one end",
+    "rotate": []
+   },
+   "stl": "hardware/parts/submarine/stl/spool_handle.stl",
+   "step": "generated/parts/submarine/spool_handle.step",
+   "volume_cm3": 23.43,
+   "area_cm2": 60.0,
+   "print_size_mm": [
+    24.0,
+    23.9,
+    55.0
+   ],
+   "footprint_mm": [
+    24.0,
+    23.9
+   ],
+   "triangles": 336,
+   "estimate": {
+    "mass_g": 14.6,
+    "time_min": 34,
+    "mass_g_all": 14.6,
+    "time_min_all": 34
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 9.07,
+    "min_wall_p1_mm": 9.07,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 424,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "spool_flange (printed)",
+     "dimensions": "M5 screw through the crank boss",
+     "source": "hardware/parts/submarine/spool_flange.py",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M5 x 70 socket head cap screw, A4 (316) stainless",
+     "qty": 1,
+     "use": "crank handle axle, through the flange boss"
+    },
+    {
+     "item": "M5 washer, A4 (316) stainless",
+     "qty": 2,
+     "use": "crank handle: under the head, and between handle and boss"
+    },
+    {
+     "item": "M5 nyloc nut, A4 (316) stainless",
+     "qty": 1,
+     "use": "crank handle, in the hex pocket on the flange's inner face"
+    }
+   ],
+   "notes": [
+    "Tighten only until the handle still spins freely on the screw; the nut sits in a pocket flush with the flange's inner face so the tether cannot catch on it."
+   ]
+  },
+  {
+   "id": "trim_weight_holder",
+   "name": "Trim weight holder",
+   "quantity": 4,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "under water: nearly neutral in sea water; printed solid so no air is trapped",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 5,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 5,
+    "sparse_infill_density_pct": 100,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "flange (panel face) on the plate, spigot up",
+    "rotate": [
+     [
+      "X",
+      180
+     ]
+    ]
+   },
+   "stl": "hardware/parts/submarine/stl/trim_weight_holder.stl",
+   "step": "generated/parts/submarine/trim_weight_holder.step",
+   "volume_cm3": 9.04,
+   "area_cm2": 43.7,
+   "print_size_mm": [
+    36.0,
+    35.9,
+    31.0
+   ],
+   "footprint_mm": [
+    36.0,
+    35.9
+   ],
+   "triangles": 504,
+   "estimate": {
+    "mass_g": 9.7,
+    "time_min": 22,
+    "mass_g_all": 38.7,
+    "time_min_all": 88
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 4.0,
+    "min_wall_p1_mm": 4.0,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 990,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "M16 stainless washers (ISO 7089)",
+     "dimensions": "16.4 mm spigot in their 17 mm holes, 27 mm long: up to 9 washers",
+     "source": "ISO 7089 plain washer, M16: d1 17, d2 30, h 3 mm; mass from its volume in 316 stainless (8.0 g/cm3)",
+     "verified": true
+    },
+    {
+     "part": "BlueROV2 bottom panel",
+     "dimensions": "12.7 mm HDPE, one M5 hole drilled through it at the spigot centre",
+     "source": "Blue Robotics BlueROV2 (https://bluerobotics.com/store/rov/bluerov2/): 457 x 338 x 254 mm, 11-12 kg in air with ballast and battery, acrylic enclosures 100 m / aluminium 300 m, 6 x T200 (4 vectored, 2 vertical), 4\" electronics and 3\" battery enclosures, Raspberry Pi 4 (2 GB) + Navigator, Bar30, low-light HD USB camera (110 deg horizontal), 9 x 200 g stainless ballast weights, R-3318 foam, payload 1.2-1.4 kg; BlueROV2 Frame (https://bluerobotics.com/store/rov/bluerov2-components-spares/brov2-asm-frame/): bottom panel 1/2 in HDPE, side panels 3/8 in HDPE, M5 x 20 frame screws and M5 slot nuts; BlueROV2 assembly guide (https://bluerobotics.com/learn/bluerov2-assembly/): ballast under the bottom panel, accessory holes drilled in the panels",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M5 x 55 socket head cap screw, A4 (316) stainless",
+     "qty": 1,
+     "use": "trim weight holder and its washers through the bottom panel"
+    },
+    {
+     "item": "M5 x 20 mm fender (penny) washer, A4 (316) stainless",
+     "qty": 1,
+     "use": "retains the trim washers"
+    },
+    {
+     "item": "M5 washer, A4 (316) stainless",
+     "qty": 1,
+     "use": "trim weight holder nut, on top of the bottom panel"
+    },
+    {
+     "item": "M5 nyloc nut, A4 (316) stainless",
+     "qty": 1,
+     "use": "trim weight holder, on top of the bottom panel"
+    },
+    {
+     "item": "M16 washer (ISO 7089), A4 (316) stainless",
+     "qty": 5,
+     "use": "trim weight, as needed (0-9 per holder; buy 20 to start)"
+    }
+   ],
+   "notes": [
+    "Fit spacers (more washers, or a short length of 16 mm tube) so the stack fills the spigot: the screw clamps the stack against the flange.",
+    "Trim in fresh water first, then add about 2.5 % of the ROV's displacement for sea water if you move between them."
+   ]
+  }
+ ],
+ "plates": [
+  {
+   "name": "A",
+   "material": "ASA",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "spool_flange",
+     "qty": 1
+    }
+   ],
+   "time_min": 231,
+   "mass_g": 129
+  },
+  {
+   "name": "B",
+   "material": "ASA",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "spool_flange",
+     "qty": 1
+    }
+   ],
+   "time_min": 231,
+   "mass_g": 129
+  },
+  {
+   "name": "C",
+   "material": "ASA",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "dvl_mount",
+     "qty": 1
+    },
+    {
+     "id": "spool_drum",
+     "qty": 1
+    },
+    {
+     "id": "skid",
+     "qty": 2
+    },
+    {
+     "id": "trim_weight_holder",
+     "qty": 4
+    },
+    {
+     "id": "spool_handle",
+     "qty": 1
+    }
+   ],
+   "time_min": 1005,
+   "mass_g": 545
+  }
+ ],
+ "assembly": {
+  "bodies": 79,
+  "interferences": "none",
+  "dvl_beams_clear": "yes (cone of 26.7 deg half-angle from the DVL face)",
+  "skid_clearance_mm": "2.5 between the skid line and the lowest other part; DVL face 9 mm above it (the A50 needs 5 cm: no lock while sitting on the bottom)",
+  "added_weight_in_sea_water_g": "218 (DVL 105, printed parts 15, stainless screws and nuts 98), before trim washers",
+  "ballast_to_remove": "2 of the 200 g ballast weights (174 g each in sea water): -131 g, then about 13 trim washers (10.0 g each in sea water, up to 9 per holder) restore the original trim",
+  "printed_parts_petg_instead_g": "82 in sea water for the same parts in PETG, against 15 in ASA",
+  "water_uptake_g": "under 3.2 (about 0.45 % at 55 % RH per the filament data sheets, assumed doubled when soaked)",
+  "spool_capacity_m": "57 of standard (7.6 mm) or 207 of slim (4.0 mm) tether, 10 mm inside the rims",
+  "passed": true
+ }
+}

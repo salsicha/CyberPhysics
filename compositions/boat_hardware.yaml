@@ -1,4 +1,4 @@
-# Physical BlueBoat stack.
+# Physical BlueBoat stack (hardware/boat.md).
 
 services:
   boat_mavros:

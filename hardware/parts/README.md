@@ -8,9 +8,12 @@ committed so they can be downloaded straight from GitHub.
 | Platform | Parts | Printing and assembly | Bill of materials |
 |---|---|---|---|
 | aerodrone | [`aerodrone/`](aerodrone/) | [aerodrone/README.md](aerodrone/README.md) | [../aerodrone.md](../aerodrone.md) |
+| airplane | [`airplane/`](airplane/) | [airplane/README.md](airplane/README.md) | [../airplane.md](../airplane.md) |
+| boat | [`boat/`](boat/) | [boat/README.md](boat/README.md) | [../boat.md](../boat.md) |
+| submarine | [`submarine/`](submarine/) | [submarine/README.md](submarine/README.md) | [../submarine.md](../submarine.md) |
 
-The other platforms (airplane, boat, lunar_rover, racecarneo, so101,
-submarine, turret) follow the same layout when their parts are added.
+The other platforms (lunar_rover, racecarneo, so101, turret) follow the
+same layout when their parts are added.
 
 ## Reference printer
 
