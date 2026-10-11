@@ -29,6 +29,14 @@ services:
     network_mode: host
     ipc: host
     restart: unless-stopped
+    # Docker on the UNO Q gives containers an open-file limit of about 2^30, and
+    # the LTTng-UST library every ROS 2 Jazzy process loads then allocates and
+    # zeroes a 128 MiB descriptor bitmap: about 200 MB of RAM for the bridge
+    # instead of 66 MB. These are the usual systemd defaults.
+    ulimits:
+      nofile:
+        soft: 1024
+        hard: 524288
     env_file:
       - ../applications/pantiltros/config/arduino_uno_q.env
     environment:
@@ -36,12 +44,13 @@ services:
       - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
       - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
     volumes:
-      # arduino-router's socket (root:arduino-router, 0660; the container runs
-      # as root). Long syntax so a missing socket fails instead of creating a
-      # directory. Restarting arduino-router recreates the socket file and
-      # leaves this mount on the old one; the bridge then exits after
-      # router_lost_exit_s (30 s) and restart: unless-stopped mounts the new
-      # one. (Mounting /var/run instead would expose docker.sock.)
+      # arduino-router's socket (root:root, 0666 with arduino-router 0.5.3;
+      # the container runs as root anyway). Long syntax so a missing socket
+      # fails instead of creating a directory. Restarting arduino-router
+      # recreates the socket file and leaves this mount on the old one; the
+      # bridge then exits after router_lost_exit_s (30 s) and restart:
+      # unless-stopped mounts the new one. (Mounting /var/run instead would
+      # expose docker.sock.)
       - type: bind
         source: /var/run/arduino-router.sock
         target: /var/run/arduino-router.sock

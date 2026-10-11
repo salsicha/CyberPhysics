@@ -135,7 +135,8 @@ echoes commands as joint states. Commands arriving while the port is closed,
 the Arduino is resetting, or the e-stop is engaged are dropped, not queued.
 `/turret/actuator_ready` is true only while commands are being written. The
 firmware is `applications/arduino/scripts/turret_firmware` (UNO R4 WiFi and
-UNO Q; compiled and unit tested, not yet run on hardware); see
+UNO Q; compiled and unit tested, and run with this bridge on a real UNO Q
+without servos; not yet run with servos or on an UNO R4); see
 `hardware/turret.md`.
 
 The bridge's `transport` parameter (`TURRET_ARDUINO_TRANSPORT`) selects the

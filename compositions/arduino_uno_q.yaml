@@ -16,6 +16,13 @@ x-unoq-image: &unoq-image
   pull_policy: build
   build:
     context: ../applications/unoq
+  # Docker on the UNO Q gives containers an open-file limit of about 2^30, and
+  # the LTTng-UST library every ROS 2 Jazzy process loads then allocates and
+  # zeroes a 128 MiB descriptor bitmap (compositions/turret_uno_q.yaml).
+  ulimits:
+    nofile:
+      soft: 1024
+      hard: 524288
 
 services:
   unoq_sub:

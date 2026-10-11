@@ -59,11 +59,22 @@ msgpack-RPC). No micro-ROS is involved.
    arduino-cli compile --upload -b arduino:zephyr:unoq -p <port> scripts/unoq_sub
    ```
 
-   or open it in the Arduino IDE 2, or copy it into an Arduino App Lab app on
-   the board.
+   or, from this image, with the board's USB device (ADB) and serial port:
+
+   ```bash
+   docker run --rm --device "/dev/bus/usb/$(lsusb -d 2341:0078 | awk '{print $2 "/" substr($4, 1, 3)}')" \
+     --device /dev/ttyACM0 salsicha/cyberphysics:arduino-latest \
+     arduino-cli compile --upload -b arduino:zephyr:unoq -p /dev/ttyACM0 unoq_sub
+   ```
+
+   The upload runs OpenOCD on the board over ADB (`hardware/turret.md`, "Arduino
+   UNO Q"). The board's serial port, `/dev/ttyACM0` on the PC, carries the
+   sketch's `Monitor` text, not the MCU's UART. You can also open the sketch
+   in the Arduino IDE 2, or copy it into an Arduino App Lab app on the board.
 2. On the UNO Q, from a checkout of this repository (Docker comes with the
    board's Debian image; the small `unoq` image, `applications/unoq`, is built
-   on the board the first time):
+   on the board the first time, or offline as in `applications/unoq/README.md`,
+   in which case use `up --no-build`):
 
    ```bash
    docker compose -f compositions/arduino_uno_q.yaml up -d
@@ -72,6 +83,11 @@ msgpack-RPC). No micro-ROS is involved.
 
    or publish from any machine on the same `ROS_DOMAIN_ID`:
    `ros2 topic pub --once /micro_ros_arduino_subscriber std_msgs/msg/Int32 "data: 1"`.
+
+Run on a real UNO Q (offline image, `up --no-build`): `set_led(1)` and
+`set_led(0)` through the router socket return `true` and `false`, and the node
+logs "LED on" and "LED off" for messages 1, 5 and 0. The LED itself was not
+watched.
 
 The UNO Q can also host the micro-ROS agent for the Pico/ESP32 demos below, for
 example the agent of the repository's `ros2` image built for arm64

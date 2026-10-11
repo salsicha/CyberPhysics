@@ -48,14 +48,16 @@ for the UNO R4 WiFi (`arduino:renesas_uno:unor4wifi`) and the UNO Q MCU
 (`arduino:zephyr:unoq`) in the `arduino` image, and its protocol, limit,
 watchdog and Feetech packet logic is unit tested on the host
 (`tests/test_turret_firmware.py`, packets byte-identical to Feetech's
-`SCServo_Linux`). It has not yet run on a real board or real servos: check
-the servo IDs, zero offsets, directions, speed and limits in
-`src/turret_config.h` with the servos free to move before mounting the
-payload. The ST3215 node `pan_tilt_ctrl_node` (package `pan_tilt_ros` in
-`applications/pantiltros/pantiltros`) is an alternative without an Arduino:
-built in the PanTiltROS image with the Feetech `SCServo_Linux` library, it
-drives the servos directly from the host over a USB bus adapter, but has not
-been run against real ST3215 servos here either.
+`SCServo_Linux`). The UNO Q build and its bridge have run on a real UNO Q
+without servos (see "Verified on a real UNO Q" below); nothing has run on an
+UNO R4 WiFi or on real servos yet: check the servo IDs, zero offsets,
+directions, speed and limits in `src/turret_config.h` with the servos free to
+move before mounting the payload. The ST3215 node `pan_tilt_ctrl_node`
+(package `pan_tilt_ros` in `applications/pantiltros/pantiltros`) is an
+alternative without an Arduino: built in the PanTiltROS image with the
+Feetech `SCServo_Linux` library, it drives the servos directly from the host
+over a USB bus adapter, but has not been run against real ST3215 servos here
+either.
 
 Firmware (`turret_firmware.ino`, shared core in `src/`):
 
@@ -73,7 +75,8 @@ Firmware (`turret_firmware.ino`, shared core in `src/`):
   `stop_disables_torque` for torque off instead); position feedback at 25 Hz,
   reported only when both servos answered; a servo that does not answer (or
   reports a fault bit) produces an `ERR`, repeated at most once per second;
-  nothing is written to the servos before the first `SET` or `STOP`.
+  nothing is written to the servos before the first `SET` or `STOP` (the
+  position reads start at power-up, so missing servos are reported at once).
 - Half-duplex adapters that echo transmitted bytes back to RX are handled. If
   the adapter needs a direction (transmit-enable) input, wire it to a free pin
   and set `TURRET_SERVO_DIR_PIN` (HIGH while transmitting).
@@ -120,13 +123,19 @@ Arduino UNO Q
 The UNO Q has two processors: a Qualcomm QRB2210 running Debian (quad
 Cortex-A53, 2 or 4 GB RAM) and an STM32U585 MCU (Cortex-M33, 160 MHz) running
 the Arduino core on Zephyr. Its USB-C port belongs to the Linux side: a host
-PC sees an ADB device (and, where arduino-router's `arduino-router-serial`
-service runs, a USB serial port that only relays the MCU's `Serial`/`Monitor`
-text through RPC), not the MCU's UART, so the UNO R4 setup (bridge on the
-host, firmware on `/dev/ttyACM0`) does not apply.
+PC sees `2341:0078 Arduino Uno Q` with an ADB interface and a CDC-ACM serial
+port (`/dev/ttyACM0`), not the MCU's UART. The serial port is the board's
+`arduino-router-serial` service (`socat` between the USB gadget port
+`/dev/ttyGS0` and the router's monitor port, TCP 7500): it carries only the
+MCU's `Monitor` text (on the UNO Q `Serial` is the same object), which the
+sketch sends as `mon/write` RPCs, and what the PC types reaches the sketch's
+`Monitor.read()`. The baud rate is irrelevant. So the UNO R4 setup (bridge on
+the host, firmware on `/dev/ttyACM0`) does not apply, and `turret_firmware`
+prints nothing there.
 Instead the bridge runs on the board and reaches the MCU through
 `arduino-router`, the msgpack-RPC router on `/var/run/arduino-router.sock`
-that owns the internal MCU link (`/dev/ttyHS1`, 115200 baud):
+that owns the internal MCU link (`/dev/ttyHS1`, 115200 baud, the MCU's
+LPUART1; the sketch's `Serial1` is USART1 on D0/D1):
 
 - MCU: the same `turret_firmware` sketch, built for `arduino:zephyr:unoq`
   (Arduino Q Boards core 1.0.0, Arduino_RouterBridge 0.4.3). It provides the
@@ -157,16 +166,35 @@ servos from their own supply as above.
 
 Deploy:
 
-1. Flash `turret_firmware` to the MCU: from a PC with the board on USB, with
-   the Arduino IDE 2 or `arduino-cli compile --upload -b arduino:zephyr:unoq`
-   (`arduino-cli board list` shows the port; the core uploads through the
-   board's Linux side), or on the board with Arduino App Lab. The `arduino`
-   image already has the core and libraries.
+1. Flash `turret_firmware` to the MCU from a PC with the board on USB, with
+   the Arduino IDE 2 or arduino-cli, for example in the `arduino` image, which
+   has the core and libraries; the container needs the board's USB device
+   (ADB) and its serial port (from which arduino-cli takes the serial number):
+
+   ```bash
+   docker run --rm --device "/dev/bus/usb/$(lsusb -d 2341:0078 | awk '{print $2 "/" substr($4, 1, 3)}')" \
+     --device /dev/ttyACM0 salsicha/cyberphysics:arduino-latest \
+     arduino-cli compile --upload -b arduino:zephyr:unoq -p /dev/ttyACM0 turret_firmware
+   ```
+
+   The core's `remoteocd` pushes the files over ADB to `/tmp/remoteocd` on
+   the board and runs the board's own OpenOCD (`/opt/openocd`, SWD through
+   the Linux side's GPIOs), as the `arduino` user without a password. It also
+   writes the core's Zephyr loader when the MCU has a different one (the
+   first upload here did, 29 s; later ones took 11 s); expect Arduino App
+   Lab, whose core on the board is 0.51.0, to write its own back when it
+   next uploads. Run no other ADB
+   server on the PC at the same time. The compile message "Bootloader file
+   specified but missing: .../bootloaders/zephyr-arduino_uno_q_stm32u585xx.elf"
+   is harmless: arduino-cli looks there to merge a bootloader into an
+   exported hex, while the upload takes the loader from the core's
+   `firmwares/` folder. Arduino App Lab on the board works too.
 2. On the UNO Q, with this repository checked out:
    `ROS_DOMAIN_ID=<id> docker compose -f compositions/turret_uno_q.yaml --profile board up -d`
-   (builds the `unoq` image on the board the first time). After an
-   `arduino-router` restart, which recreates its socket, the bridge exits
-   within `router_lost_exit_s` (30 s) and Docker restarts it on the new socket.
+   (builds the `unoq` image on the board the first time; a board without
+   internet: `applications/unoq/README.md`). After an `arduino-router`
+   restart, which recreates its socket, the bridge exits within
+   `router_lost_exit_s` (30 s) and Docker restarts it on the new socket.
 3. On the GPU host:
    `ROS_DOMAIN_ID=<id> docker compose -f compositions/turret_uno_q.yaml --profile host up`
    (`--profile realsense` adds the RealSense camera). Do not run
@@ -176,7 +204,61 @@ Deploy:
 
 Only one bridge may own the `turret/*` notifications: a second bridge on the
 same board reports "another arduino-router client already receives
-turret/pos" and never becomes ready.
+turret/pos" (or `turret/err`) and never becomes ready.
+
+Verified on a real UNO Q (2 GB model, October 2026), without servos and
+without a network, over ADB from a PC:
+
+- Board: Debian 13 (trixie), kernel 6.16.7, Docker 26.1.5 with Compose 2.26.1
+  and buildx 0.13.1, arduino-router 0.5.3, 1.7 GB RAM. The router socket is
+  `srw-rw-rw- root root`, so any local user or container can use it.
+  `sudo` and `systemctl restart arduino-router` need a password, so the
+  router restart was reproduced by recreating the socket file of a proxy in
+  front of the router instead.
+- Upload: the command in step 1 (arduino-cli 1.5.1, `arduino:zephyr` 1.0.0),
+  for `turret_firmware` and `unoq_sub`.
+- Firmware over the router: `turret/get_position` returns `[]` without
+  servos; `turret/set` returns `true` (float64, float32 and integer
+  arguments are accepted) and `false` for NaN or infinity; wrong argument
+  counts or types get router errors. With no servos the MCU sends
+  `turret/err` "servo 12 (pan_joint) timeout" and "servo 13 (tilt_joint)
+  timeout" about once a second from power-up on (position reads), "torque
+  enable timeout" after a `SET`, and "cannot hold: no position reply" 0.51 s
+  after the last `SET` (watchdog; SETs every 100 ms keep it quiet) and about
+  20 ms after a `STOP`. RPC round trips take about 7 ms. `turret/pos` needs
+  servos.
+- Bridge (`compositions/turret_uno_q.yaml --profile board`): registers both
+  notifications, sends `turret/stop` once the MCU answers while the e-stop is
+  engaged, publishes `/turret/actuator_ready` false until the e-stop is
+  released and true after; `/turret/diagnostics` is ERROR with the last
+  firmware message ("firmware: servo 13 (tilt_joint) timeout") without
+  servos. Joint commands become `turret/set` RPCs only after the release,
+  clamped to the joint limits (pan 3.0 and tilt -2.0 arrive as 1.5708 and
+  -0.65), are dropped and counted while e-stopped, and NaN is rejected in the
+  bridge. Engaging the e-stop and stopping the container each send
+  `turret/stop` (the one at shutdown still reaches the MCU although the bridge
+  closes the socket at once). Reflashing or resetting the MCU makes the bridge
+  not ready ("no answer" while the MCU is halted, "turret/get_position not
+  available" while another sketch runs) and ready again, with its
+  notifications still registered, when `turret_firmware` is back. A
+  recreated router socket made the bridge exit with status 1 after 30 s and
+  Docker restart it on the new socket. A second bridge never became ready.
+- Resources: the bridge uses about 66 MB of RAM and, idle, 35 % of one
+  Cortex-A53 core, nearly all of it rclpy's executor waking for the 50 Hz
+  `poll_rate_hz` timer (18 % at 25 Hz, 7 % at 10 Hz, at the cost of up to one
+  period of extra joint-state latency). The compositions cap the containers'
+  open-file limit: with Docker's default of about 2^30 on the board, LTTng-UST,
+  loaded by every ROS 2 process, takes 128 MiB more per process.
+- `ros2 topic pub` on `/turret/emergency_stop` with default QoS works but
+  logs an "incompatible QoS ... DURABILITY" warning in both processes: the
+  bridge also subscribes transient-local, for latched publishers.
+
+Still to check, with servos and a network: `turret/pos` at 25 Hz and
+`/turret/joint_states`, torque enable, motion, holding, limits, directions
+and zero offsets, the half-duplex adapter at 1 Mbps and 3.3 V on D0/D1, the
+servo fault bits, `stop_disables_torque`, a real `arduino-router` restart,
+and DDS between the board and the GPU host (tracker, `ROS_DOMAIN_ID`,
+multicast over Wi-Fi or Ethernet).
 
 ROS contract
 
