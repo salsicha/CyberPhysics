@@ -34,6 +34,17 @@ Builds do not modify the working tree: `.gitattributes` keeps scripts and Docker
 
 `.github/workflows/images.yml` builds the images that fit on a GitHub-hosted runner with `_build_it.sh`, the same script the Makefile targets run. It runs on pushes to `main` and pull requests that touch `applications/`, weekly, and on demand. There is one job per base image (`ros2`, `aerostack2`, and the standalone images), with one step per image, so a failing step names the broken Dockerfile. Nothing is pushed. The CUDA/PyTorch images (nvblox, isaac, groot, genesis, depthanything, pantiltros, turret_sim, smolvla, lerobot) and matlab are not built there; vinsmono is built and smoke-tested by `ci.yml`. The arm64 images the hardware compositions run (`CYBERPHYSICS_TAG=arm64`: the aerostack2 family, rangefinder and unoq) are also built, natively on GitHub's `ubuntu-24.04-arm` runners. A new app needs its own step in `images.yml`.
 
+## CAD Toolchain
+
+`applications/cad` is not a robot application: it is the pinned CadQuery
+image that builds, validates and exports the 3D-printable parts in
+`hardware/parts/` (`make -C applications build_cad`, then
+`tools/build_printable_parts.py` in it; see
+[cad/README.md](cad/README.md) and
+[hardware/parts/README.md](../hardware/parts/README.md)). `images.yml`
+builds it in the standalone job; `ci.yml`'s `printable-parts` job installs
+the same pinned requirements to check the parts and upload the STLs.
+
 ## Add An Application
 
 1. Create `applications/<app_name>/` using lowercase words with underscores only when needed.

@@ -1,0 +1,1381 @@
+{
+ "platform": "aerodrone",
+ "generator": "tools/build_printable_parts.py",
+ "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+ "usable_volume_mm": [
+  250.0,
+  250.0,
+  250.0
+ ],
+ "stl_tolerance_mm": 0.05,
+ "stl_angular_tolerance_rad": 0.3,
+ "parts": [
+  {
+   "id": "battery_tray",
+   "name": "Battery tray",
+   "quantity": 1,
+   "material": "PETG",
+   "material_fallback": null,
+   "material_reason": "shaded under the hub; the pack reaches about 60 C, well under PETG's limit",
+   "flight_critical": true,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu PETG Basic",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 3,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 30,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "flat battery face on the plate, posts and ribs up",
+    "rotate": []
+   },
+   "stl": "hardware/parts/aerodrone/stl/battery_tray.stl",
+   "step": "generated/parts/aerodrone/battery_tray.step",
+   "volume_cm3": 29.83,
+   "area_cm2": 229.4,
+   "print_size_mm": [
+    148.0,
+    64.0,
+    13.0
+   ],
+   "footprint_mm": [
+    148.0,
+    64.0
+   ],
+   "triangles": 2392,
+   "estimate": {
+    "mass_g": 32.1,
+    "time_min": 55,
+    "mass_g_all": 32.1,
+    "time_min_all": 55
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 1.75,
+    "min_wall_p1_mm": 2.75,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 7592,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "4S LiPo pack",
+     "dimensions": "up to 160 x 50 x 40 mm between the strap slots",
+     "source": "Requirement of this design: 4S 4000-5000 mAh pack, at most 160 x 50 x 40 mm, about 550 g",
+     "verified": true
+    },
+    {
+     "part": "hub_bottom_plate (printed)",
+     "dimensions": "four M3 inserts at x = -45/35 mm, y = +-25 mm",
+     "source": "hardware/parts/aerodrone/_frame.py",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M3 x 14 socket head cap screw",
+     "qty": 4,
+     "use": "battery tray to bottom plate (heads recessed in the posts)"
+    },
+    {
+     "item": "battery strap, 20 mm hook-and-loop, 250-300 mm, with rubberised face",
+     "qty": 2,
+     "use": "battery to tray"
+    },
+    {
+     "item": "anti-slip foam pad, 150 x 50 mm",
+     "qty": 1,
+     "use": "between the battery and the tray"
+    }
+   ],
+   "notes": [
+    "A lost battery is a crash: use two straps, each through its own slot pair, and check them before every flight.",
+    "The pack position sets the centre of gravity; see the assembly steps."
+   ]
+  },
+  {
+   "id": "cable_clip",
+   "name": "Arm cable clip",
+   "quantity": 8,
+   "material": "PETG",
+   "material_fallback": null,
+   "material_reason": "flexes to snap on without cracking",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu PETG Basic",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 100,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "on its side: the C profile flat on the plate",
+    "rotate": [
+     [
+      "Y",
+      90
+     ]
+    ]
+   },
+   "stl": "hardware/parts/aerodrone/stl/cable_clip.stl",
+   "step": "generated/parts/aerodrone/cable_clip.step",
+   "volume_cm3": 1.58,
+   "area_cm2": 14.7,
+   "print_size_mm": [
+    21.9,
+    20.6,
+    10.0
+   ],
+   "footprint_mm": [
+    21.9,
+    20.6
+   ],
+   "triangles": 300,
+   "estimate": {
+    "mass_g": 2.0,
+    "time_min": 5,
+    "mass_g_all": 16.0,
+    "time_min_all": 40
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 1.6,
+    "min_wall_p1_mm": 1.6,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 166,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "16 mm carbon arm tube",
+     "dimensions": "15.8 mm ring snaps over the 16 mm tube",
+     "source": "Holybro X500 V2 specification (16 mm carbon fiber tubes), https://docs.holybro.com/drone-development-kit/px4-development-kit-x500v2.md",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "zip tie 2.5 mm",
+     "qty": 1,
+     "use": "motor leads to the arm cable clip"
+    }
+   ],
+   "notes": [
+    "Two per arm: snap on from above, the tab under the tube; tie the motor and ESC leads to the tab."
+   ]
+  },
+  {
+   "id": "gps_mast",
+   "name": "GPS mast",
+   "quantity": 1,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "the highest point of the aircraft, in full sun",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 25,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "outer brim only, 5 mm",
+    "orientation": "upright: flange on the plate (the 45 deg cone under the seat needs no supports)",
+    "rotate": []
+   },
+   "stl": "hardware/parts/aerodrone/stl/gps_mast.stl",
+   "step": "generated/parts/aerodrone/gps_mast.step",
+   "volume_cm3": 64.31,
+   "area_cm2": 156.9,
+   "print_size_mm": [
+    58.0,
+    57.8,
+    132.0
+   ],
+   "footprint_mm": [
+    68.0,
+    67.8
+   ],
+   "triangles": 1428,
+   "estimate": {
+    "mass_g": 33.5,
+    "time_min": 80,
+    "mass_g_all": 33.5,
+    "time_min_all": 80
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 1.97,
+    "min_wall_p1_mm": 1.99,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 987,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "Holybro M10/M9N GPS",
+     "dimensions": "puck dia. 51 mm (V2; V1 50 mm) in a 51.8 mm lip",
+     "source": "Holybro standard M10/M9N GPS overview (https://docs.holybro.com/gps-and-rtk-system/m8n-m9n-m10-gps/standard-m10-m9n-m8n-gps/overview.md)",
+     "verified": true
+    },
+    {
+     "part": "hub_top_plate (printed)",
+     "dimensions": "three M3 inserts on a 13.5 mm radius",
+     "source": "hardware/parts/aerodrone/_frame.py",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M3 x 10 socket head cap screw",
+     "qty": 3,
+     "use": "GPS mast to top plate"
+    },
+    {
+     "item": "double-sided foam tape (VHB), 50 mm disc",
+     "qty": 1,
+     "use": "GPS puck on the mast seat"
+    }
+   ],
+   "notes": [
+    "Arrow on the GPS puck toward the nose (or set COMPASS_ORIENT to match).",
+    "The cable notch in the lip faces the nose; run the cable down the mast with two cable ties."
+   ]
+  },
+  {
+   "id": "hub_bottom_plate",
+   "name": "Hub bottom plate",
+   "quantity": 1,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "airframe exterior in the sun; carries every arm, the legs and the battery",
+   "flight_critical": true,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 4,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 25,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "outer brim only, 5 mm",
+    "orientation": "flat underside on the plate, clamp blocks up",
+    "rotate": []
+   },
+   "stl": "hardware/parts/aerodrone/stl/hub_bottom_plate.stl",
+   "step": "generated/parts/aerodrone/hub_bottom_plate.step",
+   "volume_cm3": 174.66,
+   "area_cm2": 653.5,
+   "print_size_mm": [
+    181.0,
+    181.0,
+    18.5
+   ],
+   "footprint_mm": [
+    191.0,
+    191.0
+   ],
+   "triangles": 8600,
+   "estimate": {
+    "mass_g": 101.5,
+    "time_min": 179,
+    "mass_g_all": 101.5,
+    "time_min_all": 179
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 1.98,
+    "min_wall_p1_mm": 2.16,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 22544,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "16 mm carbon arm tube (x4)",
+     "dimensions": "tube OD 16.0 mm in a 16.2 mm half bore, tube end on the stop at r = 54.0 mm",
+     "source": "Holybro X500 V2 specification (16 mm carbon fiber tubes), https://docs.holybro.com/drone-development-kit/px4-development-kit-x500v2.md",
+     "verified": true
+    },
+    {
+     "part": "hub_top_plate (printed)",
+     "dimensions": "clamp blocks 1 mm apart when tightened",
+     "source": "hardware/parts/aerodrone/_frame.py",
+     "verified": true
+    }
+   ],
+   "inserts": [
+    {
+     "size": "M3",
+     "qty": 16,
+     "where": "clamp blocks, from the top face (arm clamp bolts)"
+    },
+    {
+     "size": "M3",
+     "qty": 8,
+     "where": "underside of the ears, two per arm (landing legs)"
+    },
+    {
+     "size": "M3",
+     "qty": 4,
+     "where": "underside, rear and middle bosses (battery tray)"
+    },
+    {
+     "size": "M3",
+     "qty": 4,
+     "where": "underside, front bosses (sensor nose)"
+    }
+   ],
+   "fasteners": [
+    {
+     "item": "zip tie 2.5 mm",
+     "qty": 4,
+     "use": "power sense module and 5 V BEC to the four centre slots"
+    }
+   ],
+   "notes": [
+    "Press the 32 M3 x 5.7 inserts before assembly: clamp-block inserts from the top, the rest from the underside.",
+    "The bores print as open half-channels; clear any stringing so the tube seats on the stop."
+   ]
+  },
+  {
+   "id": "hub_top_plate",
+   "name": "Hub top plate",
+   "quantity": 1,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "airframe exterior in direct sun; clamps the arms",
+   "flight_critical": true,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 4,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 25,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "outer brim only, 5 mm",
+    "orientation": "upside down: flat top face on the plate, clamp blocks up",
+    "rotate": [
+     [
+      "X",
+      180
+     ]
+    ]
+   },
+   "stl": "hardware/parts/aerodrone/stl/hub_top_plate.stl",
+   "step": "generated/parts/aerodrone/hub_top_plate.step",
+   "volume_cm3": 175.77,
+   "area_cm2": 664.8,
+   "print_size_mm": [
+    181.0,
+    181.0,
+    18.5
+   ],
+   "footprint_mm": [
+    191.0,
+    191.0
+   ],
+   "triangles": 6104,
+   "estimate": {
+    "mass_g": 102.9,
+    "time_min": 181,
+    "mass_g_all": 102.9,
+    "time_min_all": 181
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 2.29,
+    "min_wall_p1_mm": 2.29,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 22931,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "16 mm carbon arm tube (x4)",
+     "dimensions": "tube OD 16.0 mm in a 16.2 mm half bore",
+     "source": "Holybro X500 V2 specification (16 mm carbon fiber tubes), https://docs.holybro.com/drone-development-kit/px4-development-kit-x500v2.md",
+     "verified": true
+    },
+    {
+     "part": "hub_bottom_plate, stack_tray, gps_mast (printed)",
+     "dimensions": "bolt and insert positions from _frame.py",
+     "source": "hardware/parts/aerodrone/_frame.py",
+     "verified": true
+    }
+   ],
+   "inserts": [
+    {
+     "size": "M3",
+     "qty": 4,
+     "where": "top face, stack tray grommet bolts"
+    },
+    {
+     "size": "M3",
+     "qty": 3,
+     "where": "top face, GPS mast flange"
+    }
+   ],
+   "fasteners": [
+    {
+     "item": "M3 x 25 socket head cap screw",
+     "qty": 16,
+     "use": "arm clamps, through the top plate into the bottom plate inserts"
+    },
+    {
+     "item": "M3 washer",
+     "qty": 16,
+     "use": "under the arm clamp screw heads"
+    }
+   ],
+   "notes": [
+    "Tighten the 16 clamp screws evenly in a cross pattern until the blocks almost touch (about 1 mm gap); snug, do not crush."
+   ]
+  },
+  {
+   "id": "landing_leg",
+   "name": "Landing leg",
+   "quantity": 4,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "outdoor, in the sun; takes landing loads",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 5,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 5,
+    "sparse_infill_density_pct": 40,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "lying flat on its side (the 12 mm thickness vertical)",
+    "rotate": [
+     [
+      "X",
+      90
+     ]
+    ]
+   },
+   "stl": "hardware/parts/aerodrone/stl/landing_leg.stl",
+   "step": "generated/parts/aerodrone/landing_leg.step",
+   "volume_cm3": 33.52,
+   "area_cm2": 113.5,
+   "print_size_mm": [
+    94.0,
+    181.0,
+    12.0
+   ],
+   "footprint_mm": [
+    94.0,
+    181.0
+   ],
+   "triangles": 392,
+   "estimate": {
+    "mass_g": 25.7,
+    "time_min": 46,
+    "mass_g_all": 102.7,
+    "time_min_all": 186
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 4.3,
+    "min_wall_p1_mm": 4.38,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 2809,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "hub_bottom_plate (printed)",
+     "dimensions": "two M3 inserts on the arm axis at r = 68 and 80 mm",
+     "source": "hardware/parts/aerodrone/_frame.py",
+     "verified": true
+    },
+    {
+     "part": "leg_foot (printed TPU)",
+     "dimensions": "10 x 12 mm tenon, 12 mm long",
+     "source": "hardware/parts/aerodrone/leg_foot.py",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M3 x 16 socket head cap screw",
+     "qty": 2,
+     "use": "landing leg to bottom plate"
+    }
+   ],
+   "notes": [
+    "The legs splay 20 deg outward: the feet sit 150 mm from the centre, outside the OAK-1's 69 x 55 deg view.",
+    "Ground clearance: 126 mm under the OAK-1 lens, about 130 mm under the battery."
+   ]
+  },
+  {
+   "id": "leg_foot",
+   "name": "Landing foot",
+   "quantity": 4,
+   "material": "TPU95A",
+   "material_fallback": null,
+   "material_reason": "soft pad that takes the landing shock and grips the ground",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu TPU 95A HF (or Bambu TPU 95A)",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 3,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 30,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "socket opening up, flat sole on the plate",
+    "rotate": []
+   },
+   "stl": "hardware/parts/aerodrone/stl/leg_foot.stl",
+   "step": "generated/parts/aerodrone/leg_foot.step",
+   "volume_cm3": 6.31,
+   "area_cm2": 27.5,
+   "print_size_mm": [
+    20.0,
+    22.0,
+    18.0
+   ],
+   "footprint_mm": [
+    20.0,
+    22.0
+   ],
+   "triangles": 204,
+   "estimate": {
+    "mass_g": 5.0,
+    "time_min": 23,
+    "mass_g_all": 20.0,
+    "time_min_all": 90
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 5.15,
+    "min_wall_p1_mm": 5.15,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 426,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "landing_leg (printed)",
+     "dimensions": "tenon 10 x 12 mm, socket 0.3 mm smaller (press fit)",
+     "source": "hardware/parts/aerodrone/landing_leg.py",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [],
+   "notes": [
+    "Push onto the leg tenon; a drop of CA glue keeps it on if it works loose."
+   ]
+  },
+  {
+   "id": "motor_mount",
+   "name": "Motor mount",
+   "quantity": 4,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "next to the motor and ESC, in the sun; ASA keeps its stiffness when the motor runs hot",
+   "flight_critical": true,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 5,
+    "top_shell_layers": 6,
+    "bottom_shell_layers": 6,
+    "sparse_infill_density_pct": 50,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "upside down: motor seat on the plate, tube clamp up (slit on top)",
+    "rotate": [
+     [
+      "X",
+      180
+     ]
+    ]
+   },
+   "stl": "hardware/parts/aerodrone/stl/motor_mount.stl",
+   "step": "generated/parts/aerodrone/motor_mount.step",
+   "volume_cm3": 25.29,
+   "area_cm2": 108.7,
+   "print_size_mm": [
+    69.0,
+    34.0,
+    31.0
+   ],
+   "footprint_mm": [
+    69.0,
+    34.0
+   ],
+   "triangles": 2236,
+   "estimate": {
+    "mass_g": 23.8,
+    "time_min": 46,
+    "mass_g_all": 95.3,
+    "time_min_all": 186
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 2.0,
+    "min_wall_p1_mm": 2.0,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 1750,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "Holybro 2216 KV920 motor",
+     "dimensions": "four M3 holes on a 16 x 16 mm cross; slots reach 16 x 19 and 19 x 19 mm",
+     "source": "Holybro PX4 Development Kit X500 V2 specification (https://docs.holybro.com/drone-development-kit/px4-development-kit-x500v2.md): 'Holybro 2216 KV920 Motor', mounting pattern 16x16mm, 1045 propellers, 500 mm wheelbase, 16 mm carbon fiber tubes",
+     "verified": true
+    },
+    {
+     "part": "16 mm carbon arm tube",
+     "dimensions": "OD 16.0 mm in a 16.2 mm split bore, tube end on the stop",
+     "source": "Holybro X500 V2 specification (16 mm carbon fiber tubes), https://docs.holybro.com/drone-development-kit/px4-development-kit-x500v2.md",
+     "verified": true
+    },
+    {
+     "part": "motor base: hole layout, thread depth, centre",
+     "dimensions": "the 16 x 16 mm pattern read as a cross (opposite holes 16 mm apart); M3 x 8 screws engage 4 mm through the 4 mm plate (check they stop short of the windings); 8.5 mm centre hole for the shaft end and circlip",
+     "source": "not in the Holybro specification: check on the motor",
+     "verified": false
+    }
+   ],
+   "inserts": [
+    {
+     "size": "M3",
+     "qty": 2,
+     "where": "far side of the pinch clamp"
+    }
+   ],
+   "fasteners": [
+    {
+     "item": "M3 x 8 socket head cap screw (or the motor's own screws)",
+     "qty": 4,
+     "use": "motor to mount"
+    },
+    {
+     "item": "M3 x 25 socket head cap screw",
+     "qty": 2,
+     "use": "pinch clamp on the arm tube"
+    }
+   ],
+   "notes": [
+    "Before tightening the pinch clamp, set the motor seat parallel to the hub top plate (a straight edge across both); a twisted mount tilts the thrust.",
+    "Turn the motor bell by hand after fitting the screws: nothing may rub or touch the windings.",
+    "Blue (medium) thread locker on the motor screws, which go into metal; none on screws into inserts."
+   ]
+  },
+  {
+   "id": "oak1_cradle",
+   "name": "OAK-1 cradle",
+   "quantity": 1,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "touches the OAK-1 housing, which runs warm (up to ~4 W); ASA keeps its shape",
+   "flight_critical": false,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 40,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "upside down: camera seat on the plate, walls up",
+    "rotate": [
+     [
+      "X",
+      180
+     ]
+    ]
+   },
+   "stl": "hardware/parts/aerodrone/stl/oak1_cradle.stl",
+   "step": "generated/parts/aerodrone/oak1_cradle.step",
+   "volume_cm3": 15.8,
+   "area_cm2": 103.5,
+   "print_size_mm": [
+    54.5,
+    46.4,
+    23.9
+   ],
+   "footprint_mm": [
+    54.5,
+    46.4
+   ],
+   "triangles": 1582,
+   "estimate": {
+    "mass_g": 15.4,
+    "time_min": 31,
+    "mass_g_all": 15.4,
+    "time_min_all": 31
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 1.99,
+    "min_wall_p1_mm": 1.99,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 2258,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "Luxonis OAK-1",
+     "dimensions": "36 mm wide body between walls 36.4 mm apart; 1/4\"-20 thread 14.5 mm from the USB-C end, 10 mm deep",
+     "source": "Luxonis OAK-1 datasheet (docs.luxonis.com/projects/hardware/en/latest/pages/BW1093.html, PDF copy https://media.distrelec.com/Web/Downloads/_t/ds/OAK-1_eng_tds.pdf), dimension drawing and 'Dimensions and Weight'; FOV of the fixed-focus IMX378 variant from https://docs.luxonis.com/hardware/products/OAK-1 (auto-focus: 78/66/54 deg)",
+     "verified": true
+    },
+    {
+     "part": "Luxonis OAK-1 tripod thread across the width",
+     "dimensions": "on the centre line (drawn, not dimensioned)",
+     "source": "Luxonis OAK-1 datasheet (docs.luxonis.com/projects/hardware/en/latest/pages/BW1093.html, PDF copy https://media.distrelec.com/Web/Downloads/_t/ds/OAK-1_eng_tds.pdf), dimension drawing and 'Dimensions and Weight'; FOV of the fixed-focus IMX378 variant from https://docs.luxonis.com/hardware/products/OAK-1 (auto-focus: 78/66/54 deg)",
+     "verified": false
+    },
+    {
+     "part": "oak1_stage (printed)",
+     "dimensions": "pivot and lock bosses on the stage cheek axis",
+     "source": "hardware/parts/aerodrone/oak1_stage.py",
+     "verified": true
+    }
+   ],
+   "inserts": [
+    {
+     "size": "M3-short",
+     "qty": 4,
+     "where": "side bosses: pitch pivot (2) and pitch lock (2), pressed flush from outside (through holes)"
+    }
+   ],
+   "fasteners": [
+    {
+     "item": "1/4\"-20 UNC x 1/2\" button or socket head screw",
+     "qty": 1,
+     "use": "OAK-1 to cradle (engages about 8 mm of the 10 mm thread)"
+    }
+   ],
+   "notes": [
+    "USB-C end of the OAK-1 toward the tail: with the lens down the image top then points to the nose, matching CAMERA_MOUNT_YAW_DEG = 0 in systems/aerodrone/config/topics.env (check with a still image).",
+    "Fit the camera before the cradle goes into the stage: the tripod screw is reached from above."
+   ]
+  },
+  {
+   "id": "oak1_stage",
+   "name": "OAK-1 camera stage (isolated, pitch pivot)",
+   "quantity": 1,
+   "material": "PETG",
+   "material_fallback": null,
+   "material_reason": "shaded under the nose; general structure",
+   "flight_critical": false,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu PETG Basic",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 40,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "upside down: flat top on the plate, cheeks up",
+    "rotate": [
+     [
+      "X",
+      180
+     ]
+    ]
+   },
+   "stl": "hardware/parts/aerodrone/stl/oak1_stage.stl",
+   "step": "generated/parts/aerodrone/oak1_stage.step",
+   "volume_cm3": 22.94,
+   "area_cm2": 145.6,
+   "print_size_mm": [
+    67.0,
+    81.0,
+    37.9
+   ],
+   "footprint_mm": [
+    67.0,
+    81.0
+   ],
+   "triangles": 2744,
+   "estimate": {
+    "mass_g": 25.3,
+    "time_min": 48,
+    "mass_g_all": 25.3,
+    "time_min_all": 48
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 1.99,
+    "min_wall_p1_mm": 1.99,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 4099,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "silicone gimbal damper balls (x4)",
+     "dimensions": "dia. 6.5 mm holes in 2 mm tabs",
+     "source": "No manufacturer drawing: typical listing for 'gimbal damping ball, 6.5 mm mounting hole, for 1.5-2 mm plates'",
+     "verified": false
+    },
+    {
+     "part": "oak1_cradle (printed)",
+     "dimensions": "M3 pivot and M3 lock screw on each side",
+     "source": "hardware/parts/aerodrone/oak1_cradle.py",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M3 x 8 socket head cap screw",
+     "qty": 4,
+     "use": "pitch pivot (2) and pitch lock (2), into the cradle inserts"
+    },
+    {
+     "item": "M3 washer",
+     "qty": 2,
+     "use": "under the pitch-lock screws"
+    }
+   ],
+   "notes": [
+    "Set the pitch so the lens looks straight down with the aircraft level (or at the cruise attitude you care about), then tighten the lock screws."
+   ]
+  },
+  {
+   "id": "sensor_nose",
+   "name": "Sensor nose (OAK-1 damper deck and rangefinder mount)",
+   "quantity": 1,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "airframe exterior in the sun",
+   "flight_critical": false,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 30,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "flat underside on the plate, ribs up",
+    "rotate": []
+   },
+   "stl": "hardware/parts/aerodrone/stl/sensor_nose.stl",
+   "step": "generated/parts/aerodrone/sensor_nose.step",
+   "volume_cm3": 43.41,
+   "area_cm2": 220.9,
+   "print_size_mm": [
+    110.0,
+    80.0,
+    15.0
+   ],
+   "footprint_mm": [
+    110.0,
+    80.0
+   ],
+   "triangles": 2832,
+   "estimate": {
+    "mass_g": 32.2,
+    "time_min": 58,
+    "mass_g_all": 32.2,
+    "time_min_all": 58
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 1.52,
+    "min_wall_p1_mm": 2.0,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 8153,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "hub_bottom_plate (printed)",
+     "dimensions": "four M3 inserts at x = 56/70 mm, y = +-30 mm",
+     "source": "hardware/parts/aerodrone/_frame.py",
+     "verified": true
+    },
+    {
+     "part": "Benewake TFmini-S",
+     "dimensions": "2 x dia. 2.35 mm ear holes 33 mm apart, ST2.9 screws",
+     "source": "Benewake TFmini-S product page (https://en.benewake.com/TFminiS/index.html): 42 x 15 x 16 mm, 5 g, 5 V, <= 140 mA; hole pattern from the TFmini manual SJ-PM-TFmini-T-01 A03, Figure 5 (https://cdn-shop.adafruit.com/product-files/3978/3978_manual_SJ-PM-TFmini-T-01_A03ProductManual_EN.pdf)",
+     "verified": false
+    },
+    {
+     "part": "Benewake TF-Luna (alternative)",
+     "dimensions": "2 x dia. 2.2 mm holes 30.5 mm apart, M2 screws (same slots)",
+     "source": "Benewake TF-Luna datasheet PD-TF-Luna-Datasheet-A05 (https://en.benewake.com/uploadfiles/2024/04/20240426135921367.pdf)",
+     "verified": false
+    },
+    {
+     "part": "silicone gimbal damper balls (x4)",
+     "dimensions": "dia. 6.5 mm holes in 2 mm tabs, 11 mm between the tabs",
+     "source": "No manufacturer drawing: typical listing for 'gimbal damping ball, 6.5 mm mounting hole, for 1.5-2 mm plates'",
+     "verified": false
+    },
+    {
+     "part": "Luxonis OAK-1 (through the camera stage)",
+     "dimensions": "tripod screw access over the 1/4\"-20 thread 14.5 mm from the USB-C end",
+     "source": "Luxonis OAK-1 datasheet (docs.luxonis.com/projects/hardware/en/latest/pages/BW1093.html, PDF copy https://media.distrelec.com/Web/Downloads/_t/ds/OAK-1_eng_tds.pdf), dimension drawing and 'Dimensions and Weight'; FOV of the fixed-focus IMX378 variant from https://docs.luxonis.com/hardware/products/OAK-1 (auto-focus: 78/66/54 deg)",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M3 x 10 socket head cap screw",
+     "qty": 4,
+     "use": "sensor nose to bottom plate"
+    },
+    {
+     "item": "ST2.9 x 9.5 pan head self-tapping screw (TFmini-S) or M2 x 12 + nut (TF-Luna)",
+     "qty": 2,
+     "use": "rangefinder ears, from above"
+    },
+    {
+     "item": "silicone gimbal damper ball, 6.5 mm neck",
+     "qty": 4,
+     "use": "camera stage isolation"
+    }
+   ],
+   "notes": [
+    "Rangefinder lenses point straight down, long side across the nose, connector toward the camera.",
+    "The damper ball necks snap into the 6.5 mm holes from below; print this part first to test the fit."
+   ]
+  },
+  {
+   "id": "stack_grommet",
+   "name": "Stack grommet (TPU top hat)",
+   "quantity": 8,
+   "material": "TPU95A",
+   "material_fallback": null,
+   "material_reason": "damper: no hard contact between the stack tray and the airframe",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu TPU 95A HF (or Bambu TPU 95A)",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 3,
+    "top_shell_layers": 4,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 100,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "flange down, sleeve up",
+    "rotate": []
+   },
+   "stl": "hardware/parts/aerodrone/stl/stack_grommet.stl",
+   "step": "generated/parts/aerodrone/stack_grommet.step",
+   "volume_cm3": 0.18,
+   "area_cm2": 2.8,
+   "print_size_mm": [
+    10.5,
+    10.5,
+    3.4
+   ],
+   "footprint_mm": [
+    10.5,
+    10.5
+   ],
+   "triangles": 504,
+   "estimate": {
+    "mass_g": 0.2,
+    "time_min": 1,
+    "mass_g_all": 1.8,
+    "time_min_all": 12
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 1.35,
+    "min_wall_p1_mm": 1.35,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 78,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "stack_tray (printed)",
+     "dimensions": "6.2 mm hole in a 3 mm tray",
+     "source": "hardware/parts/aerodrone/stack_tray.py",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [],
+   "notes": [
+    "Tighten the bolts only until the flanges start to bulge: crushed TPU passes vibration straight through.",
+    "TPU 95A this size is stiff: it removes high-frequency buzz and hard contact, not the 80-170 Hz rotor band. Balance the props and use ArduPilot's harmonic notch; if VIBE stays above 30 m/s/s, fit softer silicone grommets in the same holes."
+   ]
+  },
+  {
+   "id": "stack_tray",
+   "name": "Stack tray (Pi 5 + Navigator)",
+   "quantity": 1,
+   "material": "PETG",
+   "material_fallback": null,
+   "material_reason": "shaded under the boards; general structure",
+   "flight_critical": true,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu PETG Basic",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 3,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 30,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "flat underside on the plate, bosses up",
+    "rotate": []
+   },
+   "stl": "hardware/parts/aerodrone/stl/stack_tray.stl",
+   "step": "generated/parts/aerodrone/stack_tray.step",
+   "volume_cm3": 13.04,
+   "area_cm2": 111.3,
+   "print_size_mm": [
+    111.0,
+    59.0,
+    7.0
+   ],
+   "footprint_mm": [
+    111.0,
+    59.0
+   ],
+   "triangles": 3108,
+   "estimate": {
+    "mass_g": 14.7,
+    "time_min": 25,
+    "mass_g_all": 14.7,
+    "time_min_all": 25
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 2.04,
+    "min_wall_p1_mm": 2.04,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 4167,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "Raspberry Pi 5",
+     "dimensions": "58 x 49 mm holes, 3.5 mm from the edges, dia. 2.7 mm",
+     "source": "Raspberry Pi Ltd, 'Raspberry Pi 5' mechanical drawing RP-008347-DS-1 (https://datasheets.raspberrypi.com/rpi5/raspberry-pi-5-mechanical-drawing.pdf)",
+     "verified": true
+    },
+    {
+     "part": "Blue Robotics Navigator heatsink (M2.5 threads)",
+     "dimensions": "same 58 x 49 mm pattern",
+     "source": "Blue Robotics, Navigator Flight Controller technical details (https://bluerobotics.com/store/comm-control-power/control/navigator/) and Navigator Hardware Setup (https://bluerobotics.com/learn/navigator-hardware-setup/)",
+     "verified": true
+    },
+    {
+     "part": "Pi 5 underside clearance",
+     "dimensions": "4 mm bosses for the parts under the PCB (microSD socket)",
+     "source": "not on the Raspberry Pi 5 drawing",
+     "verified": false
+    },
+    {
+     "part": "stack_grommet (printed TPU)",
+     "dimensions": "6.2 mm holes, 3 mm tray",
+     "source": "hardware/parts/aerodrone/stack_grommet.py",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M3 x 12 socket head cap screw",
+     "qty": 4,
+     "use": "stack tray to top plate, through a pair of stack grommets"
+    },
+    {
+     "item": "M3 washer",
+     "qty": 4,
+     "use": "on the upper stack grommets"
+    },
+    {
+     "item": "M2.5 x 12 socket head cap screw",
+     "qty": 2,
+     "use": "from under the tray through the Pi into the Navigator heatsink (the two holes the Navigator guide's standoff uses)"
+    }
+   ],
+   "notes": [
+    "Replaces the Raspberry Pi mounting standoff of the Navigator kit; the heatsink and Navigator stack as in Blue Robotics' Navigator Hardware Setup.",
+    "Check the Pi 5 underside clears the tray (microSD socket) before tightening."
+   ]
+  }
+ ],
+ "plates": [
+  {
+   "name": "A",
+   "material": "ASA",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "hub_bottom_plate",
+     "qty": 1
+    },
+    {
+     "id": "oak1_cradle",
+     "qty": 1
+    },
+    {
+     "id": "motor_mount",
+     "qty": 3
+    }
+   ],
+   "time_min": 354,
+   "mass_g": 188
+  },
+  {
+   "name": "B",
+   "material": "ASA",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "hub_top_plate",
+     "qty": 1
+    },
+    {
+     "id": "motor_mount",
+     "qty": 1
+    }
+   ],
+   "time_min": 233,
+   "mass_g": 127
+  },
+  {
+   "name": "C",
+   "material": "ASA",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "landing_leg",
+     "qty": 2
+    }
+   ],
+   "time_min": 98,
+   "mass_g": 51
+  },
+  {
+   "name": "D",
+   "material": "ASA",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "landing_leg",
+     "qty": 2
+    }
+   ],
+   "time_min": 98,
+   "mass_g": 51
+  },
+  {
+   "name": "E",
+   "material": "ASA",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "sensor_nose",
+     "qty": 1
+    },
+    {
+     "id": "gps_mast",
+     "qty": 1
+    }
+   ],
+   "time_min": 144,
+   "mass_g": 66
+  },
+  {
+   "name": "F",
+   "material": "PETG",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "battery_tray",
+     "qty": 1
+    },
+    {
+     "id": "stack_tray",
+     "qty": 1
+    },
+    {
+     "id": "oak1_stage",
+     "qty": 1
+    },
+    {
+     "id": "cable_clip",
+     "qty": 8
+    }
+   ],
+   "time_min": 174,
+   "mass_g": 88
+  },
+  {
+   "name": "G",
+   "material": "TPU95A",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "leg_foot",
+     "qty": 4
+    },
+    {
+     "id": "stack_grommet",
+     "qty": 8
+    }
+   ],
+   "time_min": 106,
+   "mass_g": 22
+  }
+ ],
+ "assembly": {
+  "battery_centre_x_mm": -23.5,
+  "battery_on_tray": true,
+  "cg_mm": [
+   -0.0,
+   0.0,
+   -13.1
+  ],
+  "takeoff_mass_g": 2072,
+  "bodies": 139,
+  "interferences": "none",
+  "intended_press_fits": 12,
+  "camera_view_clear": "yes (69 x 55 deg + 2 deg margin)",
+  "rangefinder_beam_clear": "yes",
+  "propeller_clearance": "yes (5 mm radial, 3 mm below and 9 mm above the disc)",
+  "passed": true
+ }
+}

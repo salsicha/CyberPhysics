@@ -369,6 +369,12 @@ jobs:
         if: ${{ !cancelled() && steps.prep.outcome == 'success' }}
         timeout-minutes: 60
         run: .github/workflows/scripts/ci_build_image.sh spaceros
+      # CadQuery toolchain for hardware/parts; ci.yml's printable-parts job
+      # installs the same requirements.txt to build and check the parts
+      - name: cad
+        if: ${{ !cancelled() && steps.prep.outcome == 'success' }}
+        timeout-minutes: 30
+        run: .github/workflows/scripts/ci_build_image.sh cad
 
       - name: Disk usage
         if: ${{ !cancelled() }}

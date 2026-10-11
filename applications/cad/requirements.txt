@@ -1,0 +1,13 @@
+# CadQuery toolchain for hardware/parts (tools/build_printable_parts.py).
+# Pinned: the committed STLs are checked against a rebuild with these versions
+# (the same file is installed by the printable-parts job in ci.yml).
+cadquery==2.8.0
+cadquery-ocp==7.9.3.1.1
+cadquery-ocp-proxy==7.9.3.1.1
+numpy==2.5.4
+trimesh==5.1.1
+rtree==1.4.1
+matplotlib==3.11.2
+pillow==12.3.0
+pytest==9.1.1
+pyyaml==6.0.3

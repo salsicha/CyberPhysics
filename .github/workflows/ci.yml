@@ -27,10 +27,41 @@ jobs:
           applications/demnav/src
           applications/wildnav/src
           systems/airplane
+          hardware/parts
           tools
           tests
       - name: Check compose fallbacks match env files
         run: python tools/check_compose_env_defaults.py
+
+  # 3D-printable parts (hardware/parts/README.md): build and validate every
+  # part with the pinned CadQuery toolchain (applications/cad), fail if a
+  # committed STL or generated doc block is stale, and publish the STLs,
+  # STEPs and manifests as the printable-parts artifact.
+  printable-parts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: applications/cad/requirements.txt
+      - name: Install the CadQuery toolchain
+        run: pip install -r applications/cad/requirements.txt
+      - name: Part tests
+        run: python -m pytest tests/test_printable_parts_build.py tests/test_printable_parts_metadata.py tests/test_printable_parts_docs.py -v
+      - name: Committed STLs and generated docs are up to date
+        run: python tools/build_printable_parts.py --check
+      - name: Build STL, STEP and manifests for download
+        if: ${{ !cancelled() }}
+        run: python tools/build_printable_parts.py --out printable-parts
+      - name: Upload the printable parts
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: printable-parts
+          path: printable-parts/
+          if-no-files-found: error
 
   lint:
     runs-on: ubuntu-latest

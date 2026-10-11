@@ -1,7 +1,7 @@
 # Physical Aerodrone stack.
 #
 # This is the Raspberry Pi/BlueOS/OAK-1 hardware composition for the one
-# Aerodrone described in hardware/aerodrone.txt and systems/aerodrone/.
+# Aerodrone described in hardware/aerodrone.md and systems/aerodrone/.
 
 include:
   # Interpolate the included commands with the physical vehicle identity.

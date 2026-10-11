@@ -53,6 +53,8 @@ build_boat: build_aerostack2
 	APP=boat ./_build_it.sh
 build_cactusrt:
 	APP=cactusrt ./_build_it.sh
+build_cad:
+	APP=cad ./_build_it.sh
 build_depthanything: build_ros2
 	APP=depthanything ./_build_it.sh
 build_gazebo: build_ros2

@@ -153,7 +153,7 @@ satellite maps.
      `applications/wildnav`.
    - Include day, dusk, low-texture, canopy-shadow, wind, and GPS-degraded
      variants.
-2. Simulate all hardware sensors and interfaces from `hardware/aerodrone.txt`.
+2. Simulate all hardware sensors and interfaces from `hardware/aerodrone.md`.
    - GPS fix and covariance on the Aerostack topic used by
      `systems/aerodrone/config/topics.env`, with multipath,
      dropouts, and degraded-accuracy modes.

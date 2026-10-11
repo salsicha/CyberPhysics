@@ -118,7 +118,7 @@ correlation); it needs no GPU.
 - **Today: BlueOS companion computer.** `compositions/blueos_nav_core.yaml`
   runs DemNav with MAVROS, the navigation bridge, WildNav and the fusion on
   the aerodrone's Raspberry Pi 5 with a Blue Robotics Navigator flight
-  controller (`hardware/aerodrone.txt`), from the arm64 images. The OAK-1
+  controller (`hardware/aerodrone.md`), from the arm64 images. The OAK-1
   computes the relative depth on the camera (MegaDepth, `megadepth_ros.py`).
 - **Possible later target: Arduino VENTUNO Q** (not tested here). It is an
   edge-AI board announced for robotics; preorders opened in August 2026. It

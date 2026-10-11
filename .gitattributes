@@ -39,3 +39,8 @@ Dockerfile* text eol=lf
 *.bin filter=lfs diff=lfs merge=lfs -text
 *.blob filter=lfs diff=lfs merge=lfs -text
 *.uf2 filter=lfs diff=lfs merge=lfs -text
+# Printable parts (hardware/parts/README.md): STLs and instruction figures in
+# plain git, not LFS, so they download straight from GitHub. Keep last: it
+# overrides the *.stl and *.png LFS rules above.
+hardware/parts/*/stl/*.stl -filter binary
+hardware/parts/*/images/*.png -filter binary
