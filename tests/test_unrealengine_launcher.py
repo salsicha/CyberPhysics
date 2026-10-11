@@ -22,8 +22,10 @@ echo "CWD:$(pwd)"
 echo "LD_LIBRARY_PATH:${LD_LIBRARY_PATH-<unset>}"
 echo "AMENT_PREFIX_PATH:${AMENT_PREFIX_PATH-<unset>}"
 echo "ROS_DOMAIN_ID:${ROS_DOMAIN_ID-<unset>}"
-trap 'echo "GOT:TERM"; exit 0' TERM
-sleep "${STUB_SLEEP:-0}" &
+trap 'echo "GOT:TERM"; kill -KILL $! 2> /dev/null; exit 0' TERM
+# Off the test's pipe: a TERM that reaches the forked child before it execs
+# sleep is lost, and the sleep would hold the pipe open for STUB_SLEEP
+sleep "${STUB_SLEEP:-0}" > /dev/null 2>&1 &
 echo READY
 wait
 exit "${STUB_EXIT:-0}"
