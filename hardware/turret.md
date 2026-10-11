@@ -164,8 +164,9 @@ Deploy:
    image already has the core and libraries.
 2. On the UNO Q, with this repository checked out:
    `ROS_DOMAIN_ID=<id> docker compose -f compositions/turret_uno_q.yaml --profile board up -d`
-   (builds the `unoq` image on the board the first time). Restart the service
-   after restarting `arduino-router`, which recreates its socket.
+   (builds the `unoq` image on the board the first time). After an
+   `arduino-router` restart, which recreates its socket, the bridge exits
+   within `router_lost_exit_s` (30 s) and Docker restarts it on the new socket.
 3. On the GPU host:
    `ROS_DOMAIN_ID=<id> docker compose -f compositions/turret_uno_q.yaml --profile host up`
    (`--profile realsense` adds the RealSense camera). Do not run

@@ -36,6 +36,10 @@ make -C applications build_unoq                   # amd64, unoq-latest
 cd applications && make target_arm64 build_unoq   # arm64, needs QEMU binfmt on an amd64 host
 ```
 
-Restart the containers after restarting `arduino-router`
-(`sudo systemctl restart arduino-router`): the router recreates the socket
-file, and the bind mount still points at the old one.
+Restarting `arduino-router` (`sudo systemctl restart arduino-router`)
+recreates its socket file, and a container's bind mount still points at the
+old one. The turret bridge exits once the socket has been unreachable for
+`router_lost_exit_s` (30 s) and its `restart: unless-stopped` policy starts
+it again on the new socket; restart the `unoq_sub` demo by hand. The
+compositions do not mount `/var/run` itself, which would also expose
+`docker.sock`.

@@ -38,8 +38,10 @@ services:
     volumes:
       # arduino-router's socket (root:arduino-router, 0660; the container runs
       # as root). Long syntax so a missing socket fails instead of creating a
-      # directory. Restart this service after restarting arduino-router: the
-      # router recreates the socket file.
+      # directory. Restarting arduino-router recreates the socket file and
+      # leaves this mount on the old one; the bridge then exits after
+      # router_lost_exit_s (30 s) and restart: unless-stopped mounts the new
+      # one. (Mounting /var/run instead would expose docker.sock.)
       - type: bind
         source: /var/run/arduino-router.sock
         target: /var/run/arduino-router.sock

@@ -143,6 +143,8 @@ def bridge(module, router):
     node.transport = 'uno_q_bridge'
     node.router_socket = router.path
     node.rpc_timeout_s = 0.5
+    node.router_lost_exit_s = 30.0
+    node.router_down_since = None
     node.router = None
     node.mcu_ready = False
     node.registered = set()
@@ -344,6 +346,36 @@ def test_missing_socket_reports_error(bridge, router):
     assert not bridge._connected()
     assert bridge.router_socket in bridge.last_error
     assert not bridge.actuator_ready()
+
+
+def test_unreachable_router_exits_after_the_limit(bridge, router, module):
+    # A bind-mounted socket goes stale when arduino-router recreates it, so the
+    # bridge gives up and lets the container restart on the current socket.
+    bridge.router_socket = router.path + '.missing'
+    with patch.object(module.time, 'monotonic', return_value=100.0):
+        bridge._poll()
+    assert bridge.router_down_since == 100.0
+    for now in (110.0, 125.0):  # retried every reconnect_interval_s, still inside the limit
+        with patch.object(module.time, 'monotonic', return_value=now):
+            bridge._poll()
+    with patch.object(module.time, 'monotonic', return_value=130.5), \
+            pytest.raises(module.RouterUnreachable, match='unreachable for 30 s'):
+        bridge._poll()
+
+
+def test_reconnecting_resets_the_outage_and_zero_disables_the_exit(bridge, router, module):
+    bridge.router_lost_exit_s = 0.0
+    real_path, bridge.router_socket = bridge.router_socket, router.path + '.missing'
+    with patch.object(module.time, 'monotonic', return_value=100.0):
+        bridge._poll()
+    with patch.object(module.time, 'monotonic', return_value=10000.0):
+        bridge._poll()  # disabled: keeps retrying
+    assert not bridge._connected()
+    bridge.router_socket = real_path
+    bridge.last_connect_attempt = float('-inf')
+    connect(bridge, router)
+    assert bridge._connected()
+    assert bridge.router_down_since is None
 
 
 def test_second_bridge_is_never_ready(bridge, router):

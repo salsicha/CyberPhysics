@@ -9,6 +9,9 @@ turret_arduino_bridge:
     # from config/arduino.env or config/arduino_uno_q.env, not from this file.
     # uno_q_bridge: an RPC unanswered for this long makes the MCU not ready.
     rpc_timeout_s: 0.5
+    # uno_q_bridge: exit after the router socket has been unreachable this
+    # long, so the container restarts on a recreated socket (0: keep retrying).
+    router_lost_exit_s: 30.0
     # SET lines are written only after a false message on emergency_stop_topic.
     require_estop_release: true
     diagnostic_rate_hz: 1.0

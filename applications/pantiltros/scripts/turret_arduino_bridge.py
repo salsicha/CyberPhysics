@@ -31,6 +31,7 @@ import math
 import os
 import select
 import socket
+import sys
 import time
 from collections.abc import Callable
 from typing import Optional
@@ -59,6 +60,10 @@ MAX_LINE_BYTES = 256
 
 TRANSPORTS = ("serial", "uno_q_bridge")
 ROUTER_SOCKET = "/var/run/arduino-router.sock"
+
+
+class RouterUnreachable(RuntimeError):
+    """The arduino-router socket stayed unreachable for router_lost_exit_s."""
 # RouterBridge RPC methods provided by the UNO Q firmware
 RPC_SET = "turret/set"
 RPC_STOP = "turret/stop"
@@ -280,6 +285,11 @@ class TurretArduinoBridge(Node):
         )
         # uno_q_bridge: an RPC unanswered for this long marks the MCU not ready
         self.declare_parameter("rpc_timeout_s", 0.5)
+        # uno_q_bridge: exit (status 1) when the router socket has been
+        # unreachable this long, 0 to keep retrying. A bind-mounted socket file
+        # goes stale when arduino-router restarts and recreates it; the
+        # container's restart policy then starts the bridge again on the new one.
+        self.declare_parameter("router_lost_exit_s", 30.0)
         # Nothing is written until an explicit emergency-stop release (False).
         self.declare_parameter("require_estop_release", True)
         self.declare_parameter("diagnostic_rate_hz", 1.0)
@@ -302,6 +312,8 @@ class TurretArduinoBridge(Node):
             )
         self.router_socket = str(self.get_parameter("router_socket").value)
         self.rpc_timeout_s = max(0.05, float(self.get_parameter("rpc_timeout_s").value))
+        self.router_lost_exit_s = float(self.get_parameter("router_lost_exit_s").value)
+        self.router_down_since: float | None = None
         self.router: RouterBridgeLink | None = None
         self.mcu_ready = False
         self.registered = set()  # notifications the router now routes to us
@@ -422,7 +434,9 @@ class TurretArduinoBridge(Node):
             link.connect()
         except (OSError, RuntimeError) as exc:
             self.last_error = f"arduino-router socket {self.router_socket}: {exc}"
+            self._router_down(now)
             return
+        self.router_down_since = None
         self.router = link
         self.mcu_ready = False
         self.registered = set()
@@ -438,6 +452,18 @@ class TurretArduinoBridge(Node):
                 lambda error, _result, method=method: self._registered(method, error),
             )
         self._probe()
+
+    def _router_down(self, now: float) -> None:
+        """Count how long the router has been unreachable; give up past the limit."""
+        if self.router_down_since is None:
+            self.router_down_since = now
+        down_s = now - self.router_down_since
+        if 0.0 < self.router_lost_exit_s <= down_s:
+            raise RouterUnreachable(
+                f"arduino-router socket {self.router_socket} unreachable for "
+                f"{down_s:.0f} s ({self.last_error}); exiting so the container "
+                "restarts on the current socket"
+            )
 
     def _registered(self, method: str, error: object) -> None:
         if error is None:
@@ -779,14 +805,20 @@ class TurretArduinoBridge(Node):
 def main() -> None:
     rclpy.init()
     node = TurretArduinoBridge()
+    status = 0
     try:
         rclpy.spin(node)
     except (ExternalShutdownException, KeyboardInterrupt):
         pass
+    except RouterUnreachable as exc:
+        node.get_logger().error(str(exc))
+        status = 1
     finally:
         node.destroy_node()
         if rclpy.ok():
             rclpy.shutdown()
+    if status:
+        sys.exit(status)
 
 
 if __name__ == "__main__":
