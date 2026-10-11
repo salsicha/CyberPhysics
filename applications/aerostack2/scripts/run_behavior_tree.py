@@ -16,8 +16,9 @@ This wrapper runs the command after `--` (ros2 launch of the tree), echoes
 its output, and starts it again, a bounded number of times, only when that
 output shows the construction-time failure and no tree node ever left IDLE.
 A tree that ticked is never started again. When the tree's process died
-(the tree that never started included) the wrapper exits non-zero. SIGINT
-and SIGTERM are passed on to the command and end the run.
+(the tree that never started included), or the tree ended in FAILURE
+(as2_behavior_tree itself still exits 0 then), the wrapper exits non-zero.
+SIGINT and SIGTERM are passed on to the command and end the run.
 """
 
 from __future__ import annotations
@@ -34,6 +35,9 @@ ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
 TICKED = re.compile(r"\bIDLE\s*->\s*(RUNNING|SUCCESS|FAILURE)\b")
 # BtActionNode / service node waits that only run while the tree is built.
 CONSTRUCTION_FAILURE = re.compile(r"(action|service) server not available after waiting")
+# A node finishing. Once the root has finished the tree only halts nodes
+# back to IDLE, so the last of these is the tree's result.
+FINISHED = re.compile(r"\b(?:IDLE|RUNNING)\s*->\s*(SUCCESS|FAILURE)\b")
 # ros2 launch, for a process that exited non-zero or on a signal.
 PROCESS_DIED = re.compile(r"process has died \[pid \d+, exit code")
 
@@ -45,6 +49,7 @@ class Attempt:
         self.ticked = False
         self.construction_failed = False
         self.process_died = False
+        self.result = None  # the tree's result, once it finished
         self.returncode = None
 
     def observe(self, line):
@@ -53,6 +58,9 @@ class Attempt:
         self.construction_failed = (
             self.construction_failed or bool(CONSTRUCTION_FAILURE.search(text)))
         self.process_died = self.process_died or bool(PROCESS_DIED.search(text))
+        finished = FINISHED.search(text)
+        if finished:
+            self.result = finished.group(1)
 
     @property
     def never_started(self):
@@ -116,6 +124,9 @@ class TreeRunner:
             if not attempt.never_started:
                 if attempt.process_died:
                     self.log("the behaviour tree process died")
+                    return exit_status(attempt.returncode) or 1
+                if attempt.result == "FAILURE":
+                    self.log("the mission tree ended in FAILURE")
                     return exit_status(attempt.returncode) or 1
                 return exit_status(attempt.returncode)
             if number < self.attempts:

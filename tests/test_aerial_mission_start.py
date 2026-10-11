@@ -268,6 +268,31 @@ MISSION_DONE = [
      '\x1b[33mRUNNING\x1b[0m -> \x1b[32mSUCCESS\x1b[0m\n'),
     '[INFO] [as2_behavior_tree_node-1]: process has finished cleanly [pid 22]\n',
 ]
+def transition(node, before, after):
+    colour = {'IDLE': 36, 'RUNNING': 33, 'SUCCESS': 32, 'FAILURE': 31}
+    return (f'[as2_behavior_tree_node-1] [1791648703.241]: {node:<26}'
+            f'\x1b[{colour[before]}m{before}\x1b[0m -> \x1b[{colour[after]}m{after}\x1b[0m\n')
+
+
+# The root fails (a GoTo failed): as2_behavior_tree still exits cleanly.
+MISSION_FAILED = [
+    TICK,
+    transition('GoTo', 'RUNNING', 'FAILURE'),
+    transition('GoTo', 'FAILURE', 'IDLE'),
+    transition('Sequence', 'RUNNING', 'FAILURE'),
+    transition('Sequence', 'FAILURE', 'IDLE'),
+    '[INFO] [as2_behavior_tree_node-1]: process has finished cleanly [pid 22]\n',
+]
+# A child fails inside ForceSuccess (the generated tree's final Disarm),
+# and the root succeeds.
+MISSION_DONE_AFTER_A_TOLERATED_FAILURE = [
+    TICK,
+    transition('Disarm', 'IDLE', 'FAILURE'),
+    transition('ForceSuccess', 'IDLE', 'SUCCESS'),
+    transition('Sequence', 'RUNNING', 'SUCCESS'),
+    transition('Sequence', 'SUCCESS', 'IDLE'),
+    '[INFO] [as2_behavior_tree_node-1]: process has finished cleanly [pid 22]\n',
+]
 CRASH_IN_FLIGHT = [
     TICK,
     "[ERROR] [as2_behavior_tree_node-1]: process has died [pid 22, exit code -11, cmd 'x']\n",
@@ -460,3 +485,24 @@ def test_drone_tree_waits_for_flight_ready_without_gps_or_timeout(ready_module):
         source.read_text(), args.behavior_namespace)
     assert list(actions) == ['/${DRONE_NAMESPACE:-drone0}/GoToBehavior']
     assert services_needed == {}
+
+
+def test_a_mission_that_ends_in_failure_exits_non_zero():
+    runner, launched, out, _ = tree_runner([FakeChild(MISSION_FAILED)])
+    assert runner.run() == 1
+    assert len(launched) == 1  # it ticked: never started again
+    assert 'ended in FAILURE' in out.getvalue()
+
+
+def test_the_result_is_the_roots_last_transition():
+    for lines, result in ((MISSION_DONE, 'SUCCESS'), (MISSION_FAILED, 'FAILURE'),
+                          (MISSION_DONE_AFTER_A_TOLERATED_FAILURE, 'SUCCESS'),
+                          ([TICK], None)):
+        attempt = runner_module.Attempt()
+        for line in lines:
+            attempt.observe(line)
+        assert attempt.result == result
+    runner, _, out, _ = tree_runner([FakeChild(MISSION_DONE_AFTER_A_TOLERATED_FAILURE)])
+    assert runner.run() == 0
+    assert 'ended in FAILURE' not in out.getvalue()
+
