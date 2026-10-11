@@ -1,0 +1,20 @@
+# Control run of the GPS-denied simulation test (tools/gps_denied_sim_test.md),
+# layered on any of the three Aerodrone compositions:
+#   GPS_DENIED_COMPOSE_OVERRIDE=tools/gps_denied_sim_control.yaml \
+#       tools/gps_denied_sim_test.sh gazebo
+# DemNav and WildNav make no fixes, so nothing corrects ArduPilot while GPS 1
+# is denied and the test must fail. WildNav's container runs only the
+# navigation fusion node of its launch, so /navigation/odometry, the fix and
+# the correction source (dead_reckoning) still exist for the mission, the
+# bridge and the scorer.
+services:
+  demnav:
+    stop_signal: SIGKILL  # sleep as PID 1 ignores SIGINT
+    command: sleep infinity
+
+  wildnav:
+    command: >
+      ros2 run wildnav_pkg navigation_fusion_node --ros-args
+        -p raw_odom_topic:=/aerodrone/sensor_measurements/odom
+        -p origin_topic:=/navigation/origin
+        -p output_topic:=/navigation/odometry

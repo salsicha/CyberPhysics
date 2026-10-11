@@ -4,7 +4,8 @@
 disables its GPS mid-flight, and checks that it keeps flying GUIDED on
 DemNav/WildNav corrections fed back to ArduPilot, scoring position error
 against simulator ground truth. It is meant for nightly or local runs, not
-per-push CI.
+per-push CI. The Gazebo, Genesis and Isaac stacks have their own GPS-denied
+test, `tools/gps_denied_sim_test.sh` (`tools/gps_denied_sim_test.md`).
 
 ```bash
 tools/gps_denied_sitl_test.sh                               # defaults below

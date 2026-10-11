@@ -354,6 +354,59 @@ services:
         aerodrone/odom:aerodrone/base_link map:map_ned base_link:base_link_frd
     restart: "no"
 
+  # GPS-denied test, opt-in (tools/gps_denied_sim_test.sh isaac runs it with
+  # the validation profile and scores it; tools/gps_denied_sim_test.md):
+  #   docker compose -f compositions/aerostack2_isaac.yaml --profile denial up
+  # The recorder writes ground truth, ArduPilot's position, the fused fix and
+  # its covariance, the corrections and the DemNav/WildNav fixes to
+  # GPS_DENIED_OUTPUT/recording.jsonl; the denier disables GPS 1 for a window
+  # of simulation time during the cruise (denial_events.jsonl).
+  gps_denial_recorder:
+    profiles: ["denial"]
+    image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
+    network_mode: host
+    ipc: host
+    depends_on: [mavros]
+    environment:
+      ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
+      FASTRTPS_DEFAULT_PROFILES_FILE: *fastdds-profile
+    volumes:
+      - /dev/shm:/dev/shm
+      - *fastdds-mount
+      - ../applications/aerostack2/scripts:/workspace/applications/aerostack2/scripts:ro
+      - ${GPS_DENIED_OUTPUT:-../generated/gps_denied_sim}:/out
+    command: >
+      python3 /workspace/applications/aerostack2/scripts/gps_denial_recorder.py
+        --output /out/recording.jsonl --stack isaac
+        --truth-topic /aerodrone/simulation/ground_truth/odom --truth-type odometry
+        --origin-lat ${INITIAL_LAT:-37.9234} --origin-lon ${INITIAL_LON:--122.5967}
+    restart: "no"
+
+  gps_denier:
+    # Once the mission reaches cruise (140 m above home) waits
+    # GPS_DENIAL_START_S, sets SIM_GPS_DISABLE=1 for GPS_DENIAL_DURATION_S,
+    # restores GPS 1 and exits GPS_DENIAL_RECOVERY_S later: all simulation
+    # time (/clock), not wall time, as Isaac runs at about 0.2x real time.
+    profiles: ["denial"]
+    image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
+    network_mode: host
+    ipc: host
+    depends_on: [mavros]
+    environment:
+      ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
+      FASTRTPS_DEFAULT_PROFILES_FILE: *fastdds-profile
+    volumes:
+      - /dev/shm:/dev/shm
+      - *fastdds-mount
+      - ../applications/aerostack2/scripts:/workspace/applications/aerostack2/scripts:ro
+      - ${GPS_DENIED_OUTPUT:-../generated/gps_denied_sim}:/out
+    command: >
+      python3 /workspace/applications/aerostack2/scripts/gps_denier.py
+        --events /out/denial_events.jsonl --cruise-height-m 140.0
+        --start-s ${GPS_DENIAL_START_S:-60.0} --duration-s ${GPS_DENIAL_DURATION_S:-150.0}
+        --recovery-s ${GPS_DENIAL_RECOVERY_S:-60.0}
+    restart: "no"
+
 volumes:
   demnav_isaac_cache:
   wildnav_isaac_cache:
