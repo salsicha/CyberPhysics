@@ -17,3 +17,16 @@ slam_toolbox:
     tf_buffer_duration: 30.0
     stack_size_to_use: 40000000
     enable_interactive_mode: true
+    # Match a scan, and so correct map -> odom, every 0.2 m of odometry
+    # travel (~0.85 s at Nav2's 0.25 m/s). The odometry over-reports distance
+    # by 7-10%, so the pose runs ahead of the car between matches, and Nav2's
+    # goal check uses the correction from when its plan was made. With the
+    # 0.5 m default the node let a scan through after 0.45 m, the mapper
+    # dropped it as under 0.5 m, and matches came every ~0.9 m, moving the
+    # car by up to 0.19 m; cars stopped up to 0.07 m outside the goal
+    # tolerance (applications/racecarneo/README.md). The precise check applies
+    # the mapper's own threshold. The car cannot turn in place, so the
+    # distance always triggers before the 0.5 rad heading.
+    minimum_travel_distance: 0.2
+    minimum_travel_heading: 0.5
+    check_min_dist_and_heading_precisely: true

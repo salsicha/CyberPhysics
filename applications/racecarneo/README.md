@@ -215,32 +215,68 @@ The ROS containers do not share `/dev/shm`, so FastDDS runs over UDP only, with 
 Closed-loop status: the stack comes up unattended and Nav2 reaches goals in
 Demo World. `NavigateToPose` goals relative to the start pose, each on a
 freshly started stack (SLAM, Depth Anything and nvblox running), measured on
-2026-10-10 with this composition and its images:
+2026-10-11 with this composition and its images:
 
 | Goal (x, y, yaw) | Runs | Succeeded | Recoveries | Time to goal | Final error (SLAM map) | Final error (scan match) |
 | --- | --- | --- | --- | --- | --- | --- |
-| 3.0, -1.5, -30 deg | 5 | 5 | 0 | 15.3-16.3 s | 0.23-0.30 m, 3-5 deg | 0.17-0.30 m |
-| 1.0, -3.0, -90 deg (right turn) | 3 | 3 | 0 | 16.6-17.4 s | 0.23 m, 2-10 deg | 0.27-0.32 m |
-| 5.0, -1.5, 0 deg | 3 | 3 | 0 | 24.4-24.6 s | 0.23-0.27 m, 2-6 deg | 0.21-0.23 m |
+| 3.0, -1.5, -30 deg | 4 | 4 | 0 | 15.3-16.1 s | 0.23-0.27 m, 1-4 deg | 0.17-0.24 m |
+| 1.0, -3.0, -90 deg (right turn) | 4 | 4 | 0 | 16.3-17.6 s | 0.22-0.25 m, 1-9 deg | 0.19-0.24 m |
+| 5.0, -1.5, 0 deg | 4 | 4 | 0 | 24.0-24.5 s | 0.23-0.24 m, 3-6 deg | 0.17-0.23 m |
 
 The goal checker's tolerance is 0.25 m / 0.35 rad. The scan-match column
 locates the car by matching its final scan against the SLAM map, without
-odometry; that put it 0-0.11 m from the pose the stack reported. The
+odometry, on the same 0.05 m / 1 deg grid as the earlier tables; refined to
+0.01 m / 0.1 deg it gives 0.17-0.23, 0.22-0.24 and 0.18-0.22 m, so every
+run stopped inside the tolerance. The refined match put the car 0.02-0.06 m
+from the pose the stack reported, in 10 of 12 runs nearer the goal. The
 controller held its 15 Hz in every run (`/cmd_vel_nav` every 66.7 ms,
-longest gap 69 ms, no "missed its desired rate" warnings).
+longest gap 80 ms, no "missed its desired rate" warnings), and no run logged
+a recovery or an nvblox, costmap or SLAM warning after start-up.
 
-Three runs stopped 0.27-0.30 m from the goal although Nav2 reported success.
-`/odom` over-reports distance by 7-10% against the SLAM map, and SLAM Toolbox
-corrects `map -> odom` only about every 0.9 m of travel (every 3.6-4.1 s
-here), in steps of 0.04-0.21 m, mostly 0.06-0.12 m. The controller checks
-the goal in `odom` through the `map -> odom` at its current plan's
-timestamp, and the plan is refreshed once a second, so a correction in the
-last second before arrival leaves the car up to one correction outside the
-tolerance. In the run that recorded the corrections and ended 0.27 m out, a
-0.08 m correction landed 0.4 s before success; the runs whose last
-correction came 1.5 s or more before arrival ended 0.23-0.24 m out. Smaller
-SLAM steps (`minimum_travel_distance`, 0.5 m by default) or less biased
-odometry would narrow this.
+SLAM Toolbox matches a scan, and so corrects `map -> odom`, every 0.2 m of
+odometry travel (`minimum_travel_distance: 0.2` with
+`check_min_dist_and_heading_precisely: true` in `slam_toolbox.yaml`), every
+0.83-0.86 s at Nav2's 0.25 m/s. A correction moved the car's pose in the map
+by up to 0.12 m in the first 5 s, while the map fills in, then by a median
+0.02 m (90th percentile 0.06 m, at most 0.10 m), and in the last 2 s before
+arrival by a median 0.02 m, at most 0.06 m.
+
+With the 0.5 m default, two effects left the car outside the tolerance
+(table below). Without the precise check SLAM Toolbox lets a scan through
+after 0.45 m and its mapper drops it as under 0.5 m, so it matched only
+every 0.9 m. `/odom` over-reports distance by 7-10%, more in turns, so
+between matches the stack's pose ran ahead of the car: in four of the six
+reruns, all on the two turning goals, the scan match put the car 0.03-0.09 m
+farther from the goal than the stack did. And the controller checks the
+goal in `odom` through the `map -> odom` at its current plan's timestamp,
+while the plan is refreshed once a second, so it misses a correction in
+that last second: in one rerun the goal check measured 0.245 m while the
+corrected pose was 0.31 m from the goal. With 0.2 m spacing the first effect
+is gone (the scan match was at most 0.01 m farther from the goal than the
+stack) and the second is a few centimetres: the goal check missed up to
+0.03 m of correction, and two runs ended 0.254 and 0.269 m from the goal in
+the SLAM map while the refined scan match put them 0.233 and 0.231 m away.
+A faster plan refresh would narrow this further, but each new plan already
+causes most of the steering changes (below), and SLAM Toolbox stamps
+`map -> odom` 0.2 s after its scan (`transform_timeout`), about 0.13 s ahead
+of its arrival, so a plan still misses a correction from the 0.13 s before
+it.
+
+The cost: SLAM Toolbox used 4.6-5.3% of one CPU core while driving (2.9-3.3%
+with the 0.5 m default; 2.3-2.6% idle with either), and Nav2 50-53% as
+before. It keeps 16-27 scans for these drives instead of 3-6, so the map has
+about twice as many occupied cells: walls are continuous instead of dotted
+and the free space has no gaps between scans. Walls near the car stay one to
+two cells thick, walls 6-9 m away spread over 3-6 cells as before, and none
+is doubled; the final scan fits the map with a mean endpoint-to-wall
+distance of 0.008-0.018 m (0.022-0.038 m before). A correction now changes
+the commanded yaw rate half as much (rms 0.046 rad/s per 15 Hz cycle in the
+0.5 s after one, 0.095 rad/s before) but four times as often, so over a run
+the change per cycle is 0.026-0.056 rad/s rms (0.023-0.062 rad/s before),
+and the car strays at most 0.05-0.09 m from its plan (0.05-0.17 m before).
+Times to goal are unchanged. The pose graph gains a node every 0.2 m, so
+long missions spend more on loop closure and on the map update (every 2 s,
+over all scans); that is not measured beyond these 25 s drives.
 
 Before the speed loop, the first goal succeeded once in two runs after five
 recoveries; the other run stopped against a wall ~1 m from where the stack
@@ -248,8 +284,8 @@ believed it was. SLAM only maps where the lidar hits something, so in the
 open Demo World a goal outside the mapped area is rejected as
 `GOAL_OUTSIDE_MAP` (204).
 
-Measured with the full stack while these goals ran (three stacks; 40 s
-before the goal and 12 s while driving):
+Measured with the full stack while the 2026-10-10 goals ran (three stacks;
+40 s before the goal and 12 s while driving):
 
 | Topic | Rate | Age at receipt, median / p95 |
 | --- | --- | --- |
@@ -259,6 +295,25 @@ before the goal and 12 s while driving):
 | `/local_costmap/costmap` | 1.6-1.7 Hz (2 Hz publishing on the 5 Hz update loop) | |
 
 The stack used 1.6-1.8 GiB of GPU memory at 73-90% utilization.
+
+**2026-10-10, before the SLAM change** (`minimum_travel_distance` at its
+0.5 m default, without the precise check), with the same composition and
+images:
+
+| Goal (x, y, yaw) | Runs | Succeeded | Recoveries | Time to goal | Final error (SLAM map) | Final error (scan match) |
+| --- | --- | --- | --- | --- | --- | --- |
+| 3.0, -1.5, -30 deg | 5 | 5 | 0 | 15.3-16.3 s | 0.23-0.30 m, 3-5 deg | 0.17-0.30 m |
+| 1.0, -3.0, -90 deg (right turn) | 3 | 3 | 0 | 16.6-17.4 s | 0.23 m, 2-10 deg | 0.27-0.32 m |
+| 5.0, -1.5, 0 deg | 3 | 3 | 0 | 24.4-24.6 s | 0.23-0.27 m, 2-6 deg | 0.21-0.23 m |
+
+Three runs stopped 0.27-0.30 m from the goal in the SLAM map although Nav2
+reported success, and five 0.27-0.32 m by scan match. SLAM Toolbox corrected
+every 3.6-4.3 s in steps of 0.04-0.21 m, mostly 0.06-0.12 m. Rerunning that
+setting on 2026-10-11 alongside the runs above, two runs per goal: 6 of 6
+succeeded without recoveries in 15.1-15.5, 17.8-18.1 and 23.7-24.1 s,
+0.23-0.31 m from the goal in the SLAM map and 0.22-0.32 m by scan match
+(0.21-0.32 m refined, four of six outside the tolerance), with a match every
+0.89-0.91 m of odometry (3.6-4.7 s) moving the car 0.02-0.19 m.
 
 **2026-10-10:** re-measured after the 4 MiB DDS socket buffers and Depth
 Anything's one-frame queue. The earlier table, with the 208 KiB default
@@ -271,10 +326,11 @@ Anything also ran at 16.8-17.3 Hz with the full stack (the 3.8 Hz above was
 measured with two extra camera subscribers on the bridge, one of them
 reliable), but its depth was 0.30 s old while driving instead of 0.11 s.
 No run in either configuration logged an nvblox, costmap or controller
-warning after start-up. The wider final-error range comes from the SLAM
-correction timing above, which does not depend on the depth pipeline: both
-configurations corrected in the same steps every 3.6-4.3 s, and in the six
-reruns the last correction before arrival happened to come 1.5-3.7 s early.
+warning after start-up. The wider final-error range of the 2026-10-10 table
+comes from the SLAM correction timing, which does not depend on the depth
+pipeline: both configurations corrected in the same steps every 3.6-4.3 s,
+and in the six reruns the last correction before arrival happened to come
+1.5-3.7 s early.
 
 ## Stack Validation
 
