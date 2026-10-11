@@ -27,7 +27,9 @@ services:
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
     volumes:
-      # arduino-router's socket; restart this service after restarting the router
+      # arduino-router's socket. Restarting the router recreates it and leaves
+      # this mount on the old one; the node exits after router_lost_exit_s
+      # (30 s) and restart: unless-stopped mounts the new one.
       - type: bind
         source: /var/run/arduino-router.sock
         target: /var/run/arduino-router.sock

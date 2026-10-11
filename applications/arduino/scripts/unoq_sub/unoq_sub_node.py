@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import os
 import socket
+import sys
+import time
 
 import msgpack
 import rclpy
@@ -20,6 +22,23 @@ from rclpy.node import Node
 from std_msgs.msg import Int32
 
 ROUTER_SOCKET = "/var/run/arduino-router.sock"
+
+
+class RouterUnreachable(RuntimeError):
+    """The arduino-router socket stayed unreachable for router_lost_exit_s."""
+
+
+def socket_reachable(path: str, timeout_s: float) -> bool:
+    """Whether something accepts connections on the Unix socket at path."""
+    probe = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    probe.settimeout(timeout_s)
+    try:
+        probe.connect(path)
+    except OSError:
+        return False
+    finally:
+        probe.close()
+    return True
 
 
 class RouterClient:
@@ -70,12 +89,21 @@ class UnoQSubNode(Node):
             "router_socket", os.environ.get("UNOQ_ROUTER_SOCKET", ROUTER_SOCKET)
         )
         self.declare_parameter("rpc_timeout_s", 1.0)
+        # Exit (status 1) when the router socket has been unreachable this
+        # long, 0 to keep running: a bind-mounted socket file goes stale when
+        # arduino-router restarts, and restart: unless-stopped then starts
+        # the node again on the new one.
+        self.declare_parameter("router_lost_exit_s", 30.0)
         self.router = RouterClient(
             str(self.get_parameter("router_socket").value),
             float(self.get_parameter("rpc_timeout_s").value),
         )
+        self.router_lost_exit_s = float(self.get_parameter("router_lost_exit_s").value)
+        self.router_down_since: float | None = None
         topic = str(self.get_parameter("topic").value)
         self.create_subscription(Int32, topic, self._led, 10)
+        if self.router_lost_exit_s > 0:
+            self.create_timer(5.0, self._check_router)
         self.get_logger().info(f"{topic} -> set_led on the UNO Q MCU")
 
     def _led(self, msg: Int32) -> None:
@@ -87,18 +115,39 @@ class UnoQSubNode(Node):
         self.get_logger().info(f"LED {'on' if lit else 'off'}")
 
 
+    def _check_router(self) -> None:
+        now = time.monotonic()
+        if socket_reachable(self.router.path, self.router.timeout_s):
+            self.router_down_since = None
+            return
+        if self.router_down_since is None:
+            self.router_down_since = now
+        down_s = now - self.router_down_since
+        if 0.0 < self.router_lost_exit_s <= down_s:
+            raise RouterUnreachable(
+                f"arduino-router socket {self.router.path} unreachable for {down_s:.0f} s; "
+                "exiting so the container restarts on the current socket"
+            )
+
+
 def main() -> None:
     rclpy.init()
     node = UnoQSubNode()
+    status = 0
     try:
         rclpy.spin(node)
     except (ExternalShutdownException, KeyboardInterrupt):
         pass
+    except RouterUnreachable as exc:
+        node.get_logger().error(str(exc))
+        status = 1
     finally:
         node.router.close()
         node.destroy_node()
         if rclpy.ok():
             rclpy.shutdown()
+    if status:
+        sys.exit(status)
 
 
 if __name__ == "__main__":

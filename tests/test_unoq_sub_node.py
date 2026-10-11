@@ -98,3 +98,28 @@ def test_int32_messages_call_set_led(module, router):
     node.router = module.RouterClient(path + '.missing', 0.2)
     node._led(NS(data=1))  # logged, not raised
     assert node.get_logger().error.called
+
+
+def test_unreachable_router_exits_after_the_limit_and_reconnecting_resets(module, router):
+    # The bind-mounted socket goes stale when arduino-router recreates it, so
+    # the node gives up and lets the container restart on the current socket.
+    fake, path = router
+    node = module.UnoQSubNode.__new__(module.UnoQSubNode)
+    node.get_logger = MagicMock()
+    node.router = module.RouterClient(path + '.missing', 0.2)
+    node.router_lost_exit_s = 30.0
+    node.router_down_since = None
+    with patch.object(module.time, 'monotonic', return_value=100.0):
+        node._check_router()
+    assert node.router_down_since == 100.0
+    with patch.object(module.time, 'monotonic', return_value=125.0):
+        node._check_router()  # still inside the limit
+    with patch.object(module.time, 'monotonic', return_value=130.5), \
+            pytest.raises(module.RouterUnreachable, match='unreachable for 30 s'):
+        node._check_router()
+    node.router = module.RouterClient(path, 0.2)  # the router is back
+    node._check_router()
+    assert node.router_down_since is None
+    assert module.socket_reachable(path, 0.2)
+    assert not module.socket_reachable(path + '.missing', 0.2)
+
