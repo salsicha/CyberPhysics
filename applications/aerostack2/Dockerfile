@@ -16,27 +16,40 @@ SHELL ["/bin/bash","-c"]
 # The main ROS 2 Humble repository dropped mavros, mavros-extras and
 # libmavconn in its September 2026 sync (only mavros-msgs 2.15.1 synced).
 # Install the MAVROS 2.14.0 set this stack was validated with from the
-# dated ROS snapshot, pinned to exact versions; everything else but the
-# Gazebo assets below still comes from the main repository.
-ARG ROS_SNAPSHOT=2026-08-07
-ARG MAVROS_VERSION=2.14.0-1jammy.20260804.200257
-ARG MAVROS_EXTRAS_VERSION=2.14.0-1jammy.20260804.203703
-ARG MAVROS_MSGS_VERSION=2.14.0-1jammy.20260718.015830
-ARG LIBMAVCONN_VERSION=2.14.0-1jammy.20260609.121524
-ARG MAVLINK_VERSION=2026.6.6-1jammy.20260609.120925
-# Aerostack2's Gazebo assets, pinned the same way to the Aerostack2 release of
-# the other as2 packages (1.1.3): compositions/aerostack2_sim.yaml runs their
+# dated ROS snapshot; everything else still comes from the main repository.
+# Aerostack2's Gazebo assets are pinned to the Aerostack2 release of the
+# other as2 packages (1.1.3): compositions/aerostack2_sim.yaml runs their
 # launch_simulation.py and bind-mounts its own drone_bridges.py and
 # quadrotor_base, hd_camera and rgbd_camera templates over this layout
 # (asserted below).
-ARG AS2_GAZEBO_ASSETS_VERSION=1.1.3-1jammy.20260804.200738
+# The pins are upstream versions, applied by apt preferences: the build farm
+# builds each architecture separately, so a full Debian version
+# (2.14.0-1jammy.<build date>) exists for only one of amd64 and arm64, and
+# the snapshot has no arm64 as2-gazebo-assets (the main repository does).
+ARG ROS_SNAPSHOT=2026-08-07
+ARG MAVROS_VERSION=2.14.0
+ARG MAVLINK_VERSION=2026.6.6
+ARG AS2_GAZEBO_ASSETS_VERSION=1.1.3
 COPY ros-snapshots.asc /tmp/ros-snapshots.asc
 RUN gpg --show-keys --with-colons /tmp/ros-snapshots.asc \
       | grep -q '^fpr:::::::::4B63CF8FDE49746E98FA01DDAD19BAB3CBF125EA:' && \
     gpg --dearmor -o /usr/share/keyrings/ros-snapshots.gpg /tmp/ros-snapshots.asc && \
     echo "deb [signed-by=/usr/share/keyrings/ros-snapshots.gpg] http://snapshots.ros.org/humble/${ROS_SNAPSHOT}/ubuntu jammy main" \
       > /etc/apt/sources.list.d/ros-snapshots.list && \
-    rm /tmp/ros-snapshots.asc
+    rm /tmp/ros-snapshots.asc && \
+    printf '%s\n' \
+      "Package: ros-${ROS_DISTRO}-mavros ros-${ROS_DISTRO}-mavros-extras ros-${ROS_DISTRO}-mavros-msgs ros-${ROS_DISTRO}-libmavconn" \
+      "Pin: version ${MAVROS_VERSION}-1jammy.*" \
+      "Pin-Priority: 1001" \
+      "" \
+      "Package: ros-${ROS_DISTRO}-mavlink" \
+      "Pin: version ${MAVLINK_VERSION}-1jammy.*" \
+      "Pin-Priority: 1001" \
+      "" \
+      "Package: ros-${ROS_DISTRO}-as2-gazebo-assets" \
+      "Pin: version ${AS2_GAZEBO_ASSETS_VERSION}-1jammy.*" \
+      "Pin-Priority: 1001" \
+      > /etc/apt/preferences.d/cyberphysics-pins
 
 RUN apt update && apt install -q -y --no-install-recommends \
     python3-pip python3-venv python3-setuptools libgl1-mesa-dri \
@@ -48,16 +61,23 @@ RUN apt update && apt install -q -y --no-install-recommends \
     ros-${ROS_DISTRO}-as2-behaviors-perception \
     ros-${ROS_DISTRO}-as2-behavior-tree \
     ros-${ROS_DISTRO}-as2-platform-gazebo \
-    ros-${ROS_DISTRO}-as2-gazebo-assets=${AS2_GAZEBO_ASSETS_VERSION} \
+    ros-${ROS_DISTRO}-as2-gazebo-assets \
     ros-${ROS_DISTRO}-ros-gz \
-    ros-${ROS_DISTRO}-mavros=${MAVROS_VERSION} \
-    ros-${ROS_DISTRO}-mavros-extras=${MAVROS_EXTRAS_VERSION} \
-    ros-${ROS_DISTRO}-mavros-msgs=${MAVROS_MSGS_VERSION} \
-    ros-${ROS_DISTRO}-libmavconn=${LIBMAVCONN_VERSION} \
-    ros-${ROS_DISTRO}-mavlink=${MAVLINK_VERSION} \
+    ros-${ROS_DISTRO}-mavros \
+    ros-${ROS_DISTRO}-mavros-extras \
+    ros-${ROS_DISTRO}-mavros-msgs \
+    ros-${ROS_DISTRO}-libmavconn \
+    ros-${ROS_DISTRO}-mavlink \
     ros-${ROS_DISTRO}-rosbridge-suite \
     geographiclib-tools python3-colcon-common-extensions && \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/* && \
+    for pin in mavros:${MAVROS_VERSION} mavros-extras:${MAVROS_VERSION} \
+        mavros-msgs:${MAVROS_VERSION} libmavconn:${MAVROS_VERSION} \
+        mavlink:${MAVLINK_VERSION} as2-gazebo-assets:${AS2_GAZEBO_ASSETS_VERSION}; do \
+      installed=$(dpkg-query -W -f '${Version}' "ros-${ROS_DISTRO}-${pin%%:*}") && \
+      case "${installed}" in "${pin#*:}-1jammy."*) ;; \
+        *) echo "ros-${ROS_DISTRO}-${pin%%:*} is ${installed}, not ${pin#*:}"; exit 1 ;; esac; \
+    done
 
 # The Gazebo stack's launch files resolve and every bind-mount target exists.
 RUN . /opt/ros/${ROS_DISTRO}/setup.bash && \

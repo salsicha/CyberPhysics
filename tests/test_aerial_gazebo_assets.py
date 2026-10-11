@@ -32,15 +32,21 @@ def bind_mounts():
     return mounts
 
 
-def test_gazebo_assets_are_pinned_from_the_ros_snapshot_like_mavros():
+def test_gazebo_assets_are_pinned_like_mavros_on_every_architecture():
     text = dockerfile()
     version = re.search(r'^ARG AS2_GAZEBO_ASSETS_VERSION=(\S+)$', text, re.MULTILINE)
-    assert version, 'as2-gazebo-assets needs an exact version'
-    # Same Aerostack2 release as the rest of the as2 packages, and a dated
-    # build that the snapshot repository keeps.
-    assert re.fullmatch(r'1\.1\.3-1jammy\.\d{8}\.\d{6}', version.group(1))
-    assert 'ros-${ROS_DISTRO}-as2-gazebo-assets=${AS2_GAZEBO_ASSETS_VERSION}' in text
+    assert version, 'as2-gazebo-assets needs a pinned version'
+    # The Aerostack2 release of the other as2 packages. Upstream version only:
+    # the build date in the Debian version differs between amd64 and arm64.
+    assert version.group(1) == '1.1.3'
+    assert '"Package: ros-${ROS_DISTRO}-as2-gazebo-assets"' in text
+    assert '"Pin: version ${AS2_GAZEBO_ASSETS_VERSION}-1jammy.*"' in text
     assert 'http://snapshots.ros.org/humble/${ROS_SNAPSHOT}/ubuntu' in text
+    # No architecture-specific Debian version is pinned anywhere
+    assert not re.search(r'=\d[\w.~+-]*-1jammy\.\d{8}', text)
+    # The build checks each pin landed
+    assert 'as2-gazebo-assets:${AS2_GAZEBO_ASSETS_VERSION}' in text
+    assert 'mavros:${MAVROS_VERSION}' in text
 
 
 def test_every_bind_mount_over_the_package_exists_in_repo_and_image():
