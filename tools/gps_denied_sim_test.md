@@ -107,8 +107,9 @@ each it reports:
   straight line from where the vehicle was when a MAVROS position setpoint
   arrived to that setpoint (ArduPilot's GUIDED path), the waypoints reached
   (setpoint changes) and the distance flown. Legs start at the vehicle, not
-  at the previous waypoint, because in Isaac every other GoTo of the tree
-  succeeds at once and the vehicle flies straight to the next one;
+  at the previous waypoint, because a GoTo can end before the vehicle gets
+  there (in Isaac every other one did, until the tree sent each GoTo twice:
+  "The GoTo race" below);
 - correction coverage (share of fused samples while the fusion reports an
   active correction source) and the longest gap between corrections in
   simulation seconds (EKF3 declares position aiding lost after about 7 s);
@@ -144,12 +145,15 @@ earlier fusion settings) and the three work-in-progress runs below. The
 beyond-3-sigma share is 1.1 % for a consistent Gaussian, but over one 150 s
 window it is noisy, since the errors stay correlated for about a minute;
 10 % catches a fused covariance several times too confident. Gazebo's limit
-is 15 %: before the fused covariance followed the autopilot's lag, its
-fused sigma stayed at the fixes' 5-6 m while the autopilot drifted up to
-22 m, 8.4 % beyond 3 sigma in one run; with it (below) a Gazebo run was
-6.8 m and 0 % beyond 3 sigma, so this limit can tighten after more runs. Mission
-progress (waypoints reached while denied) is reported, not checked: see the
-Isaac run below. Every limit is a scorer option (`--max-fused-p95-m`, ...),
+stays at 15 %: before the fused covariance followed the autopilot's lag,
+its fused sigma stayed at the fixes' 5-6 m while the autopilot drifted up
+to 22 m, 8.4 % beyond 3 sigma in one run. With it, nine Gazebo runs
+(below) were 0, 0, 0, 0, 0, 0.1, 3.7, 7.6 and 7.9 % beyond 3 sigma (0-36 %
+beyond 2): when DemNav is 14-21 m off for 20-30 s the fused sigma still
+falls behind, and 10 % would leave the worst runs a margin of 1.3 where
+the error limits keep 1.5 to 4. Mission progress (waypoints reached while denied) is
+reported, not checked: see "Mission progress and the GoTo threshold"
+below. Every limit is a scorer option (`--max-fused-p95-m`, ...),
 and the limits are for the default 150 s window: score a longer or shorter
 denial against limits of its own.
 
@@ -225,21 +229,181 @@ rebuilt wildnav image's fusion, which sent velocities): all three fail.
   work-in-progress run 2), Genesis and Isaac under 1 %. With it, while
   denied: Gazebo 7.2 / 12.5 / 13.5 m at a 6.8 m sigma, 4.0 / 0 % beyond 2 /
   3 sigma; Genesis 2.0 / 2.5 / 2.7 m, 0 / 0 %; Isaac 3.2 / 5.4 / 5.9 m,
-  0 / 0 %. All pass.
-- **Mission progress in Isaac.** A GoTo completes when Aerostack2's state is
-  within `go_to_threshold` (0.2 m, the as2 default) of the target. While GPS 1
-  was denied, ArduPilot held 0.3-0.4 m from the ridge-entry waypoint in its
-  own EKF frame, so the mission hovered there (on target in truth) for
-  110 s of the 150 s denial and moved on 2 s before the restore. Gazebo and
-  Genesis passed one or two waypoints while denied. Hence waypoints are
-  reported, not checked. In Isaac every other GoTo of the tree also
-  succeeds at once (the vehicle flies straight from 0, 0 to 200, 100 and
-  from 460, 140 to 1060, 110), which is why route legs start at the vehicle.
+  0 / 0 %. All pass. The runs of "Mission progress and the GoTo threshold"
+  below have it too.
+- **Mission progress.** These runs used as2's 0.2 m GoTo threshold, at
+  which the mission hovered at the ridge entry for most of the denial (in
+  Isaac 114 s of the 150 s): see "Mission progress and the GoTo threshold"
+  below. In Isaac every other GoTo of the tree also succeeded at once (the
+  vehicle flew straight from 0, 0 to 200, 100 and from 460, 140 to
+  1060, 110): see "The GoTo race" below.
 - **Seeding.** One run never started: a satellite tile failed to download
   (120 of 121), `terrain_assets` refused the holed orthophoto and the
   wrapper exited 2. `GPS_DENIED_KEEP_VOLUMES=true` reuses a seeded cache.
 - Recordings are 220-300 kB compressed, stack logs 25-210 kB; a run holds
   the host for 8 (Gazebo), 14 (Genesis) or 35 (Isaac) minutes.
+
+### Mission progress and the GoTo threshold
+
+A GoTo completes when Aerostack2's state, ArduPilot's own position
+(`/navigation/odometry`), is within `go_to_threshold` of its target, in 3D.
+At as2's 0.2 m default the denied EKF stalled the mission at the ridge
+entry: in the nine committed-code runs above, ArduPilot's distance from a
+target it was holding (once within 1 m of it) was, while denied, 0.34 m
+median, 1.2 m p95 and 2.1 m at most (Gazebo; Genesis and Isaac under 1 m),
+and the mission held the ridge entry (within 5 m of it) for 114 s of the
+150 s denial in Isaac, 77-78 s in Genesis and 7-77 s in Gazebo. The three
+compositions now pass `go_to_threshold:=3.0` to `blueos_autonomy.launch.py`
+(whose default stays 0.2 m, for the drone's map goals): above every such
+hold distance, inside the smallest acceptance radius of a waypoint the tree
+flies (4 m; the mission's are 4-8 m) and a seventeenth of the shortest leg
+between two of its GoTos (50 m, 42 m horizontally;
+`tests/test_aerial_mission_start.py` checks all three).
+
+Runs with it, one GoTo per waypoint (the next section's runs send two):
+`daba3ca` with this change and the rebuilt aerostack2 image,
+`ROS_DOMAIN_ID=93`, 2026-10-11; columns as above, plus the waypoints
+reached (setpoint changes) and the distance flown while denied. The control
+is the same tree at 0.2 m (a compose override), the committed behaviour.
+Every validation passed 31-36 s (Gazebo), 87 s (Genesis) or 112 s (Isaac)
+before the denial. Two more Gazebo runs never started: a satellite tile
+failed to download (120 of 121; see "Seeding").
+
+| Run | Real time | Fused before | Fused | Autopilot after | DemNav fixes (n) | WildNav fixes (n) | Corrections | Fused beyond 2 / 3 sigma (sigma) | Route distance | Waypoints / flown | Result |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Gazebo 1 | 0.97x | 0.1 / 0.4 / 0.4 | 13.0 / 28.1 / 32.2 | 0.1 / 2.9 / 30.0 | 9.7 / 18.3 / 25.7 (414) | 3.4 / 6.2 / 6.4 (32) | 6.2 / 16.2 / 19.0 | 36.0 / 7.6 % (9.0 m) | 4.0 / 9.8 / 16.8 | 3 / 674 m | pass |
+| Gazebo 2 | 0.97x | 0.1 / 0.3 / 0.4 | 7.0 / 14.8 / 17.6 | 0.2 / 0.7 / 3.8 | 6.0 / 11.7 / 15.5 (451) | 3.7 / 5.5 / 5.7 (31) | 4.8 / 7.5 / 10.0 | 5.2 / 0.0 % (7.1 m) | 1.3 / 6.0 / 9.0 | 3 / 694 m | pass |
+| Gazebo 3 | 0.97x | 0.1 / 0.4 / 0.5 | 4.6 / 17.8 / 19.2 | 0.3 / 2.4 / 18.0 | 8.3 / 12.2 / 15.7 (419) | 1.7 / 6.5 / 7.5 (31) | 3.5 / 12.0 / 15.8 | 15.5 / 0.0 % (6.1 m) | 2.1 / 15.0 / 17.6 | 3 / 693 m | pass |
+| Gazebo 4 | 0.96x | 0.1 / 0.7 / 0.8 | 6.4 / 12.7 / 14.4 | 0.6 / 0.8 / 3.4 | 10.5 / 15.8 / 22.5 (370) | 4.2 / 5.8 / 6.9 (31) | 4.8 / 8.4 / 10.9 | 4.7 / 0.0 % (8.2 m) | 3.1 / 7.6 / 11.6 | 3 / 705 m | pass |
+| Genesis | 0.57x | 0.1 / 0.1 / 0.2 | 2.1 / 3.0 / 3.3 | 0.1 / 0.4 / 1.6 | 2.6 / 5.7 / 7.0 (1492) | 0.8 / 1.9 / 2.2 (53) | 0.9 / 2.3 / 3.2 | 0.0 / 0.0 % (3.8 m) | 1.2 / 2.5 / 2.7 | 3 / 711 m | pass |
+| Isaac | 0.19x | 0.1 / 0.1 / 0.2 | 3.3 / 5.6 / 5.9 | 0.1 / 1.4 / 3.9 | 4.5 / 8.0 / 9.7 (888) | 1.6 / 2.8 / 3.7 (157) | 2.0 / 3.7 / 5.8 | 0.0 / 0.0 % (3.7 m) | 2.3 / 5.9 / 6.2 | 2 / 743 m | pass |
+| Gazebo control (0.2 m) | 0.97x | 0.1 / 0.1 / 0.2 | 11.0 / 23.5 / 26.4 | 0.6 / 1.0 / 7.6 | 8.2 / 16.8 / 23.4 (430) | 3.5 / 5.3 / 5.9 (30) | 6.6 / 12.1 / 15.2 | 18.0 / 3.7 % (7.5 m) | 6.4 / 19.4 / 21.6 | 2 / 696 m | pass |
+
+- **No stall.** In Gazebo and Genesis the mission reached the cruise
+  entry, the ridge entry and the ridge mid while denied, moving on to the
+  next waypoint 13-16, 68-72 and 140-146 s into the denial; each GoTo
+  completed on arrival, and the vehicle left 1.8-3.6 s of simulation time
+  after coming within 5 m (the tree's 2 s delay included). It flew
+  674-711 m while denied, against 342 m in Genesis and 408 m in Gazebo in
+  the fused-covariance runs, which hovered at the ridge entry. In Isaac it
+  reached the ridge mid 99.6 s into the denial and left 0.4 s later; it
+  flew 743 m while denied (189 m at 0.2 m). The control hovered 18 s at the
+  ridge mid.
+- **Accuracy.** Isaac 3.3 / 5.6 / 5.9 m, as committed (3.2 / 5.4 / 5.9).
+  Genesis 2.1 / 3.0 / 3.3 m (2.0 / 2.5 / 2.7): its committed runs hovered at
+  the ridge entry for the last 80 s of the denial at a steady 1.7-2.1 m;
+  now it flies on to the ridge turn, and over the first 70 s both stay
+  within 2.5 m. Gazebo spread further than in the committed runs (p95
+  11-20 m) with either threshold: p95 13-28 m at 3 m, 23.5 m at 0.2 m. In
+  Gazebo 1 and the control DemNav was 14-21 m off (median over 10 s)
+  10-30 s after the loss, over the same ground, and the EKF followed it;
+  the other runs' DemNav stayed within 6-10 m there. Every run passes, but
+  the limits are only 1.25 and 1.4 times Gazebo 1's p95 and max, where
+  `tests/test_gps_denied_sim_scorer.py` keeps 1.5 against the committed
+  runs (these are not among them).
+- **Full mission.** One full Gazebo mission with the validator
+  (`NAVSIM_REQUIRE_VALID="demnav wildnav"`, `NAVSIM_REQUIRE_CORRECTION=true`)
+  and the recorder, no denial: the validation passed after 104 s, all 20
+  GoTos succeeded (only the first, at the take-off point, at once), the
+  vehicle came within 0.3 m of every waypoint in truth, and the tree ended
+  in SUCCESS after 18 minutes (the mission container exited 0).
+- **Isaac skipped every other waypoint** with one GoTo per waypoint: the
+  mission flew the cruise entry, the ridge mid and the ridge exit and cut
+  past the climb waypoint, the ridge entry and the ridge turn (next
+  section).
+
+### The GoTo race
+
+as2 1.1.3's GoTo (`go_to_plugin_position`, `GoToBase`) first checks its
+distance to the target 100 ms after accepting a goal (its 10 Hz run timer
+starts then), but computes that distance only when the next state arrives,
+against the stored goal: until then it is the previous goal's. The state
+follows ArduPilot's local position, 20 Hz of simulation time: every 50 ms
+of wall time in Gazebo and 90 ms in Genesis, mostly before the check, but
+every 260 ms in Isaac (0.19x), mostly after it. A goal then succeeds at
+once whenever the vehicle is still within the threshold of the previous
+waypoint (its setpoint is still sent when it ends, so the vehicle turns
+towards it and is redirected to the next waypoint 0.4 s of simulation time
+later). At 3 m it always is, so one GoTo per waypoint skipped every other
+one in Isaac; at 0.2 m the vehicle had sometimes drifted past 0.2 m by
+then, which kept the ridge entry, and its stall. No threshold fixes it.
+
+The generated tree (`applications/demnav/scripts/build_georeferenced_terrain.py`)
+therefore sends each waypoint's GoTo twice. The second's previous goal is
+the same waypoint, so its first check, stale or not, is against that
+waypoint: after a first GoTo that succeeded at once on the previous
+waypoint's distance the second flies there, and after one that flew there
+the second succeeds at once. A 2 s delay follows each: the GoTo rejects a
+goal ("there is no localization") until a state has arrived since the last
+goal ended, and the tree's GoTo node then fails, and the mission with it;
+2 s is 8 states in Isaac. It costs 2 s of wall time per waypoint, a 2 s
+longer hover at each in Gazebo (the full mission took 18 min 44 s, against
+18 min 9 s), 0.4 s in Isaac. `tests/test_aerodrone_mission_frame.py` checks
+the pairs.
+
+Runs with it (3 m, otherwise as the previous section). Isaac, Gazebo 1
+and the full mission ran on this change alone. Gazebo 2 and 3 also had
+the object-tracking work, then in progress, in the tree and the aerostack2
+image (moving cars and people in the Gazebo world, an idle FollowReference
+behaviour), so Gazebo 4 and Genesis ran from a `git
+archive` of HEAD with this change only and an aerostack2 image built from
+it (Genesis with a genesis image rebuilt from HEAD's Dockerfile). Other work
+loaded the host during Gazebo 1 and 2 (in Gazebo 2, three ONNX
+evaluations on 18 of the 20 cores, load average 45-50): Gazebo ran at
+0.80-0.81x real time, against 0.96-0.97x in every other Gazebo run here.
+Validations passed 36-41 s (Gazebo), 88 s (Genesis) and 169 s (Isaac)
+before the denial. One more Gazebo run never started (a tile, as above).
+
+| Run | Real time | Fused before | Fused | Autopilot after | DemNav fixes (n) | WildNav fixes (n) | Corrections | Fused beyond 2 / 3 sigma (sigma) | Route distance | Waypoints / flown | Result |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Isaac | 0.19x | 0.1 / 0.1 / 0.2 | 3.0 / 5.5 / 6.1 | 0.1 / 0.6 / 2.7 | 4.5 / 8.9 / 13.9 (1085) | 1.7 / 2.5 / 3.1 (154) | 1.9 / 4.2 / 5.3 | 0.0 / 0.0 % (4.0 m) | 2.2 / 5.3 / 5.5 | 3 / 726 m | pass |
+| Gazebo 1 (host loaded) | 0.81x | 0.1 / 0.3 / 1.1 | 13.0 / 40.5 / 49.7 | 0.2 / 0.5 / 28.8 | 8.0 / 19.0 / 28.8 (406) | 4.7 / 9.3 / 9.8 (37) | 8.6 / 23.4 / 29.1 | 19.9 / 7.9 % (10.8 m) | 10.0 / 38.4 / 41.6 | 2 / 698 m | fail: fused and autopilot p95, max |
+| Gazebo 2 (host loaded, tracking work) | 0.80x | 0.2 / 0.6 / 0.6 | 7.6 / 24.0 / 29.7 | 0.1 / 0.2 / 7.0 | 10.8 / 14.8 / 20.7 (401) | 3.4 / 5.0 / 6.1 (37) | 5.5 / 10.7 / 16.9 | 14.0 / 0.1 % (7.3 m) | 3.1 / 13.1 / 14.9 | 2 / 689 m | pass |
+| Gazebo 3 (tracking work) | 0.96x | 0.1 / 0.4 / 0.4 | 8.0 / 14.6 / 16.0 | 0.2 / 0.5 / 3.5 | 6.1 / 11.5 / 13.2 (463) | 2.9 / 6.5 / 7.5 (31) | 5.4 / 10.2 / 12.6 | 0.0 / 0.0 % (6.9 m) | 2.5 / 8.6 / 15.6 | 2 / 691 m | pass |
+| Gazebo 4 (`git archive`) | 0.97x | 0.1 / 0.2 / 0.2 | 8.1 / 13.2 / 13.9 | 0.2 / 0.3 / 5.5 | 4.4 / 10.6 / 14.4 (468) | 4.0 / 6.8 / 7.6 (31) | 6.0 / 9.6 / 11.8 | 0.5 / 0.0 % (6.5 m) | 4.6 / 8.4 / 14.5 | 2 / 698 m | pass |
+| Genesis (`git archive`) | 0.56x | 0.1 / 0.2 / 0.3 | 2.2 / 2.9 / 3.2 | 0.1 / 0.4 / 1.7 | 2.5 / 5.8 / 6.9 (1493) | 0.9 / 1.8 / 1.9 (54) | 1.0 / 2.3 / 3.0 | 0.0 / 0.0 % (3.7 m) | 1.2 / 2.6 / 2.7 | 3 / 692 m | pass |
+
+- **Isaac flies every waypoint.** The first GoTo of the pair succeeded at
+  once on the previous waypoint's distance at the cruise entry and the
+  ridge mid, and the second flew there each time; where the first flew, the
+  second succeeded at once. Waypoints while denied
+  (simulation seconds from the denial, ArduPilot within 3 m, then the next
+  waypoint; closest true horizontal distance): the cruise entry at 11.3 s,
+  left at 11.6 s, 2.6 m; the ridge entry at 65.3 s, left at 66.1 s, 2.3 m;
+  the ridge mid at 136.1 s, left at 136.4 s, 4.7 m, while ArduPilot was
+  3.2 m off the truth (the waypoints' acceptance radius is 8 m). Then the
+  ridge turn after the restore, 0.5 m. No stall, and the vehicle leaves
+  each waypoint 0.3-1.0 s after coming within 3 m of it in ArduPilot's
+  frame (the two 2 s delays are 0.4 s each at 0.19x), so in truth it comes
+  within about the threshold plus the navigation error. With one GoTo per
+  waypoint it reached only the ridge mid while denied.
+- **Gazebo.** The race showed in Gazebo too on the loaded host: in Gazebo 1
+  the cruise entry's first GoTo succeeded at once, and the second flew it.
+  Gazebo 1 failed its error limits: 80-110 s into the denial DemNav was
+  13-19 m off and the corrections 14-23 m, and the corrections 11-17 m
+  again at 130-150 s; the EKF followed them to 31-40 m. That is the
+  previous section's failure (its Gazebo 1 and 0.2 m control), larger; the
+  doubled GoTo only adds 2 s of hover per waypoint, which puts the vehicle
+  a few seconds behind on the same route while denied. Gazebo 4,
+  this change alone on a quiet host, passed at 8.1 / 13.2 / 13.9 m with
+  0.5 % of the fused fixes beyond 2 sigma, inside the committed runs'
+  spread (median 6-8 m, p95 11-20 m, max 12-22 m); Gazebo 2 and 3
+  passed at 7.6 / 24.0 / 29.7 and 8.0 / 14.6 / 16.0 m. All four reached the
+  cruise and ridge entries while denied (true 0.7-9.8 m at ArduPilot's 3 m)
+  and the ridge mid at 147-156 s, around the restore (with one GoTo per
+  waypoint, 140-146 s: the pairs' extra hover).
+- **Genesis** as with one GoTo per waypoint (2.1 / 3.0 / 3.3 m): the
+  cruise entry, the ridge entry and the ridge mid while denied, ArduPilot
+  within 3 m of them 12.9, 69.3 and 142.2 s in and the vehicle on to the
+  next 2.3-2.6 s later, 1.5-2.3 m from them in truth. No first GoTo of a
+  pair succeeded at once.
+- **Full mission** (Gazebo, the validator with DemNav, WildNav and a
+  correction required, the recorder, no denial): the validation passed
+  after 111 s, all 40 GoTos succeeded (the first of a pair at once only at
+  the take-off point; every second one at once, the vehicle already there),
+  the vehicle came within 0.1 m horizontally and 0.7 m in 3D of every one of
+  the 20 waypoints in truth, and the tree ended in SUCCESS (the mission
+  container exited 0). No goal was rejected.
 
 ## Limits
 
@@ -256,4 +420,6 @@ rebuilt wildnav image's fusion, which sent velocities): all three fail.
   (`systems/aerodrone/config`) are the working tree's (mounted), so
   uncommitted changes there are part of what is tested.
 - The limits rest on few runs (five Gazebo, two Genesis, two Isaac on the
-  committed code); revisit them as runs accumulate.
+  committed code, and the runs of "Mission progress and the GoTo
+  threshold"); revisit them as runs accumulate, Gazebo's error limits
+  first.

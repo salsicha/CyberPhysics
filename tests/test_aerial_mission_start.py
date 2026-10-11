@@ -1,9 +1,12 @@
 """Aerial mission start: flight_ready waits for the servers the mission tree
 calls, and the tree is started again only when it aborted while being built
-(as2_behavior_tree gives each action server 1 s then)."""
+(as2_behavior_tree gives each action server 1 s then). Also the GoTo
+completion threshold the simulations launch the autonomy with."""
 import functools
 import io
+import itertools
 import json
+import math
 import shlex
 import signal
 import sys
@@ -506,3 +509,104 @@ def test_the_result_is_the_roots_last_transition():
     assert runner.run() == 0
     assert 'ended in FAILURE' not in out.getvalue()
 
+
+# --- GoTo completion threshold ------------------------------------------------------
+
+AUTONOMY_LAUNCH = (REPO / 'applications/aerostack2/src/as2_platform_blueos/launch/'
+                   'blueos_autonomy.launch.py')
+# ArduPilot's largest distance from a GoTo target it was holding, in its own
+# frame, while GPS 1 was denied (tools/gps_denied_sim_test.md, "Mission
+# progress and the GoTo threshold"): a threshold below it can stall the
+# mission at a waypoint.
+DENIED_HOLD_ERROR_M = 2.1
+# Mission waypoints the generated tree does not fly as GoTos.
+NOT_FLOWN = {'arm_start', 'touchdown'}
+
+
+class Recorded:
+    def __init__(self, *args, **kwargs):
+        self.args, self.kwargs = args, kwargs
+
+
+def autonomy_launch_description():
+    """blueos_autonomy.launch.py's entities, with every launch class recorded."""
+    def kind(name):
+        return type(name, (Recorded,), {})
+    modules = {
+        'ament_index_python': NS(),
+        'ament_index_python.packages': NS(
+            get_package_share_directory=lambda package: f'/share/{package}'),
+        'launch': NS(LaunchDescription=kind('LaunchDescription')),
+        'launch.actions': NS(DeclareLaunchArgument=kind('DeclareLaunchArgument'),
+                             IncludeLaunchDescription=kind('IncludeLaunchDescription')),
+        'launch.launch_description_sources': NS(
+            PythonLaunchDescriptionSource=kind('PythonLaunchDescriptionSource')),
+        'launch.substitutions': NS(LaunchConfiguration=kind('LaunchConfiguration'),
+                                   PythonExpression=kind('PythonExpression')),
+        'launch_ros': NS(),
+        'launch_ros.actions': NS(Node=kind('Node')),
+    }
+    with patch.dict(sys.modules, modules):
+        module = load_script(AUTONOMY_LAUNCH, 'blueos_autonomy_launch_review')
+        return module.generate_launch_description().args[0]
+
+
+def perform(substitution, configurations):
+    """What ros2 launch makes of a recorded substitution."""
+    if isinstance(substitution, str):
+        return substitution
+    name = type(substitution).__name__
+    if name == 'LaunchConfiguration':
+        return configurations[substitution.args[0]]
+    assert name == 'PythonExpression'
+    return str(eval(''.join(perform(part, configurations) for part in substitution.args[0])))
+
+
+def test_go_to_threshold_is_a_launch_argument_that_reaches_the_go_to_behaviour():
+    entities = autonomy_launch_description()
+    arguments = {e.args[0]: e.kwargs.get('default_value') for e in entities
+                 if type(e).__name__ == 'DeclareLaunchArgument'}
+    assert arguments['go_to_threshold'] == '0.2'  # as2's own default
+    [motion] = [e for e in entities if type(e).__name__ == 'IncludeLaunchDescription'
+                and e.args[0].args[0].endswith('/motion_behaviors_launch.py')]
+    passed = dict(motion.kwargs['launch_arguments'])
+    assert passed['go_to_plugin_name'] == 'go_to_plugin_position'
+    # The behaviour declares a double parameter, and as2 reads a value
+    # without a decimal point as an integer, which kills the GoTo server.
+    for given, value in (('0.2', '0.2'), ('3', '3.0'), ('3.0', '3.0'), ('2.5', '2.5')):
+        assert perform(passed['go_to_threshold'], {'go_to_threshold': given}) == value
+
+
+@pytest.mark.parametrize('name', STACKS)
+def test_simulations_complete_a_goto_within_a_threshold_fit_for_the_mission(name):
+    tokens = shlex.split(services(name)['aerostack2_autonomy']['command'])
+    assert tokens[:4] == ['ros2', 'launch', 'as2_platform_blueos', 'blueos_autonomy.launch.py']
+    threshold = float(launch_args(tokens)['go_to_threshold'])
+    # Above what a GPS-denied ArduPilot holds, so the mission moves on ...
+    assert threshold > DENIED_HOLD_ERROR_M
+    # ... and below the mission's spacing and acceptance radii, so every
+    # waypoint is still flown to.
+    tree = ElementTree.fromstring(generated_tree())
+    targets = [tuple(float(v) for v in action.get('pose').split(';'))
+               for action in tree.iter('Action') if action.get('ID') == 'GoTo']
+    # Each waypoint's GoTo goes out twice (build_georeferenced_terrain.py).
+    waypoints = targets[::2]
+    assert targets[1::2] == waypoints and len(waypoints) == 20
+    assert threshold <= min(math.dist(a, b) for a, b in itertools.pairwise(waypoints)) / 10
+    mission = json.loads(
+        (REPO / 'applications/aerostack2/missions/wilderness_missions.json').read_text())
+    radii = [waypoint['acceptance_radius_m'] for entry in mission['missions']
+             for phase in entry['phases'] for waypoint in phase['waypoints']
+             if waypoint['id'] not in NOT_FLOWN]
+    assert threshold <= min(radii)
+
+
+def test_simulations_share_one_threshold_and_the_drone_keeps_the_default():
+    thresholds = {launch_args(shlex.split(services(name)['aerostack2_autonomy']['command']))
+                  ['go_to_threshold'] for name in STACKS}
+    assert len(thresholds) == 1
+    # The drone's map goals (blueos_aerostack.yaml) run the same launch file
+    # with as2's 0.2 m.
+    command = shlex.split(services('blueos_aerostack.yaml')['aerostack']['command'])
+    assert command[:4] == ['ros2', 'launch', 'as2_platform_blueos', 'blueos_autonomy.launch.py']
+    assert 'go_to_threshold' not in launch_args(command)

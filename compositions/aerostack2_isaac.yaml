@@ -257,10 +257,18 @@ services:
       ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
       FASTRTPS_DEFAULT_PROFILES_FILE: *fastdds-profile
     volumes: [/dev/shm:/dev/shm, *fastdds-mount]
+    # A GoTo succeeds within go_to_threshold (m, 3D) of its target in
+    # ArduPilot's own frame. GPS-denied, ArduPilot held its targets up to
+    # 2.1 m off (median 0.3 m), and as2's 0.2 m default stalled the mission
+    # at one waypoint for most of the denial; the wilderness waypoints are
+    # 42 m or more apart and accepted within 4-8 m
+    # (tools/gps_denied_sim_test.md, "Mission progress and the GoTo
+    # threshold").
     command: >
       ros2 launch as2_platform_blueos blueos_autonomy.launch.py
         namespace:=aerodrone mavros_namespace:=/mavros
         navigation_odom_topic:=/navigation/odometry takeoff_altitude:=35.0
+        go_to_threshold:=3.0
 
   flight_ready:
     # Ready to fly: MAVROS has a GPS fix and local odometry, and every

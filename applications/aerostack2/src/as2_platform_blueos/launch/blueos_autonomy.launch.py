@@ -4,7 +4,7 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
 
 
@@ -23,6 +23,10 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'navigation_odom_topic', default_value='/navigation/odometry'),
         DeclareLaunchArgument('takeoff_altitude', default_value='2.0'),
+        DeclareLaunchArgument(
+            'go_to_threshold', default_value='0.2',
+            description='Distance (m) from its target, in the navigation '
+                        'frame, at which a GoTo succeeds (as2 default 0.2)'),
         Node(
             package='as2_platform_blueos',
             executable='as2_platform_blueos_node',
@@ -77,6 +81,10 @@ def generate_launch_description():
                 'follow_path_plugin_name':
                     'follow_path_plugin_position',
                 'go_to_plugin_name': 'go_to_plugin_position',
+                # The behaviour declares a double parameter: 2 must reach
+                # it as 2.0, not as an integer it would refuse.
+                'go_to_threshold': PythonExpression(
+                    ['float(', LaunchConfiguration('go_to_threshold'), ')']),
                 'land_plugin_name': 'land_plugin_speed',
                 'takeoff_plugin_name': 'takeoff_plugin_speed',
             }.items(),

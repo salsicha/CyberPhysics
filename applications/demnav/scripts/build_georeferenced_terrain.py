@@ -234,20 +234,30 @@ def write_behavior_tree(grid, args, output_dir):
                     grid, args.origin_alt, args.area_km, world_east, world_north)
                 up += agl - home_reference_up
                 speed = float(waypoint.get("speed_limit_mps", 2.0))
-                actions.append(
-                    f'      <!-- {mission_entry["id"]}/{phase["name"]}/{waypoint["id"]} -->')
-                actions.append(
-                    f'      <Action ID="GoTo" max_speed="{speed:.2f}" '
-                    f'pose="{east:.3f};{north:.3f};{up:.3f}" yaw_angle="0.0" yaw_mode="1"/>')
+                go_to = (f'      <Action ID="GoTo" max_speed="{speed:.2f}" '
+                         f'pose="{east:.3f};{north:.3f};{up:.3f}" yaw_angle="0.0" yaw_mode="1"/>')
                 hold = float(waypoint.get("hold_s", 0.0))
-                # Aerostack2 tears down and recreates the GoTo action context at
-                # each waypoint.  Leave at least one localization update between
-                # actions; otherwise an already-satisfied waypoint can make the
-                # following goal race the state estimator and be rejected as
-                # "there is no localization".
+                # Each waypoint's GoTo goes out twice. Aerostack2's (1.1.3)
+                # GoTo first checks its distance 100 ms after accepting a goal
+                # but computes it only when the next state arrives, against the
+                # previous goal until then; where states come less often
+                # (Isaac, 0.19x real time) the goal succeeds at once whenever
+                # the vehicle is within go_to_threshold of the previous
+                # waypoint, and this one is skipped. The second GoTo's previous
+                # goal is this waypoint: it flies there unless the vehicle is.
+                # Aerostack2 tears down and recreates the GoTo action context
+                # after each goal. Leave at least one localization update
+                # between actions; otherwise the following goal races the
+                # state estimator and is rejected as "there is no
+                # localization", failing the mission.
                 settle_s = max(hold, 2.0)
-                actions.append(
-                    f'      <Delay delay_msec="{int(settle_s * 1000)}"><AlwaysSuccess/></Delay>')
+                actions.extend([
+                    f'      <!-- {mission_entry["id"]}/{phase["name"]}/{waypoint["id"]} -->',
+                    go_to,
+                    '      <Delay delay_msec="2000"><AlwaysSuccess/></Delay>',
+                    go_to,
+                    f'      <Delay delay_msec="{int(settle_s * 1000)}"><AlwaysSuccess/></Delay>',
+                ])
                 waypoint_count += 1
     # Aerostack2's Land behaviour disarms on touchdown (the BlueOS platform
     # finishes that in ArduPilot's LAND mode when ArduCopter refuses), and

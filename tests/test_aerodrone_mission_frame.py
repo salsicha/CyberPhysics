@@ -101,8 +101,44 @@ class MissionFrameTest(unittest.TestCase):
         # Flat terrain 20 m above the origin; home reference 0.2 m above it.
         heights = [float(pose.split(";")[2])
                    for pose in re.findall(r'pose="([^"]+)"', xml)]
-        self.assertEqual(heights, [34.8, 249.8, 299.8, 7.8])
+        # Each waypoint's GoTo goes out twice.
+        self.assertEqual(heights, [34.8, 34.8, 249.8, 249.8, 299.8, 299.8, 7.8, 7.8])
         self.assertEqual(terrain_builder.waypoint_agl("climb", 55.0, 0.0), 55.0)
+
+    def test_each_waypoint_is_a_pair_of_gotos_with_a_localization_update_between(self):
+        # as2 1.1.3's GoTo can check a new goal against the previous goal's
+        # distance and succeed at once; the second GoTo's previous goal is
+        # the same waypoint. A GoTo sent before a state has arrived since
+        # the last one ended is rejected, so a delay follows each.
+        mission = {"missions": [{"id": "m", "phases": [{"name": "loiter", "waypoints": [
+            {"id": "arm_start", "position_enu_m": [-720, -260, 0]},
+            {"id": "a", "position_enu_m": [-700, -240, 35], "speed_limit_mps": 3},
+            {"id": "b", "position_enu_m": [-650, -240, 35], "hold_s": 8.0},
+        ]}]}]}
+        grid = np.full((9, 9), 100.0, dtype=np.float32)
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+            mission_path = output / "mission.json"
+            mission_path.write_text(json.dumps(mission), encoding="utf-8")
+            args = SimpleNamespace(mission=str(mission_path), origin_alt=80.0,
+                                   area_km=8.0, cruise_agl=0.0)
+            count, _ = terrain_builder.write_behavior_tree(grid, args, output)
+            tree = ElementTree.parse(output / "wilderness_mission.xml")
+        self.assertEqual(count, 2)
+        steps = list(tree.find("./BehaviorTree/Sequence"))
+        first = [step.get("ID") for step in steps].index("GoTo")
+        waypoints = steps[first:first + 8]
+        self.assertEqual(steps[first + 8].get("ID"), "Land")
+        for pair, (pose, speed, settle) in zip(
+                (waypoints[:4], waypoints[4:]),
+                (("20.000;20.000;34.800", "3.00", "2000"),
+                 ("70.000;20.000;34.800", "2.00", "8000"))):
+            go_to, between, again, after = pair
+            self.assertEqual((go_to.get("ID"), go_to.get("pose"), go_to.get("max_speed")),
+                             ("GoTo", pose, speed))
+            self.assertEqual(again.attrib, go_to.attrib)
+            self.assertEqual((between.tag, between.get("delay_msec")), ("Delay", "2000"))
+            self.assertEqual((after.tag, after.get("delay_msec")), ("Delay", settle))
 
     def test_mission_ends_with_a_disarm_that_tolerates_landing_disarmed(self):
         # Aerostack2's Land disarms on touchdown, and its platform then
