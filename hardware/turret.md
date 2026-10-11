@@ -19,6 +19,10 @@ Baseline hardware
     32 GB): its STM32U585 MCU drives the servos and its Debian Linux side
     runs the ROS bridge, so the board joins the ROS graph over Wi-Fi or
     Ethernet instead of USB (3.3 V logic). See "Arduino UNO Q" below.
+  - or no microcontroller: the compute host drives the servos itself over its
+    own UART or USB through a bus servo adapter such as the Waveshare Bus
+    Servo Adapter (A) (the RACECAR Turret's Jetson). See "Direct from a Linux
+    host" below.
 - 1 x USB-C data cable (UNO R4 WiFi: to the host; UNO Q: for flashing and
   setup) and, for the UNO Q, a 5 V / 3 A USB-C power supply or a 7-24 V supply
   on VIN.
@@ -260,6 +264,139 @@ servo fault bits, `stop_disables_torque`, a real `arduino-router` restart,
 and DDS between the board and the GPU host (tracker, `ROS_DOMAIN_ID`,
 multicast over Wi-Fi or Ethernet).
 
+Direct from a Linux host (no Arduino)
+
+The bridge's `sts` transport (`TURRET_ARDUINO_TRANSPORT=sts`) drives the two
+servos from any Linux host with a UART or a USB bus servo adapter, without a
+microcontroller: Feetech STS packets at 1 Mbps on the host's serial port,
+through a half-duplex adapter that also feeds the servos from the servo
+supply. The RACECAR Turret (`systems/racecar_turret`) uses it on the car's
+Jetson: `compositions/racecar_turret_hardware.yaml` with
+`applications/pantiltros/config/jetson_uart.env` (`/dev/ttyTHS1`, the 40-pin
+header UART on pins 8 TX and 10 RX, 1000000 baud).
+
+- Same behaviour as the firmware: `turret_arduino_bridge.py` carries a Python
+  port of `src/sts_servo.*` and of the `Controller` in `src/turret_core.*`:
+  the packets above (sync write of registers 41-47, present position read of
+  register 56, torque enable in register 40, checksums, status packets and
+  their fault bits), the limits clamping every command, torque on at the
+  first `SET`, the 500 ms watchdog and `STOP` holding the measured position,
+  25 Hz feedback reported only when both servos answered, servo timeouts and
+  faults reported at most once per second, nothing written before the first
+  `SET` or `STOP`, and adapters that echo TX back to RX. The settings of
+  `src/turret_config.h` are bridge parameters in
+  `applications/pantiltros/config/arduino_bridge.yaml` with the same defaults
+  (`pan_servo_id` 12, `tilt_servo_id` 13, `*_zero_steps` 2048,
+  `*_direction` -1, `servo_speed` 2000, `servo_acceleration` 50,
+  `stop_disables_torque` false), plus `servo_reply_timeout_s` (10 ms; the
+  firmware waits 3 ms). `/turret/joint_states`, `/turret/actuator_ready`,
+  `/turret/emergency_stop` and the diagnostics are those of the other
+  transports; the diagnostics add `servo_ids`, `servo_state` (idle, active,
+  holding) and `bad_packets`. `tests/test_turret_bridge_sts.py` checks the
+  packets against the reference bytes of the firmware's host test (from
+  `SCServo_Linux`) and against the compiled firmware code on random input,
+  and runs the firmware test's scenarios against a simulated servo bus
+  (echoing adapter, missing servo, fault bits, watchdog, `STOP`, limits).
+- Safety difference: there is no microcontroller watchdog. The watchdog and
+  `STOP` run in the bridge process, so if the host, the container or the
+  bridge dies, or the UART link breaks, nothing holds the servos: the ST3215s
+  keep their last goal (already clamped to the joint limits), finish the move
+  in progress and stay there with torque on. The physical emergency-stop
+  switch that cuts the servo supply is the hardware safety, and with this
+  transport the only stop that does not depend on the host.
+- The other host-side option is the upstream C++ node `pan_tilt_ctrl_node`
+  (package `pan_tilt_ros`, built in the PanTiltROS image with Feetech's
+  `SCServo_Linux`; `usb_port` and `baud_rate` in
+  `pantiltros/config/ctrl_config.yaml`). It is not used here because its
+  interface and behaviour differ from the turret contract: `/joint_commands`
+  and `/joint_states` instead of the `/turret/*` topics, no
+  `/turret/emergency_stop` or `/turret/actuator_ready`, a joystick button
+  that turns torque off as its stop, limits in servo steps, and a joint state
+  with whichever servos answered. The bridge's `sts` transport keeps one ROS
+  contract and one safety behaviour for the UNO R4, the UNO Q and the host
+  itself, so the tracker, the UI and the compositions do not change with the
+  hardware.
+
+Wiring to a Jetson's 40-pin header, Waveshare Bus Servo Adapter (A)
+(https://www.waveshare.com/wiki/Bus_Servo_Adapter_(A)) with its jumper cap
+on A (UART mode; B is USB mode):
+
+| Jetson 40-pin header | Bus Servo Adapter (A) |
+|---|---|
+| pin 8, UART TX (3.3 V) | TX |
+| pin 10, UART RX (3.3 V) | RX |
+| pin 6, GND | GND |
+
+- Waveshare's wiki, for UART control from a Raspberry Pi Zero, ESP32,
+  Arduino or STM32 board: "the connection must be RX-RX, TX-TX", with the
+  jumper cap on A. The adapter's labels are thus from the host's side: host
+  TX to the pin labelled TX. If the servos do not answer, swap TX and RX
+  first.
+- Logic level: Waveshare does not document the logic level of the adapter's
+  host UART pins (its UART example is a Raspberry Pi Zero, whose GPIO is
+  3.3 V, but that is no specification), and the Jetson header is 3.3 V and
+  not 5 V tolerant. Before connecting the Jetson, power the adapter and
+  measure its TX pin's idle voltage (and RX's) to GND. If it is above 3.3 V,
+  put a bidirectional level shifter rated for 1 Mbps in between (e.g. a
+  BSS138-based module or a TXS0104E). The USB connection (jumper on B)
+  avoids the question entirely.
+- Servos on the adapter's servo connectors; the servo supply into its DC jack
+  (5.5 x 2.1 mm) or screw terminal through the emergency-stop switch
+  (Waveshare: "Input voltage: 9~12.6V (should match servo voltage)"). Do not
+  power the servos from the Jetson.
+
+Bring-up on the Jetson:
+
+1. Enable pins 8 and 10 as UART: `sudo /opt/nvidia/jetson-io/jetson-io.py`,
+   "Configure Jetson 40pin Header", "Configure header pins manually", select
+   `uarta`, save and reboot. Check that no serial console or other program
+   holds the port: `sudo fuser -v /dev/ttyTHS1`. The Tegra `ttyTHS` UART
+   supports 1 Mbps (`stty` accepts up to 4 Mbps). Which `ttyTHS` device is
+   the header UART differs between Jetson modules and JetPack releases; the
+   loopback below confirms it.
+2. Loopback test, adapter disconnected and a jumper wire between pins 8 and
+   10 (as root or a member of `dialout`):
+
+   ```bash
+   stty -F /dev/ttyTHS1 1000000 raw -echo
+   timeout 2 cat /dev/ttyTHS1 & sleep 0.5; echo hello > /dev/ttyTHS1; wait   # prints hello
+   ```
+
+   `-echo` matters: with the loopback, the tty's own echo would send every
+   received byte out again.
+3. Wire the adapter as above, switch the servo supply on and start the
+   composition with the emergency stop engaged. `/turret/diagnostics` should
+   say "servo bus connected" (`servo_state` idle) and `/turret/joint_states`
+   should arrive at 25 Hz before the release. "servo 12 (pan_joint) timeout"
+   and "servo 13 (tilt_joint) timeout" together mean no servo answers:
+   TX and RX swapped, the jumper on B, the wrong port, no servo supply, or a
+   header UART that does not transmit (below).
+
+Header UART TX on some JetPack releases: an NVIDIA forum thread
+(https://forums.developer.nvidia.com/t/ttyths1-uart1-40-pin-header-pins-8-10-tx-pad-does-not-drive-on-jetpack-7-l4t-r39-2-orin-nano-super-devkit/373290)
+reports that on a Jetson Orin Nano Super developer kit with JetPack 7
+(L4T R39.2), `/dev/ttyTHS1`'s TX pad (pin 8) does not drive: it sits near
+0.3 V instead of idling at 3.3 V, RX works, and the loopback returns nothing.
+Enabling `uarta` with jetson-io did not change it (the pads stay unclaimed in
+the pinmux), a second user reproduced it, and the thread has no confirmed
+fix (NVIDIA suggested a pinmux generated with its pinmux spreadsheet and
+flashed). If the loopback fails, measure pin 8 at idle. The fallback is the
+same adapter over USB with its jumper on B (Waveshare lists the Jetson Orin
+Nano among the USB hosts): only the device path changes, same transport and
+1000000 baud. Set `TURRET_ARDUINO_PORT=/dev/serial/by-id/usb-...` in the
+shell (`racecar_turret_hardware.yaml` passes that device in and gives it to
+the bridge) or in `jetson_uart.env`. On other Linux hosts, likewise, put
+their UART's or USB adapter's device in `TURRET_ARDUINO_PORT`.
+
+Status: written and tested against the firmware's reference packets and a
+simulated servo bus only. No bus servo adapter or ST3215 was attached to the
+development machine, so nothing of it has run on hardware. Still to check:
+the adapter's UART logic level and TX/RX labels, `/dev/ttyTHS1` at 1 Mbps
+on the car's JetPack, reply times against `servo_reply_timeout_s` (native
+UART and USB), whether the adapter echoes, torque enable, motion, holding,
+limits, directions and zero offsets, the servo fault bits, and the CPU load
+of the 50 Hz poll timer on the Jetson.
+
 ROS contract
 
 - Camera stream: the hardware composition defaults to the RealSense topics
@@ -275,7 +412,7 @@ ROS contract
   with `pan_joint` and `tilt_joint`.
 - Measured joint state: `sensor_msgs/msg/JointState` on `/turret/joint_states`,
   published by the bridge from firmware `POS` lines (UNO Q: `turret/pos`
-  notifications) only.
+  notifications; `sts`: the servos' position replies) only.
 - Emergency stop: `std_msgs/msg/Bool` on `/turret/emergency_stop`. `true`
   stops the tracker from commanding and makes the bridge send `STOP` and drop
   commands. On hardware both start engaged and need an explicit `false`

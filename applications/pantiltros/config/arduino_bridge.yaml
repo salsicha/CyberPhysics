@@ -5,8 +5,9 @@ turret_arduino_bridge:
     diagnostics_topic: /turret/diagnostics
     emergency_stop_topic: /turret/emergency_stop
     actuator_ready_topic: /turret/actuator_ready
-    # The link (transport serial or uno_q_bridge) and its port or socket come
-    # from config/arduino.env or config/arduino_uno_q.env, not from this file.
+    # The link (transport serial, uno_q_bridge or sts) and its port or socket
+    # come from config/arduino.env, config/arduino_uno_q.env or
+    # config/jetson_uart.env, not from this file.
     # uno_q_bridge: an RPC unanswered for this long makes the MCU not ready.
     rpc_timeout_s: 0.5
     # uno_q_bridge: exit after the router socket has been unreachable this
@@ -19,3 +20,21 @@ turret_arduino_bridge:
     pan_max_rad: 1.5708
     tilt_min_rad: -0.65
     tilt_max_rad: 0.75
+    # sts (servos driven from this host, no Arduino): the settings of the
+    # firmware's src/turret_config.h. Servo step = zero_steps + direction *
+    # rad * 4096 / 2pi (the pan_tilt_ros convention: 2048 at 0 rad, steps
+    # decreasing as the angle grows); IDs as pantiltros/config/ctrl_config.yaml.
+    pan_servo_id: 12
+    tilt_servo_id: 13
+    pan_zero_steps: 2048
+    tilt_zero_steps: 2048
+    pan_direction: -1
+    tilt_direction: -1
+    servo_speed: 2000  # goal speed, steps/s (0: servo maximum)
+    servo_acceleration: 50  # goal acceleration, 100 steps/s^2
+    # Wait this long for a servo's status packet before reporting a timeout
+    servo_reply_timeout_s: 0.01
+    # STOP and the 500 ms watchdog hold the measured position; true: torque off
+    stop_disables_torque: false
+    # The sts watchdog and 25 Hz position feedback run on the poll_rate_hz
+    # timer (default 50 Hz): keep it at 50 Hz or more with sts.

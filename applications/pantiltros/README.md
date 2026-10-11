@@ -156,10 +156,78 @@ link:
   The topics, e-stop handling and `/turret/actuator_ready` semantics are those
   of the serial transport; the diagnostics name the router socket instead of
   the port.
+- `sts`: no Arduino. The bridge drives the two ST3215s itself from any Linux
+  host with a UART or a USB bus servo adapter, in Feetech STS packets at
+  1 Mbps on `serial_port` through a half-duplex adapter
+  (`config/jetson_uart.env`: the Jetson's 40-pin header UART `/dev/ttyTHS1`
+  and a Waveshare Bus Servo Adapter (A), as on the RACECAR Turret). It runs a
+  Python port of the firmware's servo code (`src/sts_servo.*` and the
+  `Controller` of `src/turret_core.*`), so `SET` and `STOP` behave exactly as
+  with the firmware: joint limits clamp every command, the first `SET`
+  enables torque, no command for 500 ms or a `STOP` holds the measured
+  position, positions are read at 25 Hz and published only when both servos
+  answered, a servo that does not answer or reports a fault bit gives an
+  error at most once per second, nothing is written to the servos before the
+  first `SET` or `STOP`, and adapters that echo transmitted bytes are
+  handled. The firmware's settings are parameters in
+  `config/arduino_bridge.yaml` (`pan_servo_id` 12, `tilt_servo_id` 13,
+  `*_zero_steps` 2048 and `*_direction` -1 for the `pan_tilt_ros`
+  convention, `servo_speed` 2000 steps/s, `servo_acceleration` 50,
+  `servo_reply_timeout_s`, `stop_disables_torque`). The port opens
+  exclusively and is ready at once (no board reset to wait for); topics,
+  e-stop handling and `/turret/actuator_ready` are those of the serial
+  transport, and the diagnostics add `servo_ids`, `servo_state` and
+  `bad_packets`. `tests/test_turret_bridge_sts.py` checks its packets against
+  the firmware's `SCServo_Linux` reference bytes and the compiled firmware
+  code, and runs the firmware test's scenarios on a simulated servo bus.
 
 The `uno_q_bridge` transport needs `python3-msgpack`, which the small `unoq`
 image (`applications/unoq`) provides; the PanTiltROS image only carries
-`pyserial` for the serial transport.
+`pyserial` for the serial and `sts` transports.
+
+### Servos straight from a Linux host (`sts`)
+
+Wiring to a Jetson (details, bring-up and known issues in
+`hardware/turret.md`, "Direct from a Linux host"): header pin 8 (TX) to the
+adapter's TX, pin 10 (RX) to its RX, a ground pin (6) to its GND, jumper on A
+(UART mode). Waveshare's wiki says "the connection must be RX-RX, TX-TX": the
+labels are from the host's side; if the servos do not answer, swap TX and RX
+first. Waveshare does not document the logic level of these pins and the
+Jetson header is 3.3 V, not 5 V tolerant: power the adapter and measure its
+TX pin's idle voltage before connecting, and put a bidirectional level
+shifter rated for 1 Mbps in between if it is above 3.3 V. Enable pins 8/10
+with `sudo /opt/nvidia/jetson-io/jetson-io.py` (Configure 40-pin header,
+`uarta`) and check the port with a loopback (pins 8 and 10 shorted, adapter
+off):
+
+```bash
+stty -F /dev/ttyTHS1 1000000 raw -echo
+timeout 2 cat /dev/ttyTHS1 & sleep 0.5; echo hello > /dev/ttyTHS1; wait   # prints hello
+```
+
+On some JetPack releases the header UART's TX does not drive (reported for
+JetPack 7 / L4T R39.2 on the Orin Nano Super developer kit). The fallback is
+the same adapter on USB (jumper on B): only the device path changes,
+`TURRET_ARDUINO_PORT=/dev/serial/by-id/...`, which also avoids the logic-level
+question.
+
+Safety difference: there is no microcontroller watchdog. The 500 ms hold and
+`STOP` run in the bridge process; if the host or the bridge dies, or the UART
+link breaks, the ST3215s keep their last goal (already within the joint
+limits) with torque on. The physical emergency stop that cuts servo power is
+the hardware safety.
+
+The other host-side option is the upstream C++ node `pan_tilt_ctrl_node`
+(`pan_tilt_ros`, built in this image with Feetech's `SCServo_Linux`; port in
+`pantiltros/config/ctrl_config.yaml`). It speaks a different contract
+(`/joint_commands` and `/joint_states`, no `/turret/emergency_stop` or
+`/turret/actuator_ready`, a joystick button that turns torque off as its
+stop, step limits). The bridge's `sts` transport is used instead so the
+tracker, UI and compositions see one ROS contract and one safety behaviour
+whether an UNO R4, an UNO Q or the host itself drives the servos.
+
+Not yet run on hardware: no bus servo adapter or ST3215 was attached when it
+was written.
 
 Release (arm) or engage the emergency stop. The tracker and bridge keep the
 last value they received; do not leave two publishers with different values
