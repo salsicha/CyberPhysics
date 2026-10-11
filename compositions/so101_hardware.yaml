@@ -14,6 +14,16 @@
 #   SO101_HIL_ARMED=true docker compose -f compositions/so101_hardware.yaml \
 #     --profile policy up
 
+# Docker on some hosts (the UNO Q's Debian 13 Docker 26, or any host
+# whose containerd runs with LimitNOFILE=infinity) gives containers an
+# open-file limit of about 2^30. LTTng-UST, which every ROS 2 Jazzy process
+# loads, then allocates and zeroes a 128 MiB descriptor bitmap: about 130 MB
+# of extra RAM per node. These are the usual systemd defaults.
+x-ros-ulimits: &ros-ulimits
+  nofile:
+    soft: 1024
+    hard: 524288
+
 services:
   so101_depth_camera:
     network_mode: host
@@ -21,6 +31,7 @@ services:
     privileged: true
     image: salsicha/cyberphysics:realsense-${CYBERPHYSICS_TAG:-latest}
     container_name: so101_depth_camera
+    ulimits: *ros-ulimits
     stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     restart: unless-stopped
     environment:
@@ -74,6 +85,7 @@ services:
       - policy
     image: salsicha/cyberphysics:so101-${CYBERPHYSICS_TAG:-latest}
     container_name: so101_hardware_groot_bridge
+    ulimits: *ros-ulimits
     network_mode: host
     restart: unless-stopped
     depends_on:
@@ -102,6 +114,7 @@ services:
       - policy
     image: salsicha/cyberphysics:so101-${CYBERPHYSICS_TAG:-latest}
     container_name: so101_hardware_hil_guard
+    ulimits: *ros-ulimits
     network_mode: host
     restart: unless-stopped
     depends_on:
@@ -126,6 +139,7 @@ services:
     network_mode: host
     image: salsicha/cyberphysics:ros2-${CYBERPHYSICS_TAG:-latest}
     container_name: so101_foxglove_bridge
+    ulimits: *ros-ulimits
     stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     restart: unless-stopped
     environment:

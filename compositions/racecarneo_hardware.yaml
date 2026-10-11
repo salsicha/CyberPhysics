@@ -19,6 +19,16 @@
 # ROS packages, and the depthanything image installs CPU-only PyTorch on
 # arm64.
 
+# Docker on some hosts (the UNO Q's Debian 13 Docker 26, or any host
+# whose containerd runs with LimitNOFILE=infinity) gives containers an
+# open-file limit of about 2^30. LTTng-UST, which every ROS 2 Jazzy process
+# loads, then allocates and zeroes a 128 MiB descriptor bitmap: about 130 MB
+# of extra RAM per node. These are the usual systemd defaults.
+x-ros-ulimits: &ros-ulimits
+  nofile:
+    soft: 1024
+    hard: 524288
+
 services:
   racecarneo_camera:
     network_mode: host
@@ -26,6 +36,7 @@ services:
     privileged: true
     image: salsicha/cyberphysics:realsense-${CYBERPHYSICS_TAG:-latest}
     container_name: racecarneo_camera
+    ulimits: *ros-ulimits
     stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     restart: unless-stopped
     environment:
@@ -53,6 +64,7 @@ services:
     pull_policy: if_not_present
     image: salsicha/cyberphysics:racecarneo-${CYBERPHYSICS_TAG:-latest}
     container_name: racecarneo_robot_state_publisher
+    ulimits: *ros-ulimits
     stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     restart: unless-stopped
     environment:
@@ -70,6 +82,7 @@ services:
     pull_policy: if_not_present
     image: salsicha/cyberphysics:racecarneo-${CYBERPHYSICS_TAG:-latest}
     container_name: racecarneo_cmd_vel_to_ackermann
+    ulimits: *ros-ulimits
     restart: unless-stopped
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
@@ -86,6 +99,7 @@ services:
     pull_policy: if_not_present
     image: salsicha/cyberphysics:depthanything-${CYBERPHYSICS_TAG:-latest}
     container_name: racecarneo_depthanything
+    ulimits: *ros-ulimits
     stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     restart: unless-stopped
     depends_on:
@@ -119,6 +133,7 @@ services:
     pull_policy: if_not_present
     image: salsicha/cyberphysics:nvblox-${CYBERPHYSICS_TAG:-latest}
     container_name: racecarneo_nvblox
+    ulimits: *ros-ulimits
     stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     restart: unless-stopped
     depends_on:
@@ -151,6 +166,7 @@ services:
     pull_policy: if_not_present
     image: salsicha/cyberphysics:racecarneo-${CYBERPHYSICS_TAG:-latest}
     container_name: racecarneo_slam
+    ulimits: *ros-ulimits
     stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     restart: unless-stopped
     environment:
@@ -169,6 +185,7 @@ services:
     # The nvblox image ships nvblox_nav2 (NvbloxCostmapLayer) alongside Nav2.
     image: salsicha/cyberphysics:nvblox-${CYBERPHYSICS_TAG:-latest}
     container_name: racecarneo_nav2
+    ulimits: *ros-ulimits
     stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     restart: unless-stopped
     depends_on:
@@ -191,6 +208,7 @@ services:
     pull_policy: if_not_present
     image: salsicha/cyberphysics:nicegui-${CYBERPHYSICS_TAG:-latest}
     container_name: racecarneo_nicegui
+    ulimits: *ros-ulimits
     restart: unless-stopped
     depends_on:
       - racecarneo_nav2
@@ -205,6 +223,7 @@ services:
     network_mode: host
     image: salsicha/cyberphysics:ros2-${CYBERPHYSICS_TAG:-latest}
     container_name: racecarneo_foxglove_bridge
+    ulimits: *ros-ulimits
     stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     restart: unless-stopped
     environment:

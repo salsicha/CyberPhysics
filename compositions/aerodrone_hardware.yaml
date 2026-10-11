@@ -19,6 +19,15 @@ services:
     # env_file above does not apply to this file's own services.
     image: salsicha/cyberphysics:rangefinder-${CYBERPHYSICS_TAG:-arm64}
     container_name: rangefinder
+    # Docker on some hosts (the UNO Q's Debian 13 Docker 26, or any host
+    # whose containerd runs with LimitNOFILE=infinity) gives containers an
+    # open-file limit of about 2^30. LTTng-UST, which every ROS 2 Jazzy process
+    # loads, then allocates and zeroes a 128 MiB descriptor bitmap: about 130 MB
+    # of extra RAM per node. These are the usual systemd defaults.
+    ulimits:
+      nofile:
+        soft: 1024
+        hard: 524288
     network_mode: host
     ipc: host
     restart: unless-stopped
