@@ -91,6 +91,20 @@ def interface_type(type_name):
     return getattr(importlib.import_module(f"{package}.{kind}"), name)
 
 
+def request_message_interval(node, client, message_id, rate_hz, timeout_sec=5.0):
+    """Ask the autopilot to send MAVLink message `message_id` at `rate_hz`
+    (MAV_CMD_SET_MESSAGE_INTERVAL through MAVROS's set_message_interval
+    service, `client`); True once it accepted. Also used by
+    mavros_message_rates.py, which keeps the rates of the BlueOS vehicles."""
+    request = MessageInterval.Request()
+    request.message_id = message_id
+    request.message_rate = rate_hz
+    future = client.call_async(request)
+    rclpy.spin_until_future_complete(node, future, timeout_sec=timeout_sec)
+    response = future.result()
+    return response is not None and bool(response.success)
+
+
 class NavigationReadiness(Node):
     def __init__(self, namespace, actions=None, services=None, require_gps=True):
         super().__init__("navigator_navigation_readiness")
@@ -134,13 +148,8 @@ class NavigationReadiness(Node):
                 self.interval_client.service_is_ready()):
             return False
         for message_id, rate_hz in MESSAGE_RATES_HZ.items():
-            request = MessageInterval.Request()
-            request.message_id = message_id
-            request.message_rate = rate_hz
-            future = self.interval_client.call_async(request)
-            rclpy.spin_until_future_complete(self, future, timeout_sec=5.0)
-            response = future.result()
-            if response is None or not response.success:
+            if not request_message_interval(
+                    self, self.interval_client, message_id, rate_hz):
                 self.get_logger().warning(
                     f"MAVLink interval request failed for message {message_id}; retrying")
                 return False

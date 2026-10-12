@@ -1,0 +1,40 @@
+# MAVLink message rates the airplane stack asks ArduPlane for (README.md,
+# "Telemetry rates"). The airplane_message_rates service of
+# compositions/airplane_hardware.yaml runs
+# applications/aerostack2/scripts/mavros_message_rates.py with this file: it
+# asks at start, after every MAVROS reconnect, and whenever /mavros/imu/data
+# falls below half its rate (an autopilot reboot, a ground station resetting
+# the streams). ArduPlane's own stream rates (SR0_*) gave /mavros/imu/data at
+# about 1 Hz on BlueOS's link. The intervals live in the autopilot's RAM, for
+# that link: no parameter is written.
+#
+# MAVLink message name (or numeric id): rate in Hz.
+message_rates_hz:
+  # Attitude: /mavros/imu/data -> /plane0/sensor_measurements/imu, and the
+  # orientation in every local_position/odom message. MAVROS publishes
+  # imu/data from ATTITUDE_QUATERNION once it has seen one and from ATTITUDE
+  # before that, so both at one rate. 20 Hz as in the airplane simulation
+  # (airplane_sim.yaml's airplane_navigation_ready) and on the Aerodrone:
+  # DemNav and WildNav take the attitude at each camera frame's stamp from
+  # the odometry (interpolated between samples at most 1 s apart, otherwise
+  # the nearest one within 0.25 s), and a banking fixed-wing turns tens of
+  # degrees per second.
+  ATTITUDE: 20
+  ATTITUDE_QUATERNION: 20
+  # imu/data's linear acceleration (and /mavros/imu/data_raw) is the latest
+  # RAW_IMU: at the attitude rate it is never more than a sample old.
+  RAW_IMU: 20
+  # /mavros/local_position/odom -> /plane0/sensor_measurements/odom: the raw
+  # odometry the navigation fusion publishes /airplane/navigation/odometry
+  # at, and DemNav's and WildNav's attitude history.
+  LOCAL_POSITION_NED: 20
+  # /mavros/global_position/global -> /plane0/sensor_measurements/gps, the
+  # DemNav and WildNav search prior (stale after 2 s). MAVROS takes its fix
+  # status and covariance from the latest GPS_RAW_INT. 5 Hz: a GPS
+  # receiver's default update rate on ArduPilot.
+  GLOBAL_POSITION_INT: 5
+  GPS_RAW_INT: 5
+  # /mavros/vfr_hud: airspeed, ground speed, climb rate and throttle.
+  VFR_HUD: 5
+  # /mavros/battery -> /plane0/sensor_measurements/battery.
+  BATTERY_STATUS: 2

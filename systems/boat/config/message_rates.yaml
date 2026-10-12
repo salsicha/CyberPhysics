@@ -1,0 +1,37 @@
+# MAVLink message rates the boat stack asks ArduRover for (README.md,
+# "Telemetry rates"). The boat_message_rates service of
+# compositions/boat_hardware.yaml runs
+# applications/aerostack2/scripts/mavros_message_rates.py with this file: it
+# asks at start, after every MAVROS reconnect, and whenever /mavros/imu/data
+# falls below half its rate (an autopilot reboot, a ground station resetting
+# the streams). ArduRover's own stream rates (SR0_*) gave /mavros/imu/data at
+# about 1 Hz on BlueOS's link. The intervals live in the autopilot's RAM, for
+# that link: no parameter is written.
+#
+# MAVLink message name (or numeric id): rate in Hz.
+message_rates_hz:
+  # Attitude: /mavros/imu/data -> /boat0/sensor_measurements/imu, and the
+  # heading in every local_position/odom message. MAVROS publishes imu/data
+  # from ATTITUDE_QUATERNION once it has seen one and from ATTITUDE before
+  # that, so both at one rate. 10 Hz: the harbor waypoint follower
+  # (applications/boat/scripts/harbor_waypoint_nav.py) steers once per
+  # odometry message, so at its 1.1 m/s and 0.55 rad/s limits successive
+  # updates are 0.11 m and about 3 degrees apart; a hull turns far more
+  # slowly than an aircraft.
+  ATTITUDE: 10
+  ATTITUDE_QUATERNION: 10
+  # imu/data's linear acceleration (and /mavros/imu/data_raw) is the latest
+  # RAW_IMU: at the attitude rate it is never more than a sample old.
+  RAW_IMU: 10
+  # /mavros/local_position/odom -> /boat0/sensor_measurements/odom, the
+  # waypoint follower's input (see above).
+  LOCAL_POSITION_NED: 10
+  # /mavros/global_position/global -> /boat0/sensor_measurements/gps. MAVROS
+  # takes its fix status and covariance from the latest GPS_RAW_INT. 5 Hz: a
+  # GPS receiver's default update rate on ArduPilot.
+  GLOBAL_POSITION_INT: 5
+  GPS_RAW_INT: 5
+  # /mavros/vfr_hud: heading, ground speed and throttle.
+  VFR_HUD: 5
+  # /mavros/battery -> /boat0/sensor_measurements/battery.
+  BATTERY_STATUS: 2

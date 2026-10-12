@@ -1,0 +1,48 @@
+# MAVLink message rates the submarine stack asks ArduSub for (README.md,
+# "Telemetry rates"). The submarine_message_rates service of
+# compositions/submarine_hardware.yaml runs
+# applications/aerostack2/scripts/mavros_message_rates.py with this file: it
+# asks at start, after every MAVROS reconnect, and whenever /mavros/imu/data
+# falls below half its rate (an autopilot reboot, a ground station resetting
+# the streams). ArduSub's default stream rates (SR0_*) gave attitude at
+# 10 Hz but RAW_IMU, the pressure and GPS_RAW_INT at 2 Hz on BlueOS's link,
+# and a vehicle's stored SR0_* values may be lower. The intervals live in
+# the autopilot's RAM, for that link: no parameter is written.
+#
+# MAVLink message name (or numeric id): rate in Hz.
+message_rates_hz:
+  # Attitude: /mavros/imu/data -> /sub0/sensor_measurements/imu, and the
+  # heading in every local_position/odom message. MAVROS publishes imu/data
+  # from ATTITUDE_QUATERNION once it has seen one and from ATTITUDE before
+  # that, so both at one rate. 10 Hz: the pipeline waypoint follower
+  # (applications/submarine/scripts/pipeline_waypoint_nav.py) steers once
+  # per odometry message, so at its 0.45 m/s, 0.4 rad/s and 0.25 m/s
+  # vertical limits successive updates are under 5 cm and about 2 degrees
+  # apart.
+  ATTITUDE: 10
+  ATTITUDE_QUATERNION: 10
+  # imu/data's linear acceleration (and /mavros/imu/data_raw) is the latest
+  # RAW_IMU: at the attitude rate it is never more than a sample old.
+  RAW_IMU: 10
+  # /mavros/local_position/odom -> /sub0/sensor_measurements/odom: position
+  # from the EKF's source (a DVL), z the depth. ArduSub sends it only once
+  # the EKF has an origin.
+  LOCAL_POSITION_NED: 10
+  # /mavros/imu/static_pressure -> /sub0/sensor_measurements/pressure (the
+  # mirror_pressure of bridge.yaml), at the odometry's rate. MAVROS makes it
+  # from SCALED_PRESSURE, the autopilot's barometer 0; it does not publish
+  # SCALED_PRESSURE2, where ArduSub reports an external depth sensor such as
+  # a Bar30 (README.md, "Telemetry rates").
+  SCALED_PRESSURE: 10
+  # /mavros/global_position/global -> /sub0/sensor_measurements/gps (a
+  # surface GPS, if fitted). MAVROS takes its fix status and covariance from
+  # the latest GPS_RAW_INT. 5 Hz: a GPS receiver's default update rate on
+  # ArduPilot.
+  GLOBAL_POSITION_INT: 5
+  GPS_RAW_INT: 5
+  # /mavros/vfr_hud: depth (altitude), heading and throttle. 10 Hz, ArduSub's
+  # default stream rate: a request must not slow the pilot's display.
+  VFR_HUD: 10
+  # /mavros/battery -> /sub0/sensor_measurements/battery. 2 Hz would do;
+  # 3 Hz is ArduSub's default, kept for the same reason.
+  BATTERY_STATUS: 3

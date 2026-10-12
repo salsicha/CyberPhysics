@@ -39,6 +39,30 @@ services:
         --params-file /workspace/config/bridge.yaml
         -p namespace:=${BOAT_NAMESPACE:-boat0}
 
+  boat_message_rates:
+    # Asks ArduRover for the telemetry rates the bridge needs
+    # (systems/boat/config/message_rates.yaml; its own stream rates gave
+    # /mavros/imu/data at about 1 Hz) at start, after every MAVROS
+    # reconnect, and when the attitude stream drops (an autopilot reboot):
+    # systems/boat/README.md, "Telemetry rates". It sends only message
+    # interval commands: no parameter writes, modes or arming.
+    image: salsicha/cyberphysics:boat-${CYBERPHYSICS_TAG:-arm64}
+    container_name: boat_message_rates
+    network_mode: host
+    ipc: host
+    restart: unless-stopped
+    depends_on:
+      - boat_mavros
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    volumes:
+      - ../applications/aerostack2/scripts:/workspace/applications/aerostack2/scripts:ro
+      - ../systems/boat/config:/workspace/config:ro
+      - /dev/shm:/dev/shm
+    command: >
+      python3 /workspace/applications/aerostack2/scripts/mavros_message_rates.py
+        --namespace /mavros --rates /workspace/config/message_rates.yaml
+
   boat_rosbridge:
     # Port 9092: BlueOS's Cable Guy holds 9090 on the host network. Host
     # IPC and /dev/shm, or Fast DDS's shared-memory transport delivers it

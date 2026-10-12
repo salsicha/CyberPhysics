@@ -3,7 +3,7 @@
 # Reuses the shared BlueOS navigation core (MAVROS, OAK-1 MegaDepth,
 # DemNav, WildNav, rosbridge) with airplane container names, topics, and
 # scenario values supplied by systems/airplane/config/blueos.env; only the
-# MAVROS mirror bridge service is airplane-specific.
+# MAVROS mirror bridge and the telemetry-rate service are airplane-specific.
 
 include:
   - path: blueos_nav_core.yaml
@@ -30,3 +30,28 @@ services:
         --ros-args
         --params-file /workspace/systems/airplane/config/mavros_bridge.yaml
         -p namespace:=${VEHICLE_NAMESPACE:-plane0}
+
+  airplane_message_rates:
+    # Asks ArduPlane for the telemetry rates the bridge and the navigation
+    # need (systems/airplane/config/message_rates.yaml; its own stream rates
+    # gave /mavros/imu/data at about 1 Hz) at start, after every MAVROS
+    # reconnect, and when the attitude stream drops (an autopilot reboot):
+    # systems/airplane/README.md, "Telemetry rates". It sends only message
+    # interval commands: no parameter writes, modes or arming.
+    image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-arm64}
+    container_name: airplane_message_rates
+    network_mode: host
+    ipc: host
+    restart: unless-stopped
+    depends_on:
+      - mavros
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    volumes:
+      - ../applications/aerostack2/scripts:/workspace/applications/aerostack2/scripts:ro
+      - ../systems/airplane/config:/workspace/systems/airplane/config:ro
+      - /dev/shm:/dev/shm
+    command: >
+      python3 /workspace/applications/aerostack2/scripts/mavros_message_rates.py
+        --namespace /mavros
+        --rates /workspace/systems/airplane/config/message_rates.yaml
