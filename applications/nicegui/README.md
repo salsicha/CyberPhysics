@@ -90,6 +90,8 @@ Each camera is sent as JPEG frames, set by three variables per stream (`racecar_
 | Front camera | `UI_CAMERA_HZ` (0 turns it off) | `UI_CAMERA_MAX_WIDTH` | `UI_CAMERA_JPEG_QUALITY` | 5, 480, 75 |
 | Turret camera | `UI_TURRET_CAMERA_HZ` | `UI_TURRET_CAMERA_MAX_WIDTH` | `UI_TURRET_CAMERA_JPEG_QUALITY` | 8, 640, 75 |
 
+The `depth` freshness light follows `UI_DEPTH_TOPIC`: Depth Anything's `/depth_anything/depth/image` by default (the simulators), and on the car, whose nvblox reads the RealSense's aligned depth, `/camera/aligned_depth_to_color/camera_info` (a topic ending in `camera_info` is watched as `CameraInfo`, so the page does not receive the depth images).
+
 Values are clamped to 0.5-30 Hz, 160-1920 px and quality 10-95; an unreadable value keeps the default. Frames are scaled down keeping their aspect ratio, never up. The page refreshes at 5 Hz, so a browser shows at most 5 frames per second of a stream; a faster rate only shortens the delay to the newest frame. The front camera is sent only while its panel is open. The map is a PNG sent on each `/map` (SLAM Toolbox: every 2 s).
 
 The defaults suit a local link: one browser takes about 1.5-3 Mbit/s with both cameras (`systems/racecarneo/README.md`, "Long-range link", has the estimate). Over the car's long-range Wi-Fi HaLow link `compositions/racecarneo_hardware.yaml` and `racecar_turret_hardware.yaml` lower them to 2 Hz, 320 px, quality 60 (front) and 4 Hz, 480 px, quality 60 (turret): about 0.5-0.9 Mbit/s. The tracker works on the camera's own frames; only the page's copy is smaller.

@@ -48,7 +48,7 @@ from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy, qos_profile_sensor_data
 from rclpy.time import Time
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import CameraInfo, Image
 from std_msgs.msg import Bool, String
 from tf2_ros import Buffer, TransformException, TransformListener
 
@@ -72,6 +72,10 @@ CAR = env_flag('UI_CAR', True) or not TURRET
 TITLE = ('RACECAR Turret' if CAR else 'PanTiltROS Turret') if TURRET else 'RACECAR Neo'
 # The camera the tracker uses (the standalone turret's may be a RealSense's)
 TURRET_CAMERA_TOPIC = os.environ.get('UI_TURRET_CAMERA_TOPIC', '/turret/camera/image_raw')
+# The depth freshness light. The car's nvblox reads the RealSense's aligned
+# depth, so the hardware stacks watch its camera_info (a few hundred bytes)
+# rather than the 614 kB images; the simulators keep Depth Anything's image.
+DEPTH_TOPIC = os.environ.get('UI_DEPTH_TOPIC', '/depth_anything/depth/image')
 # Manual driving at full stick, below cmd_vel_to_ackermann's own limits.
 DRIVE_LIMITS = logic.DriveLimits(
     max_speed=float(os.environ.get('UI_MAX_SPEED', '0.3')),
@@ -191,8 +195,8 @@ class RacecarNeoGuiNode(Node):
             self.create_subscription(Odometry, '/odom', self.handle_odom, 10)
             self.create_subscription(Image, '/camera/color/image_raw', self.handle_camera,
                                      qos_profile_sensor_data)
-            self.create_subscription(Image, '/depth_anything/depth/image', self.handle_depth,
-                                     qos_profile_sensor_data)
+            self.create_subscription(CameraInfo if DEPTH_TOPIC.endswith('camera_info') else Image,
+                                     DEPTH_TOPIC, self.handle_depth, qos_profile_sensor_data)
             self.create_subscription(OccupancyGrid, '/map', self.handle_map, LATCHED_QOS)
             self.create_subscription(NavPath, '/plan', self.handle_plan, 10)
             self.create_subscription(String, '/racecarneo/control_status', self.handle_control_status, 10)
@@ -234,7 +238,7 @@ class RacecarNeoGuiNode(Node):
         with self.frame_lock:
             self.latest_frame = msg
 
-    def handle_depth(self, msg: Image) -> None:
+    def handle_depth(self, msg) -> None:
         self.state.depth_time = time.monotonic()
 
     def handle_map(self, msg: OccupancyGrid) -> None:

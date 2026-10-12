@@ -205,3 +205,18 @@ def test_racecarsim_camera_mount_is_the_measured_one():
     assert (x, y, z) == (0.10, 0.0, 0.120)
     # Negative pitch about y: the optical axis tilts up (ROS rpy).
     assert math.degrees(pitch) == pytest.approx(-0.81, abs=0.01) and roll == yaw == 0.0
+
+
+def test_the_cars_depth_light_follows_the_realsense_depth_nvblox_reads():
+    # The page's depth light would stay red on the car if it watched Depth
+    # Anything, which runs there only under its profile
+    import yaml
+    for name in ('racecarneo_hardware.yaml', 'racecar_turret_hardware.yaml'):
+        text = (REPO / 'compositions' / name).read_text()
+        if name == 'racecarneo_hardware.yaml':
+            env = yaml.safe_load(text)['services']['racecarneo_nicegui']['environment']
+            assert ('UI_DEPTH_TOPIC=${UI_DEPTH_TOPIC:-/camera/aligned_depth_to_color/camera_info}'
+                    in env)
+    main = (REPO / 'applications/nicegui/scripts/main.py').read_text()
+    assert "DEPTH_TOPIC = os.environ.get('UI_DEPTH_TOPIC', '/depth_anything/depth/image')" in main
+    assert "CameraInfo if DEPTH_TOPIC.endswith('camera_info') else Image" in main

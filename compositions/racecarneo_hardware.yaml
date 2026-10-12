@@ -252,6 +252,8 @@ services:
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
       - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+      # Depth light: the RealSense's aligned depth that nvblox reads
+      - UI_DEPTH_TOPIC=${UI_DEPTH_TOPIC:-/camera/aligned_depth_to_color/camera_info}
       - UI_CAMERA_HZ=${UI_CAMERA_HZ:-2}
       - UI_CAMERA_MAX_WIDTH=${UI_CAMERA_MAX_WIDTH:-320}
       - UI_CAMERA_JPEG_QUALITY=${UI_CAMERA_JPEG_QUALITY:-60}
