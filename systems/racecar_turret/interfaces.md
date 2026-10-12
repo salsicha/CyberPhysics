@@ -182,8 +182,8 @@ the shot. It runs only when all of these hold:
 - for a `person`, the aim point is on the torso, at `person_aim_fraction`
   (default 0.6) of the box height from its top, never the head; and the
   box is no taller than `person_max_box_fraction` of the image (default
-  0.6, roughly closer than 2 m with the turret camera), otherwise "too
-  close";
+  0.6, roughly closer than 2.7 m for a 1.7 m person with the turret
+  camera), otherwise "too close";
 - the launcher is idle (rack forward, trigger safe), no cycle is running,
   and darts remain;
 - at least `tag_min_interval_s` has passed since the last shot.

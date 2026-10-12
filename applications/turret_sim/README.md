@@ -93,13 +93,15 @@ tracker follows that one ID, and acknowledge a fault as on the page
 (disarm for 0.5 s, then arm; a primed launcher is cleared by hand first, no
 shot), so it fires again; that changes the tracking (a lock sticks to a
 mis-detected box, the disarms stop the turret), so the tracking metrics of
-such a run are not comparable. Even locked, the cart's ID rarely lasts the
-3.6 s from Fire to the shot with the stock checkpoint (the rack reaches the
-sear, then the box is lost while chambering); the cycle time on this
-launcher model with a steady target is checked in
-`tests/test_turret_launcher.py` (a shot 3.6 s after Fire, ready again
-after 4.0 s). The metrics file's `launcher` section records the presses, the
-acknowledged faults, the status's `last_tag` changes and launcher phases, each shot with its cycle
+such a run are not comparable. Even locked, the cart's ID often does not
+last the 2 s from Fire to the shot with the stock checkpoint (the box is
+lost while priming or chambering); the cycle time on this launcher model
+with a steady target is checked in `tests/test_turret_launcher.py` (a shot
+2.04 s after Fire, ready again after 2.47 s; one closed-loop run with the
+lock timeout raised to 2 s fired 2.05 s after Fire). The model moves the
+servos at the commanded speed, with no torque or load. The metrics file's
+`launcher` section records the presses, the acknowledged faults, the
+status's `last_tag` changes and launcher phases, each shot with its cycle
 time (`press_to_shot_s`, Fire to the sear's release; `press_to_ready_s`,
 Fire to ready again) and the true aim error when it left
 (`true_aim_error_deg`: a shot at a mis-detected box shows here), the

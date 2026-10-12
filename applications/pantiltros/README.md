@@ -255,14 +255,18 @@ is none.
 Each step is verified against the measured joints in `/turret/joint_states`
 (the rack within 2 mm, the trigger within 0.05 rad): a step not reached
 within `tag_stroke_timeout_s` (3 s; the 38 mm draw takes 0.92 s at the
-servo speed), or no measured position, is a fault. A shot leaves 2.0 s
-after Fire and the launcher is ready again after 2.5 s (on the turret
-simulator's launcher model, `tests/test_turret_launcher.py`), so with the
-2 s minimum interval a clip goes at about one dart every 4.5 s. Loaded
-(priming needs about 0.9-1.05 N m of the servo's 2.9), the rack may run
-slower than the commanded speed: measure the cycle at bring-up. With the
-safety catch on, the trigger stalls against it and the cycle faults ("trigger
-not reached"). The commanded draw and
+servo speed), or no measured position, is a fault. A shot leaves 2.04 s
+after Fire and the launcher is ready again after 2.47 s (the tracker
+driving the turret simulator's launcher model at the commanded 2000
+steps/s, a steady target: `tests/test_turret_launcher.py`), so with the
+2 s minimum interval a clip goes at about one dart every 4.5 s. That holds
+if the servos' torque limits (55 % and 30 %) only cap their torque:
+priming needs about 0.9-1.05 N m of the 1.6 the rack is allowed. If they
+cap the PWM duty instead, which also lowers the speed under load, the
+estimate is about 3.3 s to the shot and 4.0 s to ready (priming about
+1.8 s, inside the 3 s step timeout). Measure the cycle at bring-up. With
+the safety catch on, the trigger stalls against it and the cycle faults
+("trigger not reached"). The commanded draw and
 fire angle are also bounded in time: never longer than that timeout (plus
 the hold for the trigger) after the step began. A cycle in progress stops
 on the emergency stop, the actuator going not ready, any `lock`, `release`,
