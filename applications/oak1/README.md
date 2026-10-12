@@ -99,6 +99,13 @@ keep their rate and depth frames are 0.5 s old (measured on an OAK-1, below);
 MegaDepth's own rate is unchanged or better (4.0-4.6 Hz before, 4.6 Hz
 after). Its topics are still stamped when the host receives them.
 
+With no OAK-1 connected the node waits for one instead of exiting: it logs
+`Waiting for an OAK-1 on USB or the network (...)` once and then every
+minute, and tries to open the camera again every `device_retry_period_s`
+(5 s) until one is found. It used to exit, and Docker restarted the container
+in a loop (21 restarts in 10 minutes on the BlueOS Raspberry Pi 5); waiting,
+it used under 2 % of one core there.
+
 The model is tracked with Git LFS. Run `git lfs pull` before building; the
 Docker build rejects the pointer file if the binary has not been fetched.
 

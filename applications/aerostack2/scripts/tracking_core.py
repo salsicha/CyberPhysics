@@ -48,8 +48,7 @@ ReferenceShaper limits how fast the reference moves (the maximum speed) and
 how far it runs ahead of the aircraft. Heights are kept within
 [min_agl_m, max_agl_m] of the ground below the set-point; the slant
 depression is kept where the camera still sees the target
-(min_depression_for_fov), a body-fixed camera's also when the aircraft
-tilts toward the target (TrackerCore.update_tilt_raise).
+(min_depression_for_fov).
 
 Time
 ----
@@ -117,16 +116,14 @@ class TrackerConfig:
     lead_s: float = 2.5
     lead_adapt_rate: float = 0.2
     max_lead_extra_s: float = 2.5
+    # A new filter's velocity is noise (a few m/s from two fixes 0.2 s
+    # apart): the lead grows from 0 to its full length over lead_ramp_s of
+    # its life.
+    lead_ramp_s: float = 2.0
     lost_timeout_s: float = 3.0
     slant_range_m: float = 60.0
     depression_deg: float = 70.0
     fov_margin_deg: float = 4.5
-    # Slant, body-fixed camera: the aircraft's tilt toward the target turns
-    # the camera away from it; the depression floor rises by that tilt
-    # (update_tilt_raise), taken at once and let go over tilt_release_s,
-    # at most max_tilt_raise_deg.
-    tilt_release_s: float = 5.0
-    max_tilt_raise_deg: float = 15.0
     pixel_sigma_px: float = 3.0
     attitude_sigma_deg: float = 1.0
     terrain_sigma_m: float = 3.0
@@ -362,26 +359,14 @@ def long_axis_half_fov_rad(intrinsics):
     return math.atan(0.5 * intrinsics.height / intrinsics.fy)
 
 
-def min_depression_for_fov(intrinsics, margin_deg, tilt_deg=0.0):
+def min_depression_for_fov(intrinsics, margin_deg):
     """Smallest depression (deg) that keeps a target on the long axis
-    margin_deg inside the image edge, never below the contract's 60;
-    tilt_deg: how far the camera is turned away from the target (a
-    body-fixed camera on an aircraft tilting toward it)."""
+    margin_deg inside the image edge, never below the contract's 60."""
     if intrinsics is None:
-        return min(MAX_DEPRESSION_DEG, MIN_DEPRESSION_DEG + max(0.0, float(tilt_deg)))
+        return MIN_DEPRESSION_DEG
     half = math.degrees(long_axis_half_fov_rad(intrinsics))
     return min(MAX_DEPRESSION_DEG,
-               max(MIN_DEPRESSION_DEG,
-                   90.0 - (half - float(margin_deg)) + max(0.0, float(tilt_deg))))
-
-
-def tilt_toward_deg(quaternion, bearing_rad):
-    """How far (deg) the body's up axis leans toward the horizontal
-    bearing: a nadir camera fixed to the body then looks that far away from
-    a target there (negative: toward it)."""
-    up = quaternion_matrix(*quaternion)[:, 2]
-    along = up[0] * math.cos(bearing_rad) + up[1] * math.sin(bearing_rad)
-    return math.degrees(math.atan2(along, up[2]))
+               max(MIN_DEPRESSION_DEG, 90.0 - (half - float(margin_deg))))
 
 
 def camera_world_rotation(quaternion, mount_yaw_rad, stabilized=False):
@@ -604,6 +589,7 @@ class ConstantVelocityFilter:
         self.P[3:, 3:] = np.diag([speed ** 2, speed ** 2,
                                   (0.2 * speed) ** 2])
         self.t = float(t)
+        self.created = float(t)
         self.rejections = 0
         # Turn rate (rad/s) of the filtered heading, low-pass: the set-points
         # predict a turning target along its arc (predicted_turning).
@@ -914,9 +900,6 @@ class Drone:
     agl_m: float = None        # height above ground, if known
     flying: bool = True
     busy: str = ''             # a behaviour that must not be pre-empted
-    # (x, y, z, w) world <- body when the camera turns with it (body-fixed);
-    # None for a roll/pitch-stabilised camera.
-    camera_tilt_quaternion: tuple = None
 
 
 @dataclass
@@ -946,10 +929,6 @@ class TrackerCore:
     following: bool = False
     retry_at: float = 0.0
     fov_min_depression: float = MIN_DEPRESSION_DEG
-    # Slant: the depression floor's rise for the aircraft's tilt toward
-    # the target (deg, update_tilt_raise) and when it was last updated.
-    tilt_raise: float = 0.0
-    tilt_at: float = None
     notes: tuple = ()
     # Learnt on top of lead_s: ArduPilot's lag behind a moving position
     # target, a property of the autopilot, kept across tracks.
@@ -1194,46 +1173,15 @@ class TrackerCore:
                 yaw = self.yaw_hold = travel
             return centered_setpoint(target, agl, yaw, ground_fn, self.config)
         self.fov_min_depression = min_depression_for_fov(
-            intrinsics, self.config.fov_margin_deg, self.tilt_raise)
+            intrinsics, self.config.fov_margin_deg)
         depression = max(self.command.depression_deg, self.fov_min_depression)
         if depression > self.command.depression_deg:
-            tilted = (f', aircraft tilt {self.tilt_raise:.0f} deg'
-                      if self.tilt_raise >= 0.5 else '')
             notes.append(f'depression held at {depression:.1f} deg '
-                         f'(camera field of view{tilted})')
+                         '(camera field of view)')
         return slant_setpoint(
             target, drone.position, self.command.slant_range_m, depression,
             self.bearing, mount_yaw_rad, drone.yaw, ground_fn, self.config,
             intrinsics)
-
-    def update_tilt_raise(self, now, drone, target):
-        """Slant with a body-fixed camera: the aircraft tilts toward where
-        it accelerates or flies against the drag, which turns the camera
-        away from a target it chases, out toward the image edge (in Gazebo
-        at 3.5 m/s, 12 deg of tilt put the car 40 px outside the image
-        where a level camera had it 100 px inside). The depression floor
-        rises by that tilt, at once, and comes down over tilt_release_s,
-        so the set-point does not chase every swing of the attitude."""
-        quaternion = drone.camera_tilt_quaternion
-        last, self.tilt_at = self.tilt_at, now
-        if quaternion is None or self.command is None or self.command.mode != 'slant':
-            self.tilt_raise = 0.0
-            return
-        d_east, d_north = target[0] - drone.position[0], target[1] - drone.position[1]
-        if math.hypot(d_east, d_north) > 1.0:
-            bearing = math.atan2(d_north, d_east)
-        elif self.bearing is not None:
-            bearing = self.bearing
-        else:
-            return
-        tilt = min(max(tilt_toward_deg(quaternion, bearing), 0.0),
-                   self.config.max_tilt_raise_deg)
-        if tilt >= self.tilt_raise:
-            self.tilt_raise = tilt
-        else:
-            dt = 0.0 if last is None else min(max(now - last, 0.0), 1.0)
-            self.tilt_raise += (tilt - self.tilt_raise) * min(
-                1.0, dt / max(self.config.tilt_release_s, 1e-3))
 
     def adapt_lead(self, now, drone, setpoint_now, velocity, turn_rate=0.0):
         """Learn the lead ArduPilot needs: while following a target moving
@@ -1244,10 +1192,15 @@ class TrackerCore:
         max_lead_extra_s]; only while the target drives straight (a turn
         adds lag the arc prediction makes up), not while catching up (more
         than max_reference_lead_m off) or when the target outruns the
-        limit."""
+        limit, and only centered: the slant set-point lies on the bearing
+        from the aircraft itself, so the aircraft's offset from it is not a
+        lag (in Gazebo, learnt at each slant start, the lead swung between
+        -1.6 and +2.5 s and the aircraft rolled 10-20 deg either way every
+        5-6 s, throwing the car out of the image)."""
         last, self.adapted_at = self.adapted_at, now
         speed = math.hypot(velocity[0], velocity[1])
         if (last is None or not self.following or speed < 1.0 or
+                self.command is None or self.command.mode != 'centered' or
                 speed > 0.9 * self.config.max_speed_mps or
                 abs(turn_rate) > 0.05):
             return
@@ -1262,18 +1215,23 @@ class TrackerCore:
 
     def setpoint(self, now, drone, ground_fn, mount_yaw_rad, intrinsics=None):
         """Where the aircraft should be: the mode's set-point for the target
-        predicted lead_s (plus the learnt lead_extra_s) ahead, or None."""
+        predicted lead_s (plus the learnt lead_extra_s) ahead, or None. A
+        filter younger than lead_ramp_s predicts proportionally less far:
+        its velocity is still noise (in Gazebo's slant flights each new
+        filter after a re-selection threw the reference about, the aircraft
+        rolled 15 deg either way within 2 s and lost the car again)."""
         if self.state != 'tracking' or self.filter is None:
             self.adapted_at = None
             return None
         notes = []
         state_now = self.filter.predicted_turning(now)
-        self.update_tilt_raise(now, drone, state_now[:3])
         setpoint_now = self._mode_setpoint(state_now, drone, ground_fn,
                                            mount_yaw_rad, intrinsics, [], steer=False)
         self.adapt_lead(now, drone, setpoint_now, state_now[3:5],
                         self.filter.turn_rate)
         lead = self.config.lead_s + self.lead_extra_s
+        if self.config.lead_ramp_s > 0.0:
+            lead *= min(1.0, max(0.0, now - self.filter.created) / self.config.lead_ramp_s)
         state = self.filter.predicted_turning(now + lead)
         setpoint = self._mode_setpoint(state, drone, ground_fn,
                                        mount_yaw_rad, intrinsics, notes)

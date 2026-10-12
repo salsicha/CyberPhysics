@@ -369,52 +369,8 @@ def test_field_of_view_limits_the_depression():
     assert 'depression held at 64.5 deg' in status['message']
 
 
-def test_tilt_toward_a_bearing():
-    """The body's up axis leaning toward the bearing: a nose-down pitch
-    leans it ahead, a right roll to the right."""
-    assert tc.tilt_toward_deg(quaternion(pitch_deg=10.0), 0.0) == pytest.approx(10.0)
-    assert tc.tilt_toward_deg(quaternion(pitch_deg=10.0), math.pi) == pytest.approx(-10.0)
-    assert tc.tilt_toward_deg(quaternion(pitch_deg=10.0), math.pi / 2) == pytest.approx(0.0)
-    assert tc.tilt_toward_deg(quaternion(roll_deg=8.0, yaw_deg=90.0), 0.0) == pytest.approx(
-        8.0, abs=1e-6)
-
-
 SLANT70 = ('{"action": "track", "target_id": "3", "mode": "slant", '
            '"slant_range_m": 60, "depression_deg": 70}')
-
-
-def test_aircraft_tilt_toward_the_target_raises_the_depression():
-    """Gazebo's body-fixed camera, a car 20.5 m east of the aircraft that
-    chases it, nose-down 12 deg (the Gazebo test flights' tilt where the
-    car left the image): the floor rises from 64.5 deg to 76.5, which
-    keeps the car 4.5 deg inside the image through the tilted camera; it
-    comes down over tilt_release_s once level, and a stabilised camera
-    (no camera_tilt_quaternion) never raises it."""
-    tilted = quaternion(pitch_deg=12.0)
-    core = tracking_core_at((20.5, 0.0, 0.0), SLANT70, now=0.0)
-    drone = tc.Drone((0.0, 0.0, 56.4), 0.0, 56.4, camera_tilt_quaternion=tilted)
-    point = core.setpoint(0.1, drone, flat(), 0.0, GAZEBO)
-    assert point.depression_deg == pytest.approx(76.5, abs=0.1)
-    assert 'aircraft tilt 12 deg' in core.status(0.1, drone.position)['message']
-    # The car through the tilted camera at that geometry: inside the edge.
-    standoff = 60.0 * math.cos(math.radians(point.depression_deg))
-    height = 60.0 * math.sin(math.radians(point.depression_deg))
-    pose_at = tc.Pose((20.5 - standoff, 0.0, height),
-                      quaternion(pitch_deg=12.0, yaw_deg=math.degrees(point.yaw)), 0, 0.0)
-    u, v, _ = tc.project_point((20.5, 0.0, 0.0), pose_at.position,
-                               tc.camera_world_rotation(pose_at.quaternion, 0.0), GAZEBO)
-    edge = min(u, GAZEBO.width - u)
-    assert math.degrees(math.atan((GAZEBO.cx - edge) / GAZEBO.fx)) <= 30.0 - 4.4
-    # Level again: down to 70 (the command) within a few release times.
-    level = tc.Drone((0.0, 0.0, 56.4), 0.0, 56.4, camera_tilt_quaternion=quaternion())
-    for k in range(1, 300):
-        point = core.setpoint(0.1 + 0.1 * k, level, flat(), 0.0, GAZEBO)
-    assert point.depression_deg == pytest.approx(70.0, abs=0.05)
-    assert core.tilt_raise < 0.05
-    # A stabilised camera does not turn with the aircraft.
-    core = tracking_core_at((20.5, 0.0, 0.0), SLANT70, now=0.0)
-    steady = tc.Drone((0.0, 0.0, 56.4), 0.0, 56.4)
-    assert core.setpoint(0.1, steady, flat(), 0.0, GAZEBO).depression_deg == pytest.approx(70.0)
 
 
 def test_reference_shaper_limits_speed_lead_and_turn_rate():
@@ -617,9 +573,21 @@ def test_status_json_carries_the_contract_fields():
 def test_setpoint_aims_at_the_target_predicted_lead_s_ahead():
     core = tracking_core_at((0.0, 0.0, 0.0), now=0.0)
     core.filter.x[3:] = (4.0, 0.0, 0.0)
+    core.filter.created = -CONFIG.lead_ramp_s
     point = core.setpoint(0.0, flying(), flat(), 0.0, OAK1)
     assert point.position[0] == pytest.approx(4.0 * CONFIG.lead_s)
     assert point.position[2] == pytest.approx(40.0)
+
+
+def test_a_new_filter_leads_less_until_its_velocity_settles():
+    """Placed just now, the target is aimed at where it is; the lead grows
+    to lead_s over lead_ramp_s of the filter's life."""
+    core = tracking_core_at((0.0, 0.0, 0.0), now=0.0)
+    core.filter.x[3:] = (4.0, 0.0, 0.0)
+    assert core.setpoint(0.0, flying(), flat(), 0.0, OAK1).position[0] == pytest.approx(0.0)
+    core.filter.t = 1.0
+    half = core.setpoint(1.0, flying(), flat(), 0.0, OAK1).position[0]
+    assert half == pytest.approx(4.0 * 0.5 * CONFIG.lead_s)
 
 
 @pytest.mark.parametrize('mount_deg', [0.0, 90.0])
@@ -718,10 +686,11 @@ def test_every_tracker_parameter_has_a_config_field_or_a_node_default():
 
 def test_lead_is_learnt_from_the_lag_behind_a_steady_target():
     """An aircraft 3 m behind a centered set-point while the target drives
-    east at 3 m/s needs 1 s more lead; one ahead, less; a fast target or a
-    catch-up teaches nothing."""
-    def run(offset_e, speed=3.0, seconds=30.0, following=True):
-        core = tracking_core_at((0.0, 0.0, 0.0), now=0.0)
+    east at 3 m/s needs 1 s more lead; one ahead, less; a fast target, a
+    catch-up or the slant mode (whose set-point is on the bearing from the
+    aircraft itself) teaches nothing."""
+    def run(offset_e, speed=3.0, seconds=30.0, following=True, text=TRACK):
+        core = tracking_core_at((0.0, 0.0, 0.0), text, now=0.0)
         core.following = following
         core.filter.x[3:] = (speed, 0.0, 0.0)
         t = 0.0
@@ -741,6 +710,7 @@ def test_lead_is_learnt_from_the_lag_behind_a_steady_target():
     assert run(-30.0) == 0.0                               # catching up
     assert run(-3.0, following=False) == 0.0
     assert run(-3.0, speed=0.5) == 0.0                     # (nearly) still
+    assert run(-3.0, text=SLANT70) == 0.0                  # slant
 
 
 def test_a_turning_target_is_predicted_along_its_arc():

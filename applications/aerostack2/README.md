@@ -30,8 +30,9 @@ connects to the TCP server of BlueOS's MAVLink router (its protected
 "Internal Link" endpoint), so no BlueOS setting changes. It joins as MAVLink
 component 1:191 (onboard controller), which no BlueOS service uses
 (mavlink2rest is 1:194, the camera manager 1:100-105), and it opens no serial
-port: ArduPilot keeps the Navigator's UARTs. MAVROS reconnects by itself when
-BlueOS restarts its router. The previous default, `udp://0.0.0.0:14550@`,
+port: ArduPilot keeps the Navigator's UARTs. BlueOS restarts its router with
+the autopilot (a firmware install, say); MAVROS retries the lost link every
+30 s and reconnects. The previous default, `udp://0.0.0.0:14550@`,
 received nothing on a stock BlueOS (1.4.2 checked on the Pi 5): its GCS Client
 Link goes to the topside computer (192.168.2.1:14550) and its GCS Server Link,
 a UDP server on 0.0.0.0:14550, is disabled. To use UDP anyway, add a BlueOS
@@ -203,16 +204,17 @@ geoid and camera geometry it uses.
   new target), so both aim at the target predicted ahead, along its arc when
   it turns (a coordinated turn at the filtered heading's rate): `lead_s`
   (2.5 s) plus a lead learnt from how far the aircraft trails a target
-  driving straight (`lead_adapt_rate`, within `max_lead_extra_s` either
-  way). The reference
+  driving straight, followed centered (`lead_adapt_rate`, within
+  `max_lead_extra_s` either way; the slant set-point lies on the bearing from
+  the aircraft itself, so the aircraft's offset from it is no lag); a filter
+  just started, whose velocity is still noise, leads less, growing to the full
+  lead over `lead_ramp_s` (2 s). The reference
   moves at most `max_speed_mps` (ArduPilot flies position targets at
   `WPNAV_SPEED`, 5 m/s, at most anyway) and stays within
   `max_reference_lead_m` of the aircraft; heights stay 15-120 m above the
   ground under the set-point, and the depression is raised until the target
   stays `fov_margin_deg` inside the image's long axis (60 deg with the OAK-1,
-  64.5 with Gazebo's 60-degree camera), with a body-fixed camera also by the
-  aircraft's tilt toward the target, which turns the camera away from it
-  (taken at once, let go over `tilt_release_s`).
+  64.5 with Gazebo's 60-degree camera).
 - **Pre-emption.** A track command stops a running `GoToBehavior` or
   `FollowPathBehavior` (their `_behavior/stop` service): the drone's map-goal
   tree then ends and `restart: always` starts it again for the next goal.
@@ -261,7 +263,66 @@ height, median / p95; slant range within 5 / 12 m, depression within 8 deg
 and at most 8 deg shallower, p95), tracking 90 % of the time, recall 0.8, at
 most 3 re-selections in 150 s.
 
-@@RESULTS@@
+Measured 2026-10-11 and 12 with the YOLO detector (`ROS_DOMAIN_ID=92`;
+median / p95 against truth; the limit in brackets). Gazebo runs with the test
+layer's `GAZEBO_TWIST_IN_BODY_FRAME=true`. Isaac runs at 0.2x real time, so its
+follow steps were 120 s (`TRACKING_TEST_CENTERED_S=TRACKING_TEST_SLANT_S=120`)
+to keep a run within 40 minutes of the shared machine (38 min; 150 s steps
+take about 50). Every check passed in each run:
+
+| | Gazebo, run 1 | Gazebo, run 2 | Isaac |
+|---|---|---|---|
+| centered: distance from the car, m [12.5 / 17.5] | 1.0 / 3.7 | 1.0 / 3.6 | 2.1 / 5.7 |
+| centered: tracking [90 %], re-selections [3] | 100 %, 0 | 100 %, 0 | 100 %, 0 |
+| slant: range error, m [5 / 12] | 1.0 / 2.1 | 1.0 / 3.1 | 1.5 / 3.9 |
+| slant: depression error, deg [8 median]; shallower, p95 [8] | 1.5 / 3.3; 0.0 | 1.9 / 3.2; 1.8 | 4.1 / 5.6; 0.5 |
+| slant: tracking, re-selections | 100 %, 0 | 99 %, 1 | 100 %, 0 |
+| target estimate error (centered, slant), m | 0.5, 0.4 | 0.5, 0.5 | 0.4, 0.5 |
+| car recall [0.8] (centered, slant); its IDs; followed [0.8] | 0.98, 0.97; 5, 4; 0.99, 1.00 | 0.98, 0.99; 4, 6; 0.99, 0.99 | 1.00, 1.00; 1, 8; 1.00, 1.00 |
+| lost (hidden 8 s): lost after [4 s], drift [1 m], tracking again after shown [8 s] | 1.6 s, 0.05 m, 1.2 s | 2.9 s, 0.13 m, 1.2 s | 3.1 s, 0.04 m, 0.8 s |
+| stop, map goal, GoTo | pass | pass | pass |
+| detections (simulation / wall time) [4.5 Hz], per frame | 5.0 / 5.0 Hz, 73 ms | 5.0 / 5.0 Hz, 71 ms | 10 / 2.2 Hz, 73 ms |
+| host CPU busy (20 cores) | 55 % | 55 % | 39 % |
+
+The first results (2026-10-11, the first scenario: every stack failing on
+re-selections, Isaac's slant tracking 72 % of the time with 49 of them) had
+three causes, each fixed:
+
+- **A scenario that could not be followed.** The first car lapped a
+  26 m x 16 m circuit at the aircraft's own 5 m/s limit: the aircraft trailed
+  it by 10-11 m (median; 16-17 m p95) and the car left the image. The car now
+  drives at 3.5 m/s on a 116 m x 26 m oval (above): the aircraft is 1-2 m
+  from it centered.
+- **Wall-clock timeouts and limits.** `lost_timeout_s` and the handover window
+  were wall time, 0.6 s of Isaac's simulation, and so were
+  the filter's time steps, the lead and the reference's speed and yaw rate: in
+  Isaac the lead was a fifth of what ArduPilot needs and the reference ran at
+  five times the speed limit, which is why its slant lost the car at the image
+  edge, the aircraft 5-15 deg shallower than commanded (p95 10 deg). The
+  tracker now runs on the simulation clock (`TRACKING_USE_SIM_TIME`).
+- **The camera's view of the car.** With a held yaw the car drove along the
+  image's short axis half the time, where the image reaches least far and
+  where the detector found it less often (in a Gazebo slant step, in 60 % of
+  the frames against 92 % lying along the long axis). The centered mode now
+  yaws the car's travel along the long axis.
+
+Two of the Gazebo runs in between failed the slant step, and showed two
+more: a lead learnt in slant (where the set-point lies on the bearing from
+the aircraft itself) swung between -1.6 and +2.5 s, and each new filter after a
+re-selection threw the reference about with its untrained velocity; either
+rolled the aircraft 10-20 deg every few seconds and its body-fixed camera
+lost the car again. The lead is now learnt only centered, and a new filter's
+lead grows over `lead_ramp_s`. Raising the slant depression by the aircraft's
+tilt toward the target, tried for the same losses, fed the oscillation (the
+set-point jumps toward the target, the aircraft tilts further) and is not
+used.
+
+The scorer's thresholds are unchanged. The centered ones are fractions of the
+height that keep the car well inside the narrowest image (0.25 and 0.35 of the
+height against the 0.43 the 60-degree camera sees to either side); the
+followable scenario now passes them by a wide margin (p95 3.6-5.7 m against
+17.5 m), so they could be tightened to grade the control.
+
 Gazebo's ground-truth twist is the body-frame velocity, which
 `gazebo_ardupilot_backend.py` hands ArduPilot as ENU unless
 `GAZEBO_TWIST_IN_BODY_FRAME=true` (the test's `tools/tracking_sim_test_gazebo.yaml`

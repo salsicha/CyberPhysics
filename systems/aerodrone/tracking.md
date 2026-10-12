@@ -69,11 +69,7 @@ These were fixed while the parts were built and tested:
   ground level under the target.
 - Slant defaults: `slant_range_m` 60, `depression_deg` 70. The depression is
   raised above 60 deg when the camera's field of view is narrower than the
-  OAK-1's, so the target stays 4.5 deg inside the image. With a body-fixed
-  camera (the OAK-1; Gazebo's and Isaac's) it is also raised by the
-  aircraft's tilt toward the target, which turns the camera away from it
-  (taken at once, let go over `tilt_release_s`, 5 s; at most 15 deg): in
-  the Gazebo test flights a 12 deg tilt put the car outside the image.
+  OAK-1's, so the target stays 4.5 deg inside the image.
 - Centered yaw: a target moving at 2 m/s or more (`centered_yaw_min_speed_mps`)
   is followed with its direction of travel along the image's long axis (the
   end nearer the current yaw), where the image reaches farthest ahead of and

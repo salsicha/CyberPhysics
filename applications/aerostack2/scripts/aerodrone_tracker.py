@@ -512,10 +512,7 @@ class Tracker:
         for name in self.busy_names:
             if self.behaviors.get(name) == self.BehaviorStatus.RUNNING:
                 busy = name
-        # A body-fixed camera turns with the aircraft's tilt; a stabilised
-        # one does not.
-        return tc.Drone(pose.position, tc.yaw_of(pose.quaternion), agl, flying, busy,
-                        None if self.stabilized else pose.quaternion)
+        return tc.Drone(pose.position, tc.yaw_of(pose.quaternion), agl, flying, busy)
 
     # --- actions ----------------------------------------------------------
     def _execute(self, actions, hover_reason='stopped'):
