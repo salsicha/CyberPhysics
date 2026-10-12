@@ -1,7 +1,7 @@
 // Pure logic of the aerodrone web UI (index.html): tracking command
 // validation and JSON, detection/frame time alignment, display <-> image
-// pixel mapping, box hit testing, the map's ENU conversion and the
-// navigation badge. No DOM and
+// pixel mapping, box hit testing, the map's ENU conversion, the
+// navigation badge and the foam dart launcher's controls. No DOM and
 // no ROS here, so tests/test_aerodrone_tracking_ui.py runs it under node.
 // The command and topic contract is systems/aerodrone/tracking.md.
 (function (root, factory) {
@@ -130,6 +130,91 @@
   function stopCommand() {
     const command = {action: 'stop'};
     return {ok: true, command, json: JSON.stringify(command)};
+  }
+
+  // ------------------------------------------------ foam dart launcher
+  // Commands and controls of tracking.md, "Foam dart launcher". The
+  // tracker decides: Fire is enabled only while its status says every gate
+  // holds (fire_block empty) for the target it tracks, and the status is
+  // fresh; the command names that target, one command per shot.
+  const LAUNCHER_CAPACITY = 6;   // darts in the clip
+  const LAUNCHER_STATUS_STALE_S = 3;
+  // The status's fire_checks, in the tracker's order (launcher_core.GATES).
+  const FIRE_CHECK_LABELS = Object.freeze({
+    launcher: 'launcher', armed: 'armed', ready: 'bridge ready',
+    tracking: 'tracking, centered', target: 'tracked target',
+    not_person: 'target not a person', no_person: 'nobody in view',
+    target_seen: 'target in view', hover: 'hovering', height: 'height',
+    on_target: 'over the target', launcher_rest: 'at rest', darts: 'darts',
+    interval: 'interval',
+  });
+
+  function fireCommand(targetId) {
+    if (targetId === undefined || targetId === null || String(targetId) === '') {
+      return {ok: false, error: 'No tracked target to fire at'};
+    }
+    const command = {action: 'fire', target_id: String(targetId)};
+    return {ok: true, command, json: JSON.stringify(command)};
+  }
+
+  function launcherArmCommand(armed) {
+    const command = {action: armed ? 'launcher_arm' : 'launcher_disarm'};
+    return {ok: true, command, json: JSON.stringify(command)};
+  }
+
+  function reloadCommand(text) {
+    const darts = parseNumber(text);
+    if (darts === null || Number.isNaN(darts) || !Number.isInteger(darts) ||
+        darts < 0 || darts > LAUNCHER_CAPACITY) {
+      return {ok: false, error: `Darts must be a whole number, 0-${LAUNCHER_CAPACITY}`};
+    }
+    const command = {action: 'reload', darts};
+    return {ok: true, command, json: JSON.stringify(command)};
+  }
+
+  // What the launcher card shows and enables, from the latest status
+  // (null: none yet), its age in seconds and the link: {visible, state,
+  // armed, darts, shots, fire: {enabled, reason}, arm, disarm, reload,
+  // lastFire, checks}. Hidden without a launcher (status.launcher "none").
+  function launcherView(status, ageS, connected) {
+    const fitted = Boolean(status) && typeof status.launcher === 'string' &&
+      status.launcher !== 'none';
+    const view = {visible: fitted, state: fitted ? status.launcher : 'none',
+                  armed: fitted && status.launcher_armed === true,
+                  ready: fitted && status.launcher_ready === true,
+                  darts: fitted && Number.isInteger(status.darts) ? status.darts : null,
+                  shots: fitted && Number.isInteger(status.shots) ? status.shots : null,
+                  fire: {enabled: false, reason: ''}, arm: false, disarm: false,
+                  reload: false, lastFire: '', checks: []};
+    if (!fitted) return view;
+    const fresh = Number.isFinite(ageS) && ageS <= LAUNCHER_STATUS_STALE_S;
+    const block = typeof status.fire_block === 'string' ? status.fire_block : null;
+    const target = status.target_id === undefined || status.target_id === null ||
+      String(status.target_id) === '' ? null : String(status.target_id);
+    let reason = '';
+    if (!connected) reason = 'not connected';
+    else if (!fresh) reason = 'tracker status is old';
+    else if (block === null) reason = 'no fire_block in the status';
+    else if (block !== '') reason = block;
+    else if (status.state !== 'tracking' || !target) reason = 'not tracking';
+    else if (!view.armed) reason = 'launcher disarmed';
+    view.fire = {enabled: reason === '', reason};
+    view.arm = connected && !view.armed;
+    view.disarm = connected && view.armed;
+    view.reload = connected && !view.armed && !['priming', 'chambering', 'firing']
+      .includes(status.launcher);
+    const last = status.last_fire;
+    if (last && typeof last === 'object') {
+      view.lastFire = `#${last.target_id || '?'} ${last.result || ''}` +
+        (last.reason ? `: ${last.reason}` : '');
+    }
+    const checks = status.fire_checks;
+    if (checks && typeof checks === 'object') {
+      view.checks = Object.keys(checks).map(name => ({
+        name, label: FIRE_CHECK_LABELS[name] || name.replace(/_/g, ' '),
+        ok: checks[name] === true}));
+    }
+    return view;
   }
 
   function stampSeconds(stamp) {
@@ -324,5 +409,7 @@
     stampSeconds, stampDifference, stampKey, parseDetections, DetectionHistory, boxAlpha,
     fitRect, displayToImage, imageToDisplay, hitTest,
     latLonToEnu, enuToLatLon, parseStatus, navigationBadge,
+    LAUNCHER_CAPACITY, FIRE_CHECK_LABELS, fireCommand, launcherArmCommand, reloadCommand,
+    launcherView,
   };
 }));

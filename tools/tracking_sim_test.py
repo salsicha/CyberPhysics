@@ -103,7 +103,17 @@ THRESHOLDS = {
     'hover_drift_m': 1.0,          # lost and stopped: hovering
     'idle_s': 1.0,                 # stop -> idle
     'detector_rate_hz': 4.5,       # median frame rate, simulation time
+    # The fire scenario (--scenario fire): the stand-in's shot at most this
+    # long after the fire command (the cycle: 0.92 s priming, 0.92 s
+    # chambering, 0.17 s to the sear's release, at the ST3215's speed), and
+    # the bore's true ground point at the shot within this of the car's
+    # centre (the fire control's own gate is 1 m from its estimate) and
+    # inside its footprint.
+    'fire_shot_s': 3.5,
+    'fire_offset_m': 1.5,
 }
+# The scenario's car (the hatchback model): its footprint, metres.
+CAR_FOOTPRINT_M = (4.0, 1.7)
 
 
 def latlon_to_local(lat, lon, origin_lat, origin_lon):
@@ -541,6 +551,103 @@ def score_navigation(rows):
     return result
 
 
+def rotate(quaternion, vector):
+    """vector rotated by an (x, y, z, w) quaternion (world <- body)."""
+    x, y, z, w = quaternion
+    vx, vy, vz = vector
+    # v + 2 w (q x v) + 2 q x (q x v)
+    cx, cy, cz = y * vz - z * vy, z * vx - x * vz, x * vy - y * vx
+    ddx, ddy, ddz = y * cz - z * cy, z * cx - x * cz, x * cy - y * cx
+    return (vx + 2 * (w * cx + ddx), vy + 2 * (w * cy + ddy), vz + 2 * (w * cz + ddz))
+
+
+def bore_ground(drone, quaternion, ground_up):
+    """Where the body's -z axis from drone meets the level ground_up, or
+    None (horizontal East, North of the bore's ground point)."""
+    direction = rotate(quaternion, (0.0, 0.0, -1.0))
+    if direction[2] >= -1e-6:
+        return None
+    t = (drone[2] - ground_up) / -direction[2]
+    return drone[0] + t * direction[0], drone[1] + t * direction[1]
+
+
+def score_fire(rows, step, limits=THRESHOLDS):
+    """One fire command of the fire scenario: the gates when it was sent
+    (the fire control's status), the outcome, the shots the tracker and the
+    stand-in recorded and the launcher's joints. Expected 'fired' (the car):
+    accepted with every gate holding, one shot each, the stand-in's within
+    fire_shot_s, the bore's true ground point then within fire_offset_m of
+    the car's centre and inside its footprint. Expected 'refused': refused
+    with the step's reason, no shot, the rack and trigger never off rest."""
+    part = [row for row in rows if row.get('step') == step['name']]
+    events = [row for row in part if row.get('event')]
+    sent = next((row for row in events
+                 if (row['event'].get('command') or {}).get('action') == 'fire'), None)
+    outcome = next((row['event'] for row in events if 'fired' in row['event']), None)
+    result = {'expect': step['expect'], 'target': step['target']}
+    if sent is None or outcome is None:
+        return dict(result, passed=False, failures=['no fire command or outcome'])
+    fire = sent['event']
+    last = outcome.get('last_fire') or {}
+    shots, sim_shots = outcome.get('shots') or [], outcome.get('sim_shots') or []
+    result.update({key: fire.get(key) for key in ('gates_held', 'fire_block', 'fire_checks',
+                                                   'agl_m', 'bore_offset_m')})
+    result.update(result_=last.get('result'), reason=last.get('reason'), shots=len(shots),
+                  sim_shots=len(sim_shots), launcher_max=outcome.get('launcher_max'))
+    result['result'] = result.pop('result_')
+    failures = []
+    if step['expect'] == 'fired':
+        if not fire.get('gates_held') or fire.get('fire_block') != '':
+            failures.append('gates')
+        if result['result'] != 'fired':
+            failures.append('result')
+        if len(shots) != 1 or len(sim_shots) != 1:
+            failures.append('shots')
+        if sim_shots:
+            shot = sim_shots[0]
+            result['shot_after_s'] = round(shot['sim'] - sent['sim'], 2)
+            if result['shot_after_s'] > limits['fire_shot_s']:
+                failures.append('shot_after_s')
+            target = next((item for item in shot.get('targets') or []
+                           if item.get('name') == step['target']), None)
+            truth, quaternion = shot.get('truth'), shot.get('quaternion')
+            if target is None or not truth or truth[2] is None or not quaternion:
+                failures.append('shot truth')
+            else:
+                point = bore_ground(truth, quaternion, target['up'])
+                de, dn = point[0] - target['east'], point[1] - target['north']
+                yaw = target.get('yaw', 0.0)
+                along = de * math.cos(yaw) + dn * math.sin(yaw)
+                across = -de * math.sin(yaw) + dn * math.cos(yaw)
+                result.update(shot_offset_truth_m=round(math.hypot(de, dn), 3),
+                              shot_along_m=round(along, 3), shot_across_m=round(across, 3),
+                              shot_height_truth_m=round(truth[2] - target['up'], 2),
+                              shot_tilt_deg=shot.get('att'))
+                result['shot_on_car'] = (abs(along) <= CAR_FOOTPRINT_M[0] / 2
+                                         and abs(across) <= CAR_FOOTPRINT_M[1] / 2)
+                if result['shot_offset_truth_m'] > limits['fire_offset_m']:
+                    failures.append('shot_offset_truth_m')
+                if not result['shot_on_car']:
+                    failures.append('shot_on_car')
+    else:
+        if result['result'] != 'refused' or step.get('reason', '') not in str(result['reason']):
+            failures.append('refusal')
+        if shots or sim_shots:
+            failures.append('shots')
+        rack, trigger = outcome.get('launcher_max') or (None, None)
+        if rack is None or rack > 0.002 or trigger > 0.05:
+            failures.append('launcher moved')
+        if step['name'] == 'fire_person_in_view':
+            # Only the person in view refused it: every other check held.
+            checks = fire.get('fire_checks') or {}
+            if not fire.get('gates_held') or not checks or any(
+                    value is (name == 'no_person') for name, value in checks.items()):
+                failures.append('other gates')
+    result['failures'] = failures
+    result['passed'] = not failures
+    return result
+
+
 def score(rows, steps, settle_s=20.0, lost_timeout_s=3.0, dets=(), limits=THRESHOLDS):
     report = {}
     for step in steps:
@@ -552,6 +659,8 @@ def score(rows, steps, settle_s=20.0, lost_timeout_s=3.0, dets=(), limits=THRESH
             report[step['name']] = score_stop(rows, step, limits)
         elif step['kind'] == 'preempt':
             report[step['name']] = score_preempt(rows, step)
+        elif step['kind'] == 'fire':
+            report[step['name']] = score_fire(rows, step, limits)
     if dets:
         flying = next((row['sim'] for row in rows if (row.get('event') or {}).get('takeoff')),
                       None)
@@ -671,7 +780,7 @@ def fly(args):
         qos_profile_sensor_data,
     )
     from rosgraph_msgs.msg import Clock
-    from sensor_msgs.msg import NavSatFix
+    from sensor_msgs.msg import JointState, NavSatFix
     from std_msgs.msg import Bool, String
     from std_srvs.srv import SetBool
     from vision_msgs.msg import Detection2DArray
@@ -688,7 +797,8 @@ def fly(args):
              'attitude': None,
              'targets': None, 'status': None, 'estimate': None, 'platform': None,
              'step': 'setup', 'hidden': '', 'offset': [], 'up_offset': None,
-             'cmd': None, 'frames': [],
+             'cmd': None, 'frames': [], 'halted': '', 'shots': [], 'sim_shots': [],
+             'launcher': None, 'launcher_max': [0.0, 0.0], 'quaternion': None,
              'navigation': {'demnav_frames': 0, 'demnav_valid': 0, 'demnav_fixes': 0,
                             'wildnav_fixes': 0}}
     lock = threading.Lock()
@@ -720,6 +830,7 @@ def fly(args):
         state['truth_world'] = (pose.position.x, pose.position.y, pose.position.z)
         q = pose.orientation
         state['attitude'] = tilt_deg((q.x, q.y, q.z, q.w))
+        state['quaternion'] = (q.x, q.y, q.z, q.w)
 
     tracks = {}  # name: [(sim, east, north, up)], the last 120 s
 
@@ -728,9 +839,13 @@ def fly(args):
             state['targets'] = json.loads(msg.data)['targets']
         except (ValueError, KeyError):
             return
+        if state['sim'] is None:
+            return  # before /clock: sim_now() would be wall time and stick the history
         now = sim_now()
         for item in state['targets']:
             track = tracks.setdefault(item['name'], [])
+            if track and now < track[-1][0]:
+                track.clear()  # the simulation went back
             if not track or now - track[-1][0] >= 0.5:
                 track.append((now, item['east'], item['north'], item['up']))
                 while track and now - track[0][0] > 120.0:
@@ -804,6 +919,34 @@ def fly(args):
                                  qos_profile_sensor_data)
     node.create_subscription(PlatformInfo, f'{ns}/platform/info',
                              lambda msg: state.__setitem__('platform', msg), 10)
+
+    # The foam dart launcher: the tracker's shots, the stand-in's (its sear
+    # released) with the aircraft's and the targets' truth then, and its
+    # joints (the most the rack and trigger moved in a step).
+    def on_shot(msg, key):
+        try:
+            item = json.loads(msg.data)
+        except ValueError:
+            return
+        shot = {'sim': round(sim_now(), 3), 'shot': item, 'truth': truth_nav(),
+                'quaternion': state['quaternion'], 'targets': state['targets'],
+                'nav': state['nav'], 'att': state['attitude']}
+        state[key].append(shot)
+        record({key: shot})
+
+    def on_launcher_joints(msg):
+        names = list(msg.name)
+        values = dict(zip(names, msg.position))
+        if 'actuator_joint' in values and 'trigger_joint' in values:
+            state['launcher'] = (values['actuator_joint'], values['trigger_joint'])
+            state['launcher_max'] = [max(state['launcher_max'][0], values['actuator_joint']),
+                                     max(state['launcher_max'][1], values['trigger_joint'])]
+
+    node.create_subscription(String, '/tracking/shots', lambda msg: on_shot(msg, 'shots'), 10)
+    node.create_subscription(String, '/simulation/launcher/shots',
+                             lambda msg: on_shot(msg, 'sim_shots'), 10)
+    node.create_subscription(JointState, '/aerodrone/launcher/joint_states', on_launcher_joints,
+                             qos_profile_sensor_data)
     counts = state['navigation']
 
     def count(*keys):
@@ -821,6 +964,7 @@ def fly(args):
     hide_pubs = [node.create_publisher(String, topic, 10)
                  for topic in ('/simulation/targets/hide', '/tracking/truth/hide')]
     goal_pub = node.create_publisher(String, '/aerostack/map_goal', 10)
+    halt_pub = node.create_publisher(String, '/simulation/targets/halt', 10)
     arm = node.create_client(SetBool, f'{ns}/set_arming_state')
     offboard = node.create_client(SetBool, f'{ns}/set_offboard_mode')
     takeoff = ActionClient(node, Takeoff, f'{ns}/TakeoffBehavior')
@@ -847,7 +991,8 @@ def fly(args):
                'att': state['attitude'],
                'targets': state['targets'], 'status': state['status'],
                'estimate': state['estimate'], 'cmd': state['cmd'], 'ids': ids,
-               'navigation': dict(state['navigation'])}
+               'navigation': dict(state['navigation']), 'halted': state['halted'],
+               'launcher': state['launcher']}
         if event is not None:
             row['event'] = event
             log.info(f'{state["step"]}: {event}')
@@ -899,12 +1044,16 @@ def fly(args):
         return {4: 'succeeded', 5: 'canceled', 6: 'aborted'}.get(future.result().status,
                                                                  str(future.result().status))
 
-    def goto_goal(east, north, up, speed=3.0):
+    def goto_goal(east, north, up, speed=3.0, yaw=None):
         goal = GoToWaypoint.Goal()
         goal.target_pose.header.frame_id = 'earth'
         goal.target_pose.point.x, goal.target_pose.point.y, goal.target_pose.point.z = (
             float(east), float(north), float(up))
-        goal.yaw.mode = YawMode.KEEP_YAW
+        if yaw is None:
+            goal.yaw.mode = YawMode.KEEP_YAW
+        else:
+            goal.yaw.mode = YawMode.FIXED_YAW
+            goal.yaw.angle = float(yaw)
         goal.max_speed = float(speed)
         return goal
 
@@ -1051,91 +1200,258 @@ def fly(args):
                     track(name, fields)
                     lost_since = None
 
-        centered = {'mode': 'centered', 'altitude_agl_m': args.altitude}
-        # The person of the lost and pre-emption steps, from lower down.
-        low = {'mode': 'centered', 'altitude_agl_m': args.lost_altitude}
-        # --- 1: a track pre-empts a GoTo ------------------------------------------
-        step = {'name': 'preempt_goto', 'kind': 'preempt'}
-        begin(step)
-        hold_over(args.target)
-        require(wait(60.0, lambda: near(args.target, 8.0) and current_id(args.target)),
-                f'{args.target} not detected below')
-        nav = state['nav']
-        handle = send_goal(goto, goto_goal(nav[0] + 80.0, nav[1], nav[2], 2.0))
-        goto_result = handle.get_result_async()
-        record({'goto': 'away, 80 m east'})
-        # The GoTo runs, slowly enough that the target stays in view.
-        wait(1.0)
-        target_id = pick(args.target, 5.0)
-        require(target_id is not None, f'{args.target} out of view once the GoTo started')
-        command(dict({'action': 'track', 'target_id': target_id}, **centered),
-                {'target': args.target})
-        wait(10.0, goto_result.done)
-        record({'goto_result': result_name(goto_result)})
-        wait(10.0, lambda: status_state() == 'tracking')
-        wait(2.0)
-        # --- 2: centered ------------------------------------------------------------
-        step = {'name': 'centered', 'kind': 'follow', 'mode': 'centered',
-                'target': args.target, 'altitude': args.altitude}
-        begin(step)
-        follow(args.target, centered, args.centered_s)
-        # --- 3: slant ---------------------------------------------------------------
-        axis = args.mount_yaw_deg - 90.0  # the image's long (horizontal) axis
-        step = {'name': 'slant', 'kind': 'follow', 'mode': 'slant', 'target': args.target,
-                'slant_range': args.slant_range, 'depression': args.depression,
-                'axis_deg': axis}
-        begin(step)
-        follow(args.target, {'mode': 'slant', 'slant_range_m': args.slant_range,
-                             'depression_deg': args.depression}, args.slant_s)
-        # --- 4: lost ----------------------------------------------------------------
-        step = {'name': 'lost', 'kind': 'lost', 'target': args.lost_target}
-        begin(step)
-        command({'action': 'stop'})
-        hold_over(args.lost_target, args.lost_altitude)
-        track(args.lost_target, low)
-        require(wait(30.0, lambda: status_state() == 'tracking'),
-                f'{args.lost_target} not tracked')
-        wait(15.0)
-        state['hidden'] = args.lost_target
-        hide(args.lost_target)
-        record({'hide': args.lost_target})
-        wait(args.hidden_s)
-        state['hidden'] = ''
-        hide('')
-        record({'show': args.lost_target})
-        target_id = pick(args.lost_target, 15.0)
-        record({'redetected': args.lost_target, 'id': target_id})
-        if target_id is not None and target_id != following():
-            command(dict({'action': 'track', 'target_id': target_id}, **low),
-                    {'reacquire': args.lost_target})
-        wait(10.0, lambda: status_state() == 'tracking')
-        wait(5.0)
-        # --- 5: stop ----------------------------------------------------------------
-        step = {'name': 'stop', 'kind': 'stop'}
-        begin(step)
-        command({'action': 'stop'})
-        wait(args.stop_s)
-        # --- 6: pre-emption by a map goal and by a GoTo -------------------------------
-        step = {'name': 'preempt_map_goal', 'kind': 'preempt', 'cause': 'a map goal'}
-        begin(step)
-        track(args.lost_target, low)
-        wait(20.0, lambda: status_state() == 'tracking')
-        wait(5.0)
-        nav = state['nav']
-        goal_pub.publish(String(data=f'{nav[0]:.2f};{nav[1]:.2f};{nav[2]:.2f}'))
-        record({'map_goal': nav})
-        wait(5.0, lambda: status_state() == 'idle')
-        wait(2.0)
-        step = {'name': 'preempt_goto_behavior', 'kind': 'preempt', 'cause': 'GoToBehavior'}
-        begin(step)
-        track(args.lost_target, low)
-        wait(20.0, lambda: status_state() == 'tracking')
-        wait(5.0)
-        nav = state['nav']
-        handle = send_goal(goto, goto_goal(nav[0] + 5.0, nav[1], nav[2], 2.0))
-        record({'goto': 'sent'})
-        wait(5.0, lambda: status_state() == 'idle')
-        wait(10.0, handle.get_result_async().done)
+        def launcher_status():
+            return state['status'] or {}
+
+        def wait_gates(seconds, ok):
+            """Record until ok(status) holds (True) or seconds pass; the
+            fire_block reasons seen meanwhile are recorded with the result."""
+            seen = {}
+
+            def check():
+                status = launcher_status()
+                block = status.get('fire_block')
+                if block is not None:
+                    key = re.sub(r'[\d.]+', '#', str(block))
+                    seen[key] = seen.get(key, 0) + 1
+                return ok(status)
+
+            done = wait(seconds, check)
+            record({'gates_waited': round(seconds, 1), 'gates_ok': done,
+                    'blocks_seen': dict(sorted(seen.items(), key=lambda item: -item[1])[:8])})
+            return done
+
+        def checks_but(status, *names):
+            """Every fire check true but those named (which must be false)."""
+            checks = status.get('fire_checks') or {}
+            return bool(checks) and all(checks.get(name) is (name not in names)
+                                        for name in checks)
+
+        def above(name, altitude, yaw=0.0, speed=4.0):
+            """GoTo altitude m above the target's truth, nose at yaw (ENU
+            rad: 0 east puts the image's long axis north-south)."""
+            item = target_truth(name)
+            require(item is not None, f'no truth for {name}')
+            handle = send_goal(goto, goto_goal(item['east'], item['north'],
+                                               item['up'] + altitude, speed, yaw))
+            result = handle.get_result_async()
+            wait(240.0, result.done)
+            record({'above': name, 'altitude': altitude, 'goto_result': result_name(result)})
+
+        def halt_where(name, condition, timeout_s=150.0):
+            """Let name go on its route until condition(truth) holds, then
+            stop it there (/simulation/targets/halt)."""
+            halt_pub.publish(String(data=''))
+            require(wait(timeout_s, lambda: condition(target_truth(name) or {})),
+                    f'{name} never reached its halt point')
+            halt_pub.publish(String(data=name))
+            state['halted'] = name
+            require(wait(5.0, lambda: (target_truth(name) or {}).get('halted') is True),
+                    f'{name} not halted')
+            record({'halt': name, 'at': [round(target_truth(name)[key], 2)
+                                         for key in ('east', 'north', 'up')]})
+
+        def fire_at(target_name, expect, step_name, altitude, settle_s, gates, reason=None):
+            """Track target_name centered at altitude, arm, wait until
+            gates(status) holds, send one fire command naming the tracked
+            target, and record the outcome."""
+            step = {'name': step_name, 'kind': 'fire', 'target': target_name,
+                    'expect': expect, 'altitude': altitude, 'reason': reason}
+            begin(step)
+            command({'action': 'stop'})
+            above(target_name, args.fire_approach_altitude)
+            require(wait(60.0, lambda: current_id(target_name)), f'{target_name} not detected')
+            track(target_name, {'mode': 'centered', 'altitude_agl_m': altitude})
+            require(wait(30.0, lambda: status_state() == 'tracking'),
+                    f'{target_name} not tracked')
+            wait(settle_s)
+            command({'action': 'launcher_arm'})
+            require(wait(5.0, lambda: launcher_status().get('launcher_armed') is True),
+                    'the launcher did not arm')
+            held = wait_gates(args.fire_gates_s, gates)
+            status = dict(launcher_status())
+            target_id = status.get('target_id')
+            state['launcher_max'] = [0.0, 0.0]
+            shots_before = (len(state['shots']), len(state['sim_shots']))
+            command({'action': 'fire', 'target_id': target_id},
+                    {'fire': target_name, 'gates_held': held,
+                     'fire_block': status.get('fire_block'),
+                     'fire_checks': status.get('fire_checks'),
+                     'agl_m': status.get('agl_m'), 'bore_offset_m': status.get('bore_offset_m')})
+            previous = (status.get('last_fire') or {}).get('stamp')
+
+            def ended():
+                last = launcher_status().get('last_fire') or {}
+                return (last.get('stamp') != previous
+                        and last.get('result') in ('fired', 'fault', 'refused')
+                        and launcher_status().get('launcher') not in ('priming', 'chambering',
+                                                                       'firing'))
+
+            wait(15.0, ended)
+            wait(3.0)  # any shot after it
+            record({'fired': target_name,
+                    'last_fire': launcher_status().get('last_fire'),
+                    'shots': state['shots'][shots_before[0]:],
+                    'sim_shots': state['sim_shots'][shots_before[1]:],
+                    'launcher_max': state['launcher_max']})
+            command({'action': 'launcher_disarm'})
+            wait(2.0)
+
+        def fire_scenario():
+            """The launcher's fire control (systems/aerodrone/tracking.md,
+            "Foam dart launcher") against the stand-in launcher: a shot at
+            the halted car (allowed), a fire command at a person (refused),
+            and one at the car with a person in view (refused)."""
+            command({'action': 'reload', 'darts': 6})
+            wait(2.0, lambda: launcher_status().get('darts') == 6)
+            require(launcher_status().get('darts') == 6, 'reload refused')
+            people = [item['name'] for item in state['targets'] or []
+                      if item.get('class') == 'person']
+
+            def clear_of_people(item):
+                """The car at least --fire-clear-m from every person."""
+                if 'east' not in item:
+                    return False
+                return all(math.dist((item['east'], item['north']),
+                                     (other['east'], other['north'])) >= args.fire_clear_m
+                           for other in map(target_truth, people) if other)
+
+            # 1. The car, halted where it is 40 m or more from the people.
+            begin({'name': 'fire_setup', 'kind': 'setup'})
+            above(args.target, args.fire_approach_altitude + 20.0)
+            halt_where(args.target, clear_of_people)
+            fire_at(args.target, 'fired', 'fire_car', args.fire_altitude, args.fire_settle_s,
+                    lambda status: status.get('fire_block') == '')
+            halt_pub.publish(String(data=''))  # the car laps again meanwhile (step 3's route)
+            released = sim_now()
+            # 2. A person (standing): refused, never at people.
+            fire_at(args.fire_person, 'refused', 'fire_person', args.fire_altitude,
+                    args.fire_settle_s,
+                    lambda status: checks_but(status, 'not_person', 'no_person'),
+                    reason='never at people')
+            # 3. The car halted next to the walking person's loop, from where
+            # the camera sees the person on part of every lap: refused while
+            # the person is in view, every other check holding.
+            begin({'name': 'fire_setup_view', 'kind': 'setup'})
+            command({'action': 'stop'})
+            # A whole lap of the car since it went on (77 s), and the walking
+            # person's loop (24 s): the point of the car's route nearest the
+            # middle of the loop, whose near edge is then about 9.5 m away,
+            # in the image from 19 m with the image's long axis across the
+            # route.
+            wait(max(0.0, released + 85.0 - sim_now()))
+            walk = [sample[1:3] for sample in tracks.get(args.fire_view_person, [])
+                    if sample[0] >= released]
+            route = [sample[1:3] for sample in tracks.get(args.target, [])
+                     if sample[0] >= released]
+            require(walk and route, f'no truth for {args.fire_view_person} or {args.target}')
+            middle = [sum(values) / len(values) for values in zip(*walk)]
+            near = min(route, key=lambda point: math.dist(point, middle))
+            record({'view_halt': [round(value, 2) for value in near],
+                    'person_middle': [round(value, 2) for value in middle]})
+
+            def close(item):
+                return math.dist((item.get('east', 1e9), item.get('north', 1e9)), near) < 3.0
+
+            above(args.target, args.fire_approach_altitude + 20.0)
+            halt_where(args.target, close)
+            fire_at(args.target, 'refused', 'fire_person_in_view',
+                    args.fire_view_altitude, args.fire_settle_s,
+                    lambda status: checks_but(status, 'no_person')
+                    and 'is in view' in str(status.get('fire_block')),
+                    reason='a person is in view')
+            command({'action': 'stop'})
+            halt_pub.publish(String(data=''))
+            state['halted'] = ''
+
+        if args.scenario == 'tracking':
+            centered = {'mode': 'centered', 'altitude_agl_m': args.altitude}
+            # The person of the lost and pre-emption steps, from lower down.
+            low = {'mode': 'centered', 'altitude_agl_m': args.lost_altitude}
+            # --- 1: a track pre-empts a GoTo ------------------------------------------
+            step = {'name': 'preempt_goto', 'kind': 'preempt'}
+            begin(step)
+            hold_over(args.target)
+            require(wait(60.0, lambda: near(args.target, 8.0) and current_id(args.target)),
+                    f'{args.target} not detected below')
+            nav = state['nav']
+            handle = send_goal(goto, goto_goal(nav[0] + 80.0, nav[1], nav[2], 2.0))
+            goto_result = handle.get_result_async()
+            record({'goto': 'away, 80 m east'})
+            # The GoTo runs, slowly enough that the target stays in view.
+            wait(1.0)
+            target_id = pick(args.target, 5.0)
+            require(target_id is not None, f'{args.target} out of view once the GoTo started')
+            command(dict({'action': 'track', 'target_id': target_id}, **centered),
+                    {'target': args.target})
+            wait(10.0, goto_result.done)
+            record({'goto_result': result_name(goto_result)})
+            wait(10.0, lambda: status_state() == 'tracking')
+            wait(2.0)
+            # --- 2: centered ------------------------------------------------------------
+            step = {'name': 'centered', 'kind': 'follow', 'mode': 'centered',
+                    'target': args.target, 'altitude': args.altitude}
+            begin(step)
+            follow(args.target, centered, args.centered_s)
+            # --- 3: slant ---------------------------------------------------------------
+            axis = args.mount_yaw_deg - 90.0  # the image's long (horizontal) axis
+            step = {'name': 'slant', 'kind': 'follow', 'mode': 'slant', 'target': args.target,
+                    'slant_range': args.slant_range, 'depression': args.depression,
+                    'axis_deg': axis}
+            begin(step)
+            follow(args.target, {'mode': 'slant', 'slant_range_m': args.slant_range,
+                                 'depression_deg': args.depression}, args.slant_s)
+            # --- 4: lost ----------------------------------------------------------------
+            step = {'name': 'lost', 'kind': 'lost', 'target': args.lost_target}
+            begin(step)
+            command({'action': 'stop'})
+            hold_over(args.lost_target, args.lost_altitude)
+            track(args.lost_target, low)
+            require(wait(30.0, lambda: status_state() == 'tracking'),
+                    f'{args.lost_target} not tracked')
+            wait(15.0)
+            state['hidden'] = args.lost_target
+            hide(args.lost_target)
+            record({'hide': args.lost_target})
+            wait(args.hidden_s)
+            state['hidden'] = ''
+            hide('')
+            record({'show': args.lost_target})
+            target_id = pick(args.lost_target, 15.0)
+            record({'redetected': args.lost_target, 'id': target_id})
+            if target_id is not None and target_id != following():
+                command(dict({'action': 'track', 'target_id': target_id}, **low),
+                        {'reacquire': args.lost_target})
+            wait(10.0, lambda: status_state() == 'tracking')
+            wait(5.0)
+            # --- 5: stop ----------------------------------------------------------------
+            step = {'name': 'stop', 'kind': 'stop'}
+            begin(step)
+            command({'action': 'stop'})
+            wait(args.stop_s)
+            # --- 6: pre-emption by a map goal and by a GoTo -------------------------------
+            step = {'name': 'preempt_map_goal', 'kind': 'preempt', 'cause': 'a map goal'}
+            begin(step)
+            track(args.lost_target, low)
+            wait(20.0, lambda: status_state() == 'tracking')
+            wait(5.0)
+            nav = state['nav']
+            goal_pub.publish(String(data=f'{nav[0]:.2f};{nav[1]:.2f};{nav[2]:.2f}'))
+            record({'map_goal': nav})
+            wait(5.0, lambda: status_state() == 'idle')
+            wait(2.0)
+            step = {'name': 'preempt_goto_behavior', 'kind': 'preempt', 'cause': 'GoToBehavior'}
+            begin(step)
+            track(args.lost_target, low)
+            wait(20.0, lambda: status_state() == 'tracking')
+            wait(5.0)
+            nav = state['nav']
+            handle = send_goal(goto, goto_goal(nav[0] + 5.0, nav[1], nav[2], 2.0))
+            record({'goto': 'sent'})
+            wait(5.0, lambda: status_state() == 'idle')
+            wait(10.0, handle.get_result_async().done)
+        else:
+            fire_scenario()
         # --- land -------------------------------------------------------------------
         state['step'] = 'land'
         handle = send_goal(land, Land.Goal(land_speed=1.0))
@@ -1183,6 +1499,26 @@ def main():
     run.add_argument('--repick-s', type=float, default=1.0,
                      help='lost this long under a new id: track the new id')
     run.add_argument('--ready-timeout-s', type=float, default=900.0)
+    run.add_argument('--scenario', choices=('tracking', 'fire'), default='tracking',
+                     help='tracking: the follow, lost, stop and pre-emption steps; fire: the '
+                     'foam dart launcher\'s fire control against the stand-in launcher')
+    run.add_argument('--fire-person', default='person_2',
+                     help='the standing person a fire command is refused at')
+    run.add_argument('--fire-altitude', type=float, default=17.0,
+                     help='centered height of the fire steps (the fire window is 8-20 m, the '
+                     'tracker\'s minimum 15 m)')
+    run.add_argument('--fire-view-altitude', type=float, default=19.0,
+                     help='centered height above the car halted beside the walking person, '
+                     'from where the camera sees the person on part of every lap')
+    run.add_argument('--fire-approach-altitude', type=float, default=30.0)
+    run.add_argument('--fire-clear-m', type=float, default=40.0,
+                     help='the car is halted for the allowed shot this far from every person')
+    run.add_argument('--fire-view-person', default='person_1',
+                     help='the walking person the car is halted beside (the route\'s point '
+                     'nearest the middle of its loop) for the person-in-view step')
+    run.add_argument('--fire-settle-s', type=float, default=15.0)
+    run.add_argument('--fire-gates-s', type=float, default=120.0,
+                     help='how long to wait for the gates before the fire command')
     scorer = sub.add_parser('score')
     scorer.add_argument('recording')
     scorer.add_argument('--settle-s', type=float, default=20.0)

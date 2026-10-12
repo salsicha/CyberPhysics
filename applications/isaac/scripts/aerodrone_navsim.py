@@ -39,7 +39,7 @@ from ardupilot_json import (  # noqa: E402
     quaternion_to_matrix,
     state_from_enu,
 )
-from tracking_targets import HIDE_TOPIC, TRUTH_TOPIC, Tracks, truth_json  # noqa: E402
+from tracking_targets import HALT_TOPIC, HIDE_TOPIC, TRUTH_TOPIC, Tracks, truth_json  # noqa: E402
 
 
 DRONE_SIZE_M = (0.47, 0.47, 0.11)
@@ -393,9 +393,12 @@ def make_publisher(args):
             self.targets_publisher.publish(msg)
 
         def subscribe_hide(self, tracks):
-            """Hide the targets named on HIDE_TOPIC (tracking_targets.py)."""
+            """Hide the targets named on HIDE_TOPIC and stop those named on
+            HALT_TOPIC (tracking_targets.py)."""
             self.create_subscription(String, HIDE_TOPIC,
                                      lambda msg: tracks.hide(msg.data), 10)
+            self.create_subscription(String, HALT_TOPIC,
+                                     lambda msg: tracks.halt(msg.data), 10)
 
         def stamp(self):
             return self.get_clock().now().to_msg()
@@ -593,7 +596,7 @@ def main():
                     print(f"Isaac camera: no frame rendered for t={tick * dt:.3f} s", flush=True)
                 if tracks is not None:
                     publisher.publish_targets(
-                        truth_json(tick * dt, poses, tracks.origin, tracks.hidden))
+                        truth_json(tick * dt, poses, tracks.origin, tracks.hidden, tracks.halted))
                 rclpy.spin_once(publisher, timeout_sec=0.0)
             transport.send(state)
             if tick % max(1, int(physics_rate * 5.0)) == 0:

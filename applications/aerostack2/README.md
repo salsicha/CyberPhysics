@@ -115,6 +115,14 @@ beside the controls).
   view), slant range and depression angle, target position and speed, message
   and age. The target's box is drawn thick amber; a tapped target the tracker
   has not yet reported is dashed amber.
+- **Launcher.** With the foam dart launcher fitted (the status's `launcher`
+  is not `"none"`; `systems/aerodrone/tracking.md`, "Foam dart launcher"):
+  its state, *Arm launcher* and *Disarm*, the dart count and *Reload* (0-6,
+  while disarmed), the fire checks, the last shot, and *Fire*, enabled only
+  while the tracker's fresh status says every gate holds for the target it
+  tracks (`fire_block` empty), with the reason when it does not. One press
+  publishes one `{"action": "fire", "target_id": ...}` naming that target;
+  the button then waits for the next status.
 - **Map.** The click-to-goal above is unchanged. The map also shows the drone
   and the target, whose ENU position is converted the way the goal is, about the
   current `/navigation/fix` and `/navigation/odometry`.
@@ -138,7 +146,9 @@ against rosbridge and `scripts/mock_tracking_publisher.py`, a stand-in for the
 detector and the tracker that publishes made-up detections, frames and status
 and logs the commands it receives; it clicks and taps boxes in both modes,
 checks the published JSON, Stop, the map goal and the phone layout, and saves
-screenshots. `tests/test_aerodrone_tracking_ui.py` checks the page's wiring
+screenshots; a second mock with `--launcher` checks the launcher's card (Fire
+enabled only while every gate holds, one command per press, disabled with the
+reason by a person in view, a person as the target and disarming). `tests/test_aerodrone_tracking_ui.py` checks the page's wiring
 and pinned libraries, the mock, and (with node) `tests/js/tracking_logic.test.js`.
 
 ## Object tracker
@@ -208,7 +218,11 @@ geoid and camera geometry it uses.
   `max_lead_extra_s` either way; the slant set-point lies on the bearing from
   the aircraft itself, so the aircraft's offset from it is no lag); a filter
   just started, whose velocity is still noise, leads less, growing to the full
-  lead over `lead_ramp_s` (2 s). The reference
+  lead over `lead_ramp_s` (2 s), and a still target is not led (its filtered
+  speed under `still_speed_mps`, 0.5 m/s, for `still_s`, 2 s, until it
+  exceeds twice that: a parked car's filtered velocity is noise, and led in
+  full it rocked the aircraft 10-16 deg either way above it in Gazebo;
+  without the lead, under 2 deg). The reference
   moves at most `max_speed_mps` (ArduPilot flies position targets at
   `WPNAV_SPEED`, 5 m/s, at most anyway) and stays within
   `max_reference_lead_m` of the aircraft; heights stay 15-120 m above the
@@ -223,6 +237,16 @@ geoid and camera geometry it uses.
   `LandBehavior` starts. A track command is refused during take-off or landing
   and while the platform is not flying. A refused command leaves an active
   track as it is; while idle it shows as state `error` with the reason.
+- **Foam dart launcher.** With `launcher_fitted` (`TRACKING_LAUNCHER_FITTED`;
+  true in the simulators, false on the aircraft unless set) the tracker is the
+  launcher's fire control (`scripts/launcher_core.py`; contract and gates in
+  `systems/aerodrone/tracking.md`, "Foam dart launcher"): objects only, never
+  people, one operator `fire` command per dart, every gate held from the
+  command to the sear's release, the trigger at 0 and the rack stopped on any
+  abort. On the aircraft the `launcher` profile adds the servo bridge
+  (`turret_arduino_bridge.py`, `sts`, launcher only); the simulators run
+  `scripts/launcher_standin.py`. The target is geolocated from the camera's
+  position on the body (`camera_offset_m`), not the hub.
 
 The parameters and their deployed values are in
 `systems/aerodrone/config/tracking.env`; `aerodrone_tracking.yaml` repeats them
@@ -233,7 +257,9 @@ aircraft runs its own) and `scripts/tracking_truth_detector.py`
 (`--profile tracking_truth`, instead of the detector), which projects
 `/simulation/targets` through the camera in the navigation pose into
 detections, so the control can be tested apart from detection.
-`tools/tracking_sim_test.sh <gazebo|isaac>` flies and scores the
+`tools/tracking_sim_test.sh <gazebo|isaac>` (with `TRACKING_TEST_SCENARIO=fire`:
+the launcher's fire control, a shot at the halted car and two refusals, at a
+person and with a person in view) flies and scores the
 tracking end to end (`tools/tracking_sim_test.py`, layered on the composition
 by `tools/tracking_sim_test.yaml` with `--profile tracking`): the YOLO detector
 on the simulated camera, the tracker, and the scenario's car and people. Like

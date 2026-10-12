@@ -12,7 +12,8 @@ service (UserCommands; this node starts the ros_gz_bridge service bridge)
 and publishes /simulation/targets for the same time. Gazebo applies a pose
 in its next iteration (5 ms of simulation time), before the following
 camera frame. Targets named on /simulation/targets/hide are put under the
-terrain (tracking_targets.HIDE_TOPIC).
+terrain (tracking_targets.HIDE_TOPIC); those named on
+/simulation/targets/halt stop where they are (HALT_TOPIC).
 
 Isaac moves the same tracks inside its own simulation loop
 (applications/isaac/scripts/aerodrone_navsim.py).
@@ -31,7 +32,7 @@ import sys
 # next to this application.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "demnav" / "scripts"))
 sys.path.insert(0, "/workspace/applications/demnav/scripts")
-from tracking_targets import HIDE_TOPIC, TRUTH_TOPIC, Tracks, truth_json  # noqa: E402
+from tracking_targets import HALT_TOPIC, HIDE_TOPIC, TRUTH_TOPIC, Tracks, truth_json  # noqa: E402
 
 
 def parse_args(argv=None):
@@ -95,6 +96,7 @@ def run(args):
             self.create_subscription(Clock, args.clock_topic, self.on_clock,
                                      qos_profile_sensor_data)
             self.create_subscription(String, HIDE_TOPIC, self.on_hide, 10)
+            self.create_subscription(String, HALT_TOPIC, self.on_halt, 10)
             self.create_timer(10.0, self.report)
             self.get_logger().info(
                 f"Moving {', '.join(t.name for t in tracks.tracks)} in world {args.world} "
@@ -103,6 +105,10 @@ def run(args):
         def on_hide(self, msg):
             hidden = tracks.hide(msg.data)
             self.get_logger().info(f"hidden targets: {', '.join(sorted(hidden)) or 'none'}")
+
+        def on_halt(self, msg):
+            halted = tracks.halt(msg.data)
+            self.get_logger().info(f"halted targets: {', '.join(sorted(halted)) or 'none'}")
 
         def on_clock(self, msg):
             t = msg.clock.sec + msg.clock.nanosec * 1e-9
@@ -113,7 +119,7 @@ def run(args):
                 for pose in tracks.placed(poses):
                     self.set_pose(pose)
             data = String()
-            data.data = truth_json(t, poses, tracks.origin, tracks.hidden)
+            data.data = truth_json(t, poses, tracks.origin, tracks.hidden, tracks.halted)
             self.truth.publish(data)
             self.published += 1
 

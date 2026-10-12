@@ -492,7 +492,12 @@ link:
   hold return the trigger to 0 and stop the rack while pan and tilt hold
   (`stop_disables_torque` applies to pan and tilt only), and a silent
   launcher servo is reported like the others while pan and tilt positions
-  keep flowing. The port opens
+  keep flowing. With `pan_tilt_fitted` false (`TURRET_PAN_TILT_FITTED`, sts
+  and the launcher only) the bus carries the launcher alone, as on the
+  aerodrone (`systems/aerodrone/config/launcher_bridge.yaml`): nothing goes
+  to the pan and tilt IDs, joint commands need not carry them, and joint
+  states carry the launcher's two joints when both its servos answer. The
+  port opens
   exclusively and is ready at once (no board reset to wait for); topics,
   e-stop handling and `/turret/actuator_ready` are those of the serial
   transport, and the diagnostics add `servo_ids`, `servo_state` and

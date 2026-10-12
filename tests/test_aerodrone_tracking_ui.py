@@ -211,3 +211,68 @@ def test_aircraft_serves_the_repository_page_next_to_rosbridge():
     assert rosbridge['command'] == (
         'ros2 launch rosbridge_server rosbridge_websocket_launch.xml port:=9092')
     assert ':9092`' in (WEB / 'app.js').read_text()
+
+
+# The mock's foam dart launcher (--launcher) --------------------------------------
+
+def launcher_mock():
+    world = mock.MockWorld(static=True, fly=True)
+    tracker = mock.MockTracker(world)
+    launcher = mock.MockLauncher(world, tracker)
+    return world, tracker, launcher
+
+
+def fly(world, tracker, launcher, seconds, now):
+    for _ in range(int(seconds / 0.1)):
+        now += 0.1
+        tracker.update(now)
+        world.step(0.1, tracker.goal())
+        launcher.update(now)
+    return now
+
+
+def test_mock_launcher_gates_and_cycle_follow_the_tracker():
+    """The mock's launcher has the real fire control's gates, names and
+    order (launcher_core.GATES), and its status fields."""
+    import sys
+    sys.path.insert(0, str(REPO / 'applications/aerostack2/scripts'))
+    import launcher_core
+    assert mock.GATES == launcher_core.GATES
+    assert set(mock.PERSON_CLASSES) == launcher_core.PERSON_CLASSES
+    assert (mock.FIRE_MIN_AGL_M, mock.FIRE_MAX_AGL_M, mock.FIRE_MAX_OFFSET_M) == (
+        launcher_core.LauncherConfig().fire_min_agl_m,
+        launcher_core.LauncherConfig().fire_max_agl_m,
+        launcher_core.LauncherConfig().fire_max_offset_m)
+    world, tracker, launcher = launcher_mock()
+    status = launcher.status(0.0)
+    assert (status['launcher'], status['launcher_armed'], status['fire_block']) == (
+        'empty', False, 'launcher disarmed')
+    launcher.handle({'action': 'reload', 'darts': 6}, 0.0)
+    tracker.handle(json.dumps({'action': 'track', 'target_id': '3', 'mode': 'centered',
+                               'altitude_agl_m': 15}), now=0.0)
+    launcher.handle({'action': 'launcher_arm'}, 0.0)
+    now = fly(world, tracker, launcher, 12.0, 0.0)
+    assert launcher.status(now)['fire_block'] == ''
+    launcher.handle({'action': 'fire', 'target_id': '7'}, now)  # not the tracked target
+    assert launcher.last_fire['result'] == 'refused' and 'not the tracked target' in \
+        launcher.last_fire['reason']
+    launcher.handle({'action': 'fire', 'target_id': '3'}, now)
+    assert launcher.status(now)['launcher'] == 'priming'
+    now = fly(world, tracker, launcher, 3.0, now)
+    assert (launcher.shots, launcher.darts, launcher.last_fire['result']) == (1, 5, 'fired')
+    # A person next to the car: refused, then for 3 s after it left.
+    world.extra = [mock.EXTRA_PERSON]
+    now = fly(world, tracker, launcher, 2.5, now)
+    assert launcher.status(now)['fire_block'].startswith('a person is in view (#31 person)')
+    world.extra = []
+    now = fly(world, tracker, launcher, 1.0, now)
+    assert launcher.status(now)['fire_block'].startswith('a person was in view')
+    now = fly(world, tracker, launcher, 2.5, now)
+    assert launcher.status(now)['fire_block'] == ''
+    # A cycle stops when a person appears; disarming disables fire.
+    launcher.handle({'action': 'fire', 'target_id': '3'}, now)
+    world.extra = [mock.EXTRA_PERSON]
+    now = fly(world, tracker, launcher, 0.5, now)
+    assert launcher.last_fire['result'] == 'fault' and launcher.shots == 1
+    launcher.handle({'action': 'launcher_disarm'}, now)
+    assert launcher.status(now)['fire_block'] == 'launcher disarmed'

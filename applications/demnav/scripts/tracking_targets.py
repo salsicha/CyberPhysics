@@ -27,7 +27,11 @@ Each simulator also hides the targets named on ``/simulation/targets/hide``
 (``HIDE_TOPIC``: comma-separated names, empty shows them all again): it
 renders a hidden target ``HIDDEN_DEPTH_M`` under the terrain, where the
 camera cannot see it, and keeps publishing its truth on its route, marked
-``"hidden": true`` (the occlusion of tools/tracking_sim_test.py).
+``"hidden": true`` (the occlusion of tools/tracking_sim_test.py). Targets
+named on ``/simulation/targets/halt`` (``HALT_TOPIC``, the same form) stop
+where they are, marked ``"halted": true``, until a message leaves them out;
+they then go on from there (the fire control's test of
+tools/tracking_sim_test.py: the launcher fires only at a still target).
 
 Plain numpy, no ROS: the builder, the two simulator adapters and the
 tests import it.
@@ -44,6 +48,7 @@ import numpy as np
 SCHEMA_VERSION = 1
 TRUTH_TOPIC = "/simulation/targets"
 HIDE_TOPIC = "/simulation/targets/hide"
+HALT_TOPIC = "/simulation/targets/halt"
 # How far under its ground a hidden target is rendered: beneath the terrain
 # surface, out of the downward camera's sight.
 HIDDEN_DEPTH_M = 50.0
@@ -298,6 +303,9 @@ class Tracks:
         self.origin = np.asarray(document["navigation_origin_enu_m"], dtype=np.float64)
         self.tracks = [Track(entry) for entry in document["targets"]]
         self.hidden = frozenset()
+        self.halted = frozenset()
+        self._halts = {}  # name: (seconds halted so far, halted since or None)
+        self._last_t = None
 
     @classmethod
     def load(cls, path):
@@ -305,12 +313,38 @@ class Tracks:
         return cls(json.loads(path.read_text(encoding="utf-8")), path.parent)
 
     def poses(self, t):
-        return [track.pose(t) for track in self.tracks]
+        """The targets' poses at simulation time t: on their routes, a halted
+        one where it stopped (the time it spent halted taken off its own)."""
+        self._apply_halts(t)
+        return [track.pose(self._route_time(track.name, t)) for track in self.tracks]
 
     def hide(self, text):
         """Hide the targets a HIDE_TOPIC message names (and show the rest)."""
         self.hidden = hidden_names(text)
         return self.hidden
+
+    def halt(self, text):
+        """Stop the targets a HALT_TOPIC message names where they are (and
+        let the rest go on from where they stopped), from the next poses()."""
+        self.halted = hidden_names(text)
+        return self.halted
+
+    def _apply_halts(self, t):
+        t = float(t)
+        if self._last_t is not None and t < self._last_t:
+            self._halts = {}  # a world reset: the routes start again
+        self._last_t = t
+        for track in self.tracks:
+            halted, since = self._halts.get(track.name, (0.0, None))
+            if track.name in self.halted and since is None:
+                since = t
+            elif track.name not in self.halted and since is not None:
+                halted, since = halted + (t - since), None
+            self._halts[track.name] = (halted, since)
+
+    def _route_time(self, name, t):
+        halted, since = self._halts.get(name, (0.0, None))
+        return (float(t) if since is None else since) - halted
 
     def placed(self, poses):
         """The poses to render: the hidden targets under the terrain."""
@@ -325,7 +359,7 @@ class Tracks:
 
     def truth_message(self, t, poses=None):
         return truth_message(t, self.poses(t) if poses is None else poses, self.origin,
-                             self.hidden)
+                             self.hidden, self.halted)
 
 
 def hidden_names(text):
@@ -338,10 +372,11 @@ def hidden_pose(pose):
                 pose.up - HIDDEN_DEPTH_M, pose.yaw, pose.pitch, pose.roll)
 
 
-def truth_message(t, poses, origin, hidden=()):
+def truth_message(t, poses, origin, hidden=(), halted=()):
     """/simulation/targets content (systems/aerodrone/tracking.md): stamp
     in simulation seconds, positions ENU about the navigation origin; a
-    hidden target keeps its route position, marked hidden."""
+    hidden target keeps its route position, marked hidden; a halted one is
+    marked halted."""
     targets = []
     for pose in poses:
         item = {
@@ -353,9 +388,11 @@ def truth_message(t, poses, origin, hidden=()):
         }
         if pose.name in hidden:
             item["hidden"] = True
+        if pose.name in halted:
+            item["halted"] = True
         targets.append(item)
     return {"stamp": round(float(t), 6), "targets": targets}
 
 
-def truth_json(t, poses, origin, hidden=()):
-    return json.dumps(truth_message(t, poses, origin, hidden), separators=(",", ":"))
+def truth_json(t, poses, origin, hidden=(), halted=()):
+    return json.dumps(truth_message(t, poses, origin, hidden, halted), separators=(",", ":"))

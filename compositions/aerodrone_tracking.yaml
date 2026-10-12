@@ -22,6 +22,16 @@
 #                   the ground-truth detector in place of the detector, to
 #                   test the control apart from detection; enable it
 #                   without `tracking`.
+#   launcher        the aircraft: the foam dart launcher's servo bridge
+#                   (launcher_bridge), with `tracking` and the tracker's
+#                   fire control switched on (TRACKING_LAUNCHER_FITTED=true;
+#                   systems/aerodrone/tracking.md, "Foam dart launcher"):
+#                     TRACKING_LAUNCHER_FITTED=true \
+#                     TURRET_ARDUINO_PORT=/dev/serial/by-id/usb-... \
+#                     docker compose -f compositions/aerodrone_hardware.yaml \
+#                       --profile tracking --profile launcher up -d
+#                   The simulators run a stand-in instead
+#                   (aerodrone_tracking_sim.yaml, tracking_launcher).
 #
 # Adding a service here: it runs on the aircraft too. ROS containers take
 # the host network, IPC and /dev/shm, ROS_DOMAIN_ID and
@@ -79,6 +89,8 @@ services:
         -p lead_s:=${TRACKING_LEAD_S:-2.5}
         -p lead_adapt_rate:=${TRACKING_LEAD_ADAPT_RATE:-0.2}
         -p max_lead_extra_s:=${TRACKING_MAX_LEAD_EXTRA_S:-2.5}
+        -p still_speed_mps:=${TRACKING_STILL_SPEED_MPS:-0.5}
+        -p still_s:=${TRACKING_STILL_S:-2.0}
         -p lost_timeout_s:=${TRACKING_LOST_TIMEOUT_S:-3.0}
         -p slant_range_m:=${TRACKING_SLANT_RANGE_M:-60.0}
         -p depression_deg:=${TRACKING_DEPRESSION_DEG:-70.0}
@@ -87,3 +99,67 @@ services:
         -p attitude_sigma_deg:=${TRACKING_ATTITUDE_SIGMA_DEG:-1.0}
         -p terrain_sigma_m:=${TRACKING_TERRAIN_SIGMA_M:-3.0}
         -p process_accel_mps2:=${TRACKING_PROCESS_ACCEL_MPS2:-1.5}
+        -p camera_offset_m:=${TRACKING_CAMERA_OFFSET_M:-[0.137,0.0,-0.080]}
+        -p launcher_fitted:=${TRACKING_LAUNCHER_FITTED:-false}
+        -p launcher_topic_prefix:=/aerodrone/launcher
+        -p fire_min_agl_m:=${TRACKING_FIRE_MIN_AGL_M:-8.0}
+        -p fire_max_agl_m:=${TRACKING_FIRE_MAX_AGL_M:-20.0}
+        -p fire_max_offset_m:=${TRACKING_FIRE_MAX_OFFSET_M:-1.0}
+        -p fire_max_speed_mps:=${TRACKING_FIRE_MAX_SPEED_MPS:-0.5}
+        -p fire_max_tilt_deg:=${TRACKING_FIRE_MAX_TILT_DEG:-5.0}
+        -p fire_max_target_speed_mps:=${TRACKING_FIRE_MAX_TARGET_SPEED_MPS:-0.5}
+        -p fire_detection_timeout_s:=${TRACKING_FIRE_DETECTION_TIMEOUT_S:-0.8}
+        -p fire_person_clear_s:=${TRACKING_FIRE_PERSON_CLEAR_S:-3.0}
+        -p fire_min_interval_s:=${TRACKING_FIRE_MIN_INTERVAL_S:-2.0}
+
+  launcher_bridge:
+    # The aircraft's foam dart launcher (hardware/aerodrone.md, "Foam dart
+    # launcher"): its two ST3215s, the rack (ID 14) and the trigger (ID 15),
+    # on a Waveshare Bus Servo Adapter (A) on the Pi 5's USB (jumper on B),
+    # driven by the turret bridge's sts transport with no pan and tilt
+    # (applications/pantiltros/scripts/turret_arduino_bridge.py,
+    # pan_tilt_fitted false; settings in config/launcher_bridge.yaml). The
+    # tracker's fire control (TRACKING_LAUNCHER_FITTED=true) commands it on
+    # /aerodrone/launcher/*; it writes nothing until the tracker releases
+    # its emergency stop (launcher_arm), and returns the trigger to 0 and
+    # stops the rack on the emergency stop and 500 ms without commands.
+    # TURRET_ARDUINO_PORT: the adapter's /dev/serial/by-id/ path, set in the
+    # shell; never /dev/ttyUSB0, the rangefinder's adapter's default. As the
+    # rangefinder's (aerodrone_hardware.yaml), the port is reached through
+    # the host's /dev, read-only, and the USB-serial device cgroup rules,
+    # so a missing adapter does not stop the stack: the bridge retries.
+    # The small Jazzy image the turret bridge runs in on ARM boards (built
+    # on the Pi at the first `up`).
+    profiles: [launcher]
+    image: salsicha/cyberphysics:unoq-${CYBERPHYSICS_TAG:-arm64}
+    pull_policy: build
+    build:
+      context: ../applications/unoq
+    network_mode: host
+    ipc: host
+    restart: unless-stopped
+    # Docker on some hosts gives containers an open-file limit of about
+    # 2^30, and LTTng-UST, which every ROS 2 Jazzy process loads, then
+    # allocates and zeroes a 128 MiB descriptor bitmap: the usual systemd
+    # defaults.
+    ulimits:
+      nofile:
+        soft: 1024
+        hard: 524288
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - FASTRTPS_DEFAULT_PROFILES_FILE
+    device_cgroup_rules:
+      - 'c 188:* rmw'
+      - 'c 166:* rmw'
+    volumes:
+      - /dev:/host/dev:ro
+      - /dev/shm:/dev/shm
+      - ../systems/aerodrone/config/fastdds.xml:/workspace/systems/aerodrone/config/fastdds.xml:ro
+      - ../applications/pantiltros/scripts:/scripts:ro
+      - ../systems/aerodrone/config/launcher_bridge.yaml:/workspace/config/launcher_bridge.yaml:ro
+    command: >
+      python3 /scripts/turret_arduino_bridge.py --ros-args
+        -r __node:=launcher_bridge
+        --params-file /workspace/config/launcher_bridge.yaml
+        -p serial_port:=/host${TURRET_ARDUINO_PORT:-/dev/serial/by-id/SET-TURRET_ARDUINO_PORT}

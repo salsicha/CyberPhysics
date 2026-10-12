@@ -9,7 +9,12 @@
 # pre-empts a GoTo, follows the car centered and then slant, hides a person
 # under the terrain (lost, then tracked again under its new id), stops,
 # tests the pre-emption of tracking by a map goal and by a GoTo, and lands;
-# then scores the recording against the scorer's thresholds
+# and the scorer's thresholds then judge the recording. With
+# TRACKING_TEST_SCENARIO=fire it flies the foam dart launcher's fire control
+# instead (systems/aerodrone/tracking.md, "Foam dart launcher"; the
+# simulators' stand-in launcher): a shot at the car, halted (allowed), a fire
+# command at a standing person and one at the car with a person in view
+# (both refused), then lands. Either way the recording is scored
 # (tools/tracking_sim_test.py score), with the host's and the containers'
 # CPU sampled while the test flies.
 #
@@ -27,6 +32,7 @@
 #   TRACKING_TEST_KEEP_VOLUMES  true keeps the DEM/tile caches and terrain
 #                               assets for the next run (default false)
 #   TRACKING_TEST_COMPOSE_OVERRIDE  extra compose file layered last
+#   TRACKING_TEST_SCENARIO      tracking (default) or fire
 #   TRACKING_TEST_TARGET, TRACKING_TEST_LOST_TARGET, TRACKING_TEST_ALTITUDE_M,
 #   TRACKING_TEST_LOST_ALTITUDE_M, TRACKING_TEST_SLANT_RANGE_M, TRACKING_TEST_DEPRESSION_DEG,
 #   TRACKING_TEST_CENTERED_S, TRACKING_TEST_SLANT_S

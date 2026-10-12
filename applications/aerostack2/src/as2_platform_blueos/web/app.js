@@ -1,6 +1,7 @@
 // Aerodrone web UI: the downward camera with the tracked objects (tap one
-// to follow it), the follow mode, Stop, the tracker's status, and the map
-// with click-to-goal. Topics and commands: systems/aerodrone/tracking.md.
+// to follow it), the follow mode, Stop, the foam dart launcher (when the
+// tracker reports one), the tracker's status, and the map with
+// click-to-goal. Topics and commands: systems/aerodrone/tracking.md.
 (function () {
   'use strict';
   const T = window.TrackingLogic;
@@ -29,6 +30,7 @@
     odometry: null,
     gps: null,            // {status, at}: MAVROS' raw GPS fix
     correction: null,     // {source, at}: the navigation fusion's corrections
+    fireSentAt: 0,        // a Fire press waits for the next status before another
   };
   // Read by the browser test (tools/tracking_ui_browser_check.py).
   window.__trackingUi = {state, topicNames};
@@ -418,6 +420,7 @@
   }
 
   function updateButtons() {
+    showLauncher();
     $('stop').disabled = !state.connected;
     const target = currentTargetId();
     const valid = T.validateMode(currentMode(), modeInputs()).ok;
@@ -440,6 +443,92 @@
       updateButtons();
     }
   });
+
+  // ------------------------------------------------------------ launcher
+  // tracking.md, "Foam dart launcher". The tracker gates every shot; Fire is
+  // enabled only while its fresh status says every gate holds for the
+  // target it tracks (TrackingLogic.launcherView), and one press sends one
+  // command naming that target.
+  function statusAge() {
+    return state.statusAt ? (Date.now() - state.statusAt) / 1000 : Infinity;
+  }
+
+  function showLauncher() {
+    const view = T.launcherView(state.status, statusAge(), state.connected);
+    $('launcher-card').hidden = !view.visible;
+    if (!view.visible) return;
+    const chip = $('launcher-chip');
+    chip.textContent = view.state;
+    chip.className = `chip ${/^[a-z]+$/.test(view.state) ? view.state : ''}`;
+    const armed = $('launcher-armed');
+    armed.textContent = view.armed ? `Armed${view.ready ? '' : ' (not ready)'}` : 'Disarmed';
+    armed.className = `badge ${view.armed ? (view.ready ? 'warn' : 'bad') : 'ok'}`;
+    $('launcher-darts').textContent =
+      `Darts ${view.darts === null ? '-' : view.darts}, shots ${view.shots === null ? '-' : view.shots}`;
+    $('launcher-arm').disabled = !view.arm;
+    $('launcher-disarm').disabled = !view.disarm;
+    const waiting = state.fireSentAt > 0 && state.statusAt <= state.fireSentAt &&
+      Date.now() - state.fireSentAt < 3000;
+    const fire = $('fire');
+    fire.disabled = !view.fire.enabled || waiting;
+    fire.textContent = view.fire.enabled
+      ? `Fire at #${state.status.target_id} (${state.status.target_class || 'target'})` : 'Fire';
+    const block = $('fire-block');
+    block.textContent = view.fire.enabled
+      ? (waiting ? 'Fire sent: waiting for the tracker' : 'Every check holds: one press, one dart')
+      : `Fire blocked: ${view.fire.reason}`;
+    block.className = `fire-block${view.fire.enabled ? ' clear' : ''}`;
+    $('reload').disabled = !view.reload || !T.reloadCommand($('reload-darts').value).ok;
+    $('launcher-last').textContent = view.lastFire ? `Last fire: ${view.lastFire}` : '';
+    const list = $('fire-checks');
+    const text = view.checks.map(check => `${check.name}:${check.ok}`).join(',');
+    if (list.dataset.checks !== text) {
+      list.dataset.checks = text;
+      list.replaceChildren(...view.checks.map(check => {
+        const item = document.createElement('li');
+        item.textContent = `${check.ok ? '\u2713' : '\u2717'} ${check.label}`;
+        item.title = check.name;
+        if (!check.ok) item.className = 'no';
+        return item;
+      }));
+    }
+  }
+
+  $('fire').addEventListener('click', () => {
+    const view = T.launcherView(state.status, statusAge(), state.connected);
+    if (!view.fire.enabled) {
+      flash(`Fire blocked: ${view.fire.reason}`, true);
+      return;
+    }
+    const result = T.fireCommand(state.status.target_id);
+    if (!result.ok) {
+      flash(result.error, true);
+      return;
+    }
+    if (publishCommand(result)) {
+      state.fireSentAt = Date.now();
+      flash(`Fire sent at #${state.status.target_id}`);
+      showLauncher();
+    }
+  });
+
+  for (const [id, armed] of [['launcher-arm', true], ['launcher-disarm', false]]) {
+    $(id).addEventListener('click', () => {
+      if (publishCommand(T.launcherArmCommand(armed))) {
+        flash(armed ? 'Launcher arm sent' : 'Launcher disarm sent');
+      }
+    });
+  }
+
+  $('reload').addEventListener('click', () => {
+    const result = T.reloadCommand($('reload-darts').value);
+    if (!result.ok) {
+      flash(result.error, true);
+      return;
+    }
+    if (publishCommand(result)) flash(`Reload sent: ${result.command.darts} darts`);
+  });
+  $('reload-darts').addEventListener('input', showLauncher);
 
   // -------------------------------------------------------------- status
   function onStatus(message) {
@@ -513,6 +602,7 @@
       updateButtons();
     }
     showStatus();
+    showLauncher();
     showNavigation();
     scheduleRender();
   }, 500);

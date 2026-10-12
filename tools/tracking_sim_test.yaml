@@ -35,6 +35,7 @@ services:
         --slant-range ${TRACKING_TEST_SLANT_RANGE_M:-60.0}
         --depression ${TRACKING_TEST_DEPRESSION_DEG:-70.0}
         --centered-s ${TRACKING_TEST_CENTERED_S:-150} --slant-s ${TRACKING_TEST_SLANT_S:-150}
+        --scenario ${TRACKING_TEST_SCENARIO:-tracking}
     restart: "no"
 
   tracking_truth_boxes:

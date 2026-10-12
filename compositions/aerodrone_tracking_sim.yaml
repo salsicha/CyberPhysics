@@ -69,6 +69,31 @@ services:
         -p dropout:=${TRACKING_TRUTH_DROPOUT:-0.0}
         -p dem_cache_dir:=/data/demnav_cache
 
+  tracking_launcher:
+    # Stands in for the foam dart launcher's servo bridge (the aircraft's
+    # launcher_bridge in aerodrone_tracking.yaml), so the tracker's fire
+    # control (TRACKING_LAUNCHER_FITTED=true in the simulators' env files)
+    # runs its fire cycle end to end: the rack and trigger move at the
+    # ST3215's speed on the simulation clock, with the sear; no dart
+    # physics, each shot published on /simulation/launcher/shots
+    # (applications/aerostack2/scripts/launcher_standin.py).
+    profiles: [tracking, tracking_truth]
+    image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
+    network_mode: host
+    ipc: host
+    environment:
+      ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
+      FASTRTPS_DEFAULT_PROFILES_FILE: /workspace/systems/aerodrone/config/fastdds.xml
+    volumes:
+      - /dev/shm:/dev/shm
+      - ../systems/aerodrone/config/fastdds.xml:/workspace/systems/aerodrone/config/fastdds.xml:ro
+      - ../applications/aerostack2/scripts:/workspace/applications/aerostack2/scripts:ro
+    command: >
+      python3 /workspace/applications/aerostack2/scripts/launcher_standin.py --ros-args
+        -p use_sim_time:=${TRACKING_USE_SIM_TIME:-true}
+        -p topic_prefix:=/aerodrone/launcher
+        -p shots_topic:=/simulation/launcher/shots
+
   tracking_rosbridge:
     # The web page's link to ROS, as blueos_nav_core.yaml's rosbridge on
     # the aircraft: port 9092 there and here, since the page connects to

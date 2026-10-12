@@ -1,0 +1,48 @@
+# The aerodrone's foam dart launcher servo bridge (compositions/
+# aerodrone_tracking.yaml, launcher_bridge; systems/aerodrone/tracking.md,
+# "Foam dart launcher"): applications/pantiltros/scripts/turret_arduino_bridge.py
+# on the Pi 5, its sts transport driving the launcher's two ST3215s through
+# the Waveshare Bus Servo Adapter (A) on USB (jumper on B), with no pan and
+# tilt. The port (TURRET_ARDUINO_PORT, the adapter's /dev/serial/by-id/
+# path) comes from the composition.
+/**:
+  ros__parameters:
+    transport: sts
+    baud_rate: 1000000
+    dry_run: false
+    # The launcher alone: nothing is ever sent to the pan and tilt IDs.
+    actuator_fitted: true
+    pan_tilt_fitted: false
+    # The tracker's fire control, not the turret's topics.
+    joint_command_topic: /aerodrone/launcher/joint_commands
+    joint_state_topic: /aerodrone/launcher/joint_states
+    diagnostics_topic: /aerodrone/launcher/diagnostics
+    emergency_stop_topic: /aerodrone/launcher/emergency_stop
+    actuator_ready_topic: /aerodrone/launcher/actuator_ready
+    # Nothing is written until the tracker releases the emergency stop
+    # (launcher_arm); it engages it again on launcher_disarm and at start.
+    require_estop_release: true
+    diagnostic_rate_hz: 1.0
+    servo_speed: 2000  # goal speed, steps/s: 41 mm/s on the rack
+    servo_acceleration: 50
+    servo_reply_timeout_s: 0.01
+    # The launcher's limits and servo settings: the turret's
+    # (applications/pantiltros/config/arduino_bridge.yaml,
+    # hardware/parts/turret/_launcher.py): the rack in metres (0 forward,
+    # 0.038 back primes it), the trigger in radians (0 safe, 0.6 lifts the
+    # sear); IDs 14 and 15; torque limits 55 % and 30 %; the steps at 0 and
+    # the directions are set at the launcher's bench bring-up
+    # (hardware/turret.md) before it goes on the aircraft.
+    actuator_min_m: 0.0
+    actuator_max_m: 0.038
+    actuator_servo_id: 14
+    actuator_zero_steps: 512
+    actuator_direction: 1
+    actuator_pinion_radius_m: 0.0135
+    actuator_torque_limit: 550
+    trigger_min_rad: 0.0
+    trigger_max_rad: 0.6
+    trigger_servo_id: 15
+    trigger_zero_steps: 2048
+    trigger_direction: 1
+    trigger_torque_limit: 300

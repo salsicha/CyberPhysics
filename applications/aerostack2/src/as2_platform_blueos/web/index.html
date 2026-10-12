@@ -121,6 +121,33 @@
     #last-command { display: block; margin-top: 8px; color: var(--muted); font-size: 12px;
                     font-family: ui-monospace, monospace; overflow-wrap: anywhere; }
 
+    /* Foam dart launcher */
+    .launcher { padding: 12px; }
+    .launcher-state { display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+                      margin-bottom: 10px; }
+    .chip.ready { background: #1f6b34; }
+    .chip.empty, .chip.priming, .chip.chambering, .chip.firing { background: #7a5a12; }
+    .chip.fault { background: #7a1f22; }
+    .launcher-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+                        margin-bottom: 8px; }
+    #fire {
+      width: 100%; min-height: 52px; padding: 10px 18px; border: 0; border-radius: 8px;
+      background: var(--danger); color: #fff; font-weight: 800; font-size: 17px;
+      letter-spacing: 0.03em; cursor: pointer;
+    }
+    #fire:disabled { background: #4a2f31; color: #b9a9aa; cursor: not-allowed; }
+    .fire-block { margin: 6px 0 10px; font-size: 14px; color: #ffb4b6; }
+    .fire-block.clear { color: #9be29f; }
+    .reload { display: flex; align-items: end; gap: 8px; }
+    .reload .field { margin: 0; flex: 1 1 auto; }
+    .reload button { flex: 0 0 120px; }
+    .checks { list-style: none; padding: 0; margin: 8px 0 0; display: flex; flex-wrap: wrap;
+              gap: 4px; }
+    .checks li { font-size: 12px; padding: 2px 8px; border-radius: 999px;
+                 background: #1f4d2b; }
+    .checks li.no { background: #5c1f22; }
+    .launcher .note { color: var(--muted); font-size: 12px; margin: 8px 0 0; }
+
     .status dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px;
                  margin: 0; }
     .status dt { color: var(--muted); }
@@ -201,6 +228,31 @@
         <p id="mode-error" role="alert"></p>
         <button id="apply" class="secondary" type="button" disabled>Apply to the current target</button>
         <output id="last-command"></output>
+      </section>
+
+      <section class="card launcher" id="launcher-card" aria-label="Foam dart launcher" hidden>
+        <h2>Launcher</h2>
+        <div class="launcher-state">
+          <span class="chip" id="launcher-chip">-</span>
+          <span class="badge bad" id="launcher-armed">Disarmed</span>
+          <span id="launcher-darts">Darts -</span>
+        </div>
+        <div class="launcher-buttons">
+          <button id="launcher-arm" class="secondary" type="button" disabled>Arm launcher</button>
+          <button id="launcher-disarm" class="secondary" type="button" disabled>Disarm</button>
+        </div>
+        <button id="fire" type="button" disabled>Fire</button>
+        <p class="fire-block" id="fire-block" role="status"></p>
+        <div class="reload">
+          <label class="field"><span>Darts in the clip, 0-6 (disarmed)</span>
+            <input id="reload-darts" type="number" inputmode="numeric" min="0" max="6"
+                   step="1" value="6"></label>
+          <button id="reload" class="secondary" type="button" disabled>Reload</button>
+        </div>
+        <ul class="checks" id="fire-checks" aria-label="Fire checks"></ul>
+        <p class="note" id="launcher-last"></p>
+        <p class="note">Objects only, never people: Fire is refused while anyone is in
+          view. One press, one dart.</p>
       </section>
 
       <section class="card status" aria-label="Tracker status">

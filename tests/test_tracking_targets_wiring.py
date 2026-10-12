@@ -125,7 +125,8 @@ def test_isaac_places_the_targets_before_each_capture_and_publishes_them_after()
     assert (loop.index('poses = tracks.poses(tick * dt)')
             < loop.index('place_tracking_targets(target_ops, tracks.placed(poses))')
             < loop.index('camera.capture(')
-            < loop.index('truth_json(tick * dt, poses, tracks.origin, tracks.hidden)'))
+            < loop.index('truth_json(tick * dt, poses, tracks.origin, tracks.hidden, '
+                         'tracks.halted)'))
     assert 'publisher.subscribe_hide(tracks)' in main
     add = source[source.index('def add_tracking_targets('):
                  source.index('def place_tracking_targets(')]

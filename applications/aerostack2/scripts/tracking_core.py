@@ -120,6 +120,15 @@ class TrackerConfig:
     # apart): the lead grows from 0 to its full length over lead_ramp_s of
     # its life.
     lead_ramp_s: float = 2.0
+    # A still target is not led: one whose filtered speed has stayed under
+    # still_speed_mps for still_s, until it exceeds twice that. A parked
+    # car's velocity is the filter's noise, 0.1-0.4 m/s, which the full lead
+    # turned into a reference swinging a metre either way; hovering 17 m
+    # above it in Gazebo the aircraft rolled and pitched 10-16 deg either way
+    # (the launcher's fire control needs a steady hover). A walking person
+    # (1.5 m/s) or a car driving is never still that long.
+    still_speed_mps: float = 0.5
+    still_s: float = 2.0
     lost_timeout_s: float = 3.0
     slant_range_m: float = 60.0
     depression_deg: float = 70.0
@@ -299,6 +308,22 @@ class PoseHistory:
             return None
         stamp, position, quaternion = self._samples[-1]
         return Pose(position, quaternion, stamp, 0.0)
+
+    def horizontal_speed(self, window_s=0.5):
+        """The aircraft's horizontal speed (m/s of the simulation clock when
+        /clock pairs map the odometry's stamps onto it) over the last
+        window_s of odometry, or None with less than half a window."""
+        samples = self._samples
+        if len(samples) < 2:
+            return None
+        t1, p1, _ = samples[-1]
+        rate = self._rate(t1)
+        start = t1 - int(window_s / max(rate, 1e-6) * 1e9)
+        t0, p0, _ = next(item for item in samples if item[0] >= start)
+        seconds = (t1 - t0) * 1e-9 * rate
+        if seconds < 0.5 * window_s:
+            return None
+        return math.hypot(p1[0] - p0[0], p1[1] - p0[1]) / seconds
 
     def at(self, stamp_ns):
         """Pose at a frame stamp (ns), or None."""
@@ -549,18 +574,30 @@ class Geolocation:
     depression_rad: float  # of the ray, below the horizontal
 
 
+def body_point(pose, offset):
+    """World position of a point fixed to the body at offset (body FLU
+    metres from the odometry's origin), in pose."""
+    position = np.asarray(pose.position, dtype=float)
+    if offset is None or not any(offset):
+        return position
+    return position + quaternion_matrix(*pose.quaternion) @ np.asarray(offset, dtype=float)
+
+
 def geolocate(u, v, box_size, pose, intrinsics, height_fn, mount_yaw_rad,
-              stabilized, config):
+              stabilized, config, camera_offset=None):
     """Ground position of the pixel (u, v) seen in pose, on the ground
     height_fn(east, north), with its covariance, or None. box_size
-    (pixels) sets the box-centre noise."""
+    (pixels) sets the box-centre noise. camera_offset: the camera's
+    position on the body (FLU metres from the odometry's origin); the ray
+    starts there (the OAK-1 sits 137 mm ahead of the hub)."""
     rotation = camera_world_rotation(pose.quaternion, mount_yaw_rad, stabilized)
     direction = pixel_ray(rotation, intrinsics, u, v)
-    point = intersect_terrain(pose.position, direction, height_fn,
+    camera = body_point(pose, camera_offset)
+    point = intersect_terrain(camera, direction, height_fn,
                               config.max_range_m)
     if point is None:
         return None
-    range_m = float(np.linalg.norm(point - np.asarray(pose.position)))
+    range_m = float(np.linalg.norm(point - camera))
     depression = math.asin(min(1.0, -float(direction[2])))
     sigma_px = math.hypot(config.pixel_sigma_px, 0.1 * max(0.0, min(box_size)))
     angular = math.hypot(sigma_px / min(intrinsics.fx, intrinsics.fy),
@@ -939,6 +976,11 @@ class TrackerCore:
     target_class: str = None
     target_side_px: float = None
     handed_over_from: str = None
+    # The target is still (no lead; still_speed_mps): since when its speed
+    # has been under the limit, for the filter it was measured on.
+    still: bool = False
+    still_since: float = None
+    still_filter: object = None
 
     @property
     def active(self):
@@ -1219,7 +1261,8 @@ class TrackerCore:
         filter younger than lead_ramp_s predicts proportionally less far:
         its velocity is still noise (in Gazebo's slant flights each new
         filter after a re-selection threw the reference about, the aircraft
-        rolled 15 deg either way within 2 s and lost the car again)."""
+        rolled 15 deg either way within 2 s and lost the car again). A
+        still target (update_still) is not led at all."""
         if self.state != 'tracking' or self.filter is None:
             self.adapted_at = None
             return None
@@ -1232,6 +1275,8 @@ class TrackerCore:
         lead = self.config.lead_s + self.lead_extra_s
         if self.config.lead_ramp_s > 0.0:
             lead *= min(1.0, max(0.0, now - self.filter.created) / self.config.lead_ramp_s)
+        if self.update_still(now):
+            lead = 0.0
         state = self.filter.predicted_turning(now + lead)
         setpoint = self._mode_setpoint(state, drone, ground_fn,
                                        mount_yaw_rad, intrinsics, notes)
@@ -1241,6 +1286,23 @@ class TrackerCore:
             notes.append(f'height {setpoint.clamped}')
         self.notes = tuple(notes)
         return setpoint
+
+    def update_still(self, now):
+        """Whether the target is still: its filtered speed under
+        still_speed_mps for still_s (on this filter), and since then never
+        over twice that."""
+        speed, limit = self.filter.speed_mps, self.config.still_speed_mps
+        if self.still_filter is not self.filter:
+            self.still, self.still_since, self.still_filter = False, None, self.filter
+        if self.still:
+            if speed > 2.0 * limit:
+                self.still, self.still_since = False, None
+        elif speed < limit:
+            self.still_since = now if self.still_since is None else self.still_since
+            self.still = now - self.still_since >= self.config.still_s
+        else:
+            self.still_since = None
+        return self.still
 
     def estimate(self, now):
         """The target's position: predicted to now while tracking, the

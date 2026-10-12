@@ -213,3 +213,104 @@ test('navigation badge: the GPS first, then the vision corrections', () => {
                    {text: 'Navigation: dead reckoning (no GPS)', kind: 'bad'});
   assert.deepEqual(T.navigationBadge(null, null, now), {text: 'Navigation: -', kind: ''});
 });
+
+// ------------------------------------------------------- foam dart launcher
+
+function launcherSection() {
+  const start = contract.indexOf('## Foam dart launcher');
+  assert.ok(start >= 0, 'tracking.md has the launcher section');
+  return contract.slice(start);
+}
+
+test('launcher commands equal the contract examples', () => {
+  const examples = [...launcherSection().matchAll(/`(\{"action": "[a-z_]+"[^`]*\})`/g)]
+    .map(match => JSON.parse(match[1]));
+  const byAction = Object.fromEntries(examples.map(command => [command.action, command]));
+  assert.deepEqual(T.fireCommand('7').command, byAction.fire);
+  assert.deepEqual(T.launcherArmCommand(true).command, byAction.launcher_arm);
+  assert.deepEqual(T.launcherArmCommand(false).command, byAction.launcher_disarm);
+  assert.deepEqual(T.reloadCommand('6').command, byAction.reload);
+  assert.equal(T.fireCommand(7).json, '{"action":"fire","target_id":"7"}');
+  for (const none of [undefined, null, '']) assert.equal(T.fireCommand(none).ok, false);
+});
+
+test('reload takes a whole number of darts the clip holds', () => {
+  for (const ok of ['0', '1', '6', ' 3 ']) assert.equal(T.reloadCommand(ok).ok, true, ok);
+  for (const bad of ['7', '-1', '2.5', '', 'six', 'Infinity']) {
+    assert.equal(T.reloadCommand(bad).ok, false, bad);
+  }
+  assert.equal(T.LAUNCHER_CAPACITY, 6);
+});
+
+const READY = Object.freeze({
+  state: 'tracking', mode: 'centered', target_id: '7', target_class: 'car',
+  launcher: 'ready', launcher_armed: true, launcher_ready: true, darts: 5, shots: 1,
+  fire_block: '', fire_checks: {armed: true, no_person: true},
+  last_fire: {target_id: '7', result: 'fired', reason: '', stamp: 10},
+});
+
+test('Fire is enabled only while the fresh status says every gate holds', () => {
+  const view = T.launcherView(READY, 0.5, true);
+  assert.equal(view.visible, true);
+  assert.deepEqual(view.fire, {enabled: true, reason: ''});
+  assert.equal(view.disarm, true);
+  assert.equal(view.arm, false);
+  assert.equal(view.reload, false, 'reload only while disarmed');
+  assert.equal(view.darts, 5);
+  assert.match(view.lastFire, /#7 fired/);
+  assert.deepEqual(view.checks.map(check => check.label), ['armed', 'nobody in view']);
+  const cases = [
+    [READY, 0.5, false, 'not connected'],
+    [READY, 3.5, true, 'tracker status is old'],
+    [READY, Infinity, true, 'tracker status is old'],
+    [Object.assign({}, READY, {fire_block: 'a person is in view (#4 person)'}), 0.5, true,
+     'a person is in view (#4 person)'],
+    [Object.assign({}, READY, {fire_block: undefined}), 0.5, true, 'no fire_block in the status'],
+    [Object.assign({}, READY, {state: 'lost'}), 0.5, true, 'not tracking'],
+    [Object.assign({}, READY, {target_id: null}), 0.5, true, 'not tracking'],
+    [Object.assign({}, READY, {launcher_armed: false}), 0.5, true, 'launcher disarmed'],
+  ];
+  for (const [status, age, connected, reason] of cases) {
+    assert.deepEqual(T.launcherView(status, age, connected).fire, {enabled: false, reason},
+                     reason);
+  }
+});
+
+test('without a launcher the card is hidden and Fire never enabled', () => {
+  for (const status of [null, {state: 'tracking'}, Object.assign({}, READY, {launcher: 'none'})]) {
+    const view = T.launcherView(status, 0.1, true);
+    assert.equal(view.visible, false);
+    assert.equal(view.fire.enabled, false);
+  }
+});
+
+test('random statuses: Fire enabled implies every gate held in a fresh status', () => {
+  let seed = 12345;
+  const random = () => {
+    seed = (seed * 1103515245 + 12345) % 2147483648;
+    return seed / 2147483648;
+  };
+  const pick = values => values[Math.floor(random() * values.length)];
+  let enabled = 0;
+  for (let i = 0; i < 5000; i++) {
+    const status = {
+      state: pick(['tracking', 'tracking', 'lost', 'idle', 'acquiring', 'error', undefined]),
+      target_id: pick(['7', '7', '', null, undefined, 12]),
+      launcher: pick(['ready', 'ready', 'empty', 'priming', 'fault', 'none', undefined, 3]),
+      launcher_armed: pick([true, true, false, 'true', undefined]),
+      fire_block: pick(['', '', '', 'no darts', 'a person is in view (#1 person)', null, 0]),
+    };
+    const age = pick([0, 0.4, 2.9, 3.1, NaN, Infinity]);
+    const connected = pick([true, true, false]);
+    const view = T.launcherView(random() < 0.05 ? null : status, age, connected);
+    if (!view.fire.enabled) continue;
+    enabled += 1;
+    assert.equal(status.fire_block, '');
+    assert.equal(status.state, 'tracking');
+    assert.equal(status.launcher_armed, true);
+    assert.ok(status.target_id !== '' && status.target_id !== null && status.target_id !== undefined);
+    assert.ok(typeof status.launcher === 'string' && status.launcher !== 'none');
+    assert.ok(age <= 3 && connected);
+  }
+  assert.ok(enabled > 20, `the random statuses reach enabled (${enabled})`);
+});

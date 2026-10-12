@@ -590,6 +590,36 @@ def test_a_new_filter_leads_less_until_its_velocity_settles():
     assert half == pytest.approx(4.0 * 0.5 * CONFIG.lead_s)
 
 
+def test_a_still_target_is_not_led():
+    """A parked car's filtered velocity is noise (in Gazebo the full lead on
+    0.1-0.4 m/s of it rocked the aircraft 10-16 deg over a parked car): a
+    target under still_speed_mps for still_s is not led, until it exceeds
+    twice that; a new filter starts not still."""
+    core = tracking_core_at((0.0, 0.0, 0.0), now=0.0)
+    core.filter.created = -CONFIG.lead_ramp_s
+
+    def lead_at(t, speed):
+        core.filter.x[:3] = (0.0, 0.0, 0.0)
+        core.filter.x[3:] = (speed, 0.0, 0.0)
+        core.filter.t = t
+        return core.setpoint(t, flying(), flat(), 0.0, OAK1).position[0] / speed
+
+    assert lead_at(0.0, 0.3) == pytest.approx(CONFIG.lead_s)   # not still yet
+    assert lead_at(1.9, 0.3) == pytest.approx(CONFIG.lead_s)
+    assert lead_at(2.0, 0.3) == pytest.approx(0.0)             # still: 2 s under 0.5 m/s
+    assert lead_at(3.0, 0.9) == pytest.approx(0.0)             # under twice the limit
+    assert lead_at(4.0, 1.1) == pytest.approx(CONFIG.lead_s)   # moving again
+    assert lead_at(4.5, 0.4) == pytest.approx(CONFIG.lead_s)   # and must be still 2 s again
+    assert lead_at(6.6, 0.4) == pytest.approx(0.0)
+    # A walking person (1.5 m/s) or a driving car is never still.
+    for t in range(8, 20):
+        assert lead_at(float(t), 1.5) == pytest.approx(CONFIG.lead_s)
+    # A new filter (a new target, or the old one started again) starts not still.
+    core.filter = tc.ConstantVelocityFilter(np.zeros(3), np.eye(3), 20.0, CONFIG)
+    core.filter.created = -CONFIG.lead_ramp_s
+    assert lead_at(20.0, 0.3) == pytest.approx(CONFIG.lead_s)
+
+
 @pytest.mark.parametrize('mount_deg', [0.0, 90.0])
 def test_centered_yaw_lays_the_targets_travel_along_the_long_axis(mount_deg):
     """A car driving north-east, followed centered: the set-point's yaw

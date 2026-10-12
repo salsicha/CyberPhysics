@@ -41,7 +41,20 @@ ArduPilot's; wall time on the aircraft. Its timers run on that clock too.
 
 Publishes ``<prefix>/status`` (JSON, reliable + transient-local, 2 Hz and
 on every change) and ``<prefix>/target`` (PointStamped, navigation frame).
+
+With ``launcher_fitted`` it is also the fire control of the foam dart
+launcher under the hub (launcher_core.py, tracking.md "Foam dart
+launcher"): ``fire``, ``launcher_arm``, ``launcher_disarm`` and ``reload``
+on ``<prefix>/command`` go to launcher_core.FireControl, whose fields join
+the status; the launcher's servo bridge (turret_arduino_bridge.py, ``sts``,
+launcher only) or the simulators' stand-in (launcher_standin.py) takes
+``<launcher_topic_prefix>/joint_commands`` and ``/emergency_stop`` (true
+while disarmed) and gives ``/joint_states`` and ``/actuator_ready``; each
+shot is published on ``<prefix>/shots``. Only a fire command naming the
+tracked target, while every gate holds, primes and fires it
+(FireControl.handle, from _on_command alone).
 """
+import json
 import math
 import os
 import sys
@@ -51,6 +64,7 @@ import uuid
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import launcher_core as lc  # noqa: E402
 import tracking_core as tc  # noqa: E402
 
 PARAMETERS = {
@@ -74,9 +88,21 @@ PARAMETERS = {
     'preempt_behaviors': 'GoToBehavior,FollowPathBehavior',
     'busy_behaviors': 'TakeoffBehavior,LandBehavior',
     'follow_retry_s': 2.0,
+    # The camera's position on the body (FLU metres from the odometry's
+    # origin, the hub): geolocation starts the pixel's ray there. The
+    # OAK-1's lens is 137 mm ahead of the hub and 80 mm below it
+    # (hardware/parts/aerodrone/_frame.py).
+    'camera_offset_m': [0.0, 0.0, 0.0],
+    # The foam dart launcher's topics (its bridge or the stand-in) and how
+    # often its fire cycle steps.
+    'launcher_topic_prefix': '/aerodrone/launcher',
+    'launcher_rate_hz': 20.0,
 }
 CONFIG_FIELDS = {name: value for name, value in
                  vars(tc.TrackerConfig()).items()}
+# The fire control's parameters (launcher_core.LauncherConfig).
+LAUNCHER_FIELDS = {name: value for name, value in
+                   vars(lc.LauncherConfig()).items()}
 
 
 def flag(value):
@@ -88,6 +114,26 @@ def flag(value):
 
 def stamp_ns(stamp):
     return int(stamp.sec) * 1_000_000_000 + int(stamp.nanosec)
+
+
+def parameter_value(value, default):
+    """A parameter's value as its default's type (compose passes 3 for 3.0,
+    "true" for true, a list for a tuple)."""
+    if isinstance(default, bool):
+        return flag(value)
+    if isinstance(default, (tuple, list)):
+        return type(default)(float(item) for item in value)
+    return type(default)(value)
+
+
+def joint_position(msg, name):
+    """A JointState's position of the joint name, or None."""
+    names = list(msg.name)
+    if name in names:
+        index = names.index(name)
+        if index < len(msg.position):
+            return float(msg.position[index])
+    return None
 
 
 def detection_class(detection):
@@ -137,7 +183,12 @@ class Terrain:
 
 
 class Tracker:
-    """The ROS side of TrackerCore."""
+    """The ROS side of TrackerCore, and of the launcher's FireControl."""
+
+    # No launcher and the camera at the odometry's origin until __init__
+    # reads the parameters.
+    launcher_fitted = False
+    camera_offset = None
 
     def __init__(self, node):
         import rclpy
@@ -155,8 +206,8 @@ class Tracker:
             qos_profile_sensor_data,
         )
         from rosgraph_msgs.msg import Clock
-        from sensor_msgs.msg import CameraInfo, Range
-        from std_msgs.msg import String
+        from sensor_msgs.msg import CameraInfo, JointState, Range
+        from std_msgs.msg import Bool, String
         from std_srvs.srv import Trigger
         from vision_msgs.msg import Detection2DArray
 
@@ -167,18 +218,28 @@ class Tracker:
         self.PointStamped = PointStamped
         self.String = String
         self.Trigger = Trigger
+        self.JointState = JointState
+        self.Bool = Bool
         # Compose passes 3 for 3.0 and "true" for true: accept either.
         dynamic = ParameterDescriptor(dynamic_typing=True)
-        for name, default in {**PARAMETERS, **CONFIG_FIELDS}.items():
-            node.declare_parameter(name, default, dynamic)
+        for name, default in {**PARAMETERS, **CONFIG_FIELDS, **LAUNCHER_FIELDS}.items():
+            node.declare_parameter(name, list(default) if isinstance(default, tuple)
+                                   else default, dynamic)
         param = lambda name: node.get_parameter(name).value  # noqa: E731
-        values = {}
-        for name, default in CONFIG_FIELDS.items():
-            value = param(name)
-            values[name] = (flag(value) if isinstance(default, bool) else
-                            type(default)(value))
-        self.config = tc.TrackerConfig(**values)
+        self.config = tc.TrackerConfig(**{
+            name: parameter_value(param(name), default)
+            for name, default in CONFIG_FIELDS.items()})
         self.core = tc.TrackerCore(self.config)
+        self.launcher = lc.FireControl(lc.LauncherConfig(**{
+            name: parameter_value(param(name), default)
+            for name, default in LAUNCHER_FIELDS.items()}))
+        self.launcher_fitted = self.launcher.config.launcher_fitted
+        self.camera_offset = tuple(float(value) for value in param('camera_offset_m'))
+        if len(self.camera_offset) != 3 or not all(math.isfinite(v) for v in self.camera_offset):
+            raise ValueError('camera_offset_m must be three finite numbers')
+        self.estop_published = None
+        self.status_block = None
+        self.status_block_time = -math.inf
         self.ns = '/' + str(param('namespace')).strip('/')
         prefix = '/' + str(param('topic_prefix')).strip('/')
         self.mount_yaw = math.radians(float(param('camera_mount_yaw_deg')))
@@ -251,10 +312,27 @@ class Tracker:
             Trigger, f'{self.ns}/{follow}/_behavior/stop')
         node.create_timer(1.0 / float(param('control_rate_hz')), self._control)
         node.create_timer(1.0 / float(param('status_rate_hz')), self._publish_status)
+        if self.launcher_fitted:
+            launcher = '/' + str(param('launcher_topic_prefix')).strip('/')
+            self.joint_command_pub = node.create_publisher(
+                JointState, f'{launcher}/joint_commands', 10)
+            self.estop_pub = node.create_publisher(Bool, f'{launcher}/emergency_stop', latched)
+            self.shots_pub = node.create_publisher(
+                String, f'{prefix}/shots',
+                QoSProfile(depth=10, reliability=ReliabilityPolicy.RELIABLE))
+            node.create_subscription(JointState, f'{launcher}/joint_states',
+                                     self._on_launcher_joints, qos_profile_sensor_data)
+            for qos in (latched, 10):  # the bridge's is latched
+                node.create_subscription(Bool, f'{launcher}/actuator_ready',
+                                         self._on_launcher_ready, qos)
+            self._publish_estop()  # disarmed at start
+            node.create_timer(1.0 / float(param('launcher_rate_hz')), self._launcher_tick)
         node.get_logger().info(
             f'tracker ready: {prefix}/command, behaviours in {self.ns}, '
             f'camera mount {math.degrees(self.mount_yaw):g} deg'
-            f'{" (stabilised)" if self.stabilized else ""}, DEMs in {self.dem_cache_dir}')
+            f'{" (stabilised)" if self.stabilized else ""}, DEMs in {self.dem_cache_dir}; '
+            + ('foam dart launcher fitted, disarmed' if self.launcher_fitted
+               else 'no launcher'))
         self._publish_status()
 
     # --- inputs ---------------------------------------------------------
@@ -342,24 +420,41 @@ class Tracker:
             if not self.core.active:
                 return
             self.node.get_logger().info(f'tracking pre-empted by {reason}')
-            self._execute(self.core.preempt(reason, self.now()), hover_reason='pre-empted')
+            now = self.now()
+            self._execute(self.core.preempt(reason, now), hover_reason='pre-empted')
+            if self.launcher.abort(now, f'pre-empted by {reason}'):
+                self._launcher_outputs(now, self._situation(now))
         self._publish_status()
 
     def _on_command(self, msg):
+        launcher_command = lc.parse_launcher_command(msg.data)
         with self.lock:
             now = self.now()
-            drone = self._drone(now)
-            before = (self.core.state, self.core.message)
-            actions = self.core.handle_command(msg.data, now, drone)
-            self.node.get_logger().info(
-                f'command {msg.data!r}: {before[0]} -> {self.core.state} '
-                f'({self.core.message})')
-            self._execute(actions)
+            if launcher_command is not None:
+                # fire, launcher_arm, launcher_disarm, reload
+                situation = self._situation(now)
+                result = self.launcher.handle(launcher_command, now, situation)
+                self.node.get_logger().info(f'launcher command {msg.data!r}: {result}')
+                self._launcher_outputs(now, situation)
+            else:
+                drone = self._drone(now)
+                before = (self.core.state, self.core.message)
+                actions = self.core.handle_command(msg.data, now, drone)
+                self.node.get_logger().info(
+                    f'command {msg.data!r}: {before[0]} -> {self.core.state} '
+                    f'({self.core.message})')
+                self._execute(actions)
+                action = tc.parse_command(msg.data, self.config)[0]
+                if action is not None and self.launcher.abort(now, f'{action.action} command'):
+                    # A stop or track command ends a fire cycle in progress.
+                    self._launcher_outputs(now, self._situation(now))
         self._publish_status()
 
     def _on_detections(self, msg):
         with self.lock:
             core = self.core
+            if self.launcher_fitted:
+                self._launcher_detections(msg)
             if not core.active or core.command is None:
                 return
             target_id = core.command.target_id
@@ -419,7 +514,8 @@ class Tracker:
             float(center.x), float(center.y),
             (float(detection.bbox.size_x), float(detection.bbox.size_y)),
             pose, self.intrinsics, self.terrain.height_fn(now, self.bias_hold_s),
-            self.mount_yaw, self.stabilized, self.config)
+            self.mount_yaw, self.stabilized, self.config,
+            camera_offset=self.camera_offset)
 
     def _image_time(self, stamp, now):
         """An image stamp in seconds of the node's clock (now), or None."""
@@ -687,15 +783,168 @@ class Tracker:
             pose = self.poses.latest()
             status = self.core.status(now, pose.position if pose else None,
                                       self._notes(now))
+            situation = self._situation(now)
+            status.update(self.launcher.status(now, situation))
+            self.status_block = status['fire_block']
+            self.status_block_time = now
         self.status_pub.publish(self.String(data=tc.status_json(status)))
+
+    # --- the foam dart launcher (launcher_core.py) -----------------------------
+    def _situation(self, now):
+        """What the fire control's gates need now (launcher_core.Situation)."""
+        core = self.core
+        situation = lc.Situation(state=core.state)
+        if core.command is not None and core.active:
+            situation.mode = core.command.mode
+            situation.target_id = core.command.target_id
+            situation.target_class = core.target_class
+        if core.last_seen is not None and core.active:
+            situation.target_seen_s = now - core.last_seen
+        if core.filter is not None and core.state == 'tracking':
+            situation.target_speed_mps = core.filter.speed_mps
+            situation.track_started = core.filter.created
+        pose = self.poses.latest()
+        if pose is None:
+            return situation
+        reference = self.poses.to_clock(pose.stamp_ns, round(now * 1e9))
+        if reference is None or not -0.5 <= now - reference * 1e-9 <= 0.5:
+            return situation  # no recent odometry
+        situation.drone = tuple(pose.position)
+        situation.speed_mps = self.poses.horizontal_speed(0.5)
+        try:
+            situation.tilt_deg = lc.tilt_deg(pose.quaternion)
+        except ValueError:  # a degenerate quaternion
+            return situation
+        ground_fn = self.terrain.height_fn(now, self.bias_hold_s)
+        agl = self._rangefinder_agl(now, pose)
+        if agl is None and self.terrain.source(now, self.bias_hold_s) != 'flat':
+            agl = pose.position[2] - ground_fn(pose.position[0], pose.position[1])
+        situation.agl_m = agl
+        bore = lc.bore_ground_point(pose, self.launcher.config.launcher_muzzle_offset_m,
+                                    ground_fn)
+        target = core.estimate(now) if core.state == 'tracking' else None
+        if bore is not None:
+            situation.bore_ground = tuple(float(value) for value in bore)
+        if target is not None:
+            situation.target = tuple(float(value) for value in target)
+        if bore is not None and target is not None:
+            situation.offset_m = math.hypot(target[0] - bore[0], target[1] - bore[1])
+        return situation
+
+    def _launcher_detections(self, msg):
+        """Every detection frame, the tracker's target or not: the people in
+        the camera's view."""
+        now = self.now()
+        image_time = self._image_time(msg.header.stamp, now)
+        items = [(item.id, detection_class(item)) for item in msg.detections]
+        if self.launcher.on_detections(now, image_time, items):
+            # A person appeared during a fire cycle: stopped, now safe.
+            self.node.get_logger().warn(self.launcher.notice[0])
+            self._launcher_outputs(now, self._situation(now))
+
+    def _on_launcher_joints(self, msg):
+        rack = joint_position(msg, lc.ACTUATOR_JOINT)
+        trigger = joint_position(msg, lc.TRIGGER_JOINT)
+        with self.lock:
+            now = self.now()
+            if now <= 0.0:
+                return  # use_sim_time and no /clock yet
+            stamp = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
+            if stamp <= 0.0 or abs(stamp - now) > 2.0:
+                stamp = now
+            self.launcher.on_joint_state(stamp, rack, trigger)
+
+    def _on_launcher_ready(self, msg):
+        with self.lock:
+            self.launcher.on_ready(self.now(), msg.data)
+
+    def _launcher_tick(self):
+        """The fire cycle's step: gates that must hold until the release,
+        the measured launcher, the joint command while it is off rest."""
+        with self.lock:
+            now = self.now()
+            situation = self._situation(now)
+            self.launcher.tick(now, situation)
+            self._launcher_outputs(now, situation)
+            block = self.launcher.refusal(now, situation.target_id, situation)
+            changed = block != self.status_block and now - self.status_block_time >= 0.2
+        if changed:
+            self._publish_status()
+
+    def _launcher_outputs(self, now, situation):
+        """The launcher's joint command (launcher_core.FireControl.joint_goals:
+        at once when a cycle started or stopped, then while the launcher is
+        off rest), its arm state to the bridge, and the shots."""
+        if not self.launcher_fitted:
+            return
+        goals = self.launcher.joint_goals(now, situation)
+        if goals is not None:
+            self._send_launcher(goals)
+        self._publish_estop()
+        while self.launcher.records:
+            record = self.launcher.records.pop(0)
+            self.shots_pub.publish(self.String(data=json.dumps(record)))
+            self.node.get_logger().info(f'shot {record["shot"]}: {json.dumps(record)}')
+
+    def _send_launcher(self, goals):
+        """A joint command: the rack's goal (none: stopped where it is) and
+        the trigger's."""
+        rack, trigger = goals
+        command = self.JointState()
+        command.header.stamp = self.node.get_clock().now().to_msg()
+        names, positions = [], []
+        if rack is not None:
+            names.append(lc.ACTUATOR_JOINT)
+            positions.append(float(rack))
+        names.append(lc.TRIGGER_JOINT)
+        positions.append(float(trigger))
+        command.name = names
+        command.position = positions
+        self.joint_command_pub.publish(command)
+
+    def _publish_estop(self):
+        """The bridge's emergency stop: engaged while the launcher is
+        disarmed (latched; on changes)."""
+        engaged = not self.launcher.armed
+        if engaged != self.estop_published:
+            self.estop_pub.publish(self.Bool(data=engaged))
+            self.estop_published = engaged
+
+    def shutdown(self):
+        """Shutting down: a fire cycle stopped, the trigger to 0 and the rack
+        stopped now, and the launcher disarmed (the bridge's STOP), not when
+        the bridge's watchdog notices the commands have stopped."""
+        if not self.launcher_fitted:
+            return
+        try:
+            with self.lock:
+                self.launcher.disarm(self.now(), 'shutdown')
+                self._send_launcher((None, 0.0))
+                self._publish_estop()
+        except Exception:  # noqa: BLE001 - the ROS context may already be going
+            pass
 
 
 def main():
+    import signal
+
     import rclpy
     from rclpy.executors import MultiThreadedExecutor
-    rclpy.init()
+    from rclpy.signals import SignalHandlerOptions
+
+    # SIGINT and SIGTERM (compose's stop) end the spin here, with the ROS
+    # context still up: shutdown() then makes the launcher safe and tells
+    # the bridge before the node goes (rclpy's own handler would shut the
+    # context down first; SIGTERM would kill the process outright).
+    rclpy.init(signal_handler_options=SignalHandlerOptions.NO)
+
+    def interrupt(*_):
+        raise KeyboardInterrupt
+
+    for number in (signal.SIGINT, signal.SIGTERM):
+        signal.signal(number, interrupt)
     node = rclpy.create_node('aerodrone_tracker')
-    Tracker(node)
+    tracker = Tracker(node)
     executor = MultiThreadedExecutor(num_threads=4)
     executor.add_node(node)
     try:
@@ -703,6 +952,8 @@ def main():
     except KeyboardInterrupt:
         pass
     finally:
+        tracker.shutdown()
+        time.sleep(0.2)  # for the safe command and the emergency stop to go out
         node.destroy_node()
         if rclpy.ok():
             rclpy.shutdown()
