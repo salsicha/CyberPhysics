@@ -20,7 +20,7 @@ def through_holes():
 
 def insert_holes():
     return (F.JETSON_TRAY_INSERTS + F.IMU_INSERTS + F.VESC_INSERTS + F.POWER_INSERTS
-            + F.ESTOP_INSERTS + F.turret_post_inserts())
+            + F.ESTOP_INSERTS + F.turret_post_inserts() + F.HALOW_SPACERS + F.ANTENNA_INSERTS)
 
 
 def mount_holes():

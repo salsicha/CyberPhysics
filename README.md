@@ -14,7 +14,7 @@ The repository is designed for Ubuntu 24.04 and ROS 2 Jazzy unless an applicatio
 - `applications/`: reusable Dockerized tools such as ROS 2, Gazebo, Isaac Sim integrations, nvblox, Depth Anything, NiceGUI, DemNav, WildNav, and robot-specific bridges.
 - `systems/`: hardware or simulation setups, including URDF/Xacro files, calibration, controller YAML, topic conventions, and robot-specific navigation config.
 - `compositions/`: Docker Compose files that combine applications into working systems.
-- `hardware/`: each platform's bill of materials, and its 3D-printable parts: CadQuery sources, committed STLs, and printing and assembly instructions (`hardware/parts/README.md`).
+- `hardware/`: each platform's bill of materials, and its 3D-printable parts: CadQuery sources, committed STLs, and printing and assembly instructions (`hardware/parts/README.md`); `hardware/ground_station.md` is the ground station the vehicles share for their long-range Wi-Fi HaLow link.
 
 Keep large generated assets out of git. Docker images may download model weights, simulator assets, or example datasets during build; runtime maps should be downloaded or generated outside the repository.
 

@@ -11,6 +11,96 @@
  "stl_angular_tolerance_rad": 0.3,
  "parts": [
   {
+   "id": "antenna_mount",
+   "name": "Antenna mount (HaLowLink 2, rear-right corner)",
+   "quantity": 1,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "on top of the car in the sun",
+   "flight_critical": false,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 40,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "flat: the base on the plate, the wall up",
+    "rotate": []
+   },
+   "stl": "hardware/parts/racecarneo/stl/antenna_mount.stl",
+   "step": "generated/parts/racecarneo/antenna_mount.step",
+   "volume_cm3": 1.45,
+   "area_cm2": 14.0,
+   "print_size_mm": [
+    19.0,
+    14.0,
+    19.0
+   ],
+   "footprint_mm": [
+    19.0,
+    14.0
+   ],
+   "triangles": 568,
+   "estimate": {
+    "mass_g": 1.5,
+    "time_min": 6,
+    "mass_g_all": 1.5,
+    "time_min_all": 6
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 1.3,
+    "min_wall_p1_mm": 1.33,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 248,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "SMA bulkhead jack (RG316 pigtail) and right-angle SMA adapter",
+     "dimensions": "6.6 mm hole for the 1/4-36 thread in a 3.5 mm panel (most bulkhead jacks take up to about 4-5 mm); the antenna's axis 14 mm out from the panel",
+     "source": "SMA interface IEC 61169-15 / MIL-STD-348 (1/4-36 UNS-2A coupling thread); Amphenol RF 132172 right-angle adapter, plug to jack (https://www.amphenolrf.com/132172.html; 0.68 in long)",
+     "verified": false
+    },
+    {
+     "part": "Linx ANT-916-CW-HW-SMA antenna (clearance)",
+     "dimensions": "120 mm long, 10.7 mm diameter, vertical",
+     "source": "Linx ANT-916-CW-HW data sheet, rev. 11/18/13 (https://wiki.uniteng.com/meshtastic/station_g2/eng_ds_ant-916-cw-hw_a.pdf; ordering code ANT-916-CW-HW-SMA): 1/2-wave centre-fed dipole, 916 MHz centre, 900-930 MHz, 1.2 dBi peak, 120.0 mm long, 10.7 mm diameter; ANT-868-CW-HW-SMA (https://www.te.com/en/product-ANT-868-CW-HW-SMA.html): 135.5 mm",
+     "verified": true
+    },
+    {
+     "part": "deck_rear (printed)",
+     "dimensions": "two M3 x 3 inserts",
+     "source": "hardware/parts/racecarneo/_frame.py",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M3 x 6 socket head cap screw",
+     "qty": 2,
+     "use": "antenna mount to the rear deck inserts"
+    }
+   ],
+   "notes": [
+    "Tighten the bulkhead's nut with the right-angle adapter's jack pointing straight up, then screw the antenna on finger tight.",
+    "The antenna's tip stays under the RACECAR Turret's launcher only with an antenna no longer than the 120 mm one modelled: do not fit the HaLowLink's own, longer antenna on the turret car."
+   ]
+  },
+  {
    "id": "camera_arm",
    "name": "Camera arm (RealSense over the lidar)",
    "quantity": 1,
@@ -436,8 +526,8 @@
    },
    "stl": "hardware/parts/racecarneo/stl/deck_rear.stl",
    "step": "generated/parts/racecarneo/deck_rear.step",
-   "volume_cm3": 163.82,
-   "area_cm2": 759.0,
+   "volume_cm3": 163.44,
+   "area_cm2": 761.2,
    "print_size_mm": [
     235.0,
     144.0,
@@ -447,11 +537,11 @@
     245.0,
     154.0
    ],
-   "triangles": 6168,
+   "triangles": 7200,
    "estimate": {
-    "mass_g": 102.2,
+    "mass_g": 102.4,
     "time_min": 179,
-    "mass_g_all": 102.2,
+    "mass_g_all": 102.4,
     "time_min_all": 179
    },
    "validation": {
@@ -460,10 +550,10 @@
     "closed_manifold": true,
     "bodies": 1,
     "fits_bed": true,
-    "min_wall_mm": 2.5,
+    "min_wall_mm": 1.51,
     "min_wall_p1_mm": 2.5,
     "min_wall_required_mm": 1.2,
-    "bed_contact_mm2": 31749,
+    "bed_contact_mm2": 31674,
     "errors": []
    },
    "mates_with": [
@@ -480,7 +570,7 @@
      "verified": true
     },
     {
-     "part": "imu_mount, power_tray, vesc_tray, estop_tower (printed)",
+     "part": "imu_mount, power_tray, vesc_tray, estop_tower, halow_spacer, antenna_mount (printed)",
      "dimensions": "M3 x 3 inserts in the top face",
      "source": "hardware/parts/racecarneo/_frame.py",
      "verified": true
@@ -489,8 +579,8 @@
    "inserts": [
     {
      "size": "M3-short",
-     "qty": 22,
-     "where": "top face, through holes, pressed flush: IMU, power tray, VESC tray, e-stop tower, and 8 for the RACECAR Turret's plate posts"
+     "qty": 28,
+     "where": "top face, through holes, pressed flush: IMU, power tray, VESC tray, e-stop tower, HaLowLink cradle and antenna mount, and 8 for the RACECAR Turret's plate posts"
     }
    ],
    "fasteners": [
@@ -607,6 +697,172 @@
    "notes": [
     "The e-stop's NC contact opens the contactor coil (see the BOM): a 22 mm switch must never carry motor current.",
     "Its top is in the lidar's rear blind sector (behind the camera arm's fin), so it may stand above the scan plane."
+   ]
+  },
+  {
+   "id": "halow_cradle",
+   "name": "HaLowLink 2 cradle (behind the camera arm)",
+   "quantity": 1,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "on top of the car in the sun, and the HaLowLink warms it",
+   "flight_critical": false,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 3,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 30,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "flat: the floor on the plate, walls up",
+    "rotate": []
+   },
+   "stl": "hardware/parts/racecarneo/stl/halow_cradle.stl",
+   "step": "generated/parts/racecarneo/halow_cradle.step",
+   "volume_cm3": 23.55,
+   "area_cm2": 169.8,
+   "print_size_mm": [
+    74.6,
+    86.0,
+    44.0
+   ],
+   "footprint_mm": [
+    74.6,
+    86.0
+   ],
+   "triangles": 1404,
+   "estimate": {
+    "mass_g": 21.8,
+    "time_min": 45,
+    "mass_g_all": 21.8,
+    "time_min_all": 45
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 1.89,
+    "min_wall_p1_mm": 2.22,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 2987,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "Morse Micro HaLowLink 2",
+     "dimensions": "24 mm thick, 68 mm wide, 88 mm tall, standing in a 24.6 mm channel",
+     "source": "Morse Micro HaLowLink 2 product brief, Rev 9 (https://www.morsemicro.com/resources/product_brief/HaLowLink-2_Product-Brief.pdf): 'Dimensions: 88 x 68 x 24mm', 'Weight HaLowLink only: 102g', 'Power: 5V...2A', '1x USB-C port (power and Ethernet data)', '2x Gigabit Ethernet ports', 'Temperature range: 0 - 40C', 'TX power: Up to 26dBm', SMA connector; HaLowLink user guide 2.11 (https://static.gl-inet.com/www/images/products/user-guide/haLowlink2_user-guide.pdf): 12.2 'The ports at the rear of a HaLowLink device', 6.3 'Virtual Wire', antenna 'Dipole Antenna, Gain: 2.34dBi', 20 cm RF exposure distance",
+     "verified": true
+    },
+    {
+     "part": "HaLowLink 2 USB-C port (clearance)",
+     "dimensions": "about 10 mm above the unit's bottom, over the 3 mm rear stop (scaled from the brief's drawing, not dimensioned)",
+     "source": "Morse Micro HaLowLink 2 product brief, Rev 9 (https://www.morsemicro.com/resources/product_brief/HaLowLink-2_Product-Brief.pdf): 'Dimensions: 88 x 68 x 24mm', 'Weight HaLowLink only: 102g', 'Power: 5V...2A', '1x USB-C port (power and Ethernet data)', '2x Gigabit Ethernet ports', 'Temperature range: 0 - 40C', 'TX power: Up to 26dBm', SMA connector; HaLowLink user guide 2.11 (https://static.gl-inet.com/www/images/products/user-guide/haLowlink2_user-guide.pdf): 12.2 'The ports at the rear of a HaLowLink device', 6.3 'Virtual Wire', antenna 'Dipole Antenna, Gain: 2.34dBi', 20 cm RF exposure distance",
+     "verified": false
+    },
+    {
+     "part": "halow_spacer (printed) and deck_rear inserts",
+     "dimensions": "four M3 through the floor and the spacers into the deck at ((28.0, 39.0), (28.0, -39.0), (-31.0, 19.0), (-31.0, -19.0))",
+     "source": "hardware/parts/racecarneo/_frame.py",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M3 x 25 socket head cap screw",
+     "qty": 4,
+     "use": "HaLowLink cradle through the spacers into the rear deck inserts"
+    },
+    {
+     "item": "hook-and-loop strap, 20 mm, 400 mm",
+     "qty": 1,
+     "use": "HaLowLink 2 into its cradle, over the unit's top and under the floor"
+    }
+   ],
+   "notes": [
+    "The unit stands with its connector side (SMA, WAN, LAN, USB-C) to the rear; pair it with the ground station's unit before it goes in (hardware/ground_station.md).",
+    "The floor bridges the IMU 3 mm above its connectors: lift the cradle off (four screws) to reach the IMU."
+   ]
+  },
+  {
+   "id": "halow_spacer",
+   "name": "HaLowLink cradle spacer",
+   "quantity": 4,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "on the deck in the sun, under the cradle's screws",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 100,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "upright: an end on the plate",
+    "rotate": []
+   },
+   "stl": "hardware/parts/racecarneo/stl/halow_spacer.stl",
+   "step": "generated/parts/racecarneo/halow_spacer.step",
+   "volume_cm3": 0.74,
+   "area_cm2": 7.3,
+   "print_size_mm": [
+    8.0,
+    8.0,
+    18.0
+   ],
+   "footprint_mm": [
+    8.0,
+    8.0
+   ],
+   "triangles": 336,
+   "estimate": {
+    "mass_g": 0.8,
+    "time_min": 4,
+    "mass_g_all": 3.2,
+    "time_min_all": 17
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 2.29,
+    "min_wall_p1_mm": 2.29,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 41,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "halow_cradle (printed) and deck_rear",
+     "dimensions": "18 mm from the deck's top to the cradle's floor, an M3 through it",
+     "source": "hardware/parts/racecarneo/_frame.py",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [],
+   "notes": [
+    "The cradle's M3 x 25 screws pass through the spacers (they are listed with the cradle)."
    ]
   },
   {
@@ -1391,16 +1647,16 @@
      "qty": 1
     },
     {
-     "id": "lidar_mast",
+     "id": "halow_cradle",
      "qty": 1
     },
     {
-     "id": "estop_tower",
+     "id": "power_tray",
      "qty": 1
     }
    ],
-   "time_min": 344,
-   "mass_g": 186
+   "time_min": 275,
+   "mass_g": 149
   },
   {
    "name": "B",
@@ -1412,8 +1668,16 @@
      "qty": 1
     },
     {
+     "id": "lidar_mast",
+     "qty": 1
+    },
+    {
      "id": "power_tray",
-     "qty": 2
+     "qty": 1
+    },
+    {
+     "id": "estop_tower",
+     "qty": 1
     },
     {
      "id": "camera_cradle",
@@ -1430,10 +1694,18 @@
     {
      "id": "post_adapter_rear",
      "qty": 2
+    },
+    {
+     "id": "antenna_mount",
+     "qty": 1
+    },
+    {
+     "id": "halow_spacer",
+     "qty": 4
     }
    ],
-   "time_min": 241,
-   "mass_g": 121
+   "time_min": 377,
+   "mass_g": 185
   },
   {
    "name": "C",
@@ -1480,7 +1752,7 @@
   }
  ],
  "assembly": {
-  "bodies": 96,
+  "bodies": 114,
   "interferences": "none",
   "intended_press_fits": 10,
   "scan_plane_blind_sectors": [
@@ -1488,7 +1760,11 @@
   ],
   "scan_plane_in_the_fin_shadow": [
    "estop_tower: 175.2 to -175.2 deg (9.6 deg wide), 227 mm from the lidar axis",
-   "estop_body: 176.5 to -176.5 deg (7.0 deg wide), 231 mm from the lidar axis"
+   "halow_cradle: 163.5 to -163.5 deg (33.0 deg wide), 53 mm from the lidar axis",
+   "estop_body: 176.5 to -176.5 deg (7.0 deg wide), 231 mm from the lidar axis",
+   "halow_unit: 167.0 to -167.0 deg (26.0 deg wide), 52 mm from the lidar axis",
+   "halow_plug_lan: 176.7 to -176.7 deg (6.7 deg wide), 120 mm from the lidar axis",
+   "antenna_whip: -167.9 to -165.6 deg (2.3 deg wide), 257 mm from the lidar axis"
   ],
   "scan_plane_measured": "none",
   "fin_shadow_deg": "+-22.8 about the rear (180 deg)",
@@ -1497,7 +1773,8 @@
   "camera_link_mm": "D435i (179.7, 0.0, 220.0), D455 (180.2, 0.0, 222.0); URDF (180, 0, 220)",
   "imu_link_mm": "(0, 0, 142); URDF (0, 0, 80)",
   "jetson_fan_top_mm": "170.9 (9.1 mm under the scan plane)",
-  "added_mass_g": 1350,
+  "halow_link": "HaLowLink 2 upright behind the camera arm's fin, x -40 to 28 mm, z 154 to 242 mm, connector side to the rear; antenna at (-175, -60) mm, vertical, z 146 to 266 mm; 4 of their bodies cross the scan plane, all in the fin's shadow",
+  "added_mass_g": 1551,
   "passed": true
  }
 }

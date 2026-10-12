@@ -15,6 +15,10 @@ and its posts, and the checks run by tools/build_printable_parts.py:
     no-fire zone for the tracker);
   * the turret camera's view at pan 0: the tilt below which the car's own
     front sensors enter it;
+  * the car's HaLowLink 2 and its antenna (racecarneo assembly): their
+    smallest gap to the moving turret over the pan range in 5 deg steps,
+    no dart's path through them at any pan and tilt, and out of the turret
+    camera's view at level tilt;
   * cable runs (camera, UART, servo bus, 12 V) and the added mass (the
     launcher with a full clip included).
 """
@@ -35,6 +39,10 @@ REPO = Path(__file__).resolve().parents[3]
 SCAN_FILTER = REPO / "systems" / "racecar_turret" / "config" / "scan_filter.yaml"
 CLIP_Z = (150.0, 215.0)
 TURRET_STATIC_SKIP = ("base_plate", "arduino", "uno_", "servo_adapter", "bsa_")
+HALOW_PREFIXES = ("halow_", "antenna_")
+HALOW_MIN_CLEARANCE_MM = 10.0       # the antenna is a whip on a vibrating deck
+HALOW_PAN_STEP_DEG = 5
+HALOW_PRUNE_MM = 60.0
 
 
 def to_car(shape):
@@ -137,6 +145,56 @@ def no_fire_zone(items, pans=None):
     return zone
 
 
+def halow_clearance(items):
+    """The HaLowLink 2 and its antenna against the turret. Returns
+    (smallest gap to the moving turret in mm, where), the dart paths that
+    meet them [(pan, tilt, body)], and the bodies in the turret camera's
+    view at level tilt [(pan, body)]."""
+    from hardware.parts.common import cad
+    halow = [(n, s) for n, _, s in items if n.startswith(HALOW_PREFIXES)]
+    ox, oy = F.TURRET_ORIGIN[0], F.TURRET_ORIGIN[1]
+    pans = range(-int(T.PAN_LIMIT_DEG), int(T.PAN_LIMIT_DEG) + 1, HALOW_PAN_STEP_DEG)
+    worst = (HALOW_PRUNE_MM, f"nothing within {HALOW_PRUNE_MM:g} mm")
+    for tilt, st in turret.tilt_poses():
+        _, pan_st, tilt_st = turret.stages("b0385", st)
+        movers = [(n, to_car(s)) for n, s in pan_st if not n.startswith("pan_servo_horn")]
+        movers += [(n, to_car(turret.place_tilt(s, tilt))) for n, s in tilt_st]
+        boxes = [(n, s, s.BoundingBox()) for n, s in movers]
+        for a in pans:
+            # The HaLow bodies turned the other way about the pan axis: the
+            # same relative pose as the turret panned by a.
+            for hn, hs in halow:
+                h = cad.rotate(hs, "Z", a, about=(ox, oy, 0))
+                hb = h.BoundingBox()
+                for n, ms, mb in boxes:
+                    gap = max(mb.xmin - hb.xmax, hb.xmin - mb.xmax, mb.ymin - hb.ymax, hb.ymin - mb.ymax,
+                              mb.zmin - hb.zmax, hb.zmin - mb.zmax)
+                    if gap >= worst[0]:
+                        continue
+                    d = ms.distance(h)
+                    if d < worst[0]:
+                        worst = (d, f"{hn} / turret_{n} at pan {a:+d}, tilt {tilt:+.0f}, {st}")
+    lo, hi = T.TILT_RANGE_DEG
+    tilts = [lo] + list(range(math.ceil(lo / 10) * 10, int(hi) + 1, 10)) + [hi]
+    path0 = turret.dart_path()
+    hits = []
+    for a in pans:
+        for tilt in tilts:
+            path = cad.rotate(to_car(turret.place_tilt(path0, tilt)), "Z", -a, about=(ox, oy, 0))
+            pb = path.BoundingBox()
+            for hn, hs in halow:
+                if C.bbox_overlap(pb, hs.BoundingBox()) and path.intersect(hs).Volume() > 0.01:
+                    hits.append((a, tilt, hn))
+    _, front_x = turret.lens_front()
+    seen = []
+    for a in range(-int(T.PAN_LIMIT_DEG), int(T.PAN_LIMIT_DEG) + 1, 15):
+        fov = C.frustum((ox + front_x, oy, F.TURRET_ORIGIN[2] + T.TILT_Z), (1, 0, 0), (0, 0, 1),
+                        ArducamB0385.HFOV_DEG / 2, ArducamB0385.VFOV_DEG / 2, 3000.0)
+        fov = cad.rotate(fov, "Z", -a, about=(ox, oy, 0))
+        seen += [(a, hit.split(" (")[0]) for hit in C.in_view(halow, fov)]
+    return worst, hits, seen
+
+
 def check(entries=None):
     """Run the assembly checks; returns a report dict ('passed' is the
     overall result)."""
@@ -236,6 +294,18 @@ def check(entries=None):
                                     f"({', '.join(h.split(' (')[0] for h in enters[1])})")
     report["turret_camera_view_clear_level"] = enters is None or enters[0] < 0
 
+    # The car's HaLowLink 2 and its antenna: clear of the turret's sweep, its
+    # line of fire and its camera's level view.
+    (gap, where), hits, seen = halow_clearance(items)
+    report["halow_clearance"] = (
+        f"smallest gap to the moving turret {gap:.0f} mm ({where}; +-{T.PAN_LIMIT_DEG:g} deg of pan every "
+        f"{HALOW_PAN_STEP_DEG} deg at both tilt limits and level, launcher cocked and primed); "
+        + ("no dart's path meets them" if not hits else
+           "a dart's path meets them: " + "; ".join(f"pan {a:+d}, tilt {t:+.0f} ({n})" for a, t, n in hits))
+        + ("; out of the turret camera's view at level tilt" if not seen else
+           "; in the turret camera's view at level tilt: " + "; ".join(f"pan {a:+d} ({n})" for a, n in seen)))
+    halow_ok = gap >= HALOW_MIN_CLEARANCE_MM and not hits and not seen
+
     # Cable runs (straight segments along the deck and the posts).
     header = (R.JETSON_X[0] + 40.0, R.JETSON_Y[1], R.jetson_pcb_z() + 10.0)
     post_l = F.POSTS[0]
@@ -263,7 +333,7 @@ def check(entries=None):
                   + turret.MASS_G["launcher_hardware"] + L.CLIP_DARTS * L.DART_MASS_G)
     total = printed_g + 2 * turret.MASS_G["servo"] + turret.MASS_G["b0385"] + 150.0 + launcher_g
     report["added_mass_g"] = f"{total:.0f} (the launcher with a full clip {launcher_g:.0f} of it)"
-    report["passed"] = (not overlaps and not visible and in_box and pan_ok)
+    report["passed"] = (not overlaps and not visible and in_box and pan_ok and halow_ok)
     return report
 
 

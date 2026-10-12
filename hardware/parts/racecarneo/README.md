@@ -4,12 +4,14 @@ The RACECAR Neo's deck and everything that holds its electronics are
 printed: a two-piece deck on four TPU-isolated post adapters, the lidar
 mast, the camera arm and pitch-adjustable cradle that hold the RealSense
 over the lidar, the Jetson tray, the IMU mount, the VESC tray, two power
-trays, the e-stop tower and cable clips. The chassis, battery hold-down,
-electronics, sensors, emergency stop and power switching, wiring and
-fasteners are bought (see the bill of materials,
-[hardware/racecarneo.md](../../racecarneo.md), for what and why). The
-sensors sit where the URDF puts them: the C1's scan plane at (80, 0, 180) mm
-and the RealSense's `camera_link` at (180, 0, 220) mm from `base_link`.
+trays, the e-stop tower, the cradle (on four spacers) and the antenna
+mount of the HaLowLink 2 for the long-range link, and cable clips. The
+chassis, battery hold-down, electronics, sensors, emergency stop and power
+switching, radio, wiring and fasteners are bought (see the bill of
+materials, [hardware/racecarneo.md](../../racecarneo.md), for what and
+why). The sensors sit where the URDF puts them: the C1's scan plane at
+(80, 0, 180) mm and the RealSense's `camera_link` at (180, 0, 220) mm from
+`base_link`.
 
 ![Assembled deck](images/overview.png)
 
@@ -20,7 +22,8 @@ the car through the collision monitor. The camera arm crosses the plane
 only behind the lidar, 31-46 mm from its axis, inside the C1's 50 mm blind
 range: the lidar gets no return from it and sees nothing printed anywhere
 else. The arm hides a rear sector of about +-23 deg, which also covers the
-e-stop and the RACECAR Turret's plate posts.
+e-stop, the HaLowLink 2 standing right behind the fin, its antenna at the
+rear-right corner and the RACECAR Turret's plate posts.
 
 ![Scan plane](images/scan_plane.png)
 
@@ -36,27 +39,31 @@ orientation, and arrange.
 <!-- BEGIN GENERATED: plates (tools/build_printable_parts.py) -->
 #### Plate A: ASA, 0.20 mm layers
 
-Filament **Bambu ASA**, **Textured PEI Plate**, process **0.20mm Standard**. Estimated 5 h 44 min and 186 g of filament (estimates; slice for real numbers).
+Filament **Bambu ASA**, **Textured PEI Plate**, process **0.20mm Standard**. Estimated 4 h 35 min and 149 g of filament (estimates; slice for real numbers).
 
 | Part | Qty | Per-object settings | Orientation | File |
 |---|---|---|---|---|
 | `deck_rear` | 1 | 3 wall loops, 5/4 top/bottom shells, 25% gyroid, supports: none, brim: outer brim only, 5 mm | flat: underside on the plate, rims up | [stl](stl/deck_rear.stl) |
 | `jetson_tray` | 1 | 3 wall loops, 5/4 top/bottom shells, 30% gyroid, supports: none, brim: auto | flat: plate on the build plate, bosses up | [stl](stl/jetson_tray.stl) |
-| `lidar_mast` | 1 | 4 wall loops, 5/4 top/bottom shells, 40% gyroid, supports: none, brim: auto | flange down on the plate, seat up | [stl](stl/lidar_mast.stl) |
-| `estop_tower` | 1 | 4 wall loops, 5/4 top/bottom shells, 40% gyroid, supports: none, brim: auto | upright: ears on the plate, panel on top (bridged) | [stl](stl/estop_tower.stl) |
+| `halow_cradle` | 1 | 3 wall loops, 5/4 top/bottom shells, 30% gyroid, supports: none, brim: auto | flat: the floor on the plate, walls up | [stl](stl/halow_cradle.stl) |
+| `power_tray` | 1 | 3 wall loops, 5/4 top/bottom shells, 25% gyroid, supports: none, brim: auto | flat: plate on the build plate, lip up | [stl](stl/power_tray.stl) |
 
 #### Plate B: ASA, 0.20 mm layers
 
-Filament **Bambu ASA**, **Textured PEI Plate**, process **0.20mm Standard**. Estimated 4 h 01 min and 121 g of filament (estimates; slice for real numbers).
+Filament **Bambu ASA**, **Textured PEI Plate**, process **0.20mm Standard**. Estimated 6 h 17 min and 185 g of filament (estimates; slice for real numbers).
 
 | Part | Qty | Per-object settings | Orientation | File |
 |---|---|---|---|---|
 | `deck_front` | 1 | 3 wall loops, 5/4 top/bottom shells, 25% gyroid, supports: none, brim: outer brim only, 5 mm | flat: underside on the plate, rims up | [stl](stl/deck_front.stl) |
-| `power_tray` | 2 | 3 wall loops, 5/4 top/bottom shells, 25% gyroid, supports: none, brim: auto | flat: plate on the build plate, lip up | [stl](stl/power_tray.stl) |
+| `lidar_mast` | 1 | 4 wall loops, 5/4 top/bottom shells, 40% gyroid, supports: none, brim: auto | flange down on the plate, seat up | [stl](stl/lidar_mast.stl) |
+| `power_tray` | 1 | 3 wall loops, 5/4 top/bottom shells, 25% gyroid, supports: none, brim: auto | flat: plate on the build plate, lip up | [stl](stl/power_tray.stl) |
+| `estop_tower` | 1 | 4 wall loops, 5/4 top/bottom shells, 40% gyroid, supports: none, brim: auto | upright: ears on the plate, panel on top (bridged) | [stl](stl/estop_tower.stl) |
 | `camera_cradle` | 1 | 4 wall loops, 5/4 top/bottom shells, 40% gyroid, supports: none, brim: auto | upside down: the camera seat on the plate, cheeks up | [stl](stl/camera_cradle.stl) |
 | `imu_mount` | 1 | 3 wall loops, 5/4 top/bottom shells, 40% gyroid, supports: none, brim: auto | flat: plate on the build plate, bosses up | [stl](stl/imu_mount.stl) |
 | `post_adapter_front` | 2 | 5 wall loops, 5/4 top/bottom shells, 50% gyroid, supports: none, brim: auto | upside down: the seat face on the plate, sleeve up | [stl](stl/post_adapter_front.stl) |
 | `post_adapter_rear` | 2 | 5 wall loops, 5/4 top/bottom shells, 50% gyroid, supports: none, brim: auto | upside down: the seat face on the plate, sleeve up | [stl](stl/post_adapter_rear.stl) |
+| `antenna_mount` | 1 | 4 wall loops, 5/4 top/bottom shells, 40% gyroid, supports: none, brim: auto | flat: the base on the plate, the wall up | [stl](stl/antenna_mount.stl) |
+| `halow_spacer` | 4 | 4 wall loops, 5/4 top/bottom shells, 100% gyroid, supports: none, brim: auto | upright: an end on the plate | [stl](stl/halow_spacer.stl) |
 
 #### Plate C: ASA, 0.20 mm layers
 
@@ -91,7 +98,8 @@ plates when Bambu Studio's auto-arrange fits them.
 
 ### Material and printer notes
 
-- **ASA** (deck halves, adapters, mast, arm, cradle, trays, e-stop tower):
+- **ASA** (deck halves, adapters, mast, arm, cradles, trays, e-stop tower,
+  HaLowLink spacers, antenna mount):
   the car runs outdoors and the Jetson, the VESC and the RealSense warm
   their mounts. Door closed and lid on for the whole print, Textured PEI
   plate. The deck halves are large flat parts: keep the 5 mm outer brim,
@@ -125,16 +133,20 @@ plates when Bambu Studio's auto-arrange fits them.
    - `imu_mount`: the BNO085 breakout's hole diameter (M2.5 assumed).
    - `estop_tower`: the switch body's length under the panel (the datasheet
      gives only the 82 mm overall depth).
+   - `halow_cradle`: the HaLowLink 2's USB-C port height (scaled from the
+     product brief's drawing): its plug must clear the 3 mm rear stop.
+   - `antenna_mount`: the SMA bulkhead jack's thread and the panel it
+     takes (generic RF parts): the 6.6 mm hole, the 3.5 mm wall.
 2. **Supports**: none of the parts need them. The e-stop tower's top panel
    is a 32 mm bridge.
 3. **Heat-set inserts** (CNC Kitchen type, hole sizes from their table; see
    the fastener table): soldering iron with an insert tip at **245-260 C for
    ASA**. Press straight down, stop when the insert is flush, hold flat for
    a few seconds, let it cool before loading it.
-   - `deck_front`: 4 x M3 x 3 (short), Jetson tray; `deck_rear`: 22 x M3 x 3
-     (IMU 2, power trays 4, VESC tray 4, e-stop tower 4, and 8 for the
-     RACECAR Turret's posts). They go into through holes in the 5 mm deck:
-     press them flush with the top face.
+   - `deck_front`: 4 x M3 x 3 (short), Jetson tray; `deck_rear`: 28 x M3 x 3
+     (IMU 2, power trays 4, VESC tray 4, e-stop tower 4, HaLowLink cradle 4,
+     antenna mount 2, and 8 for the RACECAR Turret's posts). They go into
+     through holes in the 5 mm deck: press them flush with the top face.
    - `post_adapter_front`, `post_adapter_rear`: 1 x M3 x 5.7 each, in the seat.
    - `jetson_tray`: 4 x M2.5, in the bosses; `imu_mount`: 4 x M2.5.
 4. **Holes**: the M3 clearance holes (3.4 mm) need no reaming; if a printed
@@ -157,7 +169,8 @@ values from the plate tables.
 ### Tools and consumables
 
 - Hex keys or drivers: 2.0 mm (M2.5), 2.5 mm (M3), 5/32 in (1/4"-20 button
-  head); 5.5 mm nut driver or spanner for M3 nyloc nuts.
+  head); 5.5 mm nut driver or spanner for M3 nyloc nuts; an 8 mm (5/16 in)
+  spanner for the SMA bulkhead's nut.
 - Soldering iron with a heat-set insert tip, and a fine tip for wiring;
   crimp tool for the power connectors.
 - Calipers, a ruler or height gauge for the deck height, a small bubble
@@ -255,7 +268,28 @@ ground under the chassis centre.
     bottom, leads out through the slot at the bottom of the front wall.
     Then screw the tower to the rear of the deck (four M3 x 8 through its
     ears).
-14. **Wiring** as below, then the **Checks**.
+![HaLowLink 2 and antenna](images/step_halow.png)
+
+14. **HaLowLink 2 and antenna.** On the bench first: pair the HaLowLink 2
+    with the ground station's access point, set its address and turn its
+    2.4 GHz access point off
+    ([hardware/ground_station.md](../../ground_station.md#pairing-a-vehicles-unit)).
+    Stand the four `halow_spacer`s on the rear deck's inserts around the
+    IMU (two at x = 28 mm beside the lidar mast's flange, two at x = -31 mm
+    behind the IMU), lay the `halow_cradle` on them and screw it down with
+    four M3 x 25 through its floor and the spacers (snug). Stand the
+    HaLowLink 2 in the channel, connector side to the rear (toward the
+    e-stop), and strap it down: the 20 mm hook-and-loop strap through the
+    two slots in the floor and over the unit's top. Push the RG316
+    pigtail's SMA bulkhead jack through the `antenna_mount`'s wall from the
+    inboard side, lock washer and nut outboard, screw the right-angle
+    adapter onto the jack pointing straight up, tighten the nut, then screw
+    the mount to the rear-right corner of the deck (two M3 x 6) and the
+    antenna onto the adapter, finger tight.
+    *Check:* the antenna stands vertical, 35 mm from the e-stop's mushroom;
+    the RealSense cable still runs down the back of the fin, between the
+    fin and the HaLowLink; nothing of the cradle touches the IMU.
+15. **Wiring** as below, then the **Checks**.
 
 ### Wiring
 
@@ -277,10 +311,22 @@ Power path (see the BOM's "Power and wiring" for parts and budget):
   down the arm's ties and the fin, then along the tray), lidar through its
   USB adapter, VESC on USB, and the BNO085 on the 40-pin header's I2C
   (3.3 V, pins 1, 3, 5, 6) or UART.
+- **HaLow link** (BOM, "Long-range link"): the 5 V converter on a power
+  tray, fed from the electronics branch after the main switch through its
+  3 A fuse, its USB-C cable to the HaLowLink's USB-C port; a 0.5 m Cat6
+  cable from the HaLowLink's LAN port down its back, along the left rim in
+  the rim clips to the Jetson's Ethernet (a right-angle plug there); the
+  RG316 pigtail's right-angle plug on the HaLowLink's SMA, its cable down
+  the unit's back and along the right rim in the rim clips to the antenna
+  mount, where it leaves the bulkhead inboard and turns forward over the
+  e-stop tower's right ears (no tighter than a 15 mm bend). The WAN port
+  stays free.
 - **Routing:** leads along the deck rims in the rim clips and the deck's tie
   slots; nothing may cross the lidar's scan plane in front of or beside the
   lidar: the camera cable goes down the back of the arm's fin, inside its
-  blind sector. Keep signal and USB leads away from the motor leads.
+  blind sector, and the HaLowLink's cables go down its back to the deck
+  before they run forward. Keep signal and USB leads away from the motor
+  leads.
 - Strain relief: a zip tie at every connector, heat-shrink on every solder
   joint, and a loose loop where a lead runs from the isolated deck down to
   the chassis (motor, battery, servo leads): a taut lead bridges the
@@ -296,11 +342,11 @@ and the runtime notes in
 <!-- BEGIN GENERATED: assembly (tools/build_printable_parts.py) -->
 Generated by the assembly check (`assembly.py`), from the CAD and datasheet masses:
 
-- Bodies in the check: 96
+- Bodies in the check: 114
 - Interference between parts (screws modelled through their holes): none
 - Intended press fits: 10
 - scan_plane_blind_sectors: camera_arm: 157.2 to -157.2 deg (45.5 deg wide), 31-46 mm from the lidar axis (inside the 50 mm blind range: no returns)
-- scan_plane_in_the_fin_shadow: estop_tower: 175.2 to -175.2 deg (9.6 deg wide), 227 mm from the lidar axis; estop_body: 176.5 to -176.5 deg (7.0 deg wide), 231 mm from the lidar axis
+- scan_plane_in_the_fin_shadow: estop_tower: 175.2 to -175.2 deg (9.6 deg wide), 227 mm from the lidar axis; halow_cradle: 163.5 to -163.5 deg (33.0 deg wide), 53 mm from the lidar axis; estop_body: 176.5 to -176.5 deg (7.0 deg wide), 231 mm from the lidar axis; halow_unit: 167.0 to -167.0 deg (26.0 deg wide), 52 mm from the lidar axis; halow_plug_lan: 176.7 to -176.7 deg (6.7 deg wide), 120 mm from the lidar axis; antenna_whip: -167.9 to -165.6 deg (2.3 deg wide), 257 mm from the lidar axis
 - scan_plane_measured: none
 - fin_shadow_deg: +-22.8 about the rear (180 deg)
 - Camera view clear: yes (D455 colour 90 x 65 deg + 2 deg margin, at pitch -10, 0, +10 deg)
@@ -308,7 +354,8 @@ Generated by the assembly check (`assembly.py`), from the CAD and datasheet mass
 - camera_link_mm: D435i (179.7, 0.0, 220.0), D455 (180.2, 0.0, 222.0); URDF (180, 0, 220)
 - imu_link_mm: (0, 0, 142); URDF (0, 0, 80)
 - jetson_fan_top_mm: 170.9 (9.1 mm under the scan plane)
-- added_mass_g: 1350
+- halow_link: HaLowLink 2 upright behind the camera arm's fin, x -40 to 28 mm, z 154 to 242 mm, connector side to the rear; antenna at (-175, -60) mm, vertical, z 146 to 266 mm; 4 of their bodies cross the scan plane, all in the fin's shadow
+- added_mass_g: 1551
 - All assembly checks passed: yes
 <!-- END GENERATED: assembly -->
 
@@ -325,6 +372,11 @@ Generated by the assembly check (`assembly.py`), from the CAD and datasheet mass
 - **E-stop.** Wheels off the ground, motor spinning slowly: pressing the
   e-stop must stop the motor at once and leave the Jetson running; turning
   it to release must not restart the motor until commanded.
+- **HaLow link.** The HaLowLink's status LED solid aqua and HaLow LED solid
+  purple with the ground station's access point on; from the ground laptop
+  `ping 192.168.2.10` and the page at `http://192.168.2.10:8080`. Then the
+  range test of [hardware/ground_station.md](../../ground_station.md#range-test),
+  the RC stop included, before driving beyond the bench.
 - **Vibration.** The deck touches only its grommets; no taut cable runs from
   the deck to the chassis.
 - **Every drive:** battery hold-down latched, deck screws tight, no cracked

@@ -33,13 +33,13 @@ One page, for a phone, a tablet or a laptop, with touch or mouse. A sticky bar a
 - **Map**: the `/map` occupancy grid with the robot (TF `map -> base_link`) and the Nav2 path (`/plan`). Tap or click the map to send a `NavigateToPose` goal there, heading away from the robot; the x/y/yaw form under "Waypoint" sends a typed one. Goals are in the `map` frame, the same frame as the displayed pose, so coordinates read off the display stay valid after SLAM corrects odometry. **Cancel goal** cancels every Nav2 navigation goal (`navigate_to_pose` and `navigate_through_poses`, whoever sent it).
 - **Drive joystick**: while held it publishes `geometry_msgs/Twist` on `/cmd_vel_teleop` at 10 Hz (up to `UI_MAX_SPEED`, default 0.3 m/s; left and right set the front-wheel angle up to `UI_MAX_STEERING`, default 0.42 rad, forward and in reverse), and a final zero on release. Starting to drive cancels the active Nav2 goal. `cmd_vel_to_ackermann` gives `/cmd_vel_teleop` priority over Nav2's `/cmd_vel` while it keeps arriving.
 - **Stop / Resume**: `/racecarneo/stop_request` (`std_msgs/Bool`, transient-local): true holds zero speed whatever Nav2 or the joystick say, until Resume. The drive status line and the STOPPED badge come from `/racecarneo/control_status`.
-- **Front camera** (`/camera/color/image_raw`) and freshness indicators (TF pose, `/odom`, `/map`, camera, `/depth_anything/depth/image`, drive status).
+- **Front camera** (`/camera/color/image_raw`), JPEG-encoded at 5 Hz (at most 480 px wide, quality 75) by default and sent only while its panel is open, and freshness indicators (TF pose, `/odom`, `/map`, camera, `/depth_anything/depth/image`, drive status).
 
 ## RACECAR Turret UI (`UI_TURRET=1`)
 
 Adds, per `systems/racecar_turret/interfaces.md`:
 
-- **Turret camera**: `/turret/camera/image_raw`, JPEG-encoded at 8 Hz (at most 640 px wide), with the tracker's boxes from `/turret/yolo/segments`; the tracked target is drawn thicker (amber, green once locked). Tap a box to lock it (`/turret/command` `{"action": "lock", "target_id": ...}`), or tap elsewhere to lock whatever the tracker finds at that point (`{"action": "lock", "point": [u, v]}`).
+- **Turret camera**: `/turret/camera/image_raw`, JPEG-encoded at 8 Hz (at most 640 px wide, quality 75) by default, with the tracker's boxes from `/turret/yolo/segments`; the tracked target is drawn thicker (amber, green once locked). Tap a box to lock it (`/turret/command` `{"action": "lock", "target_id": ...}`), or tap elsewhere to lock whatever the tracker finds at that point (`{"action": "lock", "point": [u, v]}`).
 - **Release**, **Center** and an **aim joystick** (`{"action": "manual", "pan_rate", "tilt_rate"}` at 10 Hz while held, up to `UI_TURRET_MAX_RATE`, default 1 rad/s; right pans right, up tilts up; a zero-rate command on release).
 - **Arm / Disarm**: `/turret/emergency_stop` (`std_msgs/Bool`, transient-local), false arms. The badge shows the e-stop state and `/turret/actuator_ready`.
 - The tracker's `/turret/status`: mode, target, locked, aim error, base compensation, detections and message.
@@ -79,7 +79,20 @@ docker run --rm -it --network host -e ROS_DOMAIN_ID=83 -e UI_TURRET=1 \
 
 NiceGUI runs inside a Python virtual environment with ROS 2 Python packages from the system environment. The Dockerfile pins `numpy<2` so OpenCV and `cv_bridge` stay ABI-compatible, and pins `nicegui==3.13.0` because `scripts/main.py` sets the internal `ui_run.APP_IMPORT_STRING`. Set `UI_PORT` to serve on another port.
 
-Environment: `UI_TURRET` (1: the turret card), `UI_CAR` (0 with `UI_TURRET=1`: turret-only), `UI_TURRET_CAMERA_TOPIC`, `UI_PORT`, `UI_MAX_SPEED`, `UI_MAX_STEERING`, `UI_WHEELBASE`, `UI_TURRET_MAX_RATE`.
+Environment: `UI_TURRET` (1: the turret card), `UI_CAR` (0 with `UI_TURRET=1`: turret-only), `UI_TURRET_CAMERA_TOPIC`, `UI_PORT`, `UI_MAX_SPEED`, `UI_MAX_STEERING`, `UI_WHEELBASE`, `UI_TURRET_MAX_RATE`, and the camera streams below.
+
+## Image streams and bandwidth
+
+Each camera is sent as JPEG frames, set by three variables per stream (`racecar_ui_logic.image_stream`):
+
+| Stream | Rate (Hz) | Width (px, at most) | JPEG quality | Defaults |
+|---|---|---|---|---|
+| Front camera | `UI_CAMERA_HZ` (0 turns it off) | `UI_CAMERA_MAX_WIDTH` | `UI_CAMERA_JPEG_QUALITY` | 5, 480, 75 |
+| Turret camera | `UI_TURRET_CAMERA_HZ` | `UI_TURRET_CAMERA_MAX_WIDTH` | `UI_TURRET_CAMERA_JPEG_QUALITY` | 8, 640, 75 |
+
+Values are clamped to 0.5-30 Hz, 160-1920 px and quality 10-95; an unreadable value keeps the default. Frames are scaled down keeping their aspect ratio, never up. The page refreshes at 5 Hz, so a browser shows at most 5 frames per second of a stream; a faster rate only shortens the delay to the newest frame. The front camera is sent only while its panel is open. The map is a PNG sent on each `/map` (SLAM Toolbox: every 2 s).
+
+The defaults suit a local link: one browser takes about 1.5-3 Mbit/s with both cameras (`systems/racecarneo/README.md`, "Long-range link", has the estimate). Over the car's long-range Wi-Fi HaLow link `compositions/racecarneo_hardware.yaml` and `racecar_turret_hardware.yaml` lower them to 2 Hz, 320 px, quality 60 (front) and 4 Hz, 480 px, quality 60 (turret): about 0.5-0.9 Mbit/s. The tracker works on the camera's own frames; only the page's copy is smaller.
 
 The page has no login: anyone who can reach port 8080 can drive the car. Keep the car's network private.
 

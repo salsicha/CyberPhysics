@@ -136,6 +136,26 @@ TURRET_POSTS = ((-57.0, 48.0), (-57.0, -48.0), (-143.0, 48.0), (-143.0, -48.0))
 TURRET_POST_INSERT_DX = 10.0
 
 
+# --------------------------------------------------------------------- HaLow link
+# The car's Morse Micro HaLowLink 2 (hardware/racecarneo.md, "Long-range
+# link") stands upright behind the camera arm's fin, 24 mm thick across y,
+# its connector side (SMA, WAN, LAN, USB-C) facing the rear: inside the
+# fin's shadow, so the lidar does not see it, behind the RealSense, and
+# below the RACECAR Turret's sweep (racecar_turret assembly check). Its
+# cradle's floor bridges the IMU on four printed spacers; the antenna stands
+# at the rear-right corner, its top under the turret's launcher at full
+# nose-up tilt.
+HALOW_X = (-40.0, 28.0)              # connector (rear) face, front face
+HALOW_HALF_T = 12.0
+HALOW_FLOOR_Z = (150.0, 154.0)       # the cradle's floor: over the IMU and the arm foot's screw heads
+HALOW_Z0 = HALOW_FLOOR_Z[1]          # the unit's bottom
+HALOW_SPACERS = ((28.0, 39.0), (28.0, -39.0), (-31.0, 19.0), (-31.0, -19.0))
+ANTENNA_XY = (-175.0, -60.0)         # the antenna's vertical axis
+ANTENNA_AXIS_Z = 141.0               # the bulkhead's horizontal axis (along y)
+ANTENNA_PANEL_Y = (-46.0, -42.5)     # the bracket's wall: the bulkhead's panel, outer face first
+ANTENNA_INSERTS = ((-181.5, -35.0), (-168.5, -35.0))
+
+
 def turret_post_inserts():
     return tuple((x + s * TURRET_POST_INSERT_DX, y) for x, y in TURRET_POSTS for s in (1, -1))
 

@@ -325,7 +325,7 @@
   }
  ],
  "assembly": {
-  "bodies": 231,
+  "bodies": 249,
   "interferences": "none",
   "intended_press_fits": 15,
   "scan_plane_blind_sectors": [
@@ -340,10 +340,11 @@
   "scan_plane_measured": "none",
   "posts_in_scan_filter_box": "yes: box x -170..-30, y -70..70 mm; posts at (-57, 48), (-57, -48), (-143, 48), (-143, -48)",
   "pan_sweep": "clear over +-90 deg at both tilt limits and level, launcher cocked and primed; smallest gap 0.6 mm (hub_screw_0_7 / turret_pan_servo_case at -90 deg, tilt -37, cocked)",
-  "launcher_to_car_mm": "37 at the closest (launcher_servo_mount / plate_screw_2 at pan +75, tilt +43, cocked)",
+  "launcher_to_car_mm": "19 at the closest (launcher_servo_mount / antenna_whip at pan +15, tilt +43, cocked)",
   "line_of_fire": "no-fire zone (the path meets the car): pan -6 deg below tilt -28 deg (realsense); pan -4 deg below tilt -28 deg (camera_arm); pan -2 deg below tilt -28 deg (camera_arm); pan +0 deg below tilt -28 deg (camera_arm); pan +2 deg below tilt -28 deg (camera_arm); pan +4 deg below tilt -28 deg (camera_arm); pan +6 deg below tilt -28 deg (camera_cradle); pan +8 deg below tilt -28 deg (camera_cradle); pan +10 deg below tilt -28 deg (camera_cradle); pan +12 deg below tilt -27 deg (camera_cradle)",
   "turret_camera_view": "at pan 0 the car enters the view below about -3 deg of tilt (realsense)",
   "turret_camera_view_clear_level": true,
+  "halow_clearance": "smallest gap to the moving turret 19 mm (antenna_whip / turret_launcher_servo_mount at pan +10, tilt +43, cocked; +-90 deg of pan every 5 deg at both tilt limits and level, launcher cocked and primed); no dart's path meets them; out of the turret camera's view at level tilt",
   "cable_runs_mm": "UART jumpers Jetson header to adapter about 375; turret camera USB about 815 (with 120 mm of pan loop and 150 mm on the tilt stage)",
   "added_mass_g": "798 (the launcher with a full clip 428 of it)",
   "passed": true

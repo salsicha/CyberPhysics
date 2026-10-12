@@ -166,5 +166,83 @@ class SchneiderXB5AS8442:
     UNVERIFIED = ("HEAD_H", "BODY_H", "BODY_D")
 
 
+class HaLowLink2:
+    """Morse Micro HaLowLink 2: Wi-Fi HaLow (802.11ah, MM8108) router,
+    access point and extender on OpenWrt 23.05; the car's end of the
+    long-range link. Standing on its stand it is 68 wide, 88 tall and 24
+    deep; the SMA antenna jack, the two Gigabit Ethernet ports (WAN, LAN)
+    and the USB-C port (power and Ethernet) are on one 88 x 24 side, the
+    SMA near the top and the USB-C near the bottom."""
+    SOURCE = ("Morse Micro HaLowLink 2 product brief, Rev 9 "
+              "(https://www.morsemicro.com/resources/product_brief/HaLowLink-2_Product-Brief.pdf): "
+              "'Dimensions: 88 x 68 x 24mm', 'Weight HaLowLink only: 102g', 'Power: 5V...2A', "
+              "'1x USB-C port (power and Ethernet data)', '2x Gigabit Ethernet ports', 'Temperature range: 0 - 40C', "
+              "'TX power: Up to 26dBm', SMA connector; HaLowLink user guide 2.11 "
+              "(https://static.gl-inet.com/www/images/products/user-guide/haLowlink2_user-guide.pdf): 12.2 'The ports "
+              "at the rear of a HaLowLink device', 6.3 'Virtual Wire', antenna 'Dipole Antenna, Gain: 2.34dBi', "
+              "20 cm RF exposure distance")
+    SIZE = (88.0, 68.0, 24.0)          # tall, wide, deep (standing)
+    MASS_G = 102.0
+    SUPPLY = (5.0, 2.0)                # V, A, on the USB-C port
+    TEMPERATURE_C = (0.0, 40.0)
+    STOCK_ANTENNA_GAIN_DBI = 2.34      # the dipole it is certified with (ISED list in the user guide)
+    # Scaled from the brief's drawing and the user guide's port figure, not
+    # dimensioned: the ports' centres along the connector side, from the top.
+    SMA_FROM_TOP = 23.0
+    WAN_FROM_TOP = 43.0
+    LAN_FROM_TOP = 60.0
+    USBC_FROM_TOP = 78.0
+    UNVERIFIED = ("SMA_FROM_TOP", "WAN_FROM_TOP", "LAN_FROM_TOP", "USBC_FROM_TOP")
+
+
+class LinxAnt916CwHw:
+    """Linx (TE Connectivity) ANT-916-CW-HW-SMA: a straight half-wave
+    centre-fed dipole whip for 900-930 MHz, SMA plug, with an internal
+    counterpoise (no ground plane needed). The 863-870 MHz version is
+    ANT-868-CW-HW-SMA, 135.5 mm long."""
+    SOURCE = ("Linx ANT-916-CW-HW data sheet, rev. 11/18/13 "
+              "(https://wiki.uniteng.com/meshtastic/station_g2/eng_ds_ant-916-cw-hw_a.pdf; ordering code "
+              "ANT-916-CW-HW-SMA): 1/2-wave centre-fed dipole, 916 MHz centre, 900-930 MHz, 1.2 dBi peak, 120.0 mm "
+              "long, 10.7 mm diameter; ANT-868-CW-HW-SMA (https://www.te.com/en/product-ANT-868-CW-HW-SMA.html): "
+              "135.5 mm")
+    LENGTH = 120.0
+    DIAMETER = 10.7
+    GAIN_DBI = 1.2
+    BAND_MHZ = (900.0, 930.0)
+    LENGTH_868 = 135.5
+    # Not stated: the mass (an estimate) and how far the whip's base sits
+    # above the jack it screws onto (its plug's coupling nut over the thread).
+    MASS_G = 15.0
+    BASE_ABOVE_JACK = 0.5
+    UNVERIFIED = ("MASS_G", "BASE_ABOVE_JACK")
+
+
+class SmaBulkheadAndElbow:
+    """The antenna's connectors on the car: the SMA bulkhead jack at the
+    antenna end of an RG316 pigtail, through a printed panel, and an SMA
+    plug-to-jack right-angle adapter (Amphenol RF 132172 or equivalent) on
+    it, which stands the antenna up. SMA's coupling thread is 1/4-36 UNS."""
+    SOURCE = ("SMA interface IEC 61169-15 / MIL-STD-348 (1/4-36 UNS-2A coupling thread); Amphenol RF 132172 "
+              "right-angle adapter, plug to jack (https://www.amphenolrf.com/132172.html; 0.68 in long)")
+    THREAD_D = 6.35
+    PANEL_HOLE = 6.6
+    # A generic RG316 bulkhead jack and the adapter, measured off typical
+    # parts, not a drawing: panel nut, thread beyond the panel, the inner
+    # hex and crimp body, the adapter's body and how far its jack's axis is
+    # from the panel.
+    NUT_AF = 8.0
+    NUT_T = 2.5
+    PANEL_T_MAX = 5.0
+    JACK_BEYOND_PANEL = 9.0
+    INNER_HEX_D = 9.0
+    INNER_HEX_T = 3.0
+    CRIMP = (6.0, 10.0)               # diameter, length behind the inner hex (the cable then bends)
+    ELBOW_BODY = 9.5                   # cube about the axes' crossing
+    ELBOW_AXIS_FROM_PANEL = 14.0       # the antenna's axis from the panel's outer face
+    MASS_G = 12.0
+    UNVERIFIED = ("NUT_AF", "NUT_T", "PANEL_T_MAX", "JACK_BEYOND_PANEL", "INNER_HEX_D", "INNER_HEX_T", "CRIMP",
+                  "ELBOW_BODY", "ELBOW_AXIS_FROM_PANEL", "MASS_G")
+
+
 ALL = (RplidarC1, RealSenseD435i, RealSenseD455, JetsonOrinNanoDevKit, AdafruitBNO085, Vesc6MkVI,
-       SchneiderXB5AS8442)
+       SchneiderXB5AS8442, HaLowLink2, LinxAnt916CwHw, SmaBulkheadAndElbow)

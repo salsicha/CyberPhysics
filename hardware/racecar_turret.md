@@ -14,6 +14,11 @@ bus servos (pan, tilt, and the foam dart launcher's priming actuator and
 trigger) itself, from its 40-pin header UART through a Waveshare Bus Servo Adapter (A), with three jumper
 wires (TX, RX, GND).
 
+The page reaches the operator over the RACECAR Neo's long-range Wi-Fi HaLow
+link, from the ground station of [hardware/ground_station.md](ground_station.md)
+(shared with the aerodrone); the 2.4 GHz RC link and the physical
+emergency stop stay the stops.
+
 ## Compatibility notes
 
 - **No watchdog between the Jetson and the servos.** The ST3215s run in
@@ -102,6 +107,14 @@ wires (TX, RX, GND).
   nothing), so they return nothing even before the filter; the assembly
   check of `hardware/parts/racecar_turret` verifies both.
 
+- **Long-range link.** The page goes over the car's Wi-Fi HaLow link
+  (`hardware/racecarneo.md`, "Long-range link"), a few Mbit/s at range:
+  `compositions/racecar_turret_hardware.yaml` sends the turret camera to
+  the page at 4 Hz, 480 px, JPEG quality 60 (about 0.5 Mbit/s); the tracker
+  still works on the camera's full frames. The tracker checks every Fire
+  gate on the car, and a status that goes stale over a poor link disables
+  Fire. HaLow is not a safety link: the physical stop and the RC relay are.
+
 - **Line of fire.** The foam dart launcher's bore points at the car's own
   RealSense and its arm below about -28 deg of tilt within about -6 to +12
   deg of pan (the RACECAR Turret's assembly check maps it). The fire cycle
@@ -133,6 +146,17 @@ Everything in `hardware/racecarneo.md`, with these changes:
   in the top deck behind the lidar; the printed rear deck has them, for posts
   at the corners of an 86 x 96 mm rectangle centred 0.10 m behind
   `base_link` (centre of the chassis), i.e. 0.18 m behind the lidar.
+- **Long-range link**: the RACECAR Neo's (`hardware/racecarneo.md`,
+  "Long-range link"; the ground side in `hardware/ground_station.md`): the
+  HaLowLink 2 upright behind the camera arm, in front of the turret plate,
+  and its antenna at the rear-right corner of the deck. Neither is in the
+  turret's sweep, its line of fire or its camera's view at level tilt (the
+  assembly check below: the launcher passes about 19 mm over the antenna's
+  tip at full nose-up tilt). Only with the **120 mm** antenna of that list:
+  the HaLowLink's own antenna (about 200 mm) would be hit by the launcher,
+  and the same series' 868 MHz version for the EU (135.5 mm) would come
+  within about 3 mm of it; in the EU fit an 863-870 MHz dipole no longer
+  than 120 mm.
 
 ### Turret
 

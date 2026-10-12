@@ -582,3 +582,60 @@ def turret_summary(status) -> str:
 
 def fresh(now: float, stamp, max_age_s: float = 1.0) -> bool:
     return stamp is not None and now - stamp <= max_age_s
+
+
+# --- Image streams ----------------------------------------------------------
+
+@dataclass(frozen=True)
+class ImageStream:
+    """How the page sends one camera: JPEG frames at most rate_hz per second
+    (0: the stream is off), at most max_width pixels wide, at this JPEG
+    quality. The page refreshes at 5 Hz, so a browser shows at most 5 frames
+    per second of any stream."""
+    rate_hz: float
+    max_width: int
+    jpeg_quality: int
+
+    @property
+    def period_s(self) -> float:
+        return 1.0 / self.rate_hz if self.rate_hz > 0 else math.inf
+
+
+# The defaults, for a local link (Wi-Fi or Ethernet); the hardware
+# compositions lower them for the long-range Wi-Fi HaLow link.
+CAMERA_STREAM = ImageStream(rate_hz=5.0, max_width=480, jpeg_quality=75)
+TURRET_STREAM = ImageStream(rate_hz=8.0, max_width=640, jpeg_quality=75)
+STREAM_RATE_HZ = (0.5, 30.0)
+STREAM_WIDTH_PX = (160, 1920)
+STREAM_QUALITY = (10, 95)
+
+
+def image_stream(env, prefix: str, default: ImageStream, allow_off: bool = False) -> ImageStream:
+    """Read <prefix>_HZ, <prefix>_MAX_WIDTH and <prefix>_JPEG_QUALITY from
+    ``env`` (a mapping such as os.environ). An unset or unreadable value
+    keeps the default; the others are clamped to STREAM_RATE_HZ,
+    STREAM_WIDTH_PX and STREAM_QUALITY. With ``allow_off`` a rate of 0 or
+    less turns the stream off; otherwise the slowest rate is the floor."""
+    def read(suffix, fallback):
+        try:
+            value = float(str(env.get(f'{prefix}_{suffix}', '')).strip())
+        except ValueError:
+            return fallback
+        return value if math.isfinite(value) else fallback
+
+    def clamp(value, bounds):
+        return min(max(value, bounds[0]), bounds[1])
+
+    rate = read('HZ', default.rate_hz)
+    rate = 0.0 if allow_off and rate <= 0.0 else clamp(rate, STREAM_RATE_HZ)
+    width = round(clamp(read('MAX_WIDTH', default.max_width), STREAM_WIDTH_PX))
+    quality = round(clamp(read('JPEG_QUALITY', default.jpeg_quality), STREAM_QUALITY))
+    return ImageStream(rate_hz=rate, max_width=width, jpeg_quality=quality)
+
+
+def scaled_size(width: int, height: int, max_width: int) -> tuple[int, int]:
+    """The size a frame is sent at: its own, or max_width wide with the same
+    aspect ratio."""
+    if width <= max_width:
+        return width, height
+    return max_width, max(1, round(height * max_width / width))

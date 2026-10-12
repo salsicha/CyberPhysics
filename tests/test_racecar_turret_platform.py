@@ -407,6 +407,31 @@ def test_the_ui_runs_with_the_turret_page_and_the_converter_with_the_mux(stack):
             in converter['volumes'])
 
 
+def test_the_ui_sends_the_cameras_at_the_halow_link_rates(stack):
+    """The hardware page is sized for the car's Wi-Fi HaLow link (systems/
+    racecar_turret/README.md, "Long-range link"): the turret camera at 4 Hz,
+    480 px, quality 60, the front camera at 2 Hz, 320 px, quality 60; each
+    overridable from the shell, and the turret's rate within the page's
+    5 Hz refresh so it is the rate the browser sees."""
+    from conftest import load_script
+    logic = load_script(REPO / 'applications/nicegui/scripts/racecar_ui_logic.py', 'racecar_ui_logic')
+    environment = stack['racecarneo_nicegui']['environment']
+    defaults = {}
+    for name, value in environment.items():
+        if name.startswith(('UI_CAMERA_', 'UI_TURRET_CAMERA_')):
+            assert value == f'${{{name}:-{value.split(":-")[1][:-1]}}}', name
+            defaults[name] = value.split(':-')[1][:-1]
+    turret = logic.image_stream(defaults, 'UI_TURRET_CAMERA', logic.TURRET_STREAM)
+    camera = logic.image_stream(defaults, 'UI_CAMERA', logic.CAMERA_STREAM, allow_off=True)
+    assert turret == logic.ImageStream(4.0, 480, 60)
+    assert camera == logic.ImageStream(2.0, 320, 60)
+    assert turret.rate_hz <= 5.0
+    # Both are below the page's own defaults for a local link
+    for halow, local in ((turret, logic.TURRET_STREAM), (camera, logic.CAMERA_STREAM)):
+        assert halow.rate_hz < local.rate_hz and halow.max_width < local.max_width
+        assert halow.jpeg_quality < local.jpeg_quality
+
+
 def test_turret_camera_publishes_the_contract_topics(stack):
     service = stack['turret_camera']
     args = command_args(service)

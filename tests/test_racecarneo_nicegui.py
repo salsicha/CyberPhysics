@@ -138,3 +138,35 @@ def test_launcher_commands_are_json_strings(gui):
     assert [json.loads(msg.data) for msg in published(node.turret_command_pub)] == [
         {'action': 'tag', 'target_id': '7'}, {'action': 'reload', 'darts': 6},
         {'action': 'auto_next', 'enabled': True}, {'action': 'next'}, {'action': 'clear_tags'}]
+
+
+def test_image_streams_come_from_the_environment():
+    default = load_gui({'UI_TURRET': '1'})
+    assert default.CAMERA_STREAM == default.logic.CAMERA_STREAM
+    assert default.TURRET_STREAM == default.logic.TURRET_STREAM
+    halow = load_gui({'UI_TURRET': '1', 'UI_CAMERA_HZ': '0', 'UI_TURRET_CAMERA_HZ': '4',
+                      'UI_TURRET_CAMERA_MAX_WIDTH': '480', 'UI_TURRET_CAMERA_JPEG_QUALITY': '60'})
+    assert halow.CAMERA_STREAM.rate_hz == 0.0
+    assert halow.TURRET_STREAM == halow.logic.ImageStream(4.0, 480, 60)
+    assert b'UI_CAMERA_HZ=0' in halow.PLACEHOLDERS['camera']
+
+
+def test_frames_are_encoded_at_the_stream_width_and_quality(gui):
+    module, node = gui
+    stream = module.logic.ImageStream(4.0, 480, 60)
+    frame = MagicMock()
+    frame.shape = (480, 640, 3)
+    node.bridge = MagicMock()
+    node.bridge.imgmsg_to_cv2.return_value = frame
+    node.frames = module.Frames()
+    module.cv2.resize.return_value = NS(shape=(360, 480, 3))
+    module.cv2.imencode.return_value = (True, NS(tobytes=lambda: b'jpeg'))
+    node.encode('turret', MagicMock(), stream)
+    assert module.cv2.resize.call_args.args[1] == (480, 360)
+    assert module.cv2.imencode.call_args.args[2][1] == 60
+    assert node.frames.get('turret')[0] == b'jpeg' and node.frames.size('turret') == (480, 360)
+    # A frame already narrow enough is sent as it is
+    module.cv2.resize.reset_mock()
+    frame.shape = (240, 320, 3)
+    node.encode('camera', MagicMock(), stream)
+    module.cv2.resize.assert_not_called()

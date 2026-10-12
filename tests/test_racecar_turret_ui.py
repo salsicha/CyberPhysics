@@ -408,3 +408,45 @@ def test_launcher_actions_are_in_the_contract():
     contract = (REPO / 'systems/racecar_turret/interfaces.md').read_text()
     for action in ('tag', 'next', 'clear_tags', 'reload', 'auto_next'):
         assert f'"action": "{action}"' in contract
+
+
+# --- Image streams (rate, width and JPEG quality from the environment) ----------
+
+def test_image_streams_default_to_the_local_link_settings():
+    assert logic.image_stream({}, 'UI_CAMERA', logic.CAMERA_STREAM) == logic.ImageStream(5.0, 480, 75)
+    assert logic.image_stream({}, 'UI_TURRET_CAMERA', logic.TURRET_STREAM) == logic.ImageStream(8.0, 640, 75)
+    assert logic.TURRET_STREAM.period_s == pytest.approx(0.125)
+
+
+def test_image_streams_read_rate_width_and_quality():
+    env = {'UI_TURRET_CAMERA_HZ': '4', 'UI_TURRET_CAMERA_MAX_WIDTH': '480',
+           'UI_TURRET_CAMERA_JPEG_QUALITY': ' 60 ', 'UI_CAMERA_HZ': '2'}
+    assert logic.image_stream(env, 'UI_TURRET_CAMERA', logic.TURRET_STREAM) == logic.ImageStream(4.0, 480, 60)
+    # Each stream reads only its own prefix
+    assert logic.image_stream(env, 'UI_CAMERA', logic.CAMERA_STREAM) == logic.ImageStream(2.0, 480, 75)
+
+
+@pytest.mark.parametrize('value', ['', 'fast', 'nan', 'inf', '4 Hz'])
+def test_unreadable_stream_settings_keep_the_default(value):
+    env = {'UI_CAMERA_HZ': value, 'UI_CAMERA_MAX_WIDTH': value, 'UI_CAMERA_JPEG_QUALITY': value}
+    assert logic.image_stream(env, 'UI_CAMERA', logic.CAMERA_STREAM) == logic.CAMERA_STREAM
+
+
+def test_stream_settings_are_clamped_and_only_the_front_camera_turns_off():
+    wild = {'UI_CAMERA_HZ': '500', 'UI_CAMERA_MAX_WIDTH': '20', 'UI_CAMERA_JPEG_QUALITY': '100'}
+    assert logic.image_stream(wild, 'UI_CAMERA', logic.CAMERA_STREAM) == logic.ImageStream(30.0, 160, 95)
+    low = {'UI_CAMERA_HZ': '0.01', 'UI_CAMERA_MAX_WIDTH': '9999.6', 'UI_CAMERA_JPEG_QUALITY': '3'}
+    assert logic.image_stream(low, 'UI_CAMERA', logic.CAMERA_STREAM) == logic.ImageStream(0.5, 1920, 10)
+    off = logic.image_stream({'UI_CAMERA_HZ': '0'}, 'UI_CAMERA', logic.CAMERA_STREAM, allow_off=True)
+    assert off.rate_hz == 0.0 and off.period_s == math.inf
+    # The turret camera is how targets are picked: it never turns off
+    turret = logic.image_stream({'UI_TURRET_CAMERA_HZ': '0'}, 'UI_TURRET_CAMERA', logic.TURRET_STREAM)
+    assert turret.rate_hz == logic.STREAM_RATE_HZ[0]
+
+
+def test_frames_wider_than_the_stream_are_scaled_keeping_the_aspect():
+    assert logic.scaled_size(640, 480, 640) == (640, 480)
+    assert logic.scaled_size(320, 240, 480) == (320, 240)
+    assert logic.scaled_size(640, 480, 480) == (480, 360)
+    assert logic.scaled_size(1280, 720, 320) == (320, 180)
+    assert logic.scaled_size(4000, 2, 160) == (160, 1)

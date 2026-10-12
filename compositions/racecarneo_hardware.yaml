@@ -203,6 +203,11 @@ services:
         params_file:=/workspace/config/nav2.yaml
         autostart:=true
 
+  # The operator page (port 8080). Its front camera is sized for the car's
+  # long-range Wi-Fi HaLow link (a few Mbit/s at range, shared with the
+  # turret camera on the RACECAR Turret): 2 Hz, 320 px, JPEG quality 60,
+  # and only while its panel is open. Over a local link set the page's
+  # defaults (5 Hz, 480 px, 75) or more (applications/nicegui/README.md).
   racecarneo_nicegui:
     network_mode: host
     pull_policy: if_not_present
@@ -215,10 +220,15 @@ services:
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
       - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+      - UI_CAMERA_HZ=${UI_CAMERA_HZ:-2}
+      - UI_CAMERA_MAX_WIDTH=${UI_CAMERA_MAX_WIDTH:-320}
+      - UI_CAMERA_JPEG_QUALITY=${UI_CAMERA_JPEG_QUALITY:-60}
     command: >
       python3 /workspace/scripts/main.py
 
-  # Foxglove WebSocket server: connect Foxglove to ws://<car>:8765.
+  # Foxglove WebSocket server: connect Foxglove to ws://<car>:8765. A bench
+  # tool, over Ethernet or the Jetson's Wi-Fi: camera topics through it
+  # saturate the HaLow link.
   racecarneo_foxglove_bridge:
     network_mode: host
     image: salsicha/cyberphysics:ros2-${CYBERPHYSICS_TAG:-latest}

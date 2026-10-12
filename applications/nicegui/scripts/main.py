@@ -18,8 +18,11 @@ systems/racecar_turret/interfaces.md.
 
 rclpy spins in a daemon thread; page handlers publish from NiceGUI's event
 loop. Images are encoded at a modest rate in the ROS thread and served
-at /frames/<name>. The decisions (joysticks to commands, taps to goals
-and locks, status parsing) live in racecar_ui_logic.py.
+at /frames/<name>; their rate, width and JPEG quality are set by
+UI_CAMERA_* and UI_TURRET_CAMERA_* (racecar_ui_logic.image_stream), and the
+front camera is only sent while its panel is open. The decisions
+(joysticks to commands, taps to goals and locks, status parsing) live in
+racecar_ui_logic.py.
 """
 import json
 import math
@@ -76,6 +79,11 @@ DRIVE_LIMITS = logic.DriveLimits(
     wheelbase=float(os.environ.get('UI_WHEELBASE', '0.33')))
 # Manual aim at full stick (rad/s); the tracker clamps to the servo limits.
 TURRET_MAX_RATE = float(os.environ.get('UI_TURRET_MAX_RATE', '1.0'))
+# JPEG streams: <prefix>_HZ (the front camera's 0 turns it off),
+# <prefix>_MAX_WIDTH, <prefix>_JPEG_QUALITY. Over Wi-Fi HaLow the hardware
+# compositions send less (systems/racecar_turret/README.md, "Long-range link").
+CAMERA_STREAM = logic.image_stream(os.environ, 'UI_CAMERA', logic.CAMERA_STREAM, allow_off=True)
+TURRET_STREAM = logic.image_stream(os.environ, 'UI_TURRET_CAMERA', logic.TURRET_STREAM)
 
 # Nav2 goals are expressed in the map frame, so the pose shown next to the
 # waypoint inputs is map -> base_link too. /odom drifts from map as SLAM
@@ -177,7 +185,8 @@ class RacecarNeoGuiNode(Node):
             self.teleop_pub = self.create_publisher(Twist, '/cmd_vel_teleop', 10)
             self.stop_pub = self.create_publisher(Bool, '/racecarneo/stop_request', LATCHED_QOS)
             self.create_timer(0.1, self.update_map_pose)
-            self.create_timer(0.2, self.encode_latest_frame)
+            if CAMERA_STREAM.rate_hz > 0:
+                self.create_timer(CAMERA_STREAM.period_s, self.encode_latest_frame)
             self.create_timer(0.5, self.render_map)
             self.create_subscription(Odometry, '/odom', self.handle_odom, 10)
             self.create_subscription(Image, '/camera/color/image_raw', self.handle_camera,
@@ -190,7 +199,7 @@ class RacecarNeoGuiNode(Node):
         if turret:
             self.turret_command_pub = self.create_publisher(String, '/turret/command', 10)
             self.turret_estop_pub = self.create_publisher(Bool, '/turret/emergency_stop', LATCHED_QOS)
-            self.create_timer(0.125, self.encode_turret_frame)
+            self.create_timer(TURRET_STREAM.period_s, self.encode_turret_frame)
             self.create_subscription(Image, TURRET_CAMERA_TOPIC, self.handle_turret_camera,
                                      qos_profile_sensor_data)
             self.create_subscription(String, '/turret/yolo/segments', self.handle_segments, 10)
@@ -252,16 +261,16 @@ class RacecarNeoGuiNode(Node):
             msg = self.latest_frame
             self.latest_frame = None
         if msg is not None:
-            self.encode('camera', msg, 480)
+            self.encode('camera', msg, CAMERA_STREAM)
 
-    def encode(self, name: str, msg: Image, max_width: int) -> None:
+    def encode(self, name: str, msg: Image, stream: logic.ImageStream) -> None:
         try:
             frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
             height, width = frame.shape[:2]
-            if width > max_width:
-                frame = cv2.resize(frame, (max_width, round(height * max_width / width)),
-                                   interpolation=cv2.INTER_AREA)
-            ok, encoded = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 75])
+            size = logic.scaled_size(width, height, stream.max_width)
+            if size != (width, height):
+                frame = cv2.resize(frame, size, interpolation=cv2.INTER_AREA)
+            ok, encoded = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), stream.jpeg_quality])
             if ok:
                 self.frames.put(name, encoded.tobytes(), 'image/jpeg', (frame.shape[1], frame.shape[0]))
         except Exception as exc:
@@ -366,7 +375,7 @@ class RacecarNeoGuiNode(Node):
             msg = self.latest_turret_frame
             self.latest_turret_frame = None
         if msg is not None:
-            self.encode('turret', msg, 640)
+            self.encode('turret', msg, TURRET_STREAM)
 
     def handle_segments(self, msg: String) -> None:
         segments = logic.parse_segments(msg.data, fallback_size=self.state.turret_image_size)
@@ -408,7 +417,8 @@ frames = Frames()
 node_holder: dict[str, Optional[RacecarNeoGuiNode]] = {'node': None}
 JOYSTICK_JS = (Path(__file__).parent / 'joystick.js').read_text()
 PLACEHOLDERS = {
-    'camera': placeholder_svg('Waiting for /camera/color/image_raw'),
+    'camera': placeholder_svg('Waiting for /camera/color/image_raw' if CAMERA_STREAM.rate_hz > 0
+                              else 'Front camera off (UI_CAMERA_HZ=0)'),
     'turret': placeholder_svg(f'Waiting for {TURRET_CAMERA_TOPIC}'),
     'map': placeholder_svg('Waiting for /map'),
 }
@@ -530,7 +540,8 @@ def index() -> None:
                         yaw_input = ui.number('yaw rad', value=0.0, format='%.2f').classes('w-24')
                         ui.button('Send waypoint', on_click=lambda: send_form_goal()) \
                             .props('color=cyan data-testid=send-waypoint')
-                with ui.expansion('Front camera', icon='videocam').classes('w-full'):
+                # Sent only while open: over a slow link the turret camera gets the bandwidth.
+                with ui.expansion('Front camera', icon='videocam').classes('w-full') as camera_panel:
                     camera = ui.interactive_image('/frames/camera?v=0', events=[]).classes('w-full rounded')
 
         # --- Turret --------------------------------------------------------
@@ -715,6 +726,8 @@ def index() -> None:
         fresh_html.content = freshness_html(now)
         dock = []
         for name, image in images.items():
+            if name == 'camera' and not camera_panel.value:
+                continue
             version = frames.version(name)
             if version != shown[name]:
                 shown[name] = version

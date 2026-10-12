@@ -128,11 +128,17 @@ services:
     environment:
       - *dds
 
+  # The turret camera sized for the Wi-Fi HaLow link, like the front camera
+  # in racecarneo_hardware.yaml: 4 Hz, 480 px, JPEG quality 60 (about 0.5
+  # Mbit/s); the page's defaults over a local link are 8 Hz, 640 px, 75.
   racecarneo_nicegui:
     extends: {file: racecarneo_hardware.yaml, service: racecarneo_nicegui}
     environment:
       - *dds
       - UI_TURRET=1
+      - UI_TURRET_CAMERA_HZ=${UI_TURRET_CAMERA_HZ:-4}
+      - UI_TURRET_CAMERA_MAX_WIDTH=${UI_TURRET_CAMERA_MAX_WIDTH:-480}
+      - UI_TURRET_CAMERA_JPEG_QUALITY=${UI_TURRET_CAMERA_JPEG_QUALITY:-60}
     volumes:
       - ../applications/nicegui/scripts:/workspace/scripts:ro
 

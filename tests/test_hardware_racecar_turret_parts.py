@@ -163,3 +163,44 @@ def test_st3215_and_turret_geometry():
     assert T.TILT_FLOOR_TOP + 0.2 + S.WIDTH / 2 == pytest.approx(T.TILT_Z)
     # The pan servo's horn is above its plugs' room.
     assert T.PAN_BOTTOM_Z - T.BASE_FLANGE_T >= S.PLUG_LENGTH + 4.0
+
+
+def test_halow_link_stays_in_the_fin_shadow_and_off_the_turret():
+    """The HaLowLink 2 behind the camera arm and its antenna at the rear-right
+    corner (hardware/racecarneo.md, "Long-range link"): every corner of what
+    crosses the scan plane is inside the fin's shadow, the antenna stands on
+    the bracket's axis, clear of the e-stop's mushroom and behind the turret's
+    pan axis (the dart never flies backwards); the CadQuery assembly checks
+    measure the rest."""
+    from hardware.parts.racecarneo import _deck as D
+    from hardware.parts.racecarneo import halow_cradle
+
+    shadow = R.fin_shadow_deg()
+
+    def bearing_from_rear(x, y):
+        return math.degrees(math.atan2(abs(y), R.LIDAR_XY[0] - x))
+
+    x0, x1 = R.HALOW_X
+    half = halow_cradle.outer_half_w()
+    for x in (x0, x1 + halow_cradle.CLEAR + halow_cradle.FRONT_STOP[0]):
+        assert bearing_from_rear(x, half) < shadow, x
+    assert x1 + halow_cradle.CLEAR + halow_cradle.FRONT_STOP[0] < R.FIN_X[0] - 4.0   # room for the camera cable
+    ax, ay = R.ANTENNA_XY
+    whip = RF.LinxAnt916CwHw
+    assert bearing_from_rear(ax, abs(ay) + whip.DIAMETER / 2) < shadow
+    assert R.ANTENNA_PANEL_Y[0] - RF.SmaBulkheadAndElbow.ELBOW_AXIS_FROM_PANEL == ay
+    ex, ey = R.ESTOP_XY
+    mushroom = RF.SchneiderXB5AS8442.MUSHROOM_D / 2
+    assert math.hypot(ax - ex, ay - ey) - mushroom - whip.DIAMETER / 2 > 30.0
+    assert ax < RT.PLATE_CENTER[0] - RT.PLATE_HALF[0]       # behind the plate and the pan axis
+    assert x0 > RT.PLATE_CENTER[0] + RT.PLATE_HALF[0]       # the unit in front of the plate
+    # The cradle's floor clears the IMU breakout (board top 143.2 mm) and the
+    # arm foot's screw heads (148 mm); the deck has an insert for each spacer
+    # and for the antenna mount, apart from every other insert and hole.
+    assert R.HALOW_FLOOR_Z[0] >= R.DECK_Z[1] + R.ARM_FOOT_T + R.MAST_FLANGE_T + 5.0
+    inserts = D.insert_holes()
+    for p in R.HALOW_SPACERS + R.ANTENNA_INSERTS:
+        assert inserts.count(p) == 1
+        others = [q for q in inserts + D.through_holes() + D.mount_holes() if q != p]
+        assert min(math.dist(p, q) for q in others) > 8.0, p
+    assert sum(1 for x, _ in inserts if R.DECK_X[0] <= x <= R.JOINT_X[1]) == 28

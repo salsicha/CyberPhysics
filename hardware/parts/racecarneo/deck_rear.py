@@ -1,6 +1,7 @@
 """Deck, rear half: carries the IMU at the car's centre, the power
-converters, the VESC, the e-stop at the rear, and (RACECAR Turret) the
-turret plate's posts. Its front end is the lower layer of the lap joint."""
+converters, the VESC, the e-stop at the rear, the HaLowLink 2's cradle and
+antenna, and (RACECAR Turret) the turret plate's posts. Its front end is the
+lower layer of the lap joint."""
 from hardware.parts.common import printing
 from hardware.parts.racecarneo import _deck as D
 from hardware.parts.racecarneo import _frame as F
@@ -22,12 +23,12 @@ PART = {
         {"part": "post_adapter_rear (printed) through deck_grommet (printed TPU)",
          "dimensions": f"{F.GROMMET_HOLE} mm grommet holes at {F.MOUNTS['rear'][0]}",
          "source": "hardware/parts/racecarneo/_frame.py", "verified": True},
-        {"part": "imu_mount, power_tray, vesc_tray, estop_tower (printed)",
+        {"part": "imu_mount, power_tray, vesc_tray, estop_tower, halow_spacer, antenna_mount (printed)",
          "dimensions": "M3 x 3 inserts in the top face", "source": "hardware/parts/racecarneo/_frame.py", "verified": True},
     ],
     "inserts": [{"size": D.INSERT, "qty": sum(1 for x, _ in D.insert_holes() if X[0] <= x <= X[1]),
                  "where": "top face, through holes, pressed flush: IMU, power tray, VESC tray, e-stop tower, "
-                          "and 8 for the RACECAR Turret's plate posts"}],
+                          "HaLowLink cradle and antenna mount, and 8 for the RACECAR Turret's plate posts"}],
     "fasteners": [
         {"item": "M3 x 16 socket head cap screw", "qty": 2, "use": "deck to the rear post adapters, through a pair of deck grommets"},
         {"item": "M3 washer", "qty": 2, "use": "on the upper deck grommets, rear"},

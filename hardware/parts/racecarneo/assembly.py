@@ -11,6 +11,9 @@ run by tools/build_printable_parts.py:
     would stop the car through the collision monitor);
   * camera view: nothing enters the RealSense's widest view (D455 colour,
     90 x 65 deg, plus a margin);
+  * the HaLowLink 2 and its antenna: in the camera arm fin's shadow, the
+    antenna vertical (the RACECAR Turret's check measures it against the
+    turret's sweep);
   * sensor positions against the URDF, the Jetson's height under the
     scan plane, and the added mass.
 
@@ -23,11 +26,14 @@ from hardware.parts.racecarneo import _checks as C
 from hardware.parts.racecarneo import _frame as F
 from hardware.parts.racecarneo._footprints import (
     AdafruitBNO085,
+    HaLowLink2,
     JetsonOrinNanoDevKit,
+    LinxAnt916CwHw,
     RealSenseD435i,
     RealSenseD455,
     RplidarC1,
     SchneiderXB5AS8442,
+    SmaBulkheadAndElbow,
     Vesc6MkVI,
 )
 
@@ -48,8 +54,12 @@ PURCHASED_MASS = {
     "imu_board": AdafruitBNO085.MASS_G,
     "vesc": Vesc6MkVI.MASS_G,
     "estop": 80.0,                     # estimate, XB5 head + contact block
+    "halow_unit": HaLowLink2.MASS_G,
+    "antenna_whip": LinxAnt916CwHw.MASS_G,
+    "antenna_sma": SmaBulkheadAndElbow.MASS_G,
 }
 OTHER_MASS_G = 250.0                   # estimate: converters, contactor, fuse, cables, screws
+HALOW_OTHER_MASS_G = 45.0              # estimate: its 5 V converter, fuse, pigtail, USB-C and Ethernet cables
 
 
 # --------------------------------------------------------------------- placement
@@ -65,12 +75,15 @@ def printed():
     """[(name, part id, shape)] for every printed piece in place."""
     from hardware.parts.common import cad
     from hardware.parts.racecarneo import (
+        antenna_mount,
         camera_arm,
         camera_cradle,
         deck_front,
         deck_grommet,
         deck_rear,
         estop_tower,
+        halow_cradle,
+        halow_spacer,
         imu_mount,
         jetson_tray,
         lidar_mast,
@@ -82,9 +95,12 @@ def printed():
     )
     out = []
     for mod in (deck_front, deck_rear, lidar_mast, camera_arm, camera_cradle, jetson_tray, imu_mount, vesc_tray,
-                estop_tower):
+                estop_tower, halow_cradle, antenna_mount):
         stem = mod.__name__.rsplit(".", 1)[1]
         out.append((stem, stem, mod.build()))
+    spacer = halow_spacer.build()
+    for k, (x, y) in enumerate(F.HALOW_SPACERS):
+        out.append((f"halow_spacer_{k}", "halow_spacer", cad.translate(spacer, (x, y, 0))))
     for mod, which in ((post_adapter_front, "front"), (post_adapter_rear, "rear")):
         stem = mod.__name__.rsplit(".", 1)[1]
         s = mod.build()
@@ -120,6 +136,58 @@ def realsense_box(camera=RealSenseD435i):
     z0 = F.CRADLE_SEAT_Z
     return cad.box(x_front - camera.DEPTH, x_front, screw_y - camera.WIDTH / 2, screw_y + camera.WIDTH / 2,
                    z0, z0 + camera.HEIGHT)
+
+
+def halow_box():
+    """(x0, x1, y0, y1, z0, z1) of the HaLowLink 2 in its cradle."""
+    x0, x1 = F.HALOW_X
+    t = F.HALOW_HALF_T
+    return x0, x1, -t, t, F.HALOW_Z0, F.HALOW_Z0 + HaLowLink2.SIZE[0]
+
+
+def antenna_span():
+    """(z of the whip's base, z of its tip) on the antenna mount."""
+    base = F.ANTENNA_AXIS_Z + SmaBulkheadAndElbow.ELBOW_BODY / 2 + LinxAnt916CwHw.BASE_ABOVE_JACK
+    return base, base + LinxAnt916CwHw.LENGTH
+
+
+def halow_models():
+    """[(name, shape)] for the HaLowLink 2, its plugs, the antenna's
+    connectors and whip (see the footprints for what is a datasheet number
+    and what an envelope)."""
+    from hardware.parts.common import cad
+    out = []
+    H = HaLowLink2
+    x0, x1, y0, y1, z0, z1 = halow_box()
+    out.append(("halow_unit", cad.box(x0, x1, y0, y1, z0, z1)))
+    # Plug envelopes on the connector side (the WAN port is not used): a
+    # right-angle SMA plug with its cable going down, an RJ45 plug and boot,
+    # a USB-C plug and strain relief.
+    zs, zl, zu = z1 - H.SMA_FROM_TOP, z1 - H.LAN_FROM_TOP, z1 - H.USBC_FROM_TOP
+    out.append(("halow_plug_sma", cad.box(x0 - 13.0, x0, -4.6, 4.6, zs - 12.0, zs + 4.6)))
+    out.append(("halow_plug_lan", cad.box(x0 - 35.0, x0, -7.0, 7.0, zl - 7.0, zl + 7.0)))
+    out.append(("halow_plug_usbc", cad.box(x0 - 30.0, x0, -6.0, 6.0, zu - 3.5, zu + 3.5)))
+    # The antenna: the bulkhead jack through the mount's wall (inner hex and
+    # crimp inboard, nut and thread outboard), the right-angle adapter, the whip.
+    S, A = SmaBulkheadAndElbow, LinxAnt916CwHw
+    ax, ay = F.ANTENNA_XY
+    az = F.ANTENNA_AXIS_Z
+    py0, py1 = F.ANTENNA_PANEL_Y
+    nut_d = S.NUT_AF / math.cos(math.radians(30))
+    e = S.ELBOW_BODY / 2
+    jack_end = py0 - S.JACK_BEYOND_PANEL
+    sma = cad.fuse_all([
+        cad.cyl(S.INNER_HEX_D, S.INNER_HEX_T, (ax, py1, az), (0, 1, 0)),
+        cad.cyl(S.CRIMP[0], S.CRIMP[1] + 0.01, (ax, py1 + S.INNER_HEX_T - 0.01, az), (0, 1, 0)),
+        cad.cyl(S.THREAD_D - 0.05, py1 - jack_end, (ax, py1 + 0.01, az), (0, -1, 0)),
+        cad.cyl(nut_d, S.NUT_T, (ax, py0, az), (0, -1, 0)),
+        cad.cyl(nut_d, (py0 - S.NUT_T - 0.5) - (ay + e), (ax, ay + e - 0.01, az), (0, 1, 0)),
+        cad.cbox(S.ELBOW_BODY, S.ELBOW_BODY, S.ELBOW_BODY, center=(ax, ay, az)),
+    ])
+    out.append(("antenna_sma", sma))
+    base, _ = antenna_span()
+    out.append(("antenna_whip", cad.cyl(A.DIAMETER, A.LENGTH, (ax, ay, base))))
+    return out
 
 
 def imu_board_z():
@@ -230,6 +298,15 @@ def purchased():
     for x, y in F.ESTOP_INSERTS:
         add(f"estop_screw_{x:g}_{y:g}", C.screw((x, y, F.DECK_Z[1] + estop_tower.EAR[2]), (0, 0, -1), 8.0, "M3"))
 
+    # HaLowLink 2, antenna, and their screws.
+    for name, shape in halow_models():
+        add(name, shape, PURCHASED_MASS.get(name, 0.0))
+    for k, (x, y) in enumerate(F.HALOW_SPACERS):
+        add(f"halow_screw_{k}", C.screw((x, y, F.HALOW_FLOOR_Z[1]), (0, 0, -1), 25.0, "M3"))
+    from hardware.parts.racecarneo import antenna_mount
+    for x, y in F.ANTENNA_INSERTS:
+        add(f"antenna_screw_{x:g}", C.screw((x, y, F.DECK_Z[1] + antenna_mount.BASE_T), (0, 0, -1), 6.0, "M3"))
+
     # Chassis: the URDF's base_link envelope and the body posts the adapters clamp.
     add("chassis_envelope", cad.box(-180.0, 180.0, -110.0, 110.0, 0.0, 100.0))
     for which in ("front", "rear"):
@@ -325,12 +402,20 @@ def check(entries=None):
     report["imu_link_mm"] = f"({F.IMU_XY[0]:g}, {F.IMU_XY[1]:g}, {imu_board_z() + 1.6:.0f}); URDF (0, 0, 80)"
     jt = jetson_top_z()
     report["jetson_fan_top_mm"] = f"{jt:.1f} ({F.SCAN_Z - jt:.1f} mm under the scan plane)"
-    report["added_mass_g"] = round(sum(masses) + OTHER_MASS_G)
+    hx0, hx1, _, _, hz0, hz1 = halow_box()
+    halow_secs = [sx for sx in secs if sx["name"].startswith(("halow_", "antenna_"))]
+    report["halow_link"] = (
+        f"HaLowLink 2 upright behind the camera arm's fin, x {hx0:g} to {hx1:g} mm, z {hz0:g} to {hz1:g} mm, "
+        "connector side to the rear; antenna at ({:g}, {:g}) mm, vertical, z {:.0f} to {:.0f} mm; ".format(
+            *F.ANTENNA_XY, *antenna_span())
+        + (f"{len(halow_secs)} of their bodies cross the scan plane, all in the fin's shadow"
+           if all(sx["shadowed"] for sx in halow_secs) else "IN THE LIDAR'S VIEW"))
+    report["added_mass_g"] = round(sum(masses) + OTHER_MASS_G + HALOW_OTHER_MASS_G)
 
     pos_ok = (abs(cl[0] - F.CAMERA_LINK[0]) < 1.0 and abs(cl[1]) < 0.5 and abs(cl[2] - F.CAMERA_LINK[2]) < 1.0
               and abs(F.LIDAR_BOTTOM_Z + RplidarC1.SCAN_HEIGHT - F.SCAN_Z) < 0.1)
     report["passed"] = (not overlaps and not visible and not fov_hits and pos_ok
-                        and jt < F.SCAN_KEEP_OUT_Z)
+                        and jt < F.SCAN_KEEP_OUT_Z and all(sx["shadowed"] for sx in halow_secs))
     return report
 
 
@@ -423,7 +508,8 @@ def figures(out_dir, entries=None):
                 "camera_screw": (40, 0, 220), "jetson_tray": (0, 0, 60), "tray_screw": (0, 0, 60),
                 "jetson_": (0, 0, 100), "deck_grommet_upper": (0, 0, 30), "deck_screw": (0, 0, 60),
                 "post_adapter": (0, 0, -40), "deck_grommet_lower": (0, 0, -20), "imu_": (0, 0, 40),
-                "vesc": (0, 0, 50), "estop": (0, 0, 60), "power_": (0, 0, 40)}
+                "vesc": (0, 0, 50), "estop": (0, 0, 60), "power_": (0, 0, 40), "halow_spacer": (0, 0, 70),
+                "halow_": (0, 0, 110), "antenna_": (0, -40, 50)}
     render.render(sel(every, every, exploded), out_dir / "exploded.png", elev=20, azim=-60, zoom=0.95,
                   title="Exploded view")
     render.render(sel(("deck_", "post_adapter", "rim_clip"), ("deck_screw", "lap_screw", "post_")),
@@ -437,6 +523,10 @@ def figures(out_dir, entries=None):
                       ("jetson_", "tray_screw", "imu_", "vesc", "estop", "power_screw")),
                   out_dir / "step_electronics.png", elev=35, azim=-60, zoom=1.0,
                   title="Jetson tray, IMU, power trays, VESC tray and e-stop tower")
+    render.render(sel(("halow_", "antenna_", "imu_mount", "camera_arm", "lidar_mast", "deck_rear", "estop_tower"),
+                      ("halow_", "antenna_", "imu_board", "rplidar", "estop")),
+                  out_dir / "step_halow.png", elev=28, azim=-140, zoom=1.0,
+                  title="HaLowLink 2 cradle behind the camera arm, antenna at the rear-right corner")
     bodies = [(n, s) for n, _, s in pieces] + [(n, s) for n, s, _ in purchased()]
     scan_figure(out_dir / "scan_plane.png", scan_plane(bodies),
                 title="Lidar scan plane: the camera arm fin hides the rear sector, nothing is measured")

@@ -199,6 +199,49 @@ Open `http://<car>:8080` (`applications/nicegui/README.md` has the details):
   tag count and the last shot's result; tagged objects are drawn violet and
   dashed.
 
+## Long-range link
+
+The car's long-range link is the RACECAR Neo's: a HaLowLink 2 on the car,
+bridged to the Jetson's Ethernet, paired with the ground station's access
+point over Wi-Fi HaLow (`systems/racecarneo/README.md`, "Long-range link":
+addressing, pairing, region and band, range, security, bandwidth;
+`hardware/ground_station.md`: the ground side and the range test). The
+2.4 GHz RC link and its relay in the e-stop loop stay the wireless stop;
+HaLow is not a safety link.
+
+- **Addressing.** The page is at `http://192.168.2.10:8080` (the Jetson's
+  `eth0`, static, no gateway) from the ground laptop (192.168.2.1) or a
+  tablet or phone on the access point's 2.4 GHz Wi-Fi. Give the car its own
+  `ROS_DOMAIN_ID`, apart from the aerodrone's.
+- **Region and range.** 902-928 MHz in the US (FCC Part 15), 863-868 MHz in
+  the EU, set by the unit's region version, which cannot be changed; about
+  1 km line of sight by Morse Micro's figure, much less with the car's
+  antenna 0.2 m above the ground: put the ground antenna on a mast and run
+  the ground station's range test, the RC stop included.
+- **The antenna and the turret.** The car's antenna is a 120 mm half-wave
+  dipole at the rear-right corner of the deck, its tip under the launcher's
+  tail at full nose-up tilt; the HaLowLink 2 stands behind the camera arm,
+  in front of the plate. Neither is in the turret's sweep, its line of fire
+  or its camera's level view (`hardware/parts/racecar_turret/README.md`,
+  assembly check). Do not fit the HaLowLink's own, longer antenna on this
+  car: the launcher's tail would reach it.
+- **The turret camera over HaLow.** `compositions/racecar_turret_hardware.yaml`
+  sends it at 4 Hz, 480 px, JPEG quality 60, about 0.3-0.6 Mbit/s; with
+  the map, the boxes and the status, one browser takes about 0.5-0.9 Mbit/s
+  (the front camera's panel closed: it is sent only while open). The
+  tracker runs on the car at the camera's full rate and size whatever the
+  page shows; only what the operator sees is reduced. Over Ethernet or the
+  Jetson's Wi-Fi set `UI_TURRET_CAMERA_HZ=8 UI_TURRET_CAMERA_MAX_WIDTH=640
+  UI_TURRET_CAMERA_JPEG_QUALITY=75` for the page's full view.
+- **Fire over HaLow.** Every gate is checked on the car by the tracker when
+  the command arrives, not by the page; a link that drops or lags makes the
+  page's status stale (2 s) and disables Fire, and nothing fires without a
+  tap. The page has no login: on an open network anyone could arm the
+  turret and fire it. Keep the HaLow network encrypted (WPA3-SAE, your own
+  passphrase) and private.
+- **Foxglove** is a bench tool here too (Ethernet or Wi-Fi): the turret
+  camera's raw frames through it would fill the HaLow link.
+
 ## Safety
 
 - The physical emergency stop cuts drive power and servo power. Test both
