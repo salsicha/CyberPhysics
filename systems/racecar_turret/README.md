@@ -160,6 +160,15 @@ docker compose -f compositions/racecar_turret_hardware.yaml up -d
   service and container names, so the two stacks cannot run at once);
   `robot_state_publisher` runs the combined URDF on `/turret/joint_states`;
   `cmd_vel_to_ackermann` and the web UI run this checkout's scripts.
+- nvblox maps the RealSense's depth aligned to its colour camera, in
+  dynamic mode with Nav2 on its static slice
+  (`systems/racecarneo/config/nvblox_hardware.yaml`): the people around
+  the car, the turret's targets, decay out of nvblox's map instead of
+  blocking Nav2, which gets them from the lidar, as in the Isaac evaluation
+  (`applications/isaac/RACECAR_TURRET.md`, "People in nvblox's map").
+  Depth Anything is not needed and runs only with `--profile
+  depthanything`, for comparison (`applications/depthanything/README.md`,
+  "On the car"); without it the page's `depth` indicator stays red.
 - The turret services use the `pantiltros` image, which compose builds
   (`pull_policy: build`; it contains `usb_cam` and the servo bridge). The
   YOLO model is downloaded on the first start into `cache/turret/models/`.
@@ -282,8 +291,9 @@ HaLow is not a safety link.
   lidar mask were checked on a desktop host with a mock graph and synthetic
   scans; the turret camera driver was checked to start in the image, not
   with a camera.
-- arm64/Jetson images: not supported as is. The RACECAR's nvblox and Depth
-  Anything images and the PanTiltROS image install x86_64 GPU packages
-  (`compositions/racecarneo_hardware.yaml`); running the GPU parts on the
-  Orin Nano needs JetPack builds of them, and the compute budget of the bill
-  of materials.
+- arm64/Jetson images: not supported as is. The RACECAR's nvblox image and
+  the PanTiltROS image install x86_64 GPU packages
+  (`compositions/racecarneo_hardware.yaml`; the optional Depth Anything
+  image gets CPU-only PyTorch on arm64); running the GPU parts on the Orin
+  Nano needs JetPack builds of them, and the compute budget of the bill of
+  materials.

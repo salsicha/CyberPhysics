@@ -15,6 +15,19 @@
 # match systems/racecarneo/config/topics.yaml; robot_state_publisher adds
 # base_link -> racecarneo/{camera_link,lidar_link,imu_link} from the URDF.
 #
+# nvblox maps the RealSense's own depth, aligned to the colour camera
+# (/camera/aligned_depth_to_color/image_raw, 16UC1 millimetres), in dynamic
+# mode with Nav2 on its static slice (systems/racecarneo/config/
+# nvblox_hardware.yaml). From the camera's 0.22 m, Depth Anything's metric
+# depth reads about 9 times the true depth and left nvblox's map empty in
+# simulation (applications/depthanything/README.md, "Accuracy"), so it runs
+# only under the `depthanything` profile, for comparison:
+#   docker compose -f compositions/racecarneo_hardware.yaml --profile depthanything up -d
+# and RACECAR_NVBLOX_DEPTH_TOPIC=/depth_anything/depth/image with
+# RACECAR_NVBLOX_OVERRIDES=/workspace/config/nvblox.yaml maps its depth as
+# before (Depth Anything stamps the colour frame's time, which the aligned
+# depth's camera_info carries too).
+#
 # arm64/Jetson: not supported as is. The nvblox image installs x86_64 Isaac
 # ROS packages, and the depthanything image installs CPU-only PyTorch on
 # arm64.
@@ -30,6 +43,14 @@ x-ros-ulimits: &ros-ulimits
     hard: 524288
 
 services:
+  # The driver's default resolutions, depth 848x480 (the D4xx's best depth
+  # resolution) and colour 640x480 (the camera Isaac models), but at 15 Hz
+  # instead of 30: nvblox gets the 15 Hz it was evaluated at in Isaac
+  # (2.3 cm of travel per frame at the car's 0.35 m/s), and the Jetson's CPU
+  # aligns, converts and sends half as many frames. The aligned depth has
+  # the colour camera's size: 640x480 16UC1, 614 kB a frame, 9 MB/s to
+  # nvblox. Over USB the camera sends 12 MB/s of depth and 9 MB/s of colour
+  # (YUYV), about 170 Mbit/s (hardware/racecarneo.md, "USB").
   racecarneo_camera:
     network_mode: host
     pull_policy: if_not_present
@@ -53,6 +74,8 @@ services:
         tf_prefix:=racecarneo/
         enable_color:=true
         enable_depth:=true
+        rgb_camera.color_profile:=${RACECAR_COLOR_PROFILE:-640x480x15}
+        depth_module.depth_profile:=${RACECAR_DEPTH_PROFILE:-848x480x15}
         align_depth.enable:=true
         pointcloud.enable:=false
         enable_gyro:=true
@@ -94,7 +117,12 @@ services:
         --ros-args
         --params-file /workspace/config/cmd_vel_to_ackermann.yaml
 
+  # Optional (`--profile depthanything`): nothing reads its depth by
+  # default. For comparison with the RealSense: depth_accuracy record
+  # --depth-topic /camera/aligned_depth_to_color/image_raw
+  # (applications/depthanything/README.md).
   racecarneo_depthanything:
+    profiles: ["depthanything"]
     network_mode: host
     pull_policy: if_not_present
     image: salsicha/cyberphysics:depthanything-${CYBERPHYSICS_TAG:-latest}
@@ -138,7 +166,6 @@ services:
     restart: unless-stopped
     depends_on:
       - racecarneo_camera
-      - racecarneo_depthanything
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
       - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
@@ -147,12 +174,17 @@ services:
     volumes:
       - ../systems/racecarneo/config:/workspace/config:ro
       - ../applications/nvblox/racecarneo_nvblox.launch.py:/workspace/racecarneo_nvblox.launch.py:ro
+    # The aligned depth and its camera_info come from one frame and carry
+    # its stamp, which nvblox's exact time sync needs; the camera_info is
+    # the colour camera's intrinsics at the colour camera's size.
     command: >
       ros2 launch /workspace/racecarneo_nvblox.launch.py
         config_file:=/workspace/config/nvblox.yaml
+        overrides_file:=${RACECAR_NVBLOX_OVERRIDES:-/workspace/config/nvblox_hardware.yaml}
+        depth_image_topic:=${RACECAR_NVBLOX_DEPTH_TOPIC:-/camera/aligned_depth_to_color/image_raw}
+        depth_camera_info_topic:=/camera/aligned_depth_to_color/camera_info
         color_image_topic:=${RACECAR_COLOR_IMAGE_TOPIC:-/camera/color/image_raw}
         color_camera_info_topic:=${RACECAR_CAMERA_INFO_TOPIC:-/camera/color/camera_info}
-        depth_camera_info_topic:=${RACECAR_CAMERA_INFO_TOPIC:-/camera/color/camera_info}
     deploy:
       resources:
         reservations:

@@ -1,6 +1,6 @@
 # Depth Anything
 
-This application builds a ROS 2 Jazzy node for Depth Anything V2 metric monocular depth. It is used by the RACECAR Neo stack to turn the simulator RGB camera stream into a metric depth image and optional point cloud.
+This application builds a ROS 2 Jazzy node for Depth Anything V2 metric monocular depth: a metric depth image and optional point cloud from an RGB camera stream. The RACECAR Neo stacks run it alongside nvblox, which maps a depth camera's depth instead (the simulator's, or on the car the RealSense's; "Accuracy" below says why); on the car it is optional, under the `depthanything` profile.
 
 The Docker image downloads the upstream Depth-Anything-V2 repository and two metric small (`vits`, Apache-2.0) checkpoints during image build, each pinned to a model repo revision and checked by SHA-256: VKITTI (outdoor driving, trained with `max_depth` 80) and Hypersim (indoor, `max_depth` 20). Model weights are not stored in this repository.
 
@@ -170,30 +170,50 @@ compensated` (`--odom-topic /odom`) or the RacecarSim stack, then
 
 ### On the car
 
-`compositions/racecarneo_hardware.yaml` and `racecar_turret_hardware.yaml`
-still feed nvblox Depth Anything's vkitti depth. The RealSense on the car
-sits at the same 0.22 m as the Isaac camera, so a similar error is likely
-there (check it with `depth_accuracy record --depth-topic
-/camera/aligned_depth_to_color/image_raw` on the car). Options, with the
-evidence above:
+Decided on 2026-10-12: `compositions/racecarneo_hardware.yaml` and
+`racecar_turret_hardware.yaml` feed nvblox the RealSense's depth aligned to
+its colour camera (`/camera/aligned_depth_to_color/image_raw` with
+`/camera/aligned_depth_to_color/camera_info`), and Depth Anything runs only
+under the `depthanything` profile; nothing depends on it. With the evidence
+above:
 
-1. **nvblox from the RealSense depth** (`depth_image_topic:=
-   /camera/aligned_depth_to_color/image_raw`, registered to the colour
-   camera, so the colour camera_info stays), Depth Anything optional. The
-   D435i's datasheet error is under 2 % at 2 m (the D455's at 4 m), inside
-   the 9 % a floor point can afford at this height. Without Depth Anything
-   the GPU time it takes is free (48 ms per frame on the laptop GPU above;
-   not measured on the Orin Nano, where the image's PyTorch is CPU-only
-   today). nvblox reads 16-bit millimetre depth as Isaac ROS's RealSense
-   examples feed it; not tried on this composition. With real depth nvblox
-   also maps the people around the car: in Isaac its static mode (the
-   car's `nvblox.yaml`) kept them as obstacles and stopped Nav2 twice in
-   four runs, its dynamic mode with Nav2 on the static slice
-   (`systems/racecar_turret/config/nvblox_isaac.yaml`) completed 4 of 4
-   (`applications/isaac/RACECAR_TURRET.md`, "People in nvblox's map").
-2. **Depth Anything hypersim with scale alignment to the RealSense**
-   (`metric_dataset:=hypersim max_depth:=20.0
-   scale_reference_topic:=/camera/aligned_depth_to_color/image_raw`): the
-   best Depth Anything setting measured here, but 18 % of floor pixels
-   still land in the obstacle slice and obstacles 3.5-5 m away come out
-   25 % too close, and it needs the RealSense anyway.
+- The RealSense sits at the same 0.22 m as the Isaac camera, where vkitti
+  reads 9 times the true depth and left nvblox's map empty, and no Depth
+  Anything setting measured kept the floor out of nvblox's slice (the
+  best, below, lifts 18 % of it).
+- The D435i's datasheet error is under 2 % at 2 m (the D455's at 4 m) and
+  grows with the distance; a floor point can afford about 9 % at this
+  height. So nvblox integrates the RealSense to 5 m on the car, not
+  `nvblox.yaml`'s 12 m (`systems/racecarneo/config/nvblox_hardware.yaml`).
+  In Isaac, on the camera's depth, that setting completed the course and
+  mapped the obstacles near it, not those it saw only from farther
+  (`applications/isaac/RACECAR_TURRET.md`, "Evaluations").
+- nvblox reads the RealSense's encoding as it is: nvblox_ros 4.4 (the
+  image's) takes `16UC1` (millimetres, divided by 1000 on the GPU) and
+  `32FC1` (metres) and refuses any other ("Invalid depth image encoding");
+  NVIDIA's own RealSense examples feed it the driver's 16UC1 depth. The
+  aligned depth and its camera_info come from one frame with one stamp,
+  which nvblox's exact time sync needs.
+- With real depth nvblox maps the people around the car too. In Isaac its
+  static mode kept them as obstacles and stopped Nav2 twice in four runs;
+  dynamic mode with Nav2 on the static slice completed 4 of 4
+  (`applications/isaac/RACECAR_TURRET.md`, "People in nvblox's map").
+  `nvblox_hardware.yaml` is that setting (`systems/racecar_turret/config/
+  nvblox_isaac.yaml`) with the 5 m range.
+- Depth Anything's GPU time is freed: 48 ms per frame on the laptop GPU
+  above; not measured on the Orin Nano, where the image's PyTorch is
+  CPU-only today.
+
+For comparison on the car, `--profile depthanything` starts it as before
+(vkitti, max_depth 80) and `depth_accuracy record --depth-topic
+/camera/aligned_depth_to_color/image_raw` scores it against the RealSense;
+`RACECAR_NVBLOX_DEPTH_TOPIC=/depth_anything/depth/image` with
+`RACECAR_NVBLOX_OVERRIDES=/workspace/config/nvblox.yaml` maps its depth as
+before. None of this has run on the car yet.
+
+The option not taken: **Depth Anything hypersim with scale alignment to
+the RealSense** (`metric_dataset:=hypersim max_depth:=20.0
+scale_reference_topic:=/camera/aligned_depth_to_color/image_raw`), the best
+Depth Anything setting measured here: 18 % of floor pixels still land in
+the obstacle slice, obstacles 3.5-5 m away come out 25 % too close, and it
+needs the RealSense anyway.

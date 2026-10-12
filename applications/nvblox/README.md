@@ -17,17 +17,24 @@ The nvblox image is large because NVIDIA's Debian packages pull CUDA, TensorRT, 
 
 ## RACECAR Neo Launch
 
-`racecarneo_nvblox.launch.py` starts `nvblox::NvbloxNode` in a component container and remaps RACECAR topics into the camera names expected by nvblox:
+`racecarneo_nvblox.launch.py` starts `nvblox::NvbloxNode` in a component container and remaps RACECAR topics into the camera names expected by nvblox (the launch file's defaults):
 
 - `camera_0/depth/image` -> `/depth_anything/depth/image` (`depth_image_topic`)
 - `camera_0/depth/camera_info` -> `/camera/color/camera_info` (`depth_camera_info_topic`)
 - `camera_0/color/image` -> `/camera/color/image_raw` (`color_image_topic`)
 - `camera_0/color/camera_info` -> `/camera/color/camera_info` (`color_camera_info_topic`)
 
-Each topic is a launch argument; `compositions/racecarneo_hardware.yaml` sets
-them from `RACECAR_COLOR_IMAGE_TOPIC` and `RACECAR_CAMERA_INFO_TOPIC`.
+Each topic is a launch argument. The simulator compositions map the
+simulated camera's depth (`/camera/depth/image_rect_raw`);
+`compositions/racecarneo_hardware.yaml` maps the RealSense's depth aligned
+to its colour camera (`/camera/aligned_depth_to_color/image_raw`, 16UC1
+millimetres, with `/camera/aligned_depth_to_color/camera_info`), which
+nvblox_ros reads as it is (16UC1 millimetres or 32FC1 metres).
 
-The RACECAR-specific mapper parameters live in `systems/racecarneo/config/nvblox.yaml`.
+The RACECAR-specific mapper parameters live in `systems/racecarneo/config/nvblox.yaml`;
+`overrides_file` loads a second file over it: `nvblox_hardware.yaml` on the
+car and `systems/racecar_turret/config/nvblox_isaac.yaml` in Isaac (dynamic
+mode).
 
 Run through the full stack:
 

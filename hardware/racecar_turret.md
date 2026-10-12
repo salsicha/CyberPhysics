@@ -63,19 +63,21 @@ emergency stop stay the stops.
   assume 12 V.
 - **Jetson software.** `compositions/racecarneo_hardware.yaml` is not
   supported on arm64 as is (the nvblox image installs x86_64 Isaac ROS
-  packages, the Depth Anything image CPU-only PyTorch on arm64), and the
-  PanTiltROS image installs x86_64 PyTorch wheels. The turret camera
-  driver, the servo bridge, the web UI and `cmd_vel_to_ackermann` have no
-  GPU dependencies; the YOLO tracker, Depth Anything and nvblox need Jetson
-  builds (JetPack PyTorch or TensorRT) that this repository does not provide
-  yet.
-- **Compute budget (Orin Nano 8 GB).** YOLO, Depth Anything and nvblox
-  share one small GPU and 8 GB of memory with the CPU. As configured for a
-  desktop GPU they will not all keep up; reduce, roughly in this order:
-  1. Depth: the car already has an RGB-D camera. Feed nvblox the RealSense
-     depth (`/camera/depth/image_rect_raw`, aligned) and drop Depth Anything
-     on the Jetson; or run it at a smaller input (Depth Anything V2 Small at
-     about 308 px) at 5 Hz with TensorRT FP16.
+  packages), and the PanTiltROS image installs x86_64 PyTorch wheels. The
+  turret camera driver, the servo bridge, the web UI and
+  `cmd_vel_to_ackermann` have no GPU dependencies; the YOLO tracker and
+  nvblox need Jetson builds (JetPack PyTorch or TensorRT) that this
+  repository does not provide yet.
+- **Compute budget (Orin Nano 8 GB).** YOLO and nvblox share one small GPU
+  and 8 GB of memory with the CPU. As configured for a desktop GPU they
+  may not both keep up; reduce, roughly in this order:
+  1. Depth: done. nvblox maps the RealSense's depth aligned to its colour
+     camera (`/camera/aligned_depth_to_color/image_raw`, 15 Hz), and Depth
+     Anything (48 ms per frame on a laptop RTX 4000 Ada, and 9 times the
+     true depth from this camera height) runs only under the composition's
+     `depthanything` profile, for comparison
+     (`applications/depthanything/README.md`, "On the car"). The RealSense's
+     alignment and colour conversion run on the CPU.
   2. YOLO: export the tracker's model to TensorRT FP16 (`yolo export
      format=engine half=True`), at `image_size` 416-480 instead of 640, with
      the class prompts fixed at export so the text encoder does not run; a
@@ -84,6 +86,10 @@ emergency stop stay the stops.
      compensates latency.
   3. nvblox: 0.10 m voxels instead of 0.05 m, depth integration at 5 Hz or
      less, no mesh or colour integration (only the 2D ESDF slice Nav2 uses).
+     Its dynamic mode (`systems/racecarneo/config/nvblox_hardware.yaml`)
+     took 0.32-0.48 CPU cores in Isaac against 0.17-0.19 in static mode,
+     and 0.89 GB of GPU memory; its dynamic layer was evaluated with 15 Hz
+     depth, so check people still decay at a lower rate.
   4. The rest: `nvpmodel` at the highest power mode and `jetson_clocks`; an
      8 GB swap file on the NVMe so a load spike does not kill a container;
      watch `tegrastats` with the whole stack running before driving; keep

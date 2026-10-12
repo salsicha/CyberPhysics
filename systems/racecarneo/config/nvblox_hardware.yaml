@@ -1,0 +1,61 @@
+# nvblox on the car (compositions/racecarneo_hardware.yaml and
+# racecar_turret_hardware.yaml, over nvblox.yaml), reading the RealSense's
+# depth aligned to its colour camera (/camera/aligned_depth_to_color/image_raw,
+# 16UC1 millimetres, which nvblox_ros divides by 1000). Dynamic mode with
+# Nav2 on the static slice, as in the Isaac arena (nvblox_isaac.yaml): with
+# real depth nvblox maps the people around the car too, and in static mode
+# their trails and a person standing below the camera's view stayed in the
+# map and stopped Nav2; in dynamic mode the course completed 4 of 4
+# (applications/isaac/RACECAR_TURRET.md, "People in nvblox's map").
+#
+# What differs from nvblox_isaac.yaml is the range. Isaac's depth has a
+# constant 15 mm noise, so nvblox.yaml's 12 m did no harm there. A stereo
+# camera's error grows with the square of the distance (D435i under 2 % at
+# 2 m, D455 at 4 m), and from 0.22 m up a floor point's depth must be within
+# about 9 % to stay under the slice's 0.02 m (0.02 / 0.22). So both mappers
+# integrate to 5 m, where the D435i's datasheet error, scaled, is about 5 %,
+# half that margin (the D455's about 2.5 %). 5 m is also nvblox's own
+# default for a RealSense (NVIDIA's nvblox_base.yaml). It covers Nav2's
+# 6 x 6 m local costmap and 14 s of driving at 0.35 m/s; the lidar marks to
+# 8 m and SLAM's map holds the rest.
+# In Isaac (on the camera's depth) this file completed the course with every
+# threshold met; nvblox mapped the obstacles along it and not those seen
+# only from farther (RACECAR_TURRET.md, "Evaluations"). Not run on the car.
+/**:
+  ros__parameters:
+    mapping_type: dynamic
+
+    static_mapper:
+      projective_integrator_max_integration_distance_m: 5.0
+      # Out of the camera's view the TSDF decays in about 3.5 s (0.8 every
+      # 0.2 s; nvblox's 0.95 takes about 15 s). The camera sits as in Isaac,
+      # where the floor is visible only from 0.75 m in front of base_link.
+      tsdf_decay_factor: 0.8
+      # NVIDIA's dynamic-mode values (nvblox_dynamics.yaml, used with their
+      # RealSense examples), as in Isaac.
+      projective_integrator_weighting_mode: constant
+      projective_tsdf_integrator_invalid_depth_decay_factor: 0.8
+      # freespace integrator
+      max_tsdf_distance_for_occupancy_m: 0.15
+      max_unobserved_to_keep_consecutive_occupancy_ms: 200
+      min_duration_since_occupied_for_freespace_ms: 250
+      min_consecutive_occupancy_duration_for_reset_ms: 2000
+      check_neighborhood: true
+      initialize_to_high_confidence_freespace: false
+
+    dynamic_mapper:
+      projective_integrator_max_integration_distance_m: 5.0
+      projective_integrator_truncation_distance_vox: 4.0
+      free_region_occupancy_probability: 0.2
+      occupied_region_occupancy_probability: 0.9
+      unobserved_region_occupancy_probability: 0.35
+      occupied_region_half_width_m: 0.15
+      esdf_integrator_min_weight: 2.0
+      esdf_integrator_max_distance_m: 2.0
+      free_region_decay_probability: 0.55
+      occupied_region_decay_probability: 0.30
+      # The static slice's heights (nvblox.yaml), over nvblox_sim.yaml's
+      # 0.09-0.65 m, which the launch file loads on the car too.
+      esdf_slice_height: 0.10
+      esdf_slice_min_height: 0.02
+      esdf_slice_max_height: 0.55

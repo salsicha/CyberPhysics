@@ -202,7 +202,7 @@ docker compose -f compositions/racecarneo.yaml up
 The composition runs this pipeline:
 
 1. `racecarneo_bridge` publishes camera, lidar, IMU, odometry, and TF.
-2. `racecarneo_depthanything` estimates metric monocular depth from `/camera/color/image_raw` and publishes it as on the car; nothing in this composition maps it (below).
+2. `racecarneo_depthanything` estimates metric monocular depth from `/camera/color/image_raw` and publishes it as the car does under its `depthanything` profile; nothing in this composition maps it (below).
 3. `racecarneo_nvblox` integrates the bridge's depth image (`/camera/depth/image_rect_raw`, registered to the colour camera) with `/camera/color/camera_info`, then publishes TSDF/ESDF map slices. `RACECAR_NVBLOX_DEPTH_TOPIC=/depth_anything/depth/image` maps Depth Anything's depth instead.
 4. `racecarneo_slam` runs SLAM Toolbox to provide `map -> odom`.
 5. `racecarneo_nav2` plans and controls with Nav2 using nvblox costmap layers plus lidar fallback.
@@ -217,7 +217,7 @@ The ROS containers do not share `/dev/shm`, so FastDDS runs over UDP only, with 
 ### Depth for nvblox
 
 Until 2026-10-11 nvblox integrated Depth Anything's depth (vkitti, max_depth
-80), as the hardware composition still does. From the simulated car's
+80), as the car's compositions did until 2026-10-12. From the simulated car's
 camera, 0.12 m above the floor, that depth reads a median 13 times
 the bridge's depth over 0.5-5 m (15 times under 1 m; 195 frames while
 circling Demo World, `applications/depthanything/README.md`, "Accuracy"):
@@ -228,7 +228,7 @@ single obstacle and the obstacles carved out as free space,
 hypersim model reads 2.9 times; aligned to the bridge's depth every
 frame, either model still puts obstacles 3.5-5 m away at about half their
 distance. The simulator's own depth has none of this,
-so nvblox maps it, as a RealSense's depth would be mapped on the car.
+so nvblox maps it, as it maps the RealSense's depth on the car (below).
 
 nvblox counts everything 0.02-0.55 m above the floor as an obstacle, so it
 needs the camera's mount to about a centimetre. The prefab's level
@@ -252,9 +252,20 @@ camera's rays a few metres out, and the Demo World has no ground truth to
 say how many of the rest are objects off the lidar's plane or the inside
 of thick obstacles. Not checked further.
 
+On the car (`compositions/racecarneo_hardware.yaml`, also extended by
+`racecar_turret_hardware.yaml`) nvblox maps the RealSense's depth aligned
+to its colour camera (`/camera/aligned_depth_to_color/image_raw`, 16UC1
+millimetres, with its own camera_info; the camera at 640x480 colour and
+848x480 depth, 15 Hz), in dynamic mode with Nav2 on the static slice
+(`systems/racecarneo/config/nvblox_hardware.yaml`: the Isaac arena's
+`nvblox_isaac.yaml`, integrating to 5 m rather than 12 m for a stereo
+camera's error). Depth Anything runs there only under the `depthanything`
+profile, for comparison (`applications/depthanything/README.md`, "On the
+car"). Not yet run on the car.
+
 Closed-loop status: the stack comes up unattended and Nav2 reaches goals in
 Demo World. The goal tables below were measured with nvblox on Depth
-Anything's depth (before the change above). `NavigateToPose` goals relative to the start pose, each on a
+Anything's depth (before nvblox moved to the simulator's depth, above). `NavigateToPose` goals relative to the start pose, each on a
 freshly started stack (SLAM, Depth Anything and nvblox running), measured on
 2026-10-11 with this composition and its images:
 
@@ -443,6 +454,7 @@ Robot-specific config lives in `systems/racecarneo/`:
 - `config/bridge.yaml`: simulator bridge parameters
 - `config/depthanything.yaml`: metric depth parameters
 - `config/nvblox.yaml`: nvblox mapper overrides
+- `config/nvblox_hardware.yaml`: over `nvblox.yaml` on the car: dynamic mode, integration to 5 m
 - `config/nav2.yaml`: Nav2 parameters and nvblox costmap layers
 - `config/slam_toolbox.yaml`: online SLAM parameters
 - `config/topics.yaml`: topic and frame conventions

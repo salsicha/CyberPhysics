@@ -9,6 +9,7 @@ This folder contains configuration for the MIT RACECAR Neo hardware/simulation s
 - `config/depthanything.yaml`: metric Depth Anything topic/model settings.
 - `config/nav2.yaml`: Nav2 planner, controller, behavior, and nvblox costmap-layer settings.
 - `config/nvblox.yaml`: nvblox TSDF/ESDF mapper overrides for the RACECAR camera setup.
+- `config/nvblox_hardware.yaml`: over `nvblox.yaml` on the car: dynamic mode (people decay instead of staying in the map) with the RealSense's 5 m range.
 - `config/slam_toolbox.yaml`: online SLAM Toolbox settings for `map -> odom`.
 - `config/topics.yaml`: canonical topics and frames for this system.
 - `config/sensor_models.yaml`: hardware-to-simulation sensor, actuator, safety, and noise-model contract.
@@ -22,7 +23,7 @@ This folder contains configuration for the MIT RACECAR Neo hardware/simulation s
 
 ## Runtime Pipeline
 
-The full composition is `compositions/racecarneo.yaml`:
+The full simulator composition is `compositions/racecarneo.yaml`:
 
 ```bash
 docker compose -f compositions/racecarneo.yaml up
@@ -31,13 +32,36 @@ docker compose -f compositions/racecarneo.yaml up
 Data flow:
 
 ```text
-Unity simulator -> racecarneo_bridge -> /camera/color/image_raw
-/camera/color/image_raw -> Depth Anything -> /depth_anything/depth/image
-/depth_anything/depth/image + /camera/color/camera_info -> nvblox -> map slices
-nvblox map slices + SLAM map frame -> Nav2 -> /cmd_vel
+Unity simulator -> racecarneo_bridge -> /camera/color/image_raw, /camera/depth/image_rect_raw, /scan, /imu/data_raw, /odom
+/camera/depth/image_rect_raw + /camera/color/camera_info -> nvblox (static mode, nvblox.yaml) -> map slices
+/camera/color/image_raw -> Depth Anything -> /depth_anything/depth/image (published, not mapped)
+nvblox static map slice + /scan + SLAM map frame -> Nav2 -> /cmd_vel
 /cmd_vel (or /cmd_vel_teleop) -> cmd_vel_to_ackermann -> /ackermann_cmd (m/s, rad) -> simulator bridge
 URDF -> robot_state_publisher -> base_link -> racecarneo/* sensor frames
 ```
+
+On the car, `compositions/racecarneo_hardware.yaml` (and the RACECAR
+Turret's `racecar_turret_hardware.yaml`, which extends it):
+
+```text
+RealSense (colour 640x480, depth 848x480, 15 Hz) -> /camera/color/image_raw,
+    /camera/aligned_depth_to_color/image_raw (16UC1 mm, 640x480) + its camera_info
+aligned depth + its camera_info -> nvblox (dynamic mode, nvblox.yaml + nvblox_hardware.yaml) -> map slices
+nvblox static map slice + /scan + SLAM map frame -> Nav2 -> /cmd_vel
+/cmd_vel (or /cmd_vel_teleop) -> cmd_vel_to_ackermann -> /ackermann_cmd (m/s, rad) -> motor bridge (outside the composition)
+```
+
+Depth Anything's monocular depth reads about 9 times the true depth from
+the car's 0.22 m camera height (`applications/depthanything/README.md`,
+"Accuracy"), so nvblox maps the depth camera's own depth in both, and on
+the car Depth Anything runs only under the `depthanything` profile
+(`docker compose -f compositions/racecarneo_hardware.yaml --profile
+depthanything up -d`), for comparison. In dynamic mode the people walking
+by go to nvblox's decaying dynamic layer and Nav2 reads the static slice,
+so the lidar gives it the people, as in the RACECAR Turret's Isaac
+evaluation (`applications/isaac/RACECAR_TURRET.md`, "People in nvblox's
+map"). The web page's `depth` indicator follows `/depth_anything/depth/image`,
+so without the profile it stays red on the car.
 
 The NiceGUI frontend (`applications/nicegui`) shows the SLAM map with the `map -> base_link` pose and the Nav2 path, the camera, the drive status and pipeline freshness; it sends Nav2 waypoints in the `map` frame through `NavigateToPose` (tap the map or type one), cancels them, drives manually with an on-screen joystick on `/cmd_vel_teleop`, and stops the car with `/racecarneo/stop_request`. The closed-course scenario contract in `systems/racecarneo/scenarios/campus_closed_course.json` defines the environment geometry that Unity/Gazebo/Isaac assets should instantiate for validation.
 

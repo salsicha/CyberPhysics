@@ -1,8 +1,8 @@
 # RACECAR Neo bill of materials
 
 Goal: a physical 1/10-scale RACECAR Neo that matches the simulated
-CyberPhysics pipeline (`systems/racecarneo`): forward RGB camera -> Depth
-Anything -> nvblox/Nav2, with a 2D lidar for SLAM Toolbox, an IMU,
+CyberPhysics pipeline (`systems/racecarneo`): forward RGB-D camera (its
+depth) -> nvblox/Nav2, with a 2D lidar for SLAM Toolbox, an IMU,
 odometry, and Ackermann command output, run by
 `compositions/racecarneo_hardware.yaml`.
 
@@ -57,11 +57,19 @@ shared with the aerodrone): see ["Long-range link"](#long-range-link). The
   stock motor for first tests.
 - **Jetson software.** `compositions/racecarneo_hardware.yaml` states that
   arm64 is not supported as is: the nvblox image installs x86_64 Isaac ROS
-  packages and the Depth Anything image CPU-only PyTorch on arm64. The
-  Jetson in this list cannot run the composition until those images have
-  Jetson builds; until then run the GPU services on an x86 GPU computer on
-  the same network, or feed nvblox the RealSense depth instead of Depth
-  Anything.
+  packages. The Jetson in this list cannot run nvblox until that image has
+  a Jetson build; until then run nvblox and Nav2 on an x86 GPU computer on
+  the same network.
+- **Compute: no Depth Anything.** nvblox maps the RealSense's own depth
+  (aligned to its colour camera, 16UC1 millimetres), so Depth Anything, the
+  heaviest GPU load of the earlier pipeline (48 ms per frame on a laptop
+  RTX 4000 Ada; its arm64 image has CPU-only PyTorch), is not needed on the
+  Jetson. From the camera's 0.22 m its monocular depth read about 9 times
+  the true depth in simulation (`applications/depthanything/README.md`,
+  "Accuracy"); it runs only under the composition's `depthanything`
+  profile, for comparison. The Orin Nano's GPU is left to nvblox (dynamic
+  mode, 15 Hz depth) and, on the RACECAR Turret, the YOLO tracker
+  (`hardware/racecar_turret.md`, "Compute budget").
 - **Drivers the composition expects but does not start.** It needs
   `/scan` (frame `racecarneo/lidar_link`), `/imu/data_raw`
   (`racecarneo/imu_link`), odometry and an `/ackermann_cmd` consumer from
@@ -84,7 +92,19 @@ shared with the aerodrone): see ["Long-range link"](#long-range-link). The
   servo draws 2-3 A at stall. Power the servo from a separate 6 V BEC.
 - **USB.** The developer kit has four USB 3.2 Type-A ports and a USB-C:
   RealSense (USB 3, a blue port of its own), lidar (USB adapter), VESC
-  (USB) and one spare. No powered hub is needed for the car alone.
+  (USB) and one spare. No powered hub is needed for the car alone. The four
+  Type-A ports share one USB 3.2 Gen 2 (10 Gbit/s) link through the
+  carrier's hub. The composition runs the RealSense at depth 848x480 and
+  colour 640x480, 15 Hz: 12 MB/s of depth (Z16) and 9 MB/s of colour
+  (YUYV), about 170 Mbit/s, a few percent of its 5 Gbit/s USB 3 link (the
+  driver's default 30 Hz doubles it). The lidar, the VESC and the turret
+  camera are USB 2 devices on the hub's separate USB 2 side. The RealSense
+  needs a USB 3 connection: the driver logs `Device USB type: 3.2` (on
+  USB 2 it offers fewer profiles; check the cable). On the Jetson the CPU
+  aligns the depth to the colour camera and converts the colour from YUYV
+  (librealsense uses CUDA only when built with it, and the ROS packages
+  are not); the aligned depth, 614 kB a frame, goes to nvblox over DDS at
+  9 MB/s.
 - **Long-range link.** The developer kit's own Wi-Fi reaches across a room
   or a building, not a field. The car's IP link is Wi-Fi HaLow (802.11ah,
   sub-GHz): a Morse Micro HaLowLink 2 on the car, cabled to the Jetson's

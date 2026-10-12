@@ -334,6 +334,19 @@ depth. Resources: nvblox 0.89 GB of GPU memory (1.0 GB with the vkitti
 depth, which allocated blocks out to 12 m) and 0.32-0.48 cores in dynamic
 mode (0.17-0.19 in static mode); the GPU's peak 4.0-4.2 GB.
 
+The car's own setting (`systems/racecarneo/config/nvblox_hardware.yaml`:
+e with both mappers integrating to 5 m, for the RealSense's error), run
+here on the camera's depth with `RACECAR_TURRET_NVBLOX_OVERRIDES=
+/workspace/config/nvblox_hardware.yaml`, one run (compensated) on
+2026-10-12: course completed in 150.3 s, no collision, 0.245 m/s, every
+threshold met, no planner failure. nvblox mapped 38 % of the outlines (e: 81-83 %):
+the obstacles along the course 78-100 %, the island's pillar and barrel
+(in the camera's view from 3.8-4.0 m) 79 and 53 %, the arena walls 40 %,
+and the island's wall and crates (in view only from 6.9 m and more, or
+not at all) none; 2 % carved free, no phantoms; the costmap 100 %. nvblox took
+0.21-0.52 cores, the GPU's peak 4.0 GB. This checks the range, not a real
+stereo camera's error.
+
 ## Fidelity gaps
 
 - **Simulation runs at about half real time** (real-time factor 0.5 with the
@@ -347,8 +360,9 @@ mode (0.17-0.19 in static mode); the GPU's peak 4.0-4.2 GB.
 - **Depth for nvblox.** nvblox maps the simulated camera's depth: the
   rendered depth with the RealSense noise model (15 mm, 1 % dropout,
   nothing beyond 10 m), not a real stereo camera's errors and holes. The
-  car's hardware composition still maps Depth Anything's depth, which from
-  this camera height reads about 9 times too far ("Depth for nvblox").
+  car's hardware composition maps the RealSense's aligned depth the same
+  way, in dynamic mode, but integrates it to 5 m rather than 12 m for a
+  stereo camera's error (`systems/racecarneo/config/nvblox_hardware.yaml`).
 - **Lidar**: an instantaneous scan (no rotation skew), PhysX collision
   shapes rather than visual surfaces, ideal reflectivity, and no turret
   posts (so no `/scan_raw` and no laser_filters stage, which the car has).

@@ -9,8 +9,9 @@ aiming together. This file is the contract between those parts; change it
 only together with every part that uses it.
 
 Hardware choices: the turret camera is a USB (UVC) camera on the tilt link,
-and the PanTiltROS YOLO tracker runs on the car's Jetson next to Depth
-Anything and nvblox. The Jetson drives the two ST3215 serial bus servos
+and the PanTiltROS YOLO tracker runs on the car's Jetson next to nvblox,
+which maps the RealSense's depth (Depth Anything is optional on the car).
+The Jetson drives the two ST3215 serial bus servos
 itself, with no microcontroller: its 40-pin header UART (pins 8 TX and 10 RX,
 `/dev/ttyTHS1`, 3.3 V) goes to a half-duplex bus servo adapter (Waveshare Bus
 Servo Adapter (A) in UART mode), which also feeds the servos from the servo
@@ -44,7 +45,8 @@ above it (-v).
 
 The car's topics are those of `systems/racecarneo/config/topics.yaml`,
 unchanged (`/cmd_vel`, `/ackermann_cmd`, `/odom`, `/scan`, `/imu/data_raw`,
-`/camera/color/*`, `/camera/depth/*`), except that on this platform `/scan`
+`/camera/color/*`, `/camera/depth/*`, and on the car the RealSense's
+`/camera/aligned_depth_to_color/*`, nvblox's input), except that on this platform `/scan`
 is the masked scan: the turret plate's four posts sit inside Nav2's robot
 radius, so the lidar driver publishes `/scan_raw` and a laser_filters box
 filter (`config/scan_filter.yaml`) removes the post returns into `/scan`. A

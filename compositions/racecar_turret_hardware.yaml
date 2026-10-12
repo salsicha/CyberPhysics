@@ -1,7 +1,9 @@
 # Physical RACECAR Turret (systems/racecar_turret): the RACECAR Neo hardware
-# stack of racecarneo_hardware.yaml (RealSense, Depth Anything, nvblox, SLAM
-# Toolbox, Nav2, cmd_vel_to_ackermann, the web UI, Foxglove), extended from
-# that file, plus the PanTiltROS turret on its plate behind the lidar:
+# stack of racecarneo_hardware.yaml (RealSense, nvblox on the RealSense's
+# aligned depth in dynamic mode, SLAM Toolbox, Nav2, cmd_vel_to_ackermann,
+# the web UI, Foxglove; Depth Anything only under the `depthanything`
+# profile), extended from that file, plus the PanTiltROS turret on its plate
+# behind the lidar:
 #
 #   turret_camera   USB (UVC) turret camera -> /turret/camera/image_raw and
 #                   camera_info, frame turret/camera_optical_frame
@@ -108,8 +110,10 @@ services:
     volumes:
       - ../applications/racecarneo/scripts/cmd_vel_to_ackermann.py:/workspace/cmd_vel_to_ackermann.py:ro
 
+  # Optional, as on the RACECAR: `--profile depthanything`.
   racecarneo_depthanything:
     extends: {file: racecarneo_hardware.yaml, service: racecarneo_depthanything}
+    profiles: ["depthanything"]
     environment:
       - *dds
 
