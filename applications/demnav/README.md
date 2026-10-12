@@ -40,8 +40,8 @@ insufficient. ArduPilot GPS/EKF remains the fallback localization source.
   (positive values turn it counter-clockwise seen from above). It is
   body-fixed, so banked or pitched it looks h * tan(tilt) away from the
   vehicle; `camera_stabilized: true` declares a roll/pitch-stabilised
-  camera that only turns with the heading (the Genesis and
-  `satellite_camera_sim` cameras). Each frame is resampled north-up onto
+  camera that only turns with the heading (the airplane's
+  `satellite_camera_sim` camera). Each frame is resampled north-up onto
   the DEM grid through its ray geometry (`terrain_match.py`,
   `camera_geometry.py`), using the full odometry attitude interpolated to
   the frame stamp (simulator-time stamps are mapped onto MAVROS wall time
@@ -77,9 +77,9 @@ insufficient. ArduPilot GPS/EKF remains the fallback localization source.
   tangent of the view's edge (half the field of view plus the tilt):
   flat-ground projection displaces relief by that much. The defaults (2.0,
   0.1 cells, 1 deg) are calibrated on Isaac and Gazebo frames with ground
-  truth. `attitude_sigma_deg` is the EKF's attitude error: the Isaac and
-  Genesis stacks set 0.5 (their EKF's tilt error while GPS-denied, heading
-  error under 1 deg); Gazebo's EKF is worse (tilt 0.7-0.9 deg while
+  truth. `attitude_sigma_deg` is the EKF's attitude error: the Isaac
+  stack sets 0.5 (its EKF's tilt error while GPS-denied, heading error
+  under 1 deg); Gazebo's EKF is worse (tilt 0.7-0.9 deg while
   GPS-denied, heading 1-2 deg) and keeps the default 1. The aircraft needs
   its own flight-log calibration.
 - **Height above ground.** A fresh, in-range downward rangefinder reading

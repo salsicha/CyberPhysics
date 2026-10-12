@@ -23,7 +23,7 @@ import yaml
 from conftest import REPO, install_ros_stubs, load_script
 
 SCRIPTS = REPO / 'applications/aerostack2/scripts'
-STACKS = ('aerostack2_sim.yaml', 'aerostack2_genesis.yaml', 'aerostack2_isaac.yaml')
+STACKS = ('aerostack2_sim.yaml', 'aerostack2_isaac.yaml')
 # BT.CPP built-ins the generated tree uses besides the as2 nodes.
 BT_BUILTINS = {'Sequence', 'Delay', 'AlwaysSuccess', 'ForceSuccess'}
 

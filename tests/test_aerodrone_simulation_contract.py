@@ -69,55 +69,6 @@ class ArduPilotJSONTest(unittest.TestCase):
             atol=1e-8)
 
 
-class GenesisNavsimTestCase(unittest.TestCase):
-    """Loads applications/genesis/scripts/aerodrone_navsim.py with ROS stubbed."""
-
-    @classmethod
-    def setUpClass(cls):
-        from unittest import mock
-
-        from conftest import install_ros_stubs
-        with mock.patch.dict(sys.modules):
-            install_ros_stubs()
-            for name in ("rosgraph_msgs", "rosgraph_msgs.msg"):
-                sys.modules[name] = mock.MagicMock()
-            cls.navsim = load_module(
-                "genesis_aerodrone_navsim",
-                "applications/genesis/scripts/aerodrone_navsim.py")
-
-
-class GenesisCameraModelTest(GenesisNavsimTestCase):
-    """The Genesis camera takes a vertical FOV; FOV_DEG and the published
-    camera_info are horizontal, and both must describe the rendered image."""
-
-    def test_camera_info_matches_the_rendered_focal_length(self):
-        from types import SimpleNamespace
-        width, height, fov = 640, 480, 69.0
-        vertical = self.navsim.vertical_fov_deg(fov, width, height)
-        # Genesis' pinhole focal length (gs Camera.f) for that vertical FOV.
-        rendered_f = 0.5 * height / np.tan(np.deg2rad(0.5 * vertical))
-        info = self.navsim.GenesisSensorPublisher.camera_info(
-            SimpleNamespace(args=SimpleNamespace(
-                width=width, height=height, fov_deg=fov)),
-            None, "downward_camera_optical_frame")
-        self.assertAlmostEqual(info.k[0], rendered_f, places=6)
-        self.assertAlmostEqual(info.k[4], rendered_f, places=6)
-        self.assertAlmostEqual(
-            np.degrees(2.0 * np.arctan(0.5 * width / info.k[0])), fov, places=6)
-
-    def test_square_image_keeps_its_fov(self):
-        self.assertAlmostEqual(
-            self.navsim.vertical_fov_deg(60.0, 480, 480), 60.0, places=9)
-
-    def test_clock_carries_the_lock_step_simulation_time(self):
-        from unittest import mock
-        publisher = mock.MagicMock()
-        self.navsim.GenesisSensorPublisher.publish_clock(
-            mock.MagicMock(clock_pub=publisher), 1234 * (1.0 / 1200.0))
-        clock = publisher.publish.call_args.args[0].clock
-        self.assertEqual((clock.sec, clock.nanosec), (1, 28333333))
-
-
 class TerrainCollisionTest(unittest.TestCase):
     def test_collision_height_is_conservative(self):
         grid = np.arange(81, dtype=np.float32).reshape(9, 9)
@@ -128,11 +79,15 @@ class TerrainCollisionTest(unittest.TestCase):
 
 class ComposeContractTest(unittest.TestCase):
     def test_all_drone_backends_use_real_stack_contract(self):
-        for filename, simulator in (
+        backends = (
             ("aerostack2_sim.yaml", "gazebo_ardupilot_backend"),
             ("aerostack2_isaac.yaml", "isaacsim"),
-            ("aerostack2_genesis.yaml", "genesis"),
-        ):
+        )
+        # Every Aerodrone simulation stack is one of these.
+        self.assertEqual(
+            sorted(path.name for path in (ROOT / "compositions").glob("aerostack2_*.yaml")),
+            sorted(filename for filename, _ in backends))
+        for filename, simulator in backends:
             text = (ROOT / "compositions" / filename).read_text(encoding="utf-8")
             with self.subTest(filename=filename):
                 self.assertIn(simulator, text)
@@ -192,14 +147,10 @@ class ComposeContractTest(unittest.TestCase):
         self.assertEqual(drone_systems, ["aerodrone"])
         self.assertTrue((systems / "aerodrone" / "config" / "arducopter.params").is_file())
         for pseudo_system in (
-            "aerostack2_common", "aerostack2_gazebo",
-            "aerostack2_genesis", "aerostack2_isaac",
+            "aerostack2_common", "aerostack2_gazebo", "aerostack2_isaac",
         ):
             self.assertFalse((systems / pseudo_system).exists())
-        for filename in (
-            "aerostack2_sim.yaml", "aerostack2_genesis.yaml",
-            "aerostack2_isaac.yaml",
-        ):
+        for filename in ("aerostack2_sim.yaml", "aerostack2_isaac.yaml"):
             compose = (ROOT / "compositions" / filename).read_text(encoding="utf-8")
             with self.subTest(filename=filename):
                 self.assertIn("../systems/aerodrone", compose)

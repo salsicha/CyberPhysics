@@ -2,8 +2,8 @@
 """Generate the Gazebo world of an SO-101 scenario.
 
 The scenario JSON (systems/so101/scenarios/picking_table.json) is the scene's
-single source of truth; Isaac and Genesis build their scenes from it at
-start-up, and Gazebo loads the SDF this script writes from it:
+single source of truth; Isaac builds its scene from it at start-up, and
+Gazebo loads the SDF this script writes from it:
 
   scenario_world.py                 rewrite systems/so101/worlds/picking_table.sdf
   scenario_world.py --check         exit 1 if the committed world is stale

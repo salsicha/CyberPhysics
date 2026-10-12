@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Deny an Aerodrone simulation's GPS 1 for a window of simulation time.
 
-The ``gps_denier`` service of the ``denial`` profile of the Gazebo, Genesis
-and Isaac compositions (tools/gps_denied_sim_test.sh and
+The ``gps_denier`` service of the ``denial`` profile of the Gazebo and
+Isaac compositions (tools/gps_denied_sim_test.sh and
 tools/gps_denied_sim_test.md):
 
 1. waits until the mission reaches cruise: the vehicle armed and at least
@@ -14,9 +14,9 @@ tools/gps_denied_sim_test.md):
    time, waits ``--recovery-s`` (GPS_DENIAL_RECOVERY_S) and exits 0.
 
 Every interval is simulation time from ``/clock`` (ArduPilot's lock-step
-time), never wall time: Isaac runs at about 0.2x and Genesis at about 0.5x
-real time. Each step is appended to ``--events`` as a JSON line with the wall
-time ``rx`` and the simulation time ``sim``, for
+time), never wall time: Isaac runs at about 0.2x real time. Each step is
+appended to ``--events`` as a JSON line with the wall time ``rx`` and the
+simulation time ``sim``, for
 tools/gps_denied_sim_scorer.py. Exits 1 if ArduPilot refuses the parameter.
 
 The schedule (DenialSchedule) is plain Python; ROS is imported only by

@@ -1,8 +1,8 @@
 # SO-101 simulation
 
 This package provides one SO-101 description and adapters for Gazebo Harmonic,
-Genesis, NVIDIA Isaac Sim, and a lightweight ROS-only simulator. All backends
-expose the same ROS 2 interface:
+NVIDIA Isaac Sim, and a lightweight ROS-only simulator. All backends expose
+the same ROS 2 interface:
 
 - State: `sensor_msgs/msg/JointState` on `/joint_states`
 - Position command: `std_msgs/msg/Float64MultiArray` on `/so101/joint_commands`
@@ -55,8 +55,8 @@ that surface's top (the arm's underside is its spawn z, the URDF's root
 link), nothing floating or sunk, nothing interpenetrating. So every simulator
 starts the task from the same state as the printed station
 (`hardware/parts/so101/`, built from the same file): Isaac keeps its objects
-kinematic where the scenario puts them, Gazebo and Genesis simulate them as
-free bodies, which stay put because they already rest on the table.
+kinematic where the scenario puts them, Gazebo simulates them as free bodies,
+which stay put because they already rest on the table.
 
 - Isaac builds the scene from the scenario at start-up (`so101_task_scene.py`).
 - Gazebo loads `systems/so101/worlds/picking_table.sdf`, generated from the
@@ -64,7 +64,6 @@ free bodies, which stay put because they already rest on the table.
   `python3 applications/so101/scripts/scenario_world.py` (`--check` reports a
   stale world; the tests run it). `gazebo.launch.py` spawns the arm at the
   scenario's `robot_spawn` (`scenario_file` launch argument).
-- Genesis builds the scene from the scenario (`--scenario`).
 - `validate_calibration_and_dataset.py` and the simulators report an
   inconsistent scenario.
 
@@ -82,26 +81,6 @@ sensor is the scenario camera; `gazebo.launch.py` bridges it to
 (frame `groot_camera_rgb_optical_frame`; the depth image is registered to the
 colour image). With `headless:=true` the server renders with
 `--headless-rendering` (EGL), so the camera works without a display.
-
-## Genesis
-
-Build the SO-101 controller image and the Genesis image, then run:
-
-```bash
-make -C applications build_so101 build_genesis
-docker compose -f compositions/so101_genesis.yaml up
-```
-
-Use `--headless` by appending it to the Genesis service command for server runs
-(with `PYOPENGL_PLATFORM=egl` so the camera renders without a display).
-Use `--backend cpu` on machines without a compatible GPU. The adapter loads
-`systems/so101/urdf/so101.urdf` as a fixed-base robot at the scenario's spawn
-pose, builds the scene from `--scenario` (fixed boxes for the table, riser,
-bins, occluder and board; the objects as free bodies with the scenario's mass
-and friction), applies PD position control at each simulation step, keeps
-simulated time at wall-clock rate, and renders the scenario camera to the
-common camera topics at its frame rate (`--no-camera` to skip it). It prints
-the objects' positions every `SO101_LOG_HEARTBEAT_SECONDS` (30 s).
 
 ## Isaac Sim
 

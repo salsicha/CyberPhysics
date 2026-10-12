@@ -3,8 +3,8 @@
 
 Reads, from a run directory, the recording of the ``gps_denial_recorder``
 service (recording.jsonl or recording.jsonl.gz) and the events of the
-``gps_denier`` service (denial_events.jsonl) of the Gazebo, Genesis and
-Isaac compositions' ``denial`` profile, and reports before (cruise on GPS),
+``gps_denier`` service (denial_events.jsonl) of the Gazebo and Isaac
+compositions' ``denial`` profile, and reports before (cruise on GPS),
 during and after the GPS 1 denial:
 
 - horizontal error against simulator ground truth of the fused navigation
@@ -80,10 +80,6 @@ STACK_THRESHOLDS = {
               'max_autopilot_median_m': 6.0, 'max_autopilot_p95_m': 12.0,
               'max_autopilot_max_m': 15.0, 'max_route_m': 15.0,
               'max_fused_beyond_3sigma': 0.10},
-    'genesis': {'max_fused_median_m': 5.0, 'max_fused_p95_m': 6.0, 'max_fused_max_m': 7.0,
-                'max_autopilot_median_m': 5.0, 'max_autopilot_p95_m': 6.0,
-                'max_autopilot_max_m': 7.0, 'max_route_m': 7.0,
-                'max_fused_beyond_3sigma': 0.10},
 }
 STACKS = tuple(STACK_THRESHOLDS)
 

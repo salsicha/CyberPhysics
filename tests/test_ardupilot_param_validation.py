@@ -60,7 +60,7 @@ def test_metadata_generation_failure_is_not_partial_validation(tmp_path, monkeyp
 def test_layered_parameter_files_resolve_to_their_firmware():
     assert validator.vehicle_for('systems/aerodrone/config/arducopter_sitl.params') == 'ArduCopter'
     assert validator.vehicle_for('arducopter_gps_input.params') == 'ArduCopter'
-    assert validator.vehicle_for('applications/genesis/config/aerodrone_sitl.params') == 'ArduCopter'
+    assert validator.vehicle_for('applications/isaac/config/aerodrone_sitl.params') == 'ArduCopter'
     assert validator.vehicle_for('systems/boat/config/ardurover_sitl.params') == 'Rover'
     assert validator.vehicle_for('systems/submarine/config/ardusub_sitl.params') == 'ArduSub'
     with pytest.raises(ValueError, match='specify --vehicle'):

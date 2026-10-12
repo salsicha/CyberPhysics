@@ -235,7 +235,7 @@ services:
       - /dev/shm:/dev/shm
       - *fastdds-mount
       - demnav_gazebo_cache:/data/demnav_cache:ro
-    # attitude_sigma_deg keeps the default 1 here, unlike Isaac and Genesis:
+    # attitude_sigma_deg keeps the default 1 here, unlike Isaac:
     # this EKF's tilt error (0.2-0.5 deg RMS on GPS, 0.7-0.9 deg GPS-denied)
     # and yaw error (1-2 deg) are larger, and its frames are ~0.2 s older than
     # their stamps. At 0.5, 31% of replayed fixes fell outside 2 sigma.

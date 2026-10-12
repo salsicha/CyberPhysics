@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Aerodrone GPS-denied simulation test: flies the wilderness mission of the
-# Gazebo, Genesis or Isaac composition, denies GPS 1 for a window of
+# Gazebo or Isaac composition, denies GPS 1 for a window of
 # simulation time during the cruise (the `denial` profile's gps_denier) and
 # scores the recording (gps_denial_recorder) with
 # tools/gps_denied_sim_scorer.py against the stack's thresholds. The
@@ -9,7 +9,7 @@
 # passes. Intended for nightly/local runs on a host with the stack's images
 # and GPU. See tools/gps_denied_sim_test.md.
 #
-# Usage: tools/gps_denied_sim_test.sh <gazebo|genesis|isaac> [scorer options...]
+# Usage: tools/gps_denied_sim_test.sh <gazebo|isaac> [scorer options...]
 # Environment:
 #   ROS_DOMAIN_ID              ROS 2 domain for the run (default 0)
 #   GPS_DENIAL_START_S / GPS_DENIAL_DURATION_S / GPS_DENIAL_RECOVERY_S
@@ -20,7 +20,7 @@
 #   GPS_DENIED_COMPOSE_OVERRIDE  extra compose file layered on the stack, e.g.
 #                              tools/gps_denied_sim_control.yaml (control run)
 #   GPS_DENIED_TIMEOUT_S       overall wall-clock limit (default gazebo 1800,
-#                              genesis 2700, isaac 3300)
+#                              isaac 3300)
 #   GPS_DENIED_KEEP_VOLUMES    true keeps the stack's DEM/tile caches and
 #                              terrain assets for the next run (default false)
 #   NAVSIM_REQUIRE_VALID / NAVSIM_REQUIRE_CORRECTION  validator requirements
@@ -32,9 +32,8 @@ cd "$(dirname "$0")/.."
 stack="${1:-}"
 case "$stack" in
     gazebo) composition=compositions/aerostack2_sim.yaml; default_timeout=1800 ;;
-    genesis) composition=compositions/aerostack2_genesis.yaml; default_timeout=2700 ;;
     isaac) composition=compositions/aerostack2_isaac.yaml; default_timeout=3300 ;;
-    *) echo "usage: $0 <gazebo|genesis|isaac> [scorer options...]" >&2; exit 2 ;;
+    *) echo "usage: $0 <gazebo|isaac> [scorer options...]" >&2; exit 2 ;;
 esac
 shift
 

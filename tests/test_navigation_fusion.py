@@ -278,8 +278,8 @@ def test_uncertainty_grows_and_status_degrades_without_corrections(module):
 
 
 def test_dead_reckoning_ages_on_the_simulator_clock(module):
-    """Genesis and Isaac run slower than real time; the uncertainty and the
-    NO_FIX limit follow their /clock, not wall time."""
+    """Isaac runs slower than real time; the uncertainty and the NO_FIX
+    limit follow the simulator's /clock, not wall time."""
     h = Harness(module, dead_reckoning_drift_mps=1.0, dead_reckoning_limit_s=60.0,
                 fix_variance_weight=1.0)
 

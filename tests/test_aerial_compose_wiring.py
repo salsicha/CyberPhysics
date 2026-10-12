@@ -8,8 +8,7 @@ import yaml
 from conftest import REPO
 
 COMPOSITIONS = REPO / 'compositions'
-SIM_MOUNTS = {'aerostack2_sim.yaml': '0.0', 'aerostack2_genesis.yaml': '0.0',
-              'aerostack2_isaac.yaml': '90.0'}
+SIM_MOUNTS = {'aerostack2_sim.yaml': '0.0', 'aerostack2_isaac.yaml': '90.0'}
 
 
 def services(name):
@@ -120,7 +119,6 @@ def test_every_simulated_camera_sees_the_ground_from_the_cruise():
     the terrain's relief across the footprint (twice the cruise height)."""
     needed = 2.0 * env_value('CRUISE_AGL_M')
     sources = {
-        'applications/genesis/scripts/aerodrone_navsim.py': r'far=([0-9.]+)',
         'applications/isaac/scripts/aerodrone_navsim.py':
             r'GetClippingRangeAttr\(\)\.Set\(Gf\.Vec2f\([0-9.]+, ([0-9.]+)\)\)',
         'applications/gazebo/models/rgbd_camera.sdf.jinja': r'<far>([0-9.]+)</far>',

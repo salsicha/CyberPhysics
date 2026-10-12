@@ -100,8 +100,8 @@ whatever its rate. 60 s is the fixes' measured integral correlation time
 simulator truth): DemNav's errors are terrain-fixed biases (the same error
 at the same place with and without GPS) that fade over about a footprint
 flown, 44-47 s in the lite SITL stack (1/e after 27-29 s, GPS on or
-denied) and 62-66 s in Genesis; Gazebo's persist longer (4-7 m biases,
-82-126 s), Isaac's less (14-48 s). In Gazebo, where the camera fixes also
+denied); Gazebo's persist longer (4-7 m biases, 82-126 s), Isaac's less
+(14-48 s). In Gazebo, where the camera fixes also
 move with the EKF's own attitude error (height x tilt) and a faster EKF
 response closes that loop, the corrections' errors averaged over 60 s are
 already 0.9-1.7 times the variance the EKF is told; a shorter window would

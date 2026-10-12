@@ -12,7 +12,7 @@ import pytest
 from conftest import REPO
 
 COMPOSITIONS = REPO / 'compositions'
-SIMULATORS = ('aerostack2_sim.yaml', 'aerostack2_genesis.yaml', 'aerostack2_isaac.yaml')
+SIMULATORS = ('aerostack2_sim.yaml', 'aerostack2_isaac.yaml')
 
 
 def env_file(path):

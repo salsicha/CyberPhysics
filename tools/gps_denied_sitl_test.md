@@ -4,8 +4,8 @@
 disables its GPS mid-flight, and checks that it keeps flying GUIDED on
 DemNav/WildNav corrections fed back to ArduPilot, scoring position error
 against simulator ground truth. It is meant for nightly or local runs, not
-per-push CI. The Gazebo, Genesis and Isaac stacks have their own GPS-denied
-test, `tools/gps_denied_sim_test.sh` (`tools/gps_denied_sim_test.md`).
+per-push CI. The Gazebo and Isaac stacks have their own GPS-denied test,
+`tools/gps_denied_sim_test.sh` (`tools/gps_denied_sim_test.md`).
 
 ```bash
 tools/gps_denied_sitl_test.sh                               # defaults below
@@ -61,7 +61,7 @@ navigation fusion and the ArduPilot navigation bridge together:
 - `tools/gps_denied_sitl_scorer.py`: scores the denied phase;
 - `validator` (`validation` profile,
   `applications/aerostack2/scripts/validate_aerodrone_navsim.py`, the
-  `navsim_validator` of the Gazebo/Genesis/Isaac compositions with this
+  `navsim_validator` of the Gazebo and Isaac compositions with this
   stack's topics): run once by the test script when the mission logs
   `EVENT at_altitude`, before the GPS is denied. It needs, over at least
   10 s, fresh and valid MAVROS GPS/odometry/IMU, the camera image, depth and
@@ -112,8 +112,8 @@ navigation fusion and the ArduPilot navigation bridge together:
    inflated sigma would exceed `max_correction_sigma_m` (100 m, where EKF3
    clips the GPS accuracy it fuses) is held back and not counted, so the
    stream thins out instead of being fused as more accurate than it is
-   (up to 0.9 % of the corrections recorded in Isaac, Gazebo and Genesis
-   went out at 100-175 m before; in Isaac it now holds back DemNav-only
+   (up to 0.9 % of the corrections recorded in the simulator stacks went
+   out at 100-175 m before; in Isaac it now holds back DemNav-only
    corrections that would go out at 117-122 m). Fixes more than
    `correction_consistency_sigma` (5) combined sigma apart are not
    combined; the one farther from the fused position is left out (a false
@@ -148,8 +148,8 @@ navigation fusion and the ArduPilot navigation bridge together:
    MAVROS connects, once it has read the parameters); on the aircraft the
    file must be loaded by hand (`systems/aerodrone/README.md`).
 
-The feature is on by default in every ArduCopter stack (Gazebo, Genesis,
-Isaac, this test and the BlueOS hardware stacks: `GPS_INPUT_CORRECTIONS`
+The feature is on by default in every ArduCopter stack (Gazebo, Isaac,
+this test and the BlueOS hardware stacks: `GPS_INPUT_CORRECTIONS`
 defaults to true, `GPS_INPUT_CORRECTIONS=false` turns it off). The airplane
 stacks keep it off: ArduPlane has not been validated.
 
@@ -245,13 +245,12 @@ denied:
 - `EK3_MAG_CAL=2` (with the velocity below, sent at ~0.84 m/s): this test
   2.5 / 4.1 / 4.3 and 2.3 / 3.7 / 3.8 m (RMSE / p95 / max), the EKF's
   velocity within 0.20 m/s (median) and 0.55 m/s of the truth. But
-  Gazebo's and Genesis' compasses (SITL's JSON backend) agree with the
-  attitude, and there three-axis fusion is what holds the tilt: 150 s of
-  denial ended 13.4 / 22.8 / 25.3 and 20.9 / 45.1 / 51.9 m off in Gazebo
-  (median / p95 / max, the second denied 30 s after the validation rather
-  than 60 s after cruise; committed code 5.7-7.5 / 11.2-19.8 / 12.3-22.4 m,
-  the EKF's velocity 2.2 m/s off instead of 0.4-0.9) and 6.0 / 6.7 / 6.9 m
-  in Genesis (2.0 / 2.5 / 2.6 m): `tools/gps_denied_sim_test.md`.
+  Gazebo's compass (SITL's JSON backend) agrees with the attitude, and
+  there three-axis fusion is what holds the tilt: 150 s of denial ended
+  13.4 / 22.8 / 25.3 and 20.9 / 45.1 / 51.9 m off in Gazebo (median / p95 /
+  max, the second denied 30 s after the validation rather than 60 s after
+  cruise; committed code 5.7-7.5 / 11.2-19.8 / 12.3-22.4 m, the EKF's
+  velocity 2.2 m/s off instead of 0.4-0.9): `tools/gps_denied_sim_test.md`.
 - A velocity from successive camera fixes, sent in the same GPS_INPUT with
   a third source set (GPS position and velocity): per source a 3 s
   straight-line fit to the accepted fixes, carried from the window's mean
@@ -272,17 +271,15 @@ denied:
   off; in one, corrections held back for 4 s also made ArduPilot drop
   GPS 2). In the heavy stacks the camera rides the vehicle and the fixes
   are projected with the EKF's attitude: in Gazebo the fits scatter by
-  0.7-1.2 m/s,
-  none qualified and the test passed as with the committed code (Isaac's
-  recordings scatter as much); in Genesis they qualified (0.45 m/s) but
-  grew to 0.54 / 1.49 m/s off
-  (median / p95, 27 % beyond 2 sigma) once the EKF lost GPS, and the
-  denial ended 4.5 / 13.4 / 17.3 m off, failing the test. With
-  `EK3_MAG_CAL=2` but the fit's own standard error as accuracy Gazebo
-  went 34.9 / 75.7 / 84.9 m off.
+  0.7-1.2 m/s, none qualified and the test passed as with the committed
+  code (Isaac's recordings scatter as much). With `EK3_MAG_CAL=2` but the
+  fit's own standard error as accuracy Gazebo went 34.9 / 75.7 / 84.9 m
+  off.
 
 So the lite stack's runaway comes from this SITL model's compass and
-position-only aiding, and both remedies regress the heavier simulators.
+position-only aiding, and neither remedy holds in the heavier simulators:
+the compass setting regresses Gazebo, the velocity never qualifies there,
+and the two together, at the fit's own accuracy, regress it further.
 A fix that holds everywhere needs a velocity whose errors do not follow
 the EKF (optical flow, which no stack has, or visual odometry), or a
 compass model and calibration the EKF agrees with. The lite numbers above
@@ -311,19 +308,17 @@ consistent 2D Gaussian puts 13.5 / 1.1 % there):
 | --- | --- | --- | --- | --- |
 | this test, two runs (committed navigation) | 24 / 9, 16 / 3 % | 21 / 6, 13 / 0 % | 17 / 3, 10 / 0 % | 11 / 0, 4 / 0 % |
 | Gazebo, three runs (`tools/gps_denied_sim_test.sh`) | 10-31 / 0-2 % | 5-19 / 0 % | 1.5-3.7 / 0 % | 0-2 / 0 % |
-| Genesis, two runs | 34-42 / 0 % | 0 / 0 % | 0 / 0 % | 0 / 0 % |
 | Isaac | 69 / 51 % | 30 / 0 % | 0 / 0 % | 0 / 0 % |
 
 0.5 keeps every stack at or under 3.2 % beyond 3 sigma (0.25 leaves 6 %
-here) and is conservative in Genesis and Isaac (their errors are 2-3 m,
-the sigma 2.3-2.8 m). A 10 s time constant lagged the error's growth after the GPS
-loss here (19 / 3 and 13 / 0 % at 0.5). Live, on the final code:
+here) and is conservative in Isaac (none beyond 2 sigma). A 10 s time
+constant lagged the error's growth after the GPS loss here (19 / 3 and
+13 / 0 % at 0.5). Live, on the final code:
 
 | Run | Fused error while denied (median / p95 / max) | Fused sigma (median) | Beyond 2 / 3 sigma | Before (committed) |
 | --- | --- | --- | --- | --- |
 | this test, two runs | 11.0 / 28.4 / 29.4 and 11.0 / 28.3 / 29.1 m (RMSE 14.1) | 7.4-7.6 m | 6.1-6.8 / 0 % | 3.9 m, 70-75 / 44-55 % |
 | Gazebo | 7.2 / 12.5 / 13.5 m | 6.8 m | 4.0 / 0 % | 5.9-6.1 m, 10-17.5 / 3.3-8.4 % |
-| Genesis | 2.0 / 2.5 / 2.7 m | 2.8 m | 0 / 0 % | 3.7 m, 0 / 0 % |
 | Isaac | 3.2 / 5.4 / 5.9 m | 2.3 m | 0 / 0 % | 3.1 m, 0.1 / 0 % |
 
 Navigation is unchanged (the fused covariance does not reach ArduPilot;
@@ -347,7 +342,6 @@ tells the EKF. Measured in the recorded runs (lag 1/e / integral time):
 | --- | --- | --- | --- |
 | this test, GPS on throughout (336 s) | 27 / 44 s (rms 5.0 m, sigma 3.9 m) | too few matches | 27 / 44 s |
 | this test, denied (3 runs x 300 s, windows 60 and 20 s) | 28-29 / 45-47 s | too few matches | 28-29 / 44-47 s |
-| Genesis, GPS on (2 x 820-850 s) | 33-38 / 62-66 s | 19 / 30-36 s | 30-37 / 52-55 s |
 | Gazebo, GPS on after a denial (8 x 250 s) | 52-69 / 82-126 s (4-7 m biases) | 59-94 s or longer / 93-184 s (1-2 m bias) | 57-94 / 86-177 s |
 | Gazebo, denied (8 x 150 s) | 17-70 / 36-113 s | sparse (0.2/s) | 14-68 / 21-92 s |
 | Isaac, denied (4 x 150 s) | 9-22 / 14-48 s | 7 s once its 1-2 m bias is removed | 22-54 / 66-91 s |
@@ -362,9 +356,8 @@ follows without an exponential model: the error of the inverse-variance
 mean of the corrections over 60 s, against what it would be for
 independent samples, was 0.3-0.9 of the 120-fold inflation the window
 applies here, 0.9-1.7 of it in Gazebo (eight runs: its corrections are as
-confident as their errors support, or more), 0.2-0.4 in Isaac and 0.15 in
-Genesis. So 60 s is the measured value for this stack and Genesis and a
-lower bound for Gazebo; no single shorter window is supported, and lite's
+confident as their errors support, or more) and 0.2-0.4 in Isaac. So 60 s
+is the measured value for this stack and a lower bound for Gazebo; no single shorter window is supported, and lite's
 slower recovery is the honest cost of position-only corrections whose
 errors persist for most of a minute. Separate windows per source are not
 either: WildNav's errors are small against its sigma but carry a steady

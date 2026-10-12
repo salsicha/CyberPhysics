@@ -92,8 +92,8 @@ environment with sensor-driven waypoint navigation.
 Goal: validate the SO-101 arm, depth camera, calibration, and GR00T policy path
 in a realistic tabletop picking scenario.
 
-1. Build realistic manipulation scenes for Isaac Sim and the existing Gazebo or
-   Genesis adapters where useful.
+1. Build realistic manipulation scenes for Isaac Sim and the existing Gazebo
+   adapter where useful.
    - Include a rigid table, arm mount, bins/trays, clutter, target objects,
      distractors, occluders, varied materials, labels/AprilTags for
      calibration, and realistic lighting.

@@ -3,8 +3,8 @@
 
 The simulator is authoritative for dynamics.  ArduPilot sends motor PWM over
 UDP and receives the resulting physical state in its documented JSON backend
-format.  This module deliberately has no ROS or simulator dependency so all
-three backends use the identical controller boundary.
+format.  This module deliberately has no ROS or simulator dependency so the
+Gazebo and Isaac backends use the identical controller boundary.
 """
 
 from __future__ import annotations

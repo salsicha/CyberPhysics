@@ -570,8 +570,8 @@ def test_tilted_camera_fixes_the_vehicle_not_the_image_centre(
 
 
 def test_stabilized_camera_ignores_vehicle_tilt(make_node, camera_sim):
-    """Genesis and satellite_camera_sim hold the camera level: their frames
-    must not be shifted by the vehicle's roll and pitch."""
+    """satellite_camera_sim (the airplane) holds the camera level: its
+    frames must not be shifted by the vehicle's roll and pitch."""
     east, north, yaw = 500.0, 200.0, 0.9
     depth, altitude = render(camera_sim, east, north, yaw)
     tilt = {'roll': math.radians(10.0), 'pitch': math.radians(-12.0)}

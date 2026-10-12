@@ -59,8 +59,6 @@ build_depthanything: build_ros2
 	APP=depthanything ./_build_it.sh
 build_gazebo: build_ros2
 	APP=gazebo ./_build_it.sh
-build_genesis: build_aerostack2
-	APP=genesis ./_build_it.sh
 build_isaac:
 	APP=isaac ./_build_it.sh
 build_groot:

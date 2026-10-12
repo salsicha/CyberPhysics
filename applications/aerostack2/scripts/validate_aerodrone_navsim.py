@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Check that an Aerodrone navigation simulation is healthy.
 
-One validator for every Aerodrone stack: the Gazebo, Genesis and Isaac
+One validator for every Aerodrone stack: the Gazebo and Isaac
 compositions (``validation`` profile) and the lite SITL stack
 (tools/gps_denied_sitl.yaml, run by tools/gps_denied_sitl_test.sh once the
 vehicle is airborne). It passes (exit 0) as soon as all of these hold at the

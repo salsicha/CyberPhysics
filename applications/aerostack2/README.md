@@ -258,21 +258,22 @@ mode's yaw ended in a GPS glitch, EKF failsafe and emergency yaw reset.
 
 ## Aerodrone simulation
 
-`systems/aerodrone/` is the single physical quadrotor definition used by hardware and every simulation backend. Simulator assets and adapters are owned by `applications/gazebo/`, `applications/genesis/`, and `applications/isaac/`; the Mount Tamalpais mission and validation contracts are owned by this application.
+`systems/aerodrone/` is the single physical quadrotor definition used by hardware and every simulation backend. Simulator assets and adapters are owned by `applications/gazebo/` and `applications/isaac/`; the Mount Tamalpais mission and validation contracts are owned by this application.
 
 Run a backend with one of:
 
 ```bash
-docker compose -f compositions/aerostack2_sim.yaml up
-docker compose -f compositions/aerostack2_genesis.yaml up
-docker compose -f compositions/aerostack2_isaac.yaml up
+docker compose -f compositions/aerostack2_sim.yaml up     # Gazebo
+docker compose -f compositions/aerostack2_isaac.yaml up   # Isaac Sim
 ```
 
-All three use Navigator/ArduCopter through the same MAVROS and `as2_platform_blueos` boundary, build the same georeferenced terrain, and execute the generated behavior-tree mission. Topic names are defined in `systems/aerodrone/config/topics.env`; deployment values are in `applications/aerostack2/config/mount_tamalpais.env`.
+Genesis support (`applications/genesis/`, `compositions/aerostack2_genesis.yaml`, the SO-101 adapter) was removed: Gazebo and Isaac are the simulators, and Genesis appears only in older commits.
+
+Both use Navigator/ArduCopter through the same MAVROS and `as2_platform_blueos` boundary, build the same georeferenced terrain, and execute the generated behavior-tree mission. Topic names are defined in `systems/aerodrone/config/topics.env`; deployment values are in `applications/aerostack2/config/mount_tamalpais.env`.
 
 ### DDS transport
 
-Every ROS container of the three compositions and of the lite SITL stack (`tools/gps_denied_sitl.yaml`) loads `systems/aerodrone/config/fastdds.xml` through `FASTRTPS_DEFAULT_PROFILES_FILE`. The containers share the host network and `/dev/shm` and run as root, so FastDDS (Humble, Fast DDS 2.6) sends between them through shared memory. Its default 512 KiB segment holds less than one camera frame (640x480 RGB is 0.9 MB, 32FC1 depth 1.2 MB): the sender reused buffers before the subscribers had read them, and DemNav, WildNav and the validator received 1-3 % of the Genesis frames (0.03-0.07 of 2.3 Hz), all of them with the profile. The profile gives every sender an 8 MiB segment and keeps UDP, with 4 MiB socket buffers, for peers that cannot use the shared memory. Isaac Sim runs as user 1234; FastDDS creates its shared-memory files mode 0644, so shared memory between it and the root containers delivers nothing, and it loads `fastdds_udp.xml` (UDP only, same buffers) instead. A ROS container added to these stacks needs the same profile, mount, host `/dev/shm` (`ipc: host` or a `/dev/shm` volume) and user; `tests/test_aerial_dds_transport.py` checks them.
+Every ROS container of the two compositions and of the lite SITL stack (`tools/gps_denied_sitl.yaml`) loads `systems/aerodrone/config/fastdds.xml` through `FASTRTPS_DEFAULT_PROFILES_FILE`. The containers share the host network and `/dev/shm` and run as root, so FastDDS (Humble, Fast DDS 2.6) sends between them through shared memory. Its default 512 KiB segment holds less than one camera frame (640x480 RGB is 0.9 MB, 32FC1 depth 1.2 MB): the sender reused buffers before the subscribers had read them, and DemNav, WildNav and the validator received 1-3 % of the camera frames, all of them with the profile. The profile gives every sender an 8 MiB segment and keeps UDP, with 4 MiB socket buffers, for peers that cannot use the shared memory. Isaac Sim runs as user 1234; FastDDS creates its shared-memory files mode 0644, so shared memory between it and the root containers delivers nothing, and it loads `fastdds_udp.xml` (UDP only, same buffers) instead. A ROS container added to these stacks needs the same profile, mount, host `/dev/shm` (`ipc: host` or a `/dev/shm` volume) and user; `tests/test_aerial_dds_transport.py` checks them.
 
 The kernel caps the socket buffers at `net.core.rmem_max` and `net.core.wmem_max`. Shared memory does not depend on them, but Isaac Sim's camera does: on a host where they are below 4 MiB (208 KiB was the long-standing default; check with `sysctl net.core.rmem_max`), its UDP frames can still be dropped. Raising them is optional and not done by the stacks: `sudo sysctl -w net.core.rmem_max=4194304 net.core.wmem_max=4194304`. A killed process leaves its segment in `/dev/shm`; `docker run --rm --ipc host salsicha/cyberphysics:aerostack2-latest fastdds shm clean` removes the stale ones.
 
@@ -286,23 +287,23 @@ The BlueOS drone (`compositions/blueos_aerostack.yaml`) gates its map-goal tree 
 
 Stopping a stack mid-mission (`docker compose down` once the validator has passed, say) logs `Failed to cancel action server for GoToBehavior` (or whichever behaviour was running). The tree halts the running node on SIGINT and sends the cancel, and the behaviour cancels the goal (`Request to cancel goal received`, `Goal canceled`), but rclcpp has already shut down, so the tree's wait for the cancel response returns at once and logs the error; the behaviour warns that the client will not receive its response. A mission that runs to its end halts no running node and does not log it.
 
-A GoTo succeeds once the vehicle is within `go_to_threshold` (3D) of its target in the navigation frame, ArduPilot's own (`/navigation/odometry`). `blueos_autonomy.launch.py` takes it as a launch argument, Aerostack2's 0.2 m by default, which the drone's map goals keep; the three simulations pass 3.0 m. While GPS 1 was denied ArduPilot held its targets up to 2.1 m off in that frame (0.3 m median), and at 0.2 m the wilderness mission hovered at one waypoint for most of the denial; its waypoints are 42 m or more apart and accepted within 4-8 m (`tools/gps_denied_sim_test.md`, "Mission progress and the GoTo threshold").
+A GoTo succeeds once the vehicle is within `go_to_threshold` (3D) of its target in the navigation frame, ArduPilot's own (`/navigation/odometry`). `blueos_autonomy.launch.py` takes it as a launch argument, Aerostack2's 0.2 m by default, which the drone's map goals keep; both simulations pass 3.0 m. While GPS 1 was denied ArduPilot held its targets up to 2.1 m off in that frame (0.3 m median), and at 0.2 m the wilderness mission hovered at one waypoint for most of the denial; its waypoints are 42 m or more apart and accepted within 4-8 m (`tools/gps_denied_sim_test.md`, "Mission progress and the GoTo threshold").
 
 The generated tree (`applications/demnav/scripts/build_georeferenced_terrain.py`) sends each waypoint's GoTo twice, 2 s apart. as2 1.1.3's GoTo first checks its distance to the target 100 ms after accepting a goal (its 10 Hz run timer starts then), but computes that distance only when the next state arrives, against the previous goal until then. Where states come less often than that (ArduPilot's local position is 20 Hz of simulation time: every 260 ms of wall time in Isaac at 0.19x), a goal succeeded at once whenever the vehicle was within `go_to_threshold` of the previous waypoint, and every other waypoint was skipped. The second GoTo's previous goal is the same waypoint, so it flies there unless the vehicle already is. Each GoTo is followed by a delay because the behaviour rejects a goal (`there is no localization`, failing the mission) until a state has arrived since the last goal ended.
 
 ### Navigation health check
 
-`scripts/validate_aerodrone_navsim.py` checks that a running Aerodrone navigation simulation is healthy, and is the `navsim_validator` service (`validation` profile) of all three compositions:
+`scripts/validate_aerodrone_navsim.py` checks that a running Aerodrone navigation simulation is healthy, and is the `navsim_validator` service (`validation` profile) of both compositions:
 
 ```bash
-docker compose -f compositions/aerostack2_genesis.yaml --profile validation up -d
-docker compose -f compositions/aerostack2_genesis.yaml logs -f navsim_validator
+docker compose -f compositions/aerostack2_sim.yaml --profile validation up -d
+docker compose -f compositions/aerostack2_sim.yaml logs -f navsim_validator
 ```
 
 It starts once `flight_ready` completes and passes (exit 0) when, at the same moment and over at least 10 s of observation:
 
 - MAVROS GPS, odometry and IMU (`GPS_TOPIC`, `RAW_ODOM_TOPIC`, `IMU_TOPIC`) are fresh and finite;
-- the downward image and camera_info WildNav uses (`WILDNAV_IMAGE_TOPIC`, `WILDNAV_CAMERA_INFO_TOPIC`) and the depth image and camera_info DemNav uses (`DEPTH_TOPIC`, `CAMERA_INFO_TOPIC`) are fresh and well formed, agree on frame and size (aspect ratio for the depth pair, which DemNav rescales), carry the stack's camera frame (Genesis/Isaac `downward_camera_optical_frame`), and at least 25 % of the depth pixels are finite (DemNav's own threshold); the rangefinder too when the stack has one (none of the three simulates one, so they pass `--rangefinder-topic ""`);
+- the downward image and camera_info WildNav uses (`WILDNAV_IMAGE_TOPIC`, `WILDNAV_CAMERA_INFO_TOPIC`) and the depth image and camera_info DemNav uses (`DEPTH_TOPIC`, `CAMERA_INFO_TOPIC`) are fresh and well formed, agree on frame and size (aspect ratio for the depth pair, which DemNav rescales), carry the stack's camera frame (Isaac `downward_camera_optical_frame`), and at least 25 % of the depth pixels are finite (DemNav's own threshold); the rangefinder too when the stack has one (neither simulation has one, so both pass `--rangefinder-topic ""`);
 - `/navigation/origin` (latched) has arrived, finite and within 50 km of `INITIAL_LAT`/`INITIAL_LON`;
 - `/navigation/odometry` and `/navigation/fix` are fresh and finite, with a known, positive, symmetric covariance whose horizontal sigma is at most 1 km, the fix status is not NO_FIX, and the fused odometry is in the `odom` frame;
 - `/demnav/valid` and `/wildnav/valid` are alive (WildNav may be four `WILDNAV_RATE_HZ` periods old), `/wildnav/confidence` (and `/demnav/confidence` when DemNav matches are required) has arrived, and any confidence lies in [0, 1], any `/demnav/fix` or `/wildnav/fix` received is valid, and `/navigation/correction_source` and `correction_confidence` are fresh and valid;
@@ -322,7 +323,7 @@ Aerodrone navsim validation FAILED after 45.0 s; 4 problem(s):
 
 ### GPS-denied test
 
-`tools/gps_denied_sim_test.sh <gazebo|genesis|isaac>` runs a composition with the `validation` profile and its `denial` profile, and scores the flight (`tools/gps_denied_sim_test.md`). The profile adds two services, both from this application's scripts: `gps_denier` (`scripts/gps_denier.py`) disables GPS 1 (`SIM_GPS_DISABLE=1`) `GPS_DENIAL_START_S` (60 s) after the mission reaches cruise, for `GPS_DENIAL_DURATION_S` (150 s), and records `GPS_DENIAL_RECOVERY_S` (60 s) more after restoring it, all of it simulation time (`/clock`; the defaults are in `config/mount_tamalpais.env`); `gps_denial_recorder` (`scripts/gps_denial_recorder.py`) records ground truth, ArduPilot's position, the fused fix and its covariance, the corrections and the DemNav/WildNav fixes. `tools/gps_denied_sim_scorer.py` reports fused and autopilot error, per-source fix errors, covariance consistency and route-keeping before, during and after the denial, and checks them against per-stack thresholds. The validator must pass as well (exit 3 otherwise), as in the lite test.
+`tools/gps_denied_sim_test.sh <gazebo|isaac>` runs a composition with the `validation` profile and its `denial` profile, and scores the flight (`tools/gps_denied_sim_test.md`). The profile adds two services, both from this application's scripts: `gps_denier` (`scripts/gps_denier.py`) disables GPS 1 (`SIM_GPS_DISABLE=1`) `GPS_DENIAL_START_S` (60 s) after the mission reaches cruise, for `GPS_DENIAL_DURATION_S` (150 s), and records `GPS_DENIAL_RECOVERY_S` (60 s) more after restoring it, all of it simulation time (`/clock`; the defaults are in `config/mount_tamalpais.env`); `gps_denial_recorder` (`scripts/gps_denial_recorder.py`) records ground truth, ArduPilot's position, the fused fix and its covariance, the corrections and the DemNav/WildNav fixes. `tools/gps_denied_sim_scorer.py` reports fused and autopilot error, per-source fix errors, covariance consistency and route-keeping before, during and after the denial, and checks them against per-stack thresholds. The validator must pass as well (exit 3 otherwise), as in the lite test.
 
 ### Tracking targets and scenario
 

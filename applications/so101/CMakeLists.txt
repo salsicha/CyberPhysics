@@ -12,7 +12,6 @@ install(
   PROGRAMS
     scripts/gazebo_command_relay.py
     scripts/so101_hil_guard.py
-    scripts/genesis_so101.py
     scripts/isaacsim_so101.py
     scripts/so101_cbf_control.py
     scripts/score_picking_task.py

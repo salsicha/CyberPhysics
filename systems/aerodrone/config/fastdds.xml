@@ -6,7 +6,7 @@
   sends between them through shared memory. Its default 512 KiB segment holds
   less than one camera frame (640x480 RGB is 0.9 MB, 32FC1 depth 1.2 MB):
   buffers were recycled before the subscribers read them and DemNav, WildNav
-  and the validator received 1-3 % of the Genesis frames. Each sender's
+  and the validator received 1-3 % of the camera frames. Each sender's
   segment now holds several RGB + depth bursts. UDP stays for peers that
   cannot use this shared memory (Isaac Sim runs as another user and uses
   fastdds_udp.xml), with larger socket buffers; the kernel caps them at

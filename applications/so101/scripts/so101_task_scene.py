@@ -148,8 +148,7 @@ class SO101TaskScene:
     def _build_scene(self):
         # Objects are kinematic here (they stay where the scenario puts them),
         # so a scenario whose objects do not rest on their surfaces would
-        # start Isaac in a different state from Gazebo and Genesis, which
-        # drop them.
+        # start Isaac in a different state from Gazebo, which drops them.
         for error in scene_support_errors(self.scenario):
             print(f"SO-101 scenario inconsistency: {error}", flush=True)
         UsdGeom.Xform.Define(self.stage, "/World/Task")

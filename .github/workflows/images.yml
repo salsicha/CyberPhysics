@@ -11,7 +11,7 @@
 #
 # Not built here:
 #   nvblox, isaac, groot          CUDA/Isaac images of 20-40 GB
-#   genesis, depthanything        PyTorch images of 10-13 GB
+#   depthanything                 PyTorch image of about 10 GB
 #   pantiltros, turret_sim        PyTorch/Ultralytics images of about 10 GB
 #   smolvla, lerobot (so101)      CUDA PyTorch/LeRobot stacks
 #   matlab                        needs a MathWorks download and license

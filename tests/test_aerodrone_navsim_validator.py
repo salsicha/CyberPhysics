@@ -15,7 +15,7 @@ from conftest import REPO, load_script
 V = load_script(REPO / 'applications/aerostack2/scripts/validate_aerodrone_navsim.py',
                 'validate_aerodrone_navsim')
 
-HEAVY_STACKS = ('aerostack2_sim.yaml', 'aerostack2_genesis.yaml', 'aerostack2_isaac.yaml')
+HEAVY_STACKS = ('aerostack2_sim.yaml', 'aerostack2_isaac.yaml')
 TOPIC_ENV = ('GPS_TOPIC', 'RAW_ODOM_TOPIC', 'ODOM_TOPIC', 'IMU_TOPIC', 'WILDNAV_IMAGE_TOPIC',
              'WILDNAV_CAMERA_INFO_TOPIC', 'DEPTH_TOPIC', 'CAMERA_INFO_TOPIC',
              'RANGEFINDER_TOPIC', 'NAVIGATION_ODOM_TOPIC', 'WILDNAV_RATE_HZ', 'INITIAL_LAT',

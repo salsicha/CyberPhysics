@@ -2,7 +2,7 @@
 """Record an Aerodrone simulation's navigation for the GPS-denied test.
 
 The ``gps_denial_recorder`` service of the ``denial`` profile of the
-Gazebo, Genesis and Isaac compositions (tools/gps_denied_sim_test.sh and
+Gazebo and Isaac compositions (tools/gps_denied_sim_test.sh and
 tools/gps_denied_sim_test.md). Writes one compact JSON line per sample to
 ``--output``, each with its arrival wall time ``rx`` (and ``t``, the header
 stamp, where the message has one), for tools/gps_denied_sim_scorer.py:
@@ -54,7 +54,7 @@ def fix_row(kind, msg, rx):
 
 
 def truth_row(msg, rx):
-    """Ground truth from an Odometry (Genesis, Isaac) or a PoseStamped (Gazebo)."""
+    """Ground truth from an Odometry (Isaac) or a PoseStamped (Gazebo)."""
     pose = msg.pose.pose if hasattr(msg.pose, 'pose') else msg.pose
     stamp = msg.header.stamp
     p = pose.position

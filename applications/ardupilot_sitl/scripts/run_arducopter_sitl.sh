@@ -2,7 +2,7 @@
 set -euo pipefail
 
 sim_host="${SIM_JSON_HOST:-127.0.0.1}"
-# JSON:<host> drives an external physics backend (Gazebo, Genesis, Isaac);
+# JSON:<host> drives an external physics backend (Gazebo, Isaac);
 # "builtin" uses ArduPilot's own multicopter model (tools/gps_denied_sitl).
 sitl_model="${ARDUCOPTER_SITL_MODEL:-JSON:${sim_host}}"
 # Instance N serves MAVLink on TCP 5760 + 10 * N.

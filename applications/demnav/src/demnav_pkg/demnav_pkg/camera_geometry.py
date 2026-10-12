@@ -17,7 +17,7 @@ of systems/aerodrone/config/topics.env (0 = image top toward the nose; the
 Isaac camera is mounted at 90). A body-fixed camera (the OAK-1 on the
 aircraft, Isaac, Gazebo) tilts with the vehicle, so the image centre is
 not the point below the vehicle. A roll/pitch-stabilised camera
-(``camera_stabilized``: the Genesis and satellite_camera_sim cameras)
+(``camera_stabilized``: the airplane's satellite_camera_sim camera)
 only turns with the heading.
 
 Time

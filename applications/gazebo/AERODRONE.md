@@ -44,7 +44,7 @@ DemNav (every depth frame) and WildNav (`WILDNAV_RATE_HZ`, 0.2 Hz) use.
 
 SITL loads only the shared ArduCopter parameters (`systems/aerodrone/config`):
 in flight Gazebo's quadrotor learns a hover throttle of 0.67, the hardware
-`MOT_THST_HOVER`, so unlike Genesis and Isaac it needs no backend compensation.
+`MOT_THST_HOVER`, so unlike Isaac it needs no backend compensation.
 
 The tracking targets (a car and two people, `applications/aerostack2/README.md`,
 "Tracking targets and scenario") are visual-only, gravity-free models the

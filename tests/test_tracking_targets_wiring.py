@@ -1,4 +1,4 @@
-"""Tracking targets in the Gazebo, Genesis and Isaac compositions: the
+"""Tracking targets in the Gazebo and Isaac compositions: the
 models are fetched, baked with the terrain and moved by every simulator,
 which publishes /simulation/targets; AERODRONE_MISSION picks the tracking
 scenario's tree for flight_ready and the mission alike."""
@@ -12,9 +12,8 @@ import yaml
 
 from conftest import REPO, load_script
 
-STACKS = {'gazebo': 'aerostack2_sim.yaml', 'genesis': 'aerostack2_genesis.yaml',
-          'isaac': 'aerostack2_isaac.yaml'}
-SIMULATOR = {'gazebo': 'gazebo_targets', 'genesis': 'genesis', 'isaac': 'isaacsim'}
+STACKS = {'gazebo': 'aerostack2_sim.yaml', 'isaac': 'aerostack2_isaac.yaml'}
+SIMULATOR = {'gazebo': 'gazebo_targets', 'isaac': 'isaacsim'}
 TARGETS_JSON = '/workspace/missions/tracking_targets.json'
 MODULE_MOUNT = ('../applications/demnav/scripts/tracking_targets.py:'
                 '/workspace/applications/demnav/scripts/tracking_targets.py:ro')
@@ -104,15 +103,11 @@ def test_aerodrone_mission_picks_one_tree_for_flight_ready_and_the_mission(stack
 
 
 def test_ground_truth_comes_at_10_hz_or_more_of_simulation_time():
-    """Genesis and Isaac publish it with every camera frame, Gazebo's driver
+    """Isaac publishes it with every camera frame, Gazebo's driver
     every --period-s of simulation time."""
     driver = load_script(REPO / 'applications/gazebo/scripts/gazebo_tracking_targets.py',
                          'gazebo_tracking_targets_review')
     assert driver.parse_args([]).period_s <= 0.1
-    genesis = compose('genesis')['services']['genesis']
-    source = (REPO / 'applications/genesis/scripts/aerodrone_navsim.py').read_text()
-    assert 'env_float("GENESIS_CAMERA_RATE_HZ", 10.0)' in source
-    assert 'GENESIS_CAMERA_RATE_HZ' not in str(genesis.get('environment'))
     isaac = compose('isaac')['services']['isaacsim']['environment']
     assert float(re.search(r':-([\d.]+)', isaac['ISAAC_CAMERA_HZ']).group(1)) >= 10.0
 
@@ -121,21 +116,6 @@ def test_ground_truth_comes_at_10_hz_or_more_of_simulation_time():
 
 def loop_after(source, marker):
     return source[source.index(marker):]
-
-
-def test_genesis_places_the_targets_before_each_render_and_publishes_them_after():
-    source = (REPO / 'applications/genesis/scripts/aerodrone_navsim.py').read_text()
-    loop = loop_after(source, 'publisher.publish_clock(tick * dt)')
-    assert (loop.index('poses = tracks.poses(tick * dt)')
-            < loop.index('place_tracking_targets(target_entities, tracks.placed(poses))')
-            < loop.index('camera.render(')
-            < loop.index('truth_json(tick * dt, poses, tracks.origin, tracks.hidden)'))
-    add = source[source.index('def add_tracking_targets('):
-                 source.index('def place_tracking_targets(')]
-    # Visual only: fixed, without collision, so nothing touches the drone.
-    assert 'fixed=True, collision=False' in add
-    # The test's occlusions (tracking_targets.HIDE_TOPIC).
-    assert 'publisher.subscribe_hide(tracks)' in source[source.index('def main():'):]
 
 
 def test_isaac_places_the_targets_before_each_capture_and_publishes_them_after():

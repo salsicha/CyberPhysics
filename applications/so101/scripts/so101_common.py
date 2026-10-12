@@ -30,8 +30,8 @@ JOINT_LIMITS_RELATIVE_PATH = Path("systems", "so101", "config", "joint_limits.js
 # object (each one's "rests_on" names the surface it stands on; see
 # scene_support_errors), and the fixed camera (pose, resolution, field of
 # view). The camera constants below are read from it; Gazebo's world is
-# generated from it (scenario_world.py), Isaac and Genesis build their scenes
-# from it, and the printed station (hardware/parts/so101) is derived from it.
+# generated from it (scenario_world.py), Isaac builds its scene from it, and
+# the printed station (hardware/parts/so101) is derived from it.
 SCENARIO_FILE_ENV = "SO101_SCENARIO_FILE"
 SCENARIO_RELATIVE_PATH = Path("systems", "so101", "scenarios", "picking_table.json")
 
@@ -114,7 +114,7 @@ TASK_STATUS_TOPIC = "/so101/task_status"
 POLICY_STATS_TOPIC = "/so101/policy_stats"
 
 # The scenario's "camera" block is the single source of truth for the
-# simulated camera: Isaac, Gazebo and Genesis render from it, CameraInfo is
+# simulated camera: Isaac and Gazebo render from it, CameraInfo is
 # derived from its resolution and horizontal FOV, and the URDF/TF camera mount
 # must equal its pose relative to base_link (enforced by
 # validate_calibration_and_dataset.py and the tests). It models the RealSense

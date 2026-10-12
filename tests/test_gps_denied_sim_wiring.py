@@ -1,7 +1,7 @@
-"""GPS-denied simulation test wiring: the `denial` profile of the Gazebo,
-Genesis and Isaac compositions, its env defaults, the denier's
-simulation-time schedule, the recorder's rows, the wrapper and the control
-override (tools/gps_denied_sim_test.md)."""
+"""GPS-denied simulation test wiring: the `denial` profile of the Gazebo
+and Isaac compositions, its env defaults, the denier's simulation-time
+schedule, the recorder's rows, the wrapper and the control override
+(tools/gps_denied_sim_test.md)."""
 import re
 import shlex
 import subprocess
@@ -16,10 +16,8 @@ recorder = load_script(REPO / 'applications/aerostack2/scripts/gps_denial_record
                        'gps_denial_recorder_review')
 env_check = load_script(REPO / 'tools/check_compose_env_defaults.py', 'env_defaults_review')
 
-STACKS = {'gazebo': 'aerostack2_sim.yaml', 'genesis': 'aerostack2_genesis.yaml',
-          'isaac': 'aerostack2_isaac.yaml'}
+STACKS = {'gazebo': 'aerostack2_sim.yaml', 'isaac': 'aerostack2_isaac.yaml'}
 TRUTH = {'gazebo': ('/aerodrone/ground_truth/pose', 'pose'),
-         'genesis': ('/aerodrone/simulation/ground_truth/odom', 'odometry'),
          'isaac': ('/aerodrone/simulation/ground_truth/odom', 'odometry')}
 ENV = REPO / 'applications/aerostack2/config/mount_tamalpais.env'
 WINDOW = ('GPS_DENIAL_START_S', 'GPS_DENIAL_DURATION_S', 'GPS_DENIAL_RECOVERY_S')
@@ -209,6 +207,8 @@ def test_wrapper_runs_each_stack_with_the_validation_and_denial_profiles():
     subprocess.run(['bash', '-n', str(WRAPPER)], check=True)
     for stack, composition in STACKS.items():
         assert re.search(rf'{stack}\) composition=compositions/{composition};', text)
+    # ... and no other stack: every one it accepts has a composition here.
+    assert sorted(re.findall(r'^\s+(\w+)\) composition=', text, re.MULTILINE)) == sorted(STACKS)
     assert '--profile validation --profile denial' in text
     for variable in ('ROS_DOMAIN_ID', 'GPS_DENIED_PROJECT', 'GPS_DENIED_COMPOSE_OVERRIDE',
                      'GPS_DENIED_OUTPUT', 'GPS_DENIED_TIMEOUT_S'):

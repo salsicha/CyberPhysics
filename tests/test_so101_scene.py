@@ -4,8 +4,8 @@ systems/so101/scenarios/picking_table.json is the scene. Everything in it
 rests on what it stands on (the arm on its 31 mm riser, the riser, bins and
 objects on the table), Gazebo's world is generated from it, the launch file
 spawns the arm where it says, and the shared constants are read from it, so
-Isaac (kinematic objects), Gazebo and Genesis (free objects) start the task
-from the same state as the printed station.
+Isaac (kinematic objects) and Gazebo (free objects) start the task from the
+same state as the printed station.
 """
 import copy
 import json
@@ -13,7 +13,6 @@ import math
 import re
 import sys
 import xml.etree.ElementTree as ET
-from types import ModuleType
 from unittest.mock import MagicMock
 
 import numpy as np
@@ -22,12 +21,10 @@ import pytest
 from conftest import REPO, install_ros_stubs
 
 install_ros_stubs()
-sys.modules.setdefault('genesis', ModuleType('genesis'))
 sys.path.insert(0, str(REPO / 'applications/so101/scripts'))
 import so101_common as common  # noqa: E402
 import scenario_world  # noqa: E402
 import score_picking_task  # noqa: E402
-from genesis_so101 import camera_look, genesis_quat, vertical_fov_deg  # noqa: E402
 
 SCENARIO = REPO / 'systems/so101/scenarios/picking_table.json'
 WORLD = REPO / 'systems/so101/worlds/picking_table.sdf'
@@ -192,19 +189,6 @@ def test_scenario_file_can_be_overridden(tmp_path, monkeypatch):
     monkeypatch.setenv(common.SCENARIO_FILE_ENV, str(other))
     assert common.scenario_file() == other
     assert common.load_scenario_file() == scenario()
-
-
-def test_genesis_camera_is_the_scenario_camera():
-    camera = common.scenario_camera(scenario())
-    width, height = camera['resolution']
-    assert vertical_fov_deg(camera['horizontal_fov_deg'], width, height) == pytest.approx(42.56, abs=0.01)
-    pos, lookat, up = camera_look(camera)
-    rotation = common.rpy_to_matrix(camera['rpy'])
-    np.testing.assert_allclose(np.subtract(lookat, pos), rotation[:, 0])
-    np.testing.assert_allclose(up, rotation[:, 2])
-    assert np.subtract(lookat, pos)[2] == pytest.approx(-math.sin(camera['rpy'][1]))   # looks down
-    w, x, y, z = genesis_quat([0.0, 0.0, math.pi / 2])
-    assert (w, x, y, z) == pytest.approx((math.cos(math.pi / 4), 0.0, 0.0, math.sin(math.pi / 4)))
 
 
 def test_isaac_scene_reports_an_inconsistent_scenario(capsys):

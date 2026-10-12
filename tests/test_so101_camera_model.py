@@ -1,6 +1,6 @@
 """One SO-101 camera model: renderer, CameraInfo and TF must agree.
 
-Isaac, Gazebo and Genesis render from the scenario "camera" block (pose of
+Isaac and Gazebo render from the scenario "camera" block (pose of
 groot_camera_link in the world, resolution, horizontal FOV), which models the
 RealSense D435i's 16:9 colour stream. CameraInfo must carry the intrinsics of
 that FOV, and the URDF mount (TF) must place the optical frame where the

@@ -13,7 +13,7 @@ Data that is specific to one vehicle may also live with its system: `racecarneo/
 
 ## Current systems
 
-- `aerodrone/`: the repository single quadrotor, used by hardware, Gazebo, Genesis, and Isaac deployments.
+- `aerodrone/`: the repository single quadrotor, used by hardware, Gazebo, and Isaac deployments.
 - `airplane/`: ArduPlane/BlueOS fixed-wing configuration.
 - `boat/`: BlueBoat/BlueOS/ArduRover configuration.
 - `submarine/`: BlueROV2/BlueOS/ArduSub configuration.

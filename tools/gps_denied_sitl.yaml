@@ -185,7 +185,7 @@ services:
 
   # Navigation stack health check (applications/aerostack2/scripts/
   # validate_aerodrone_navsim.py, also the `validation` profile of the
-  # Gazebo/Genesis/Isaac compositions). The test script runs it once the
+  # Gazebo and Isaac compositions). The test script runs it once the
   # vehicle is at altitude: raw MAVROS sensors, this stack's camera topics,
   # the EKF origin, fused odometry/fix, DemNav/WildNav streams, at least one
   # valid DemNav match, corrections being applied and MAVROS's static TF

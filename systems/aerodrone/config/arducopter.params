@@ -6,7 +6,7 @@
 # corrections, ../README.md). Simulators layer it first, then the SITL-only
 # relaxations in arducopter_sitl.params, then arducopter_gps_input.params
 # (unless GPS_INPUT_CORRECTIONS=false) and backend physics compensation
-# (applications/{genesis,isaac}/config/aerodrone_sitl.params); see
+# (applications/isaac/config/aerodrone_sitl.params); see
 # applications/ardupilot_sitl/scripts/run_arducopter_sitl.sh.
 FRAME_CLASS,1
 FRAME_TYPE,1

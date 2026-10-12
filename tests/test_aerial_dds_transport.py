@@ -8,8 +8,8 @@ import pytest
 import yaml
 from conftest import REPO
 
-STACKS = ['compositions/aerostack2_genesis.yaml', 'compositions/aerostack2_isaac.yaml',
-          'compositions/aerostack2_sim.yaml', 'tools/gps_denied_sitl.yaml']
+STACKS = ['compositions/aerostack2_isaac.yaml', 'compositions/aerostack2_sim.yaml',
+          'tools/gps_denied_sitl.yaml']
 CONFIG = 'systems/aerodrone/config'
 SHM_PROFILE = f'/workspace/{CONFIG}/fastdds.xml'
 UDP_PROFILE = f'/workspace/{CONFIG}/fastdds_udp.xml'

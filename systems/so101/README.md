@@ -1,7 +1,7 @@
 # SO-101 System
 
 This directory contains configuration for the SO-101 hardware setup used by the
-SO-101 Gazebo, Genesis, and Isaac Sim adapters.
+SO-101 Gazebo and Isaac Sim adapters.
 
 Hardware (bill of materials, printed parts, printing and assembly):
 [hardware/so101.md](../../hardware/so101.md).
@@ -13,7 +13,7 @@ Hardware (bill of materials, printed parts, printing and assembly):
 - `config/controllers.yaml`: ROS 2 control configuration for Gazebo.
 - `config/groot_demo.yaml`: SO-101 + GR00T bridge parameters for Isaac Sim.
 - `worlds/empty.sdf`: minimal Gazebo world for the arm.
-- `scenarios/picking_table.json`: the tabletop picking scene and its tasks, the single source of truth for Isaac Sim, Genesis, Gazebo, GR00T scoring and the printed station (see "Scene" below).
+- `scenarios/picking_table.json`: the tabletop picking scene and its tasks, the single source of truth for Isaac Sim, Gazebo, GR00T scoring and the printed station (see "Scene" below).
 - `worlds/picking_table.sdf`: the scene as a Gazebo world (bins, target objects, clutter, an occluder, calibration board, the camera sensor, lighting, and collision geometry), generated from the scenario by `applications/so101/scripts/scenario_world.py`; do not edit it by hand.
 - `validation/groot_demo_sync_manifest.example.json`: example topic synchronization manifest for GR00T regression bags.
 - `validation/acceptance_thresholds.json`: default SO-101 picking acceptance thresholds.
@@ -29,7 +29,7 @@ applications/so101/scripts/regenerate_urdf.sh
 `config/joint_limits.json` is the only place the joint position limits are
 written down. The Xacro reads it (`xacro.load_yaml`), so the generated URDF
 carries the same values, and every runtime consumer loads it:
-`so101_common.py` (Isaac, Genesis, the mock simulator, the Gazebo relay, the
+`so101_common.py` (Isaac, the mock simulator, the Gazebo relay, the
 CBF controller, the GR00T bridge and the HIL guard), the GR00T demo/mock policy
 and dataset normaliser (`applications/groot/scripts/so101_joint_limits.py`), and
 the SmolVLA server's checkpoint range check. Containers find it under
@@ -70,11 +70,11 @@ spans 0.400-0.431 m, the arm's base stands on it (spawn z 0.431 m, the
 underside of the URDF's base box), and the bins, objects and occluder stand on
 the table. `so101_common.scene_support_errors` checks every such contact and
 that nothing interpenetrates; the tests and
-`validate_calibration_and_dataset.py` run it, Isaac and Genesis report its
-findings at start-up, and `scenario_world.py` refuses to write a Gazebo world
-from an inconsistent scenario. Isaac (kinematic objects), Gazebo and Genesis
-(free objects) therefore start the task from the same state, which is also
-the printed station's (`hardware/parts/so101/`, derived from this file).
+`validate_calibration_and_dataset.py` run it, Isaac reports its findings at
+start-up, and `scenario_world.py` refuses to write a Gazebo world from an
+inconsistent scenario. Isaac (kinematic objects) and Gazebo (free objects)
+therefore start the task from the same state, which is also the printed
+station's (`hardware/parts/so101/`, derived from this file).
 
 After editing the scenario, regenerate the Gazebo world:
 
@@ -87,7 +87,7 @@ python3 applications/so101/scripts/scenario_world.py   # --check to verify
 The SO-101 URDF includes a fixed `groot_camera_link` and
 `groot_camera_rgb_optical_frame`. The scenario's `camera` block
 (`scenarios/picking_table.json`) is the single source of the camera model:
-Isaac, Gazebo and Genesis render from it, `/so101/camera/camera_info`
+Isaac and Gazebo render from it, `/so101/camera/camera_info`
 publishes its intrinsics and the URDF joint `base_to_groot_camera` must equal
 its pose (`validate_calibration_and_dataset.py` checks this).
 

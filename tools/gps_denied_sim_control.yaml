@@ -1,5 +1,5 @@
 # Control run of the GPS-denied simulation test (tools/gps_denied_sim_test.md),
-# layered on any of the three Aerodrone compositions:
+# layered on either Aerodrone composition (Gazebo or Isaac):
 #   GPS_DENIED_COMPOSE_OVERRIDE=tools/gps_denied_sim_control.yaml \
 #       tools/gps_denied_sim_test.sh gazebo
 # DemNav and WildNav make no fixes, so nothing corrects ArduPilot while GPS 1

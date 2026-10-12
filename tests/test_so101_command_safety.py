@@ -4,8 +4,9 @@ np.clip passes NaN through, so every simulator command input, the joint-limit
 controller and the Gazebo relay must reject non-finite commands rather than
 clamp them. The HIL gate must survive malformed hardware feedback.
 """
-from types import ModuleType, SimpleNamespace as NS
+from types import SimpleNamespace as NS
 from unittest.mock import MagicMock
+import ast
 import sys
 
 import numpy as np
@@ -16,10 +17,8 @@ from conftest import REPO, install_ros_stubs
 
 install_ros_stubs()
 sys.modules.setdefault('tf2_ros', MagicMock())
-sys.modules.setdefault('genesis', ModuleType('genesis'))
 sys.path.insert(0, str(REPO / 'applications/so101/scripts'))
 from gazebo_command_relay import CommandRelay
-from genesis_so101 import GenesisBridge, to_numpy
 from mock_so101_sim import MockSO101Sim
 from so101_cbf_control import SO101CBFController
 from so101_common import JOINT_NAMES, LOWER_LIMITS, UPPER_LIMITS, validated_joint_command
@@ -107,11 +106,6 @@ def test_simulators_keep_last_target_on_non_finite_command(invalid):
     bad = NS(data=[invalid, 0.1, 0.1, 0.1, 0.1, 0.01])
     good = NS(data=[0.2, 0.1, 0.1, 0.1, 0.1, 0.01])
 
-    genesis = node(GenesisBridge, target=np.zeros(6, np.float32))
-    genesis._command(good)
-    genesis._command(bad)
-    np.testing.assert_allclose(genesis.target, good.data, rtol=1e-6)
-
     mock_sim = node(MockSO101Sim, command_queue=[], command_latency_s=0.0,
                     get_clock=lambda: NS(now=lambda: NS(nanoseconds=0)))
     mock_sim._command(bad)
@@ -124,6 +118,22 @@ def test_simulators_keep_last_target_on_non_finite_command(invalid):
     relay.publisher.publish.assert_not_called()
     relay._command(good)
     relay.publisher.publish.assert_called_once()
+
+
+def test_isaac_bridge_keeps_its_target_on_an_invalid_command():
+    """isaacsim_so101.py needs Isaac Sim to import: check that its command
+    callback goes through validated_joint_command and ignores what it rejects."""
+    tree = ast.parse((REPO / 'applications/so101/scripts/isaacsim_so101.py').read_text())
+    bridge = next(n for n in ast.walk(tree) if isinstance(n, ast.ClassDef) and n.name == 'IsaacBridge')
+    command = next(n for n in bridge.body if isinstance(n, ast.FunctionDef) and n.name == '_command')
+    guarded = [n for n in command.body if isinstance(n, ast.Try)]
+    assert len(guarded) == 1 and command.body[0] is guarded[0]
+    calls = {c.func.id for c in ast.walk(guarded[0]) if isinstance(c, ast.Call)
+             and isinstance(c.func, ast.Name)}
+    assert 'validated_joint_command' in calls
+    handler, = guarded[0].handlers
+    assert isinstance(handler.type, ast.Name) and handler.type.id == 'ValueError'
+    assert isinstance(handler.body[-1], ast.Return)   # the target is left as it was
 
 
 @pytest.mark.parametrize('invalid', NON_FINITE)
@@ -140,26 +150,3 @@ def test_cbf_controller_never_publishes_non_finite(invalid):
     command = np.asarray(controller.command_pub.publish.call_args.args[0].data)
     assert np.all(np.isfinite(command))
     assert np.all(command >= LOWER_LIMITS) and np.all(command <= UPPER_LIMITS)
-
-
-def test_genesis_readings_are_copied_from_device_tensors():
-    class CudaTensor:
-        """Mimics a CUDA torch tensor: np.asarray() on it raises TypeError."""
-
-        def __init__(self, values):
-            self.values = np.asarray(values, dtype=np.float32)
-
-        def __array__(self, *args, **kwargs):
-            raise TypeError("can't convert cuda:0 device type tensor to numpy")
-
-        def detach(self):
-            return self
-
-        def cpu(self):
-            return NS(numpy=lambda: self.values)
-
-    readings = CudaTensor([0.1, 0.2, 0.3, 0.4, 0.5, 0.02])
-    with pytest.raises(TypeError):
-        np.asarray(readings)
-    np.testing.assert_allclose(to_numpy(readings), readings.values)
-    np.testing.assert_allclose(to_numpy([0.0] * 6), np.zeros(6))

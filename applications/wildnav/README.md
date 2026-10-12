@@ -23,7 +23,7 @@ independent, so n (rate x correlation time) samples carry one independent
 sample's information, whatever the rate. 60 s is the fixes' measured
 integral correlation time against simulator truth: DemNav's errors are
 terrain-fixed biases that fade over about a footprint flown (44-47 s in the
-lite SITL stack, 62-66 s in Genesis, longer in Gazebo, shorter in Isaac;
+lite SITL stack, longer in Gazebo, shorter in Isaac;
 tools/gps_denied_sitl_test.md has the measurements), and a faster EKF
 response also closes a loop through its own attitude, which body-fixed
 cameras use. A correction whose inflated sigma would exceed

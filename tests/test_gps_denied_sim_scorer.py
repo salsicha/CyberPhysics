@@ -289,8 +289,7 @@ def test_projection_matches_the_synthetic_world():
 # code: tools/gps_denied_sim_test.md, "Measured".
 MEASURED = {'isaac': [(3.2, 5.5, 6.0), (2.6, 5.7, 6.0)],
             'gazebo': [(7.5, 11.2, 12.3), (5.7, 12.6, 14.5), (7.3, 19.8, 22.4),
-                       (10.6, 13.7, 15.2), (7.8, 13.7, 15.8)],
-            'genesis': [(2.0, 2.5, 2.6), (2.1, 2.5, 2.6)]}
+                       (10.6, 13.7, 15.2), (7.8, 13.7, 15.8)]}
 
 
 @pytest.mark.parametrize('stack', sorted(MEASURED))
@@ -305,6 +304,7 @@ def test_thresholds_pass_the_measured_runs_with_a_margin_that_can_still_fail(sta
 
 
 def test_every_stack_has_every_threshold():
+    assert set(scorer.STACKS) == set(MEASURED)   # every stack's limits rest on measured runs
     keys = set(scorer.STACK_THRESHOLDS['gazebo'])
     for stack in scorer.STACKS:
         assert set(scorer.STACK_THRESHOLDS[stack]) == keys

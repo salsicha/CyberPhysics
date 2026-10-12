@@ -163,7 +163,7 @@ class MissionFrameTest(unittest.TestCase):
 
 class TerrainTextureTest(unittest.TestCase):
     def test_mesh_uvs_put_each_vertex_on_its_orthophoto_pixel(self):
-        """The renderers (Gazebo, Isaac, Genesis) sample the orthophoto
+        """The renderers (Gazebo, Isaac) sample the orthophoto
         mosaic at each vertex's UV (v up, as in OBJ/USD). That pixel must
         be the vertex's own geographic position as WildNav's tile cache
         computes it."""

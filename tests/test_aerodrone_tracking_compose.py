@@ -17,8 +17,7 @@ import yaml
 from conftest import REPO
 
 COMPOSITIONS = REPO / 'compositions'
-SIMULATORS = {'aerostack2_sim.yaml': 'gazebo', 'aerostack2_genesis.yaml': 'genesis',
-              'aerostack2_isaac.yaml': 'isaac'}
+SIMULATORS = {'aerostack2_sim.yaml': 'gazebo', 'aerostack2_isaac.yaml': 'isaac'}
 SHM_PROFILE = '/workspace/systems/aerodrone/config/fastdds.xml'
 SIM_ONLY = {'tracking_truth_detector', 'tracking_rosbridge', 'tracking_ui'}
 TRACKING_PROFILES = ('tracking', 'tracking_truth')
