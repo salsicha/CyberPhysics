@@ -20,8 +20,9 @@ during and after the GPS 1 denial:
   commanded (the straight line from where the vehicle was when a MAVROS
   position setpoint arrived to that setpoint), and, reported but not
   checked, the waypoints reached and the distance flown (a GoTo completes
-  within Aerostack2's 0.2 m go_to_threshold of ArduPilot's own position,
-  which a denied EKF can hold 0.3-0.4 m off, stalling the mission);
+  within the compositions' 3 m go_to_threshold of ArduPilot's own position;
+  at Aerostack2's 0.2 m default a denied EKF held a waypoint 0.3-0.4 m off,
+  stalling the mission);
 - whether GPS 1 lost its fix, the vehicle stayed armed in GUIDED with no
   failsafe text (the lite test's FAILSAFE_PATTERN) and corrections stayed
   active.
