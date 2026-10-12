@@ -13,7 +13,7 @@
 # (tools/tracking_sim_test.py score), with the host's and the containers'
 # CPU sampled while the test flies.
 #
-# Usage: tools/tracking_sim_test.sh <gazebo|genesis|isaac>
+# Usage: tools/tracking_sim_test.sh <gazebo|isaac>
 # Environment:
 #   ROS_DOMAIN_ID               ROS 2 domain for the run (default 0)
 #   TRACKING_TEST_DETECTOR      real (default) or truth
@@ -23,7 +23,7 @@
 #   TRACKING_TEST_OUTPUT        run directory (default generated/tracking_sim/<stack>)
 #   TRACKING_TEST_PROJECT       compose project name (default tracking_<stack>)
 #   TRACKING_TEST_TIMEOUT_S     overall wall-clock limit (default gazebo 2400,
-#                               genesis 3600, isaac 7200)
+#                               isaac 7200)
 #   TRACKING_TEST_KEEP_VOLUMES  true keeps the DEM/tile caches and terrain
 #                               assets for the next run (default false)
 #   TRACKING_TEST_COMPOSE_OVERRIDE  extra compose file layered last
@@ -41,9 +41,8 @@ layers=(-f tools/tracking_sim_test.yaml)
 case "$stack" in
     gazebo) composition=compositions/aerostack2_sim.yaml; default_timeout=2400
             layers+=(-f tools/tracking_sim_test_gazebo.yaml) ;;
-    genesis) composition=compositions/aerostack2_genesis.yaml; default_timeout=3600 ;;
     isaac) composition=compositions/aerostack2_isaac.yaml; default_timeout=7200 ;;
-    *) echo "usage: $0 <gazebo|genesis|isaac>" >&2; exit 2 ;;
+    *) echo "usage: $0 <gazebo|isaac>" >&2; exit 2 ;;
 esac
 [ -z "${TRACKING_TEST_COMPOSE_OVERRIDE:-}" ] || layers+=(-f "$TRACKING_TEST_COMPOSE_OVERRIDE")
 

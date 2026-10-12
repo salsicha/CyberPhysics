@@ -1,0 +1,62 @@
+{
+  "name": "racecar_turret_isaac_arena",
+  "description": "A 20 m x 15 m walled arena for driving and aiming at the same time. The car laps the course of missions/isaac_course.json counter-clockwise around a central island of crates, pillars and a wall segment while person_1, the target, walks an outer loop in the same direction, starting 8 m ahead-right of it; obstacles between the two loops hide the target for a few seconds at a time, person_2 walks back and forth across both loops west of the island (across the course) and person_3 strolls on the island inside the car's loop. People give way to the car (racecar_turret_sim.Walkers).",
+  "frame": "world = map = odom at the start: metres, x east, y north, z up; the car spawns at the origin facing +x, so SLAM's map and the odometry start equal to it",
+  "spawn": {"x": 0.0, "y": 0.0, "yaw_deg": 0.0},
+  "arena": {
+    "min_xy": [-3.5, -3.0],
+    "max_xy": [16.5, 12.0],
+    "wall_height_m": 1.2,
+    "wall_thickness_m": 0.2,
+    "wall_color": [0.62, 0.6, 0.56],
+    "floor_color": [0.42, 0.42, 0.4]
+  },
+  "obstacles": [
+    {"name": "pillar_south", "type": "cylinder", "center": [10.0, -1.0], "radius": 0.2, "height": 2.5, "color": [0.7, 0.7, 0.72]},
+    {"name": "east_wall_segment", "type": "box", "center": [14.5, 4.0], "size": [0.2, 1.4, 1.8], "yaw_deg": 0.0, "color": [0.8, 0.76, 0.66]},
+    {"name": "crate_north", "type": "box", "center": [8.5, 9.0], "size": [0.5, 0.5, 1.2], "yaw_deg": 0.0, "color": [0.5, 0.34, 0.18]},
+    {"name": "pillar_west", "type": "cylinder", "center": [-1.4, 4.0], "radius": 0.25, "height": 2.5, "color": [0.7, 0.7, 0.72]},
+    {"name": "island_wall", "type": "box", "center": [6.5, 4.0], "size": [4.0, 0.2, 1.5], "yaw_deg": 0.0, "color": [0.8, 0.76, 0.66]},
+    {"name": "island_crate_1", "type": "box", "center": [3.0, 3.0], "size": [1.0, 1.0, 1.0], "yaw_deg": 20.0, "color": [0.55, 0.38, 0.2]},
+    {"name": "island_crate_2", "type": "box", "center": [10.0, 5.5], "size": [1.2, 0.8, 0.8], "yaw_deg": -15.0, "color": [0.6, 0.42, 0.22]},
+    {"name": "island_pillar", "type": "cylinder", "center": [9.5, 2.5], "radius": 0.3, "height": 2.5, "color": [0.7, 0.7, 0.72]},
+    {"name": "island_barrel", "type": "cylinder", "center": [3.5, 5.5], "radius": 0.3, "height": 0.9, "color": [0.75, 0.2, 0.12]}
+  ],
+  "people": {
+    "models_from": "applications/aerostack2/missions/tracking_targets.json",
+    "sample_spacing_m": 0.1,
+    "collision_radius_m": 0.22,
+    "targets": [
+      {
+        "name": "person_1",
+        "class": "person",
+        "model": "walking_person",
+        "speed_mps": 0.33,
+        "corner_radius_m": 2.0,
+        "start_offset_m": 8.0,
+        "route_enu_m": [[-2.3, -1.8], [15.3, -1.8], [15.3, 9.8], [-2.3, 9.8]]
+      },
+      {
+        "name": "person_2",
+        "class": "person",
+        "model": "casual_female",
+        "speed_mps": 0.8,
+        "corner_radius_m": 0.0,
+        "start_offset_m": 5.0,
+        "route_enu_m": [[1.9, -2.4], [2.1, -2.4], [2.0, 10.9]]
+      },
+      {
+        "name": "person_3",
+        "class": "person",
+        "model": "casual_female",
+        "speed_mps": 0.5,
+        "corner_radius_m": 0.5,
+        "start_offset_m": 0.0,
+        "route_enu_m": [[4.5, 2.0], [8.5, 2.0], [8.5, 3.0], [4.5, 3.0]]
+      }
+    ]
+  },
+  "selected_target": "person_1",
+  "vehicle_footprint_m": [0.50, 0.34],
+  "mission": {"file": "systems/racecar_turret/missions/isaac_course.json", "id": "arena_lap"}
+}

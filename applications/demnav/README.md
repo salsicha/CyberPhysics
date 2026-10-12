@@ -161,10 +161,19 @@ correlation); it needs no GPU.
 
 ## Build-time cache seeding
 
-The Docker image seeds a default Golden Gate Park DEM cache at build time (`37.7694, -122.4862`) into `/data/demnav_cache`. Override these build args for another test area:
+The Docker image seeds a default Golden Gate Park DEM cache at build time (`37.7694, -122.4862`) into `/usr/share/cyberphysics/demnav_seed` (`DEMNAV_SEED_DIR`), and the entrypoint copies the seed files `/data/demnav_cache` does not have into it on every start, unless the cache is mounted read-only. Override these build args for another test area:
 
 - `SEED_NAV_ASSETS=0` disables build-time seeding.
 - `NAV_ASSET_LAT` and `NAV_ASSET_LON` set the cache center.
 - `DEMNAV_AREA_KM` and `DEMNAV_DEM_RESOLUTION_M` set the generated DEM window.
+
+The seed lives beside the cache, not in it, because the BlueOS stacks (`compositions/blueos_nav_core.yaml`) mount the host's `DEMNAV_CACHE_HOST` (`/data/demnav_cache`; the airplane's `blueos.env` sets its own) over `/data/demnav_cache`, which used to hide it; the host directory now receives the seed on the container's first start. DemNav downloads SRTM heights (internet) for any area not in the cache. The file is named after the area's centre, size and resolution, so before a flight without internet seed the host directory with the stack's `INITIAL_LAT`, `INITIAL_LON` and `AREA_KM` (an unset `INITIAL_LAT`/`INITIAL_LON` loads the map around the first fix instead, which no seed matches):
+
+```bash
+docker run --rm -v /data/demnav_cache:/data/demnav_cache salsicha/cyberphysics:demnav-arm64 \
+  python3 -m demnav_pkg.seed_cache --lat 37.9234 --lon -122.5967 --area-km 10.0
+```
+
+On the Raspberry Pi 5 this took a few seconds for a 10 km area (333 x 333 heights).
 
 Generated DEM cache files belong in the image or a runtime volume, not in the repository. The simulator-neutral georeferenced terrain builder and collision generator live in `scripts/`; simulator-specific loading remains with each simulator application.

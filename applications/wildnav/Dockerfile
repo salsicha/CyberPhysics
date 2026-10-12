@@ -41,6 +41,11 @@ RUN . /opt/ros/$ROS2_DISTRO/setup.bash && . /workspace/install/setup.bash && \
       "$(sed -n '1s/^#!//p' "$script")" -c 'import sys; from importlib.metadata import entry_points; [ep] = [e for e in entry_points(group="console_scripts") if e.name == sys.argv[1]]; ep.load()' "${script##*/}" || exit 1; \
     done
 
+# The seed goes beside the cache, not in it: the vehicle stacks mount a
+# host directory over /data/wildnav_cache (compositions/blueos_nav_core.yaml)
+# and would hide it. The entrypoint copies the seed files the cache lacks
+# into it on every start (applications/wildnav/README.md).
+ENV WILDNAV_SEED_DIR=/usr/share/cyberphysics/wildnav_seed
 RUN if [ "$SEED_NAV_ASSETS" = "1" ]; then \
       . /venv/bin/activate && . /opt/ros/$ROS2_DISTRO/setup.bash && \
       . /workspace/install/setup.bash && \
@@ -52,7 +57,7 @@ RUN if [ "$SEED_NAV_ASSETS" = "1" ]; then \
         --max-tiles "$WILDNAV_MAX_TILES" \
         --feature-backend "$WILDNAV_FEATURE_BACKEND" \
         --tile-url-template "$WILDNAV_TILE_URL" \
-        --cache-dir /data/wildnav_cache; \
+        --cache-dir "$WILDNAV_SEED_DIR"; \
     fi
 
 COPY ./entrypoint.sh /

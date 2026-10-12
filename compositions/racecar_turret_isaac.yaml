@@ -1,0 +1,415 @@
+# RACECAR Turret in NVIDIA Isaac Sim (systems/racecar_turret/interfaces.md,
+# applications/isaac/RACECAR_TURRET.md): the car with the turret drives a
+# Nav2 course through an arena (SLAM Toolbox, Nav2, Depth Anything, nvblox
+# and cmd_vel_to_ackermann as in racecarneo.yaml, with the hardware car's
+# geometry) while the PanTiltROS tracker keeps a walking person centred in
+# the turret camera.
+#
+#   docker compose -f compositions/racecar_turret_isaac.yaml up
+#   tools/racecar_turret_isaac_test.sh      # the scored evaluation (two runs)
+#
+# Every node runs on the simulator's /clock (simulation time runs slower
+# than real time when the GPU cannot keep up). Isaac Sim's bundled Jazzy
+# libraries have no tf2_msgs: racecar_turret_odom_tf turns its /odom into
+# odom -> base_link. SLAM Toolbox and Nav2 take systems/racecarneo/config
+# unchanged except use_sim_time (rewritten into /tmp at start; nav2.yaml's
+# own false would otherwise win over the launch argument).
+#
+# The whole stack fits the GPU (RTX 4000 Ada Laptop, 12 GB): 4.1 GB at the
+# peak of an evaluation run (Isaac Sim 2.0, nvblox 1.0, YOLOE 0.6, Depth
+# Anything vits 0.4) and about 7 GB of host memory (RACECAR_TURRET.md).
+# nvblox integrates the front camera's own depth (/camera/depth/image_rect_raw,
+# rendered with the RealSense's noise and range): from this camera, 0.22 m
+# above the floor, Depth Anything's vkitti depth reads about 9 times the
+# true depth and nvblox mapped none of the arena's obstacles from it
+# (RACECAR_TURRET.md, "Depth for nvblox"). nvblox maps in dynamic mode
+# (systems/racecar_turret/config/nvblox_isaac.yaml) so that the people
+# walking around the car do not stay in its map. Depth Anything still runs
+# and publishes as on the car; RACECAR_TURRET_NVBLOX_DEPTH=/depth_anything/depth/image
+# feeds nvblox from it again, RACECAR_TURRET_NVBLOX_OVERRIDES=/workspace/config/nvblox.yaml
+# with RACECAR_TURRET_NVBLOX_SLICE=/nvblox_node/static_map_slice maps in the
+# car's static mode.
+#
+# The ROS containers do not share /dev/shm, so Fast DDS uses UDP only with
+# 4 MiB socket buffers (racecarneo.yaml); Isaac Sim runs as another user.
+
+x-ros-env: &ros-env
+  ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
+  FASTDDS_BUILTIN_TRANSPORTS: UDPv4?sockets_size=4194304
+
+# Every Jazzy process loads LTTng-UST, which zeroes a descriptor bitmap
+# sized by the open-file limit (racecarneo_hardware.yaml).
+x-ros-ulimits: &ros-ulimits
+  nofile:
+    soft: 1024
+    hard: 524288
+
+x-isaac-caches: &isaac-caches
+  - ~/docker/isaac-sim/6.0.1/cache/kit:/isaac-sim/kit/cache:rw
+  - ~/docker/isaac-sim/6.0.1/cache/user:/isaac-sim/.cache:rw
+  - ~/docker/isaac-sim/6.0.1/cache/ov:/isaac-sim/.cache/ov:rw
+  - ~/docker/isaac-sim/6.0.1/cache/pip:/isaac-sim/.cache/pip:rw
+  - ~/docker/isaac-sim/6.0.1/cache/glcache:/isaac-sim/.cache/nvidia/GLCache:rw
+  - ~/docker/isaac-sim/6.0.1/cache/computecache:/isaac-sim/.nv/ComputeCache:rw
+  - ~/docker/isaac-sim/6.0.1/logs:/isaac-sim/.nvidia-omniverse/logs:rw
+  - ~/docker/isaac-sim/6.0.1/config:/isaac-sim/.nvidia-omniverse/config:rw
+  - ~/docker/isaac-sim/6.0.1/data:/isaac-sim/.local/share/ov/data:rw
+
+services:
+  racecar_turret_assets:
+    # The vehicle URDF (sim_vehicle:=true), the people's CC0 Gazebo Fuel
+    # models (downloaded once into the cache volume, licence and SHA-256
+    # checked) baked for Isaac, their routes and the floor texture
+    # (applications/isaac/scripts/racecar_turret_assets.py).
+    image: salsicha/cyberphysics:racecarneo-${CYBERPHYSICS_TAG:-latest}
+    pull_policy: if_not_present
+    container_name: racecar_turret_isaac_assets
+    network_mode: host
+    volumes:
+      - ../systems:/workspace/systems:ro
+      - ../applications/isaac/scripts:/workspace/applications/isaac/scripts:ro
+      - ../applications/demnav/scripts:/workspace/applications/demnav/scripts:ro
+      - ../applications/aerostack2/missions:/workspace/applications/aerostack2/missions:ro
+      - racecar_turret_target_cache:/data/target_cache
+      - racecar_turret_assets:/data/racecar_turret_assets
+    command: >
+      python3 /workspace/applications/isaac/scripts/racecar_turret_assets.py
+        --repo /workspace
+        --scenario systems/racecar_turret/scenarios/isaac_arena.json
+        --cache-dir /data/target_cache --output-dir /data/racecar_turret_assets
+    restart: "no"
+
+  racecar_turret_isaac_cache_init:
+    image: salsicha/cyberphysics:isaac-${CYBERPHYSICS_TAG:-latest}
+    container_name: racecar_turret_isaac_cache_init
+    user: "0:0"
+    network_mode: none
+    volumes: *isaac-caches
+    entrypoint: ["/bin/chown"]
+    command: ["1234:1234", /isaac-sim/kit/cache, /isaac-sim/.cache,
+      /isaac-sim/.cache/ov, /isaac-sim/.cache/pip, /isaac-sim/.cache/nvidia/GLCache,
+      /isaac-sim/.nv/ComputeCache, /isaac-sim/.nvidia-omniverse/logs,
+      /isaac-sim/.nvidia-omniverse/config, /isaac-sim/.local/share/ov/data]
+    restart: "no"
+
+  racecar_turret_isaacsim:
+    # Lock-step physics, the car, its sensors and the turret, the arena and
+    # its people; /clock, the RACECAR's topics (racecarneo_ros_bridge.py's),
+    # the turret's and /simulation/truth.
+    image: salsicha/cyberphysics:isaac-${CYBERPHYSICS_TAG:-latest}
+    container_name: racecar_turret_isaac_sim
+    network_mode: host
+    ipc: host
+    runtime: nvidia
+    ulimits: *ros-ulimits
+    depends_on:
+      racecar_turret_assets: {condition: service_completed_successfully}
+      racecar_turret_isaac_cache_init: {condition: service_completed_successfully}
+    environment:
+      <<: *ros-env
+      ACCEPT_EULA: Y
+      PRIVACY_CONSENT: Y
+      ROS_DISTRO: jazzy
+      RMW_IMPLEMENTATION: rmw_fastrtps_cpp
+      LD_LIBRARY_PATH: /isaac-sim/exts/isaacsim.ros2.core/jazzy/lib
+      NVIDIA_DRIVER_CAPABILITIES: all
+      ISAAC_PHYSICS_HZ: ${ISAAC_PHYSICS_HZ:-120.0}
+      ISAAC_RENDER_HZ: ${ISAAC_RENDER_HZ:-15.0}
+      ISAAC_CAMERA_HZ: ${ISAAC_CAMERA_HZ:-15.0}
+      ISAAC_TURRET_HFOV_DEG: ${ISAAC_TURRET_HFOV_DEG:-70.0}
+      ISAAC_MAX_REAL_TIME_FACTOR: ${ISAAC_MAX_REAL_TIME_FACTOR:-1.0}
+    volumes:
+      - ../applications/isaac/scripts:/workspace/applications/isaac/scripts:ro
+      - ../applications/demnav/scripts/tracking_targets.py:/workspace/applications/demnav/scripts/tracking_targets.py:ro
+      - ../systems:/workspace/systems:ro
+      - racecar_turret_assets:/data/racecar_turret_assets:ro
+      - ~/docker/isaac-sim/6.0.1/cache/kit:/isaac-sim/kit/cache:rw
+      - ~/docker/isaac-sim/6.0.1/cache/user:/isaac-sim/.cache:rw
+      - ~/docker/isaac-sim/6.0.1/cache/ov:/isaac-sim/.cache/ov:rw
+      - ~/docker/isaac-sim/6.0.1/cache/pip:/isaac-sim/.cache/pip:rw
+      - ~/docker/isaac-sim/6.0.1/cache/glcache:/isaac-sim/.cache/nvidia/GLCache:rw
+      - ~/docker/isaac-sim/6.0.1/cache/computecache:/isaac-sim/.nv/ComputeCache:rw
+      - ~/docker/isaac-sim/6.0.1/logs:/isaac-sim/.nvidia-omniverse/logs:rw
+      - ~/docker/isaac-sim/6.0.1/config:/isaac-sim/.nvidia-omniverse/config:rw
+      - ~/docker/isaac-sim/6.0.1/data:/isaac-sim/.local/share/ov/data:rw
+    entrypoint: []
+    command: >
+      /workspace/applications/isaac/scripts/run_racecar_turret_isaac.sh --headless
+        --assets /data/racecar_turret_assets
+        --scenario /workspace/systems/racecar_turret/scenarios/isaac_arena.json
+    deploy:
+      resources:
+        reservations:
+          devices: [{driver: nvidia, count: all, capabilities: [gpu]}]
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /tmp/isaac_sim_ready"]
+      interval: 2s
+      timeout: 1s
+      retries: 300
+      start_period: 10s
+
+  racecar_turret_odom_tf:
+    image: salsicha/cyberphysics:racecarneo-${CYBERPHYSICS_TAG:-latest}
+    pull_policy: if_not_present
+    container_name: racecar_turret_isaac_odom_tf
+    network_mode: host
+    ulimits: *ros-ulimits
+    environment: *ros-env
+    volumes:
+      - ../applications/isaac/scripts/racecar_turret_odom_tf.py:/workspace/racecar_turret_odom_tf.py:ro
+    command: >
+      python3 /workspace/racecar_turret_odom_tf.py --ros-args -p use_sim_time:=true
+
+  racecar_turret_robot_state_publisher:
+    # The RACECAR's sensor frames and the turret (racecar_turret.urdf.xacro,
+    # simulator optical frames), the turret joints from /turret/joint_states.
+    image: salsicha/cyberphysics:racecarneo-${CYBERPHYSICS_TAG:-latest}
+    pull_policy: if_not_present
+    container_name: racecar_turret_isaac_robot_state_publisher
+    network_mode: host
+    ulimits: *ros-ulimits
+    stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
+    environment: *ros-env
+    volumes:
+      - ../systems:/workspace/systems:ro
+    command: >
+      ros2 launch /workspace/systems/racecarneo/launch/racecarneo_description.launch.py
+        urdf:=/workspace/systems/racecar_turret/urdf/racecar_turret.urdf.xacro
+        camera_optical_frames:=true
+        sim_geometry:=false
+        joint_states_topic:=/turret/joint_states
+
+  racecar_turret_cmd_vel_to_ackermann:
+    # The hardware car's limits (cmd_vel_to_ackermann.yaml: 0.33 m wheelbase,
+    # 0.42 rad steering, 0.35 m/s), which the simulated car has too.
+    image: salsicha/cyberphysics:racecarneo-${CYBERPHYSICS_TAG:-latest}
+    pull_policy: if_not_present
+    container_name: racecar_turret_isaac_cmd_vel_to_ackermann
+    network_mode: host
+    ulimits: *ros-ulimits
+    environment: *ros-env
+    volumes:
+      - ../systems/racecarneo/config:/workspace/config:ro
+      - ../applications/racecarneo/scripts/cmd_vel_to_ackermann.py:/workspace/cmd_vel_to_ackermann.py:ro
+    command: >
+      python3 /workspace/cmd_vel_to_ackermann.py
+        --ros-args
+        --params-file /workspace/config/cmd_vel_to_ackermann.yaml
+        -p use_sim_time:=true
+
+  racecar_turret_slam:
+    image: salsicha/cyberphysics:racecarneo-${CYBERPHYSICS_TAG:-latest}
+    pull_policy: if_not_present
+    container_name: racecar_turret_isaac_slam
+    network_mode: host
+    ulimits: *ros-ulimits
+    stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
+    depends_on:
+      racecar_turret_isaacsim: {condition: service_healthy}
+    environment: *ros-env
+    volumes:
+      - ../systems/racecarneo/config:/workspace/config:ro
+    command:
+      - bash
+      - -c
+      - >-
+        sed 's/use_sim_time: false/use_sim_time: true/' /workspace/config/slam_toolbox.yaml
+        > /tmp/slam_toolbox.yaml &&
+        exec ros2 launch slam_toolbox online_async_launch.py use_sim_time:=true
+        slam_params_file:=/tmp/slam_toolbox.yaml
+
+  racecar_turret_depthanything:
+    # As on the car (racecarneo_hardware.yaml): its depth and points are
+    # published, but nvblox maps the camera's own depth (see the header).
+    image: salsicha/cyberphysics:depthanything-${CYBERPHYSICS_TAG:-latest}
+    pull_policy: if_not_present
+    container_name: racecar_turret_isaac_depthanything
+    network_mode: host
+    ulimits: *ros-ulimits
+    depends_on:
+      racecar_turret_isaacsim: {condition: service_healthy}
+    environment:
+      <<: *ros-env
+      NVIDIA_VISIBLE_DEVICES: ${NVIDIA_VISIBLE_DEVICES:-all}
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    command: >
+      ros2 run depthanything_pkg depth_node --ros-args
+        -p use_sim_time:=true
+        -p image_topic:=/camera/color/image_raw
+        -p camera_info_topic:=/camera/color/camera_info
+        -p depth_topic:=/depth_anything/depth/image
+        -p pointcloud_topic:=/depth_anything/points
+        -p metric_dataset:=vkitti
+        -p encoder:=vits
+        -p max_depth:=80.0
+        -p publish_pointcloud:=true
+        -p pointcloud_stride:=4
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu, compute, utility]
+
+  racecar_turret_nvblox:
+    image: salsicha/cyberphysics:nvblox-${CYBERPHYSICS_TAG:-latest}
+    pull_policy: if_not_present
+    container_name: racecar_turret_isaac_nvblox
+    network_mode: host
+    ulimits: *ros-ulimits
+    stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
+    depends_on:
+      racecar_turret_isaacsim: {condition: service_healthy}
+    environment:
+      <<: *ros-env
+      NVIDIA_VISIBLE_DEVICES: ${NVIDIA_VISIBLE_DEVICES:-all}
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility,graphics,video
+    volumes:
+      - ../systems/racecarneo/config:/workspace/config:ro
+      - ../systems/racecar_turret/config/nvblox_isaac.yaml:/workspace/nvblox_isaac.yaml:ro
+      - ../applications/nvblox/racecarneo_nvblox.launch.py:/workspace/racecarneo_nvblox.launch.py:ro
+    # nvblox.yaml has no use_sim_time: add it under its ros__parameters.
+    # nvblox_isaac.yaml maps the walking people as dynamic (decaying) rather
+    # than into the static map (RACECAR_TURRET.md, "Depth for nvblox").
+    # The depth image is registered to the colour camera (one render
+    # product), so the colour camera_info describes it.
+    command:
+      - bash
+      - -c
+      - >-
+        sed 's/^  ros__parameters:$$/  ros__parameters:\n    use_sim_time: true/'
+        /workspace/config/nvblox.yaml > /tmp/nvblox.yaml &&
+        exec ros2 launch /workspace/racecarneo_nvblox.launch.py config_file:=/tmp/nvblox.yaml
+        overrides_file:=${RACECAR_TURRET_NVBLOX_OVERRIDES:-/workspace/nvblox_isaac.yaml}
+        depth_image_topic:=${RACECAR_TURRET_NVBLOX_DEPTH:-/camera/depth/image_rect_raw}
+        depth_camera_info_topic:=/camera/color/camera_info
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu, compute, utility]
+
+  racecar_turret_nav2:
+    # The nvblox image ships nvblox_nav2 (NvbloxCostmapLayer) alongside Nav2.
+    image: salsicha/cyberphysics:nvblox-${CYBERPHYSICS_TAG:-latest}
+    pull_policy: if_not_present
+    container_name: racecar_turret_isaac_nav2
+    network_mode: host
+    ulimits: *ros-ulimits
+    stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
+    depends_on:
+      racecar_turret_slam: {condition: service_started}
+      racecar_turret_nvblox: {condition: service_started}
+      racecar_turret_cmd_vel_to_ackermann: {condition: service_started}
+    environment: *ros-env
+    volumes:
+      - ../systems/racecarneo/config:/workspace/config:ro
+    # The nvblox costmap layers read nvblox's combined (static and dynamic)
+    # slice: nvblox_isaac.yaml maps in dynamic mode.
+    command:
+      - bash
+      - -c
+      - >-
+        sed -e 's/use_sim_time: false/use_sim_time: true/'
+        -e 's#/nvblox_node/static_map_slice#${RACECAR_TURRET_NVBLOX_SLICE:-/nvblox_node/combined_map_slice}#'
+        /workspace/config/nav2.yaml > /tmp/nav2.yaml &&
+        exec ros2 launch nav2_bringup navigation_launch.py use_sim_time:=true
+        params_file:=/tmp/nav2.yaml autostart:=true
+
+  racecar_turret_tracker:
+    # The PanTiltROS tracker on the Isaac turret camera; the evaluator (or
+    # the UI) selects the target through /turret/command.
+    # RACECAR_TURRET_COMPENSATION=false turns off base-rotation compensation
+    # and target lead together (the comparison run of the evaluation).
+    image: salsicha/cyberphysics:pantiltros-${CYBERPHYSICS_TAG:-latest}
+    pull_policy: if_not_present
+    container_name: racecar_turret_isaac_tracker
+    network_mode: host
+    ipc: host
+    gpus: all
+    ulimits: *ros-ulimits
+    depends_on:
+      racecar_turret_isaacsim: {condition: service_healthy}
+    environment:
+      <<: *ros-env
+      RMW_IMPLEMENTATION: rmw_fastrtps_cpp
+      YOLO_CONFIG_DIR: /workspace/cache/ultralytics
+      TORCH_HOME: /workspace/cache/torch
+      PANTILT_MODEL_DIR: /workspace/cache/models
+    working_dir: /workspace/cache/models
+    volumes:
+      - ../applications/pantiltros/scripts/pantilt_yolo_tracker.py:/scripts/pantilt_yolo_tracker.py:ro
+      - ../systems/racecar_turret/config:/workspace/racecar_turret/config:ro
+      - ../cache/turret:/workspace/cache
+    command: >
+      python3 /scripts/pantilt_yolo_tracker.py
+        --ros-args
+        --params-file /workspace/racecar_turret/config/turret_tracker_isaac.yaml
+        -p base_compensation:=${RACECAR_TURRET_COMPENSATION:-true}
+        -p target_lead:=${RACECAR_TURRET_COMPENSATION:-true}
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /tmp/pantilt_yolo_ready"]
+      interval: 5s
+      timeout: 2s
+      retries: 120
+      start_period: 30s
+
+  racecar_turret_evaluation:
+    # tools/racecar_turret_isaac_test.sh: selects the target as the UI does,
+    # drives the course and records the run for tools/racecar_turret_scorer.py.
+    profiles: ["evaluation"]
+    image: salsicha/cyberphysics:racecarneo-${CYBERPHYSICS_TAG:-latest}
+    pull_policy: if_not_present
+    container_name: racecar_turret_isaac_evaluation
+    network_mode: host
+    ulimits: *ros-ulimits
+    depends_on:
+      racecar_turret_isaacsim: {condition: service_healthy}
+      racecar_turret_tracker: {condition: service_healthy}
+      racecar_turret_nav2: {condition: service_started}
+    environment: *ros-env
+    volumes:
+      - ../tools/racecar_turret_evaluator.py:/workspace/racecar_turret_evaluator.py:ro
+      - ../systems:/workspace/systems:ro
+      - ${RACECAR_TURRET_OUTPUT:-../generated/racecar_turret_isaac/run}:/out
+    command: >
+      python3 /workspace/racecar_turret_evaluator.py
+        --output /out/recording.jsonl
+        --mission-file /workspace/systems/racecar_turret/missions/isaac_course.json
+        --mission-id ${RACECAR_TURRET_MISSION:-arena_lap}
+        --target ${RACECAR_TURRET_TARGET:-person_1}
+        --label ${RACECAR_TURRET_LABEL:-run}
+        --course-timeout-s ${RACECAR_TURRET_COURSE_TIMEOUT_S:-900}
+    restart: "no"
+
+  racecar_turret_map_recorder:
+    # nvblox's map slice and Nav2's global costmap every 5 s of simulation
+    # time, for tools/racecar_turret_map_coverage.py score (which
+    # tools/racecar_turret_isaac_test.sh runs): do they see the arena's
+    # obstacles? The nvblox image has nvblox_msgs.
+    profiles: ["evaluation"]
+    image: salsicha/cyberphysics:nvblox-${CYBERPHYSICS_TAG:-latest}
+    pull_policy: if_not_present
+    container_name: racecar_turret_isaac_map_recorder
+    network_mode: host
+    ulimits: *ros-ulimits
+    depends_on:
+      racecar_turret_isaacsim: {condition: service_healthy}
+    environment: *ros-env
+    volumes:
+      - ../tools/racecar_turret_map_coverage.py:/workspace/tools/racecar_turret_map_coverage.py:ro
+      - ../applications/isaac/scripts/racecar_turret_sim.py:/workspace/applications/isaac/scripts/racecar_turret_sim.py:ro
+      - ${RACECAR_TURRET_OUTPUT:-../generated/racecar_turret_isaac/run}:/out
+    command: >
+      python3 /workspace/tools/racecar_turret_map_coverage.py record
+        --output-dir /out/maps --period-s 5
+        --slice-topic ${RACECAR_TURRET_NVBLOX_SLICE:-/nvblox_node/combined_map_slice}
+        --ros-args -p use_sim_time:=true
+    restart: "no"
+
+volumes:
+  racecar_turret_target_cache:
+  racecar_turret_assets:

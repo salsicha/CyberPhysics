@@ -21,8 +21,10 @@ logged on stdout and, with ``--command-log``, appended to that file as a
 JSON line {"rx": wall time, "topic": ..., "data": raw string, "command":
 parsed command or null}. ``--navigation`` also publishes /navigation/fix,
 /navigation/odometry and /navigation/correction_source about
-``--origin-lat``/``--origin-lon``, for the map; never use it next to a real
-navigation stack. ``--static`` freezes the objects and the drone, for
+``--origin-lat``/``--origin-lon``, for the map, and MAVROS' raw GPS fix
+(/mavros/global_position/raw/fix), as a healthy GPS without vision
+corrections looks (the page's navigation badge: GPS); never use it next to
+a real navigation stack. ``--static`` freezes the objects and the drone, for
 repeatable browser checks (tools/tracking_ui_test.sh).
 
 MockWorld and MockTracker are plain Python; ROS, NumPy and OpenCV are
@@ -352,8 +354,8 @@ def run(args):
     if args.navigation:
         fix_pub = node.create_publisher(NavSatFix, '/navigation/fix', 5)
         odom_pub = node.create_publisher(Odometry, '/navigation/odometry', 5)
-        source_pub = node.create_publisher(String, '/navigation/correction_source', latched)
-        source_pub.publish(String(data='mock'))
+        source_pub = node.create_publisher(String, '/navigation/correction_source', 5)
+        gps_pub = node.create_publisher(NavSatFix, '/mavros/global_position/raw/fix', 5)
 
         def on_navigation():
             east, north, agl = world.drone
@@ -367,6 +369,10 @@ def run(args):
                 METRES_PER_DEGREE * math.cos(math.radians(args.origin_lat)))
             fix.altitude = agl
             fix_pub.publish(fix)
+            gps_pub.publish(fix)
+            # The fusion's value whenever no DemNav/WildNav correction is
+            # active, GPS or not.
+            source_pub.publish(String(data='dead_reckoning'))
             odom = Odometry()
             odom.header.stamp = stamp
             odom.header.frame_id = 'odom'

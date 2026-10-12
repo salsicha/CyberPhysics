@@ -25,6 +25,25 @@ ros2 launch as2_platform_blueos blueos_platform.launch.py \
   namespace:=drone0 mavros_namespace:=/mavros
 ```
 
+The BlueOS stacks' MAVROS (`BLUEOS_FCU_URL`, default `tcp://127.0.0.1:5777`)
+connects to the TCP server of BlueOS's MAVLink router (its protected
+"Internal Link" endpoint), so no BlueOS setting changes. It joins as MAVLink
+component 1:191 (onboard controller), which no BlueOS service uses
+(mavlink2rest is 1:194, the camera manager 1:100-105), and it opens no serial
+port: ArduPilot keeps the Navigator's UARTs. MAVROS reconnects by itself when
+BlueOS restarts its router. The previous default, `udp://0.0.0.0:14550@`,
+received nothing on a stock BlueOS (1.4.2 checked on the Pi 5): its GCS Client
+Link goes to the topside computer (192.168.2.1:14550) and its GCS Server Link,
+a UDP server on 0.0.0.0:14550, is disabled. To use UDP anyway, add a BlueOS
+MAVLink endpoint (UDP Client to 127.0.0.1:14550) and set `BLUEOS_FCU_URL`;
+do not enable the GCS Server Link on the same Pi then, as it binds
+0.0.0.0:14550 too and whichever of it and MAVROS starts second cannot open
+the port (MAVROS logs `udp:bind: Address already in use` and retries every
+30 s).
+
+The stacks' rosbridge listens on 9092, not on its default 9090, which is
+BlueOS's network manager (Cable Guy); the map page connects to 9092.
+
 The platform republishes MAVROS odometry, IMU, GPS, and battery data on the
 standard Aerostack2 `sensor_measurements/*` topics. Aerostack2 commands are
 translated to ArduPilot GUIDED-mode velocity or local-position setpoints.
@@ -98,6 +117,15 @@ beside the controls).
 - **Map.** The click-to-goal above is unchanged. The map also shows the drone
   and the target, whose ENU position is converted the way the goal is, about the
   current `/navigation/fix` and `/navigation/odometry`.
+- **Navigation badge.** The GPS, from MAVROS' raw fix
+  (`/mavros/global_position/raw/fix`, status -1 without a fix), and the vision
+  corrections the navigation fusion applies (`/navigation/correction_source`):
+  "GPS", "GPS + demnav", "demnav (no GPS)", "dead reckoning (no GPS)", or "GPS
+  unknown" after 5 s without a fix message. The fusion's source alone says
+  `dead_reckoning` whenever no DemNav or WildNav correction is active, GPS or
+  not, and the badge showed it while the GPS was healthy (in the Gazebo test
+  flights the raw fix had a fix throughout while the source said
+  `dead_reckoning` 88-100 % of the time).
 
 Commands are published only while rosbridge is connected: roslib queues what
 is published while disconnected and would send a stale command on
@@ -138,6 +166,12 @@ geoid and camera geometry it uses.
 - **Filter.** A constant-velocity Kalman filter of the target's position, with
   Mahalanobis gating (five rejections in a row restart it where the target now
   is). A target unseen for `lost_timeout_s` (3 s) is lost.
+- **Time.** The tracker runs on its node clock: the simulators' env files set
+  `TRACKING_USE_SIM_TIME` (`use_sim_time`), so its timeouts, filter, lead and
+  speed and yaw-rate limits are seconds of simulation, as ArduPilot's, in a
+  simulator slower than real time (Isaac runs at about 0.2x); the aircraft
+  keeps wall time. A detection's time is its image's stamp on that
+  clock.
 - **Track handover.** The detector's track IDs change when its image-space
   tracker loses an object, which the body-fixed camera of a manoeuvring
   aircraft makes common. When the selected ID is missing from a frame within
@@ -158,7 +192,10 @@ geoid and camera geometry it uses.
   the reference through the behaviour's `_behavior/modify` service at 10 Hz and
   cancels the goal to hover (the behaviour then sets HOVER). If the tracker dies
   the aircraft holds the last reference; it never keeps flying a velocity. The
-  centered set-point is above the target at `altitude_agl_m` above its ground;
+  centered set-point is above the target at `altitude_agl_m` above its ground,
+  yawed so a target moving at 2 m/s or more (`centered_yaw_min_speed_mps`)
+  travels along the image's long axis, where the image reaches farthest ahead
+  of and behind it (a walking or standing person keeps the yaw);
   the slant set-point is `R cos(theta)` short of the target on its bearing from
   the aircraft and `R sin(theta)` above it, yawed so the target lies on the
   image's long axis. ArduPilot trails a moving GUIDED position target (by
@@ -173,7 +210,9 @@ geoid and camera geometry it uses.
   `max_reference_lead_m` of the aircraft; heights stay 15-120 m above the
   ground under the set-point, and the depression is raised until the target
   stays `fov_margin_deg` inside the image's long axis (60 deg with the OAK-1,
-  64.5 with Gazebo's 60-degree camera).
+  64.5 with Gazebo's 60-degree camera), with a body-fixed camera also by the
+  aircraft's tilt toward the target, which turns the camera away from it
+  (taken at once, let go over `tilt_release_s`).
 - **Pre-emption.** A track command stops a running `GoToBehavior` or
   `FollowPathBehavior` (their `_behavior/stop` service): the drone's map-goal
   tree then ends and `restart: always` starts it again for the next goal.
@@ -192,7 +231,7 @@ aircraft runs its own) and `scripts/tracking_truth_detector.py`
 (`--profile tracking_truth`, instead of the detector), which projects
 `/simulation/targets` through the camera in the navigation pose into
 detections, so the control can be tested apart from detection.
-`tools/tracking_sim_test.sh <gazebo|genesis|isaac>` flies and scores the
+`tools/tracking_sim_test.sh <gazebo|isaac>` flies and scores the
 tracking end to end (`tools/tracking_sim_test.py`, layered on the composition
 by `tools/tracking_sim_test.yaml` with `--profile tracking`): the YOLO detector
 on the simulated camera, the tracker, and the scenario's car and people. Like
@@ -200,10 +239,11 @@ the operator in the page, the test picks a target by the ID of its box: it
 pairs each detection frame with `/simulation/targets` projected through the
 camera (the ground-truth detector, run beside the detector on
 `/tracking/truth/detections`) and takes the nearest box of the target's kind
-and size. A track command cancels a running GoTo; the car is followed
-centered 50 m above it (from 40 m it left the image as the aircraft trailed
-it) and slant (60 m at 70 deg) for 150 s each, the test clicking the car's
-new box whenever the tracker loses it; a person, tracked from 40 m, is hidden
+and size. A track command cancels a running GoTo, sent once the aircraft
+holds above a point of the car's route; the car is followed centered 50 m
+above it and slant (60 m at 70 deg) for 150 s each (`TRACKING_TEST_CENTERED_S`,
+`TRACKING_TEST_SLANT_S`), the test clicking the car's new box whenever the
+tracker has lost it for 1 s of simulation time; a person, tracked from 40 m, is hidden
 under the terrain for 8 s (`/simulation/targets/hide`): lost and hovering,
 then selected again; `stop` leaves the aircraft idle and hovering; a map goal
 and a GoTo end tracking. `TRACKING_TEST_DETECTOR=truth` runs the
@@ -221,34 +261,7 @@ height, median / p95; slant range within 5 / 12 m, depression within 8 deg
 and at most 8 deg shallower, p95), tracking 90 % of the time, recall 0.8, at
 most 3 re-selections in 150 s.
 
-Measured 2026-10-11 (`ROS_DOMAIN_ID=91`; median / p95 against truth; the
-scenario's car laps its circuit at the aircraft's 5 m/s speed limit, and the
-aircraft cuts inside its corners: with the ground-truth detector Gazebo kept
-11.2 / 15.3 m centered, every check passing):
-
-| | Gazebo | Genesis | Isaac |
-|---|---|---|---|
-| centered: distance from the car, m | 10.4 / 16.0 | 8.3 / 17.3 | 9.5 / 14.8 |
-| centered: tracking, re-selections | 97 %, 4 | 95 %, 5 | 98 %, 5 |
-| slant: range / depression error | 2.0 / 5.1 m, 5.6 / 16.4 deg | 1.9 / 4.8 m, 3.9 / 13.6 deg | 2.0 / 5.9 m, 5.8 / 11.0 deg |
-| slant: tracking, re-selections | 94 %, 7 | 93 %, 7 | 72 %, 49 |
-| target estimate error (centered, slant) | 1.5, 1.6 m | 0.3, 0.4 m | 0.3, 0.6 m |
-| car recall; its IDs (centered, slant) | 0.88, 0.91; 12, 19 | 0.77, 0.74; 6, 8 | 0.99, 0.92; 6, 51 |
-| lost (hidden 8 s): lost after, tracking again after shown | 2.5 s, 1.2 s (new ID) | 1.4 s, 0.6 s | 0.0 s, 0.7 s |
-| stop, map goal, GoTo | pass | pass | pass |
-| detections (simulation / wall time), per frame | 5.0 / 5.0 Hz, 71 ms | 10 / 4.6 Hz, 54 ms | 10 / 2.0 Hz, 75 ms |
-| host CPU busy (20 cores) | 53 % | 25 % | 33 % |
-
-Every stack fails on re-selections, Genesis also on its recall (0.77 / 0.74
-from 50 m) and Isaac's slant on its tracking fraction: the operator re-selects
-the car when it leaves the image as the aircraft trails it, or when the
-detector misses it for longer than `lost_timeout_s`, which is wall-clock time
-and so 1.5 s of Genesis' (0.5x real time) and 0.6 s of Isaac's (0.2x)
-simulation. Isaac's slant lost the car at the image edge every few seconds,
-and its person was already lost when it was hidden (the 0.0 s). Isaac ran
-before the host tracker's last two changes (sizes within 2 times in every
-association, the long reach only for recently seen tracks) and the tracker's
-kind check, which removed Gazebo's following of people instead of the car.
+@@RESULTS@@
 Gazebo's ground-truth twist is the body-frame velocity, which
 `gazebo_ardupilot_backend.py` hands ArduPilot as ENU unless
 `GAZEBO_TWIST_IN_BODY_FRAME=true` (the test's `tools/tracking_sim_test_gazebo.yaml`
@@ -327,9 +340,9 @@ Aerodrone navsim validation FAILED after 45.0 s; 4 problem(s):
 
 ### Tracking targets and scenario
 
-The three simulations render moving ground targets for the object tracker (`systems/aerodrone/tracking.md`), all from one definition, `missions/tracking_targets.json`: in the open field 60 m north-west of home, a car (`car_1`, Gazebo Fuel's "Hatchback blue") laps a 26 m x 16 m circuit with 6.5 m corners at 5 m/s (14.6 s a lap), a person (`person_1`, "Walking person") walks a 12 m x 6 m loop inside it at 1.5 m/s (21.7 s) and another (`person_2`, "Casual female") stands between them. Each starts its loop at simulation time 0 and goes round at constant speed.
+The two simulations, Gazebo and Isaac, render moving ground targets for the object tracker (`systems/aerodrone/tracking.md`), all from one definition, `missions/tracking_targets.json`: in the open clearing 60 m north-west of home, a car (`car_1`, Gazebo Fuel's "Hatchback blue") laps a 116 m x 26 m oval along the clearing, two 90 m straights joined by 13 m-radius turns, at 3.5 m/s (74.8 s a lap), a person (`person_1`, "Walking person") walks a 12 m x 6 m loop in its middle at 1.5 m/s (21.7 s) and another (`person_2`, "Casual female") stands between them, 12.6 m from the walker's loop. Each starts its loop at simulation time 0 and goes round at constant speed. The car is a fair test of following: it drives at 70 % of the aircraft's 5 m/s speed limit (`TRACKING_MAX_SPEED_MPS`, ArduPilot's `WPNAV_SPEED`), so the aircraft can catch up after a lag; its turns ask the aircraft above it for 0.9 m/s², under half its `WPNAV_ACCEL`; and each straight is four slant stand-offs long (60 m at 70 deg: 20.5 m), so a slant follower drives behind it. The first scenario's car lapped a 26 m x 16 m circuit with 6.5 m corners at the speed limit itself: the aircraft trailed it by 11 m (median) even with the ground-truth detector, and left it at the image edge; on a 60 m x 24 m oval the slant follower sat inside the loop with the car circling it, crossing the image sideways (`tests/test_tracking_targets.py` checks all three).
 
-- **Models.** The `target_assets` service downloads each pinned Fuel model version into the stack's `tracking_targets_<simulator>_cache` volume (the first run needs the network, like the DEM and imagery seeds) and checks its SHA-256 and its licence on Fuel (all CC0, `THIRD_PARTY_NOTICES.md`). `terrain_assets` (`--targets`) bakes each into one textured mesh, metres, z up, front along +x, its lowest point at z = 0, with every material in one texture atlas (`applications/demnav/scripts/target_models.py`): `model.obj` and `<model>_atlas.png` for Gazebo and Genesis, the same triangles in `model_mesh.npz` for Isaac, under `/data/navsim_assets/models/<model>`.
-- **Routes on the ground.** The builder resolves each route on the terrain the cameras see, the render mesh's triangles (`terrain_mesh.npz`, `terrain.obj`), into a track sampled every 0.2 m (`tracking_targets.json` in the assets; `applications/demnav/scripts/tracking_targets.py`): position, ground height and heading, and for the car the pitch and roll of the ground under its wheels. Every simulator places each target at its track pose for its own simulation time: Genesis and Isaac in their lock-step loop just before each camera frame (visual-only meshes, no physics); Gazebo through the `gazebo_targets` service (`applications/gazebo/scripts/gazebo_tracking_targets.py`), which sets the visual-only, gravity-free models' poses with the world's `set_pose` service every 0.02 s of `/clock` (the builder puts them in the world at their start).
-- **Ground truth.** `/simulation/targets` follows the contract: Genesis and Isaac publish it with each camera frame (10 Hz), Gazebo's driver every 0.02 s; `stamp` is simulation seconds (`/clock`). Positions are ENU metres about the navigation frame's origin, ArduPilot's EKF origin, which is the vehicle's home (`manifest.json` `home_enu_m`, the reference the simulators give ArduPilot positions about), not INITIAL_LAT/INITIAL_LON: the field is about (-40, 45) there. `up` is the ground under the target and `yaw` its heading, counter-clockwise from east. Projected through the camera, the truth falls on the rendered target. From a fixed camera 40 m above the field, the projected model silhouette and the target's rendered pixels overlap with an IoU of 0.92-0.98 for the car, their centroids within 1 px (Genesis, Isaac) and 1.7 px (Gazebo, where a frame can show a pose up to one 0.02 s update old). In the tracking scenario, through the drone's ground-truth pose at the hold, the car's centroid is within 0.4 px (Isaac), 1.2 px (Genesis) and 2 px (Gazebo) of the projected truth. Genesis' camera_info puts the principal point at (W/2, H/2); its renders put it half a pixel up and to the left, at ((W - 1)/2, (H - 1)/2), as Isaac's camera_info does.
-- **Tracking scenario.** `AERODRONE_MISSION=tracking docker compose -f compositions/aerostack2_<...>.yaml up` flies `tracking_mission.xml` instead of the wilderness mission (the `wilderness_mission` service runs it; `flight_ready` reads the same tree): arm, take off to 35 m, fly to the centre of the car's circuit, 40 m above the ground there and nose east (GoTo sent twice, like the wilderness waypoints, fixed yaw), then hover until stopped, commanding nothing more so the tracker can take over. From 40 m the downward camera covers 46 m x 35 m of ground (Gazebo, Isaac: 60 degrees across 640 x 480; Genesis renders `FOV_DEG`, 69 degrees: 55 m x 41 m); the targets stay inside its 35 m square whatever the yaw, with 2 m to spare. The car is about 60 x 30 px there and the people about 6 x 10 px.
+- **Models.** The `target_assets` service downloads each pinned Fuel model version into the stack's `tracking_targets_<simulator>_cache` volume (the first run needs the network, like the DEM and imagery seeds) and checks its SHA-256 and its licence on Fuel (all CC0, `THIRD_PARTY_NOTICES.md`). `terrain_assets` (`--targets`) bakes each into one textured mesh, metres, z up, front along +x, its lowest point at z = 0, with every material in one texture atlas (`applications/demnav/scripts/target_models.py`): `model.obj` and `<model>_atlas.png` for Gazebo, the same triangles in `model_mesh.npz` for Isaac, under `/data/navsim_assets/models/<model>`.
+- **Routes on the ground.** The builder resolves each route on the terrain the cameras see, the render mesh's triangles (`terrain_mesh.npz`, `terrain.obj`), into a track sampled every 0.2 m (`tracking_targets.json` in the assets; `applications/demnav/scripts/tracking_targets.py`): position, ground height and heading, and for the car the pitch and roll of the ground under its wheels. Every simulator places each target at its track pose for its own simulation time: Isaac in its lock-step loop just before each camera frame (visual-only meshes, no physics); Gazebo through the `gazebo_targets` service (`applications/gazebo/scripts/gazebo_tracking_targets.py`), which sets the visual-only, gravity-free models' poses with the world's `set_pose` service every 0.02 s of `/clock` (the builder puts them in the world at their start).
+- **Ground truth.** `/simulation/targets` follows the contract: Isaac publishes it with each camera frame (10 Hz), Gazebo's driver every 0.02 s; `stamp` is simulation seconds (`/clock`). Positions are ENU metres about the navigation frame's origin, ArduPilot's EKF origin, which is the vehicle's home (`manifest.json` `home_enu_m`, the reference the simulators give ArduPilot positions about), not INITIAL_LAT/INITIAL_LON: the field is about (-30, 46) there. `up` is the ground under the target and `yaw` its heading, counter-clockwise from east. Projected through the camera, the truth falls on the rendered target. From a fixed camera 40 m above the field, the projected model silhouette and the target's rendered pixels overlap with an IoU of 0.92-0.98 for the car, their centroids within 1 px (Isaac) and 1.7 px (Gazebo, where a frame can show a pose up to one 0.02 s update old). In the first tracking scenario, through the drone's ground-truth pose at the hold, the car's centroid was within 0.4 px (Isaac) and 2 px (Gazebo) of the projected truth.
+- **Tracking scenario.** `AERODRONE_MISSION=tracking docker compose -f compositions/aerostack2_<...>.yaml up` flies `tracking_mission.xml` instead of the wilderness mission (the `wilderness_mission` service runs it; `flight_ready` reads the same tree): arm, take off to 35 m, fly to the middle of the car's oval, 50 m above the ground there and nose east (GoTo sent twice, like the wilderness waypoints, fixed yaw), then hover until stopped, commanding nothing more so the tracker can take over. From 50 m the downward camera covers 58 m x 43 m of ground (Gazebo, Isaac: 60 degrees across 640 x 480); whatever the yaw, the people stay inside its 43 m square with 2 m to spare, and the car crosses it on every lap (the middle of its straights). The car is about 44 x 24 px there and the people about 7 x 10 px.

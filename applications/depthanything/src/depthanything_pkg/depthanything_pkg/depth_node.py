@@ -1,10 +1,6 @@
 #!/usr/bin/env python3
-import math
-import os
-import sys
 from typing import Optional
 
-import cv2
 import numpy as np
 import rclpy
 import torch
@@ -14,15 +10,7 @@ from rclpy.qos import HistoryPolicy, QoSProfile, qos_profile_sensor_data
 from sensor_msgs.msg import CameraInfo, Image, PointCloud2, PointField
 from std_msgs.msg import Header
 
-# Put metric_depth first so DepthAnythingV2 resolves to the metric model implementation.
-sys.path.insert(0, '/opt/Depth-Anything-V2/metric_depth')
-sys.path.append('/opt/Depth-Anything-V2')
-
-try:
-    from depth_anything_v2.dpt import DepthAnythingV2
-except ImportError as exc:
-    print(f'Error importing DepthAnythingV2: {exc}')
-    DepthAnythingV2 = None
+from depthanything_pkg import metric_depth
 
 
 class DepthAnythingNode(Node):
@@ -40,6 +28,15 @@ class DepthAnythingNode(Node):
         self.declare_parameter('min_depth', 0.05)
         self.declare_parameter('publish_pointcloud', True)
         self.declare_parameter('pointcloud_stride', 4)
+        # Optional per-frame scale alignment (README.md, "Scale alignment"):
+        # a metric depth image registered to the colour camera; empty: off.
+        self.declare_parameter('scale_reference_topic', '')
+        self.declare_parameter('scale_reference_min_m', 0.3)
+        self.declare_parameter('scale_reference_max_m', 4.0)
+        self.declare_parameter('scale_reference_stride', 8)
+        self.declare_parameter('scale_reference_min_samples', 100)
+        self.declare_parameter('scale_reference_max_age_s', 0.05)
+        self.declare_parameter('scale_hold_s', 1.0)
 
         image_topic = self.get_parameter('image_topic').value
         camera_info_topic = self.get_parameter('camera_info_topic').value
@@ -52,37 +49,31 @@ class DepthAnythingNode(Node):
         self.publish_pointcloud = bool(self.get_parameter('publish_pointcloud').value)
         self.pointcloud_stride = max(1, int(self.get_parameter('pointcloud_stride').value))
         self.camera_info: Optional[CameraInfo] = None
+        scale_reference_topic = self.get_parameter('scale_reference_topic').value
+        self.aligner = None
+        if scale_reference_topic:
+            self.aligner = metric_depth.ScaleAligner(
+                self.get_parameter('scale_reference_min_m').value,
+                self.get_parameter('scale_reference_max_m').value,
+                self.get_parameter('scale_reference_stride').value,
+                self.get_parameter('scale_reference_min_samples').value,
+                self.get_parameter('scale_reference_max_age_s').value,
+                self.get_parameter('scale_hold_s').value)
 
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         self.get_logger().info(f'Using device: {self.device}')
 
-        model_configs = {
-            'vits': {'encoder': 'vits', 'features': 64, 'out_channels': [48, 96, 192, 384]},
-            'vitb': {'encoder': 'vitb', 'features': 128, 'out_channels': [96, 192, 384, 768]},
-            'vitl': {'encoder': 'vitl', 'features': 256, 'out_channels': [256, 512, 1024, 1024]},
-            'vitg': {'encoder': 'vitg', 'features': 384, 'out_channels': [1536, 1536, 1536, 1536]},
-        }
-        if self.encoder not in model_configs:
-            raise ValueError(f'Unsupported encoder {self.encoder}; expected one of {sorted(model_configs)}')
-        if DepthAnythingV2 is None:
-            raise RuntimeError('DepthAnythingV2 class not found. Is /opt/Depth-Anything-V2 installed?')
-
-        config = dict(model_configs[self.encoder])
-        config['max_depth'] = self.max_depth
-        self.model = DepthAnythingV2(**config)
-
-        model_path = self.get_parameter('model_path').value
-        if not model_path:
-            model_path = (
-                f'/opt/Depth-Anything-V2/checkpoints/'
-                f'depth_anything_v2_metric_{self.metric_dataset}_{self.encoder}.pth'
-            )
-        if not os.path.exists(model_path):
-            raise FileNotFoundError(f'Metric Depth Anything weights not found at {model_path}')
-
-        state_dict = torch.load(model_path, map_location='cpu')
-        self.model.load_state_dict(state_dict)
-        self.model = self.model.to(self.device).eval()
+        # The model's output is its sigmoid head times max_depth, so
+        # max_depth must be the checkpoint's training value (80 vkitti, 20
+        # hypersim) or every depth is scaled by the difference.
+        trained = metric_depth.TRAINED_MAX_DEPTH.get(self.metric_dataset)
+        if trained is not None and abs(trained - self.max_depth) > 1e-6:
+            self.get_logger().warn(
+                f'max_depth {self.max_depth:g} differs from the {self.metric_dataset} '
+                f'checkpoint\'s {trained:g}: depths are scaled by {self.max_depth / trained:.3g}')
+        self.model, model_path = metric_depth.load_model(
+            self.encoder, self.metric_dataset, self.max_depth,
+            self.get_parameter('model_path').value, self.device)
         self.get_logger().info(
             f'Loaded Depth Anything V2 metric {self.metric_dataset}/{self.encoder} from {model_path}'
         )
@@ -103,6 +94,15 @@ class DepthAnythingNode(Node):
         self.create_subscription(
             CameraInfo, camera_info_topic, self.camera_info_callback,
             qos_profile_sensor_data)
+        if self.aligner is not None:
+            self.create_subscription(
+                Image, scale_reference_topic, self.scale_reference_callback,
+                QoSProfile(history=HistoryPolicy.KEEP_LAST, depth=5,
+                           reliability=qos_profile_sensor_data.reliability,
+                           durability=qos_profile_sensor_data.durability))
+            self.get_logger().info(
+                f'Scaling each depth to {scale_reference_topic} (median ratio over '
+                f'{self.aligner.min_m:g}-{self.aligner.max_m:g} m)')
 
         self.get_logger().info(
             f'Subscribed to {image_topic} and {camera_info_topic}; publishing depth to {depth_topic}'
@@ -112,6 +112,18 @@ class DepthAnythingNode(Node):
 
     def camera_info_callback(self, msg: CameraInfo) -> None:
         self.camera_info = msg
+
+    @staticmethod
+    def stamp_s(header: Header) -> float:
+        return header.stamp.sec + header.stamp.nanosec * 1e-9
+
+    def scale_reference_callback(self, msg: Image) -> None:
+        try:
+            pixels = self.bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough')
+            self.aligner.add_reference(
+                self.stamp_s(msg.header), metric_depth.depth_image_to_m(pixels, msg.encoding))
+        except (ValueError, TypeError) as exc:
+            self.get_logger().error(f'Unusable scale reference: {exc}', throttle_duration_sec=10.0)
 
     def image_callback(self, msg: Image) -> None:
         try:
@@ -123,11 +135,15 @@ class DepthAnythingNode(Node):
         with torch.no_grad():
             depth = self.model.infer_image(cv_image)
 
-        depth = np.asarray(depth, dtype=np.float32)
-        depth[
-            (~np.isfinite(depth)) |
-            (depth < self.min_depth) |
-            (depth > self.max_depth)] = np.nan
+        depth = metric_depth.mask_range(depth, self.min_depth, self.max_depth)
+        if self.aligner is not None:
+            scale = self.aligner.scale_for(self.stamp_s(msg.header), depth)
+            if scale is None:
+                self.get_logger().warn('No scale reference for this frame: not published',
+                                       throttle_duration_sec=5.0)
+                return
+            depth = metric_depth.mask_range(depth * np.float32(scale), self.min_depth, self.max_depth)
+            self.get_logger().info(f'Depth scale {scale:.3f}', throttle_duration_sec=10.0)
 
         depth_msg = self.bridge.cv2_to_imgmsg(depth, encoding='32FC1')
         depth_msg.header = msg.header

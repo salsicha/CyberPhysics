@@ -1,12 +1,12 @@
 # Aerodrone object tracking (systems/aerodrone/tracking.md): the services
 # only the simulations run. Included, never run alone, by
-# aerostack2_sim.yaml, aerostack2_genesis.yaml and aerostack2_isaac.yaml
+# aerostack2_sim.yaml and aerostack2_isaac.yaml
 # beside aerodrone_tracking.yaml (the services they share with the
 # aircraft; profiles explained there), with topics.env, tracking.env and
 # ../applications/aerostack2/config/tracking_<simulator>.env.
 #
 # Never included by the aircraft stack: it runs its own rosbridge
-# (blueos_nav_core.yaml, port 9090) and web page (blueos_aerostack.yaml
+# (blueos_nav_core.yaml, port 9092) and web page (blueos_aerostack.yaml
 # aerostack_gui, port 8080) on the host network; these would clash.
 #
 # ROS containers here load the shared FastDDS profile like every
@@ -70,8 +70,9 @@ services:
         -p dem_cache_dir:=/data/demnav_cache
 
   tracking_rosbridge:
-    # The web page's link to ROS (port 9090), as blueos_nav_core.yaml's
-    # rosbridge on the aircraft.
+    # The web page's link to ROS, as blueos_nav_core.yaml's rosbridge on
+    # the aircraft: port 9092 there and here, since the page connects to
+    # that port (BlueOS holds 9090 on the aircraft).
     profiles: [tracking, tracking_truth]
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
     stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
@@ -83,7 +84,7 @@ services:
     volumes:
       - /dev/shm:/dev/shm
       - ../systems/aerodrone/config/fastdds.xml:/workspace/systems/aerodrone/config/fastdds.xml:ro
-    command: ros2 launch rosbridge_server rosbridge_websocket_launch.xml
+    command: ros2 launch rosbridge_server rosbridge_websocket_launch.xml port:=9092
 
   tracking_ui:
     # The map-goal and object-tracking page on http://localhost:8080, served

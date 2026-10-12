@@ -40,10 +40,12 @@ holders and a topside tether spool. Printing and assembly instructions:
   CyberPhysics stack in Docker beside BlueOS is specified for a Pi 5
   (8 GB). It takes the same 58 x 49 mm holes on Blue Robotics' electronics
   tray. Check the Navigator's revision (the August 2025 one is the Pi 5
-  revision) and run BlueOS 1.4 or newer. No Active Cooler (it does not fit
-  under the Navigator's heatsink) and no NVMe HAT: inside the sealed 4 in
-  tube the heatsink is the cooler; watch `vcgencmd get_throttled` on the
-  bench with the tube closed.
+  revision) and run BlueOS 1.4 or newer. Keep BlueOS's kernel: after an OS
+  upgrade to Raspberry Pi OS's 6.12 kernel ArduPilot (4.5.3 to 4.7.1) does
+  not start on the Pi 5 (`applications/navigator/README.md`). No Active
+  Cooler (it does not fit under the Navigator's heatsink) and no NVMe HAT:
+  inside the sealed 4 in tube the heatsink is the cooler; watch `vcgencmd
+  get_throttled` on the bench with the tube closed.
 - **Underwater position (gap in the previous list).** Below the surface
   there is no GPS: without a positioning sensor ArduSub holds depth and
   heading but not position, `/sub0/sensor_measurements/odom` has no

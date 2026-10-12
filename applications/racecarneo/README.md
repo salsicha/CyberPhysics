@@ -127,7 +127,9 @@ Simulator model limits (RacecarSim v2.8.3):
 - Steering full lock is 20 degrees (`max_steering_angle: 0.349`).
 - The simulated car is smaller than the hardware description: wheelbase
   0.225 m (wheel colliders at +-1.125 Unity units, 1 unit = 0.1 m), lidar
-  0.125 m above `base_link`, camera 0.10 m forward and 0.145 m up. The bridge
+  0.125 m above `base_link`, camera 0.10 m forward and 0.145 m up in the
+  prefab; the rendered depth puts the camera 0.120 m above the floor,
+  pitched 0.81 deg up, which the URDF uses ("Depth for nvblox"). The bridge
   (`bridge.yaml`), the simulator's `cmd_vel_to_ackermann` overrides and the
   URDF's `sim_geometry:=true` use these values; its tightest turn is ~0.62 m,
   inside Nav2's 0.75 m minimum turning radius.
@@ -200,8 +202,8 @@ docker compose -f compositions/racecarneo.yaml up
 The composition runs this pipeline:
 
 1. `racecarneo_bridge` publishes camera, lidar, IMU, odometry, and TF.
-2. `racecarneo_depthanything` estimates metric monocular depth from `/camera/color/image_raw`.
-3. `racecarneo_nvblox` consumes the estimated depth image and camera info, then publishes TSDF/ESDF map slices.
+2. `racecarneo_depthanything` estimates metric monocular depth from `/camera/color/image_raw` and publishes it as on the car; nothing in this composition maps it (below).
+3. `racecarneo_nvblox` integrates the bridge's depth image (`/camera/depth/image_rect_raw`, registered to the colour camera) with `/camera/color/camera_info`, then publishes TSDF/ESDF map slices. `RACECAR_NVBLOX_DEPTH_TOPIC=/depth_anything/depth/image` maps Depth Anything's depth instead.
 4. `racecarneo_slam` runs SLAM Toolbox to provide `map -> odom`.
 5. `racecarneo_nav2` plans and controls with Nav2 using nvblox costmap layers plus lidar fallback.
 6. `racecarneo_cmd_vel_to_ackermann` converts Nav2 `/cmd_vel` into `/ackermann_cmd`; manual driving on `/cmd_vel_teleop` takes priority while it keeps arriving, and `/racecarneo/stop_request` latches a stop (`systems/racecarneo/config/cmd_vel_to_ackermann.yaml`).
@@ -212,8 +214,41 @@ NiceGUI is available at `http://localhost:8080`.
 
 The ROS containers do not share `/dev/shm`, so FastDDS runs over UDP only, with 4 MiB socket buffers (`FASTDDS_BUILTIN_TRANSPORTS=UDPv4?sockets_size=4194304`). With the 208 KiB default, best-effort subscribers lost the 640x480 frames: with the simulator, bridge and Depth Anything running they received 74 % of the colour and 23 % of the depth frames (14.7 and 4.5 of 19.8 Hz), and Depth Anything published 3.8 Hz. With the larger buffers they receive every frame and Depth Anything keeps up with the camera (15-18 Hz). It subscribes with a one-frame queue, so it always infers on the newest frame: with the sensor-data queue of five its depth was a median 0.31 s old, now 0.11 s. The kernel caps the buffers at `net.core.rmem_max` and `net.core.wmem_max` (see "DDS transport" in `applications/aerostack2/README.md`).
 
+### Depth for nvblox
+
+Until 2026-10-11 nvblox integrated Depth Anything's depth (vkitti, max_depth
+80), as the hardware composition still does. From the simulated car's
+camera, 0.12 m above the floor, that depth reads a median 13 times
+the bridge's depth over 0.5-5 m (15 times under 1 m; 195 frames while
+circling Demo World, `applications/depthanything/README.md`, "Accuracy"):
+anything farther than about 0.9 m lands beyond nvblox's 12 m integration
+distance (in the Isaac arena the same error left nvblox's map without a
+single obstacle and the obstacles carved out as free space,
+`applications/isaac/RACECAR_TURRET.md`, "Depth for nvblox"). The indoor hypersim model reads 2.9 times; aligned to the
+bridge's depth every frame, either model still puts obstacles 3.5-5 m away
+at about half their distance. The simulator's own depth has none of this,
+so nvblox maps it, as a RealSense's depth would be mapped on the car.
+
+nvblox counts everything 0.02-0.55 m above the floor as an obstacle, so it
+needs the camera's mount to about a centimetre. The prefab's level
+0.145 m (the URDF's earlier `sim_geometry` mount) put the floor 0.3-0.6 m
+ahead 19 mm high and 44 % of it in that band: with the bridge's depth
+nvblox filled the space in front of the car, and both goals below
+aborted ("no valid path found"). The simulator's depth fits a flat floor
+0.120 m below the camera with the camera pitched 0.81 degrees up (floor
+residual under 2.4 mm from 0.3 to 4 m, 0-3 % in the band), which the URDF
+now uses. With it, on 2026-10-11 (one stack): the stack validator passed,
+the goals (3.0, -1.5, -30 deg) and then (5.0, -1.5, 0 deg) succeeded, and
+89-96 % of SLAM's wall cells in the area nvblox had observed had an
+nvblox obstacle within 0.15 m. About 60 % of nvblox's obstacle cells are
+not within 0.15 m of SLAM's walls; some are streaks along the camera's
+rays a few metres out, and the Demo World has no ground truth to say how
+many of the rest are objects off the lidar's plane or the inside of thick
+obstacles. Not checked further.
+
 Closed-loop status: the stack comes up unattended and Nav2 reaches goals in
-Demo World. `NavigateToPose` goals relative to the start pose, each on a
+Demo World. The goal tables below were measured with nvblox on Depth
+Anything's depth (before the change above). `NavigateToPose` goals relative to the start pose, each on a
 freshly started stack (SLAM, Depth Anything and nvblox running), measured on
 2026-10-11 with this composition and its images:
 

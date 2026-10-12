@@ -1,12 +1,12 @@
 # Aerodrone object tracking (systems/aerodrone/tracking.md): the services the
-# aircraft and the Gazebo, Genesis and Isaac simulations share.
+# aircraft and the Gazebo and Isaac simulations share.
 #
 # Included, never run alone, by:
 #   - blueos_aerostack.yaml (the aircraft; aerodrone_hardware.yaml includes
 #     it), with no env file of its own: the fallbacks below are the
 #     aircraft's values (Compose resolves a nested include's env_file
 #     against the working directory, which breaks aerodrone_hardware.yaml);
-#   - aerostack2_sim.yaml, aerostack2_genesis.yaml, aerostack2_isaac.yaml,
+#   - aerostack2_sim.yaml and aerostack2_isaac.yaml,
 #     with topics.env, tracking.env and
 #     ../applications/aerostack2/config/tracking_<simulator>.env (image tag,
 #     DEM cache volume, camera mount, FastDDS profile). They also include
@@ -40,7 +40,10 @@ services:
     # (applications/aerostack2/scripts/aerodrone_tracker.py). The DemNav
     # image: its DEM loader, geoid and camera geometry, on Aerostack2's.
     # env_file: the parameters' values (tools/check_compose_env_defaults.py
-    # holds the fallbacks below to them).
+    # holds the fallbacks below to them). Its timeouts, filter and limits
+    # run on the node's clock: the simulators' env files set
+    # TRACKING_USE_SIM_TIME (their /clock runs slower than real time), the
+    # aircraft keeps wall time.
     profiles: [tracking, tracking_truth]
     image: salsicha/cyberphysics:demnav-${CYBERPHYSICS_TAG:-arm64}
     network_mode: host
@@ -57,6 +60,7 @@ services:
       - ${TRACKING_DEM_SOURCE:-${DEMNAV_CACHE_HOST:-/data/demnav_cache}}:/data/demnav_cache:ro
     command: >
       python3 /workspace/applications/aerostack2/scripts/aerodrone_tracker.py --ros-args
+        -p use_sim_time:=${TRACKING_USE_SIM_TIME:-false}
         -p namespace:=${DRONE_NAMESPACE:-drone0}
         -p topic_prefix:=${TRACKING_TOPIC_PREFIX:-/tracking}
         -p odometry_topic:=${NAVIGATION_ODOM_TOPIC:-/navigation/odometry}

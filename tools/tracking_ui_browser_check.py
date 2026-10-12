@@ -168,6 +168,12 @@ def desktop(browser, url, commands, out):
         check(distance < 40, f'box #{box["id"]} ({box["className"]}) is drawn '
               f'(edge colour distance {distance:.0f})')
     page.screenshot(path=str(out / 'desktop_boxes.png'))
+    # A healthy GPS without vision corrections (the fusion then says
+    # dead_reckoning) is GPS navigation.
+    page.wait_for_function("() => document.getElementById('nav-badge').textContent"
+                           " === 'Navigation: GPS'", timeout=10000)
+    check('ok' in page.get_attribute('#nav-badge', 'class'),
+          'the navigation badge shows GPS with the fusion at dead_reckoning')
 
     # Centered, with a height above ground.
     page.fill('#altitude-agl', '40')

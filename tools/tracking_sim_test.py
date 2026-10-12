@@ -39,10 +39,14 @@ the target, then (each step logged to the recording):
 While following, a target the tracker has lost under a new id that it
 did not take over itself (aerodrone_tracker's track handover) is tracked
 again under that id --repick-s later, as the operator would click its new
-box; one out of view for 10 s is found again from above its route.
+box; one out of view for 10 s is found again from above its route. Those
+times are simulation seconds, like the tracker's lost_timeout_s (the
+simulators may run slower than real time). A hold above a route is above
+the route's point nearest its middle, which the target passes every lap.
 
 Records 10 Hz rows (JSON lines): simulation time, the aircraft's navigation
-position and yaw and its simulator ground truth in the navigation frame,
+position and yaw and its simulator ground truth in the navigation frame
+(and its true roll and pitch, which move a body-fixed camera's view),
 the targets' truth, the tracker's status and estimate, the commanded id and
 the step; and a ``det`` line per detection frame: the targets in view, the
 id each was given, how many tracks matched no target and the id the
@@ -70,14 +74,14 @@ import time
 
 METERS_PER_DEG_LAT = 111320.0
 TRUTH = {'gazebo': ('/aerodrone/ground_truth/pose', 'pose'),
-         'genesis': ('/aerodrone/simulation/ground_truth/odom', 'odometry'),
          'isaac': ('/aerodrone/simulation/ground_truth/odom', 'odometry')}
 # Pass/fail limits of score(). The follow limits ask that the target stays
-# well inside the image and the geometry is held; they do not grade the
-# control's finesse: the scenario's car laps its 26 m x 16 m circuit at the
-# aircraft's 5 m/s speed limit, and the aircraft cuts inside its corners,
-# trailing it by 6-15 m (Gazebo, Genesis; with the ground-truth detector
-# too). The narrowest simulated camera (60 deg across 640 x 480) sees
+# well inside the image and the geometry is held. The scenario's car can be
+# followed: it laps a 60 m x 24 m oval at 3.5 m/s, 70 % of the aircraft's
+# speed limit, with 12 m-radius turns (tracking_targets.json; the first
+# scenario's car lapped a 26 m x 16 m circuit at the 5 m/s limit itself,
+# and the aircraft trailed it by 11 m, median, even with the ground-truth
+# detector). The narrowest simulated camera (60 deg across 640 x 480) sees
 # 0.43 x the height to either side of the centre across the image: the
 # centered limits are fractions of the commanded height. In slant the
 # target is (90 - depression) deg off nadir along the long axis, 10 deg
@@ -205,6 +209,23 @@ def stable_id(frames, name, count=3):
         return None
     ids = {frame[name] for frame in recent}
     return ids.pop() if len(ids) == 1 else None
+
+
+def tilt_deg(quaternion):
+    """(roll, pitch) in degrees of an (x, y, z, w) body attitude (FLU,
+    ZYX): what moves a body-fixed camera's view."""
+    x, y, z, w = quaternion
+    roll = math.atan2(2.0 * (w * x + y * z), 1.0 - 2.0 * (x * x + y * y))
+    pitch = math.asin(max(-1.0, min(1.0, 2.0 * (w * y - z * x))))
+    return (round(math.degrees(roll), 2), round(math.degrees(pitch), 2))
+
+
+def route_hold(samples):
+    """(east, north, up) of the route sample nearest the samples' mean: a
+    point the target passes on every lap (a loop's middle may be metres from
+    its route)."""
+    mean = [sum(values) / len(values) for values in zip(*samples)]
+    return tuple(min(samples, key=lambda sample: math.dist(sample[:2], mean[:2])))
 
 
 # --- scoring ------------------------------------------------------------------
@@ -664,6 +685,7 @@ def fly(args):
     latched = QoSProfile(depth=1, reliability=ReliabilityPolicy.RELIABLE,
                          durability=DurabilityPolicy.TRANSIENT_LOCAL)
     state = {'sim': None, 'origin': None, 'nav': None, 'yaw': None, 'truth_world': None,
+             'attitude': None,
              'targets': None, 'status': None, 'estimate': None, 'platform': None,
              'step': 'setup', 'hidden': '', 'offset': [], 'up_offset': None,
              'cmd': None, 'frames': [],
@@ -696,6 +718,8 @@ def fly(args):
     def on_truth(msg):
         pose = msg.pose.pose if hasattr(msg.pose, 'pose') else msg.pose
         state['truth_world'] = (pose.position.x, pose.position.y, pose.position.z)
+        q = pose.orientation
+        state['attitude'] = tilt_deg((q.x, q.y, q.z, q.w))
 
     tracks = {}  # name: [(sim, east, north, up)], the last 120 s
 
@@ -820,6 +844,7 @@ def fly(args):
                'step': state['step'], 'hidden': state['hidden'],
                'nav': state['nav'], 'yaw': state['yaw'],
                'truth': truth if truth and truth[2] is not None else None,
+               'att': state['attitude'],
                'targets': state['targets'], 'status': state['status'],
                'estimate': state['estimate'], 'cmd': state['cmd'], 'ids': ids,
                'navigation': dict(state['navigation'])}
@@ -980,14 +1005,14 @@ def fly(args):
             return bool(item and nav and math.dist(nav[:2], (item['east'], item['north'])) < radius)
 
         def hold_over(name, altitude=None):
-            """Fly altitude (--altitude) above the middle of the target's
-            route (the mean of its last 60 s of truth) and wait for it to
-            pass below."""
+            """Fly altitude (--altitude) above the target's route where it
+            comes nearest the route's middle (route_hold: from its last 60 s
+            of truth) and wait for it to pass below."""
             altitude = args.altitude if altitude is None else altitude
             now = sim_now()
             samples = [sample[1:] for sample in tracks.get(name, []) if now - sample[0] <= 60.0]
             require(samples, f'no truth for {name}')
-            east, north, up = (sum(values) / len(values) for values in zip(*samples))
+            east, north, up = route_hold(samples)
             handle = send_goal(goto, goto_goal(east, north, up + altitude, 4.0))
             result = handle.get_result_async()
             wait(240.0, result.done)
@@ -1002,24 +1027,29 @@ def fly(args):
             its route and tracked anew."""
             end = sim_now() + seconds
             track(name, fields)
-            lost_for = 0.0
+            lost_since = None
             while sim_now() < end:
                 record()
                 time.sleep(0.1)
-                lost_for = lost_for + 0.1 if status_state() in ('lost', 'error') else 0.0
+                # Simulation seconds, as the tracker's lost_timeout_s.
+                if status_state() not in ('lost', 'error'):
+                    lost_since = None
+                    continue
+                lost_since = sim_now() if lost_since is None else lost_since
+                lost_for = sim_now() - lost_since
                 if lost_for < args.repick_s:
                     continue
                 target_id = current_id(name)
                 if target_id is not None and target_id != following():
                     command(dict({'action': 'track', 'target_id': target_id}, **fields),
                             {'reacquire': name, 'lost_s': round(lost_for, 1)})
-                    lost_for = 0.0
+                    lost_since = None
                 elif lost_for >= 10.0:
                     record({'reacquire': name, 'lost_s': round(lost_for, 1)})
                     command({'action': 'stop'})
                     hold_over(name)
                     track(name, fields)
-                    lost_for = 0.0
+                    lost_since = None
 
         centered = {'mode': 'centered', 'altitude_agl_m': args.altitude}
         # The person of the lost and pre-emption steps, from lower down.

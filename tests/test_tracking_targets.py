@@ -1,5 +1,5 @@
 """Tracking targets of the Aerodrone simulations (systems/aerodrone/tracking.md):
-routes resolved on the terrain the simulators render, the poses all three
+routes resolved on the terrain the simulators render, the poses both
 give the targets, the /simulation/targets ground truth, the Fuel model
 conversion and the tracking scenario's mission tree."""
 import hashlib
@@ -33,8 +33,8 @@ MISSION = json.loads(
     (REPO / 'applications/aerostack2/missions/wilderness_missions.json').read_text())
 HOME = MISSION['missions'][0]['phases'][0]['waypoints'][0]['position_enu_m'][:2]
 CC0 = 'Creative Commons Zero v1.0 Universal'
-# The narrowest simulated downward camera: Gazebo's and Isaac's 60 deg
-# across 640 x 480 (Genesis renders FOV_DEG, 69 deg).
+# The simulated downward camera: Gazebo's and Isaac's 60 deg across
+# 640 x 480.
 NARROW_FOV_DEG, ASPECT = 60.0, 480 / 640
 
 
@@ -63,7 +63,7 @@ def triangle_height(triangles, east, north):
 
 def test_targets_stand_on_the_triangles_the_simulators_render(tmp_path):
     """MeshHeight interpolates terrain_mesh.npz over the faces make_mesh
-    writes to terrain.obj (Gazebo's, Genesis' and Isaac's visual terrain)."""
+    writes to terrain.obj (Gazebo's and Isaac's visual terrain)."""
     rng = np.random.default_rng(1)
     grid = (800.0 + rng.uniform(-30, 30, size=(9, 9))).astype(np.float32)
     args = NS(max_grid_size=257, area_km=0.8, lat=37.9234, lon=-122.5967, origin_alt=781.0,
@@ -205,34 +205,95 @@ MODEL_SIZE_M = {'hatchback_blue': (4.0, 2.14), 'walking_person': (0.9, 0.6),
                 'casual_female': (0.6, 0.6)}
 
 
-def test_scenario_has_a_looping_car_and_person_near_home_in_view_of_the_hold():
+# The aircraft's horizontal speed limit (systems/aerodrone/config/tracking.env
+# TRACKING_MAX_SPEED_MPS, ArduPilot's WPNAV_SPEED) and acceleration
+# (arducopter.params WPNAV_ACCEL, 2 m/s^2).
+MAX_SPEED_MPS, MAX_ACCEL_MPS2 = 5.0, 2.0
+
+
+def footprint_corners(pose, model):
+    length, width = MODEL_SIZE_M[model]
+    c, s = math.cos(pose.yaw), math.sin(pose.yaw)
+    return [(pose.east + c * dx - s * dy, pose.north + s * dx + c * dy)
+            for dx in (-length / 2, length / 2) for dy in (-width / 2, width / 2)]
+
+
+def scenario_tracks():
+    return tt.Tracks(tt.resolve_tracks(CONFIG, lambda e, n: np.zeros_like(e) - 30.0,
+                                       (*HOME, -29.8)))
+
+
+def test_scenario_has_a_looping_car_and_people_near_home_around_the_hold():
     scenario = CONFIG['scenario']
     assert 30.0 <= scenario['hold_agl_m'] <= 60.0
     moving = [t for t in CONFIG['targets'] if t.get('speed_mps', 0) > 0]
     speeds = {t['class']: t['speed_mps'] for t in moving}
-    assert speeds['car'] == pytest.approx(5.0, abs=0.5)
-    assert speeds['person'] == pytest.approx(1.5, abs=0.3)
     assert {t['class'] for t in CONFIG['targets']} <= {'car', 'person'}  # COCO names
+    assert speeds['person'] == pytest.approx(1.5, abs=0.3)  # walking
+    assert [t['class'] for t in CONFIG['targets'] if not t.get('speed_mps')] == ['person']
     assert all(len(t['route_enu_m']) >= 3 for t in moving)  # loops
-    tracks = tt.Tracks(tt.resolve_tracks(CONFIG, lambda e, n: np.zeros_like(e) - 30.0,
-                                         (*HOME, -29.8)))
     hold = np.array(scenario['hold_enu_m'])
     # Whatever the drone's yaw, the camera sees a square of this half size
-    # from the hold; every target stays inside it with 2 m to spare for the
-    # drone's drift.
+    # from the hold; the people stay inside it with 2 m to spare for the
+    # drone's drift, the car crosses it on every lap (for 10 s or more).
     half = footprint_half_m(scenario['hold_agl_m']) - 2.0
-    for track in tracks.tracks:
-        length, width = MODEL_SIZE_M[track.model]
+    for track in scenario_tracks().tracks:
         period = track.length / track.speed if track.speed else 1.0
+        inside = []
         for t in np.linspace(0.0, period, 400):
             pose = track.pose(t)
-            # Near home ...
-            assert math.dist((pose.east, pose.north), HOME) < 100.0
-            c, s = math.cos(pose.yaw), math.sin(pose.yaw)
-            corners = [(pose.east + c * dx - s * dy, pose.north + s * dx + c * dy)
-                       for dx in (-length / 2, length / 2) for dy in (-width / 2, width / 2)]
-            # ... and in view.
-            assert np.abs(np.subtract(corners, hold)).max() <= half, (track.name, t)
+            assert math.dist((pose.east, pose.north), HOME) < 100.0   # near home
+            corners = footprint_corners(pose, track.model)
+            inside.append(np.abs(np.subtract(corners, hold)).max() <= half)
+        if track.name.startswith('person'):
+            assert all(inside), track.name
+        else:
+            assert 10.0 <= np.mean(inside) * period and not all(inside), track.name
+
+
+def test_the_car_can_be_followed_within_the_aircraft_limits():
+    """A fair test of the follow modes: the car drives at 60-70 % of the
+    aircraft's speed limit, so the aircraft can catch up after a lag, its
+    turns (13 m radius) ask the aircraft above it for about half its
+    acceleration, and each straight is four slant stand-offs long (60 m at
+    70 deg: 20.5 m), so a slant follower drives behind it rather than
+    circling inside its loop. The first scenario's car lapped a
+    26 m x 16 m circuit at the 5 m/s limit itself: the aircraft trailed it
+    by 11 m (median) even with the ground-truth detector; on a 60 m x 24 m
+    oval the slant follower sat inside the loop, the car crossing its view
+    sideways."""
+    [car] = [t for t in CONFIG['targets'] if t['class'] == 'car']
+    assert 0.6 * MAX_SPEED_MPS <= car['speed_mps'] <= 0.7 * MAX_SPEED_MPS
+    rows, _ = tt.resample(tt.route_polyline(car['route_enu_m'], car['corner_radius_m'],
+                                             arc_step_deg=0.5), 0.2)
+    # Curvature (rad per metre) over 2 m of route, and the turn's radius.
+    heading = np.unwrap(rows[:, 3])
+    turn = np.abs(heading[10:] - heading[:-10]) / (rows[10:, 0] - rows[:-10, 0])
+    assert car['speed_mps'] ** 2 * turn.max() <= 0.55 * MAX_ACCEL_MPS2
+    assert 1.0 / turn.max() >= 10.0
+    # Straights long enough for the lead to settle and a slant follower
+    # to stay behind the car.
+    standoff = 60.0 * math.cos(math.radians(70.0))
+    straight = np.concatenate(([False], turn < 1e-3, [False])).astype(int)
+    edges = np.flatnonzero(np.diff(straight))
+    lengths = (edges[1::2] - edges[::2]) * 0.2
+    assert len(lengths) == 2 and lengths.min() >= 4.0 * standoff
+
+
+def test_the_people_are_apart_from_each_other_and_the_car():
+    """The walking person (the occlusion step's target) is never within
+    the tracker's handover reach (4 m plus half of 2.5 s at 1.5 m/s) of the
+    standing one, and the car keeps clear of both."""
+    tracks = {track.name: track for track in scenario_tracks().tracks}
+    walker, stander, car = tracks['person_1'], tracks['person_2'], tracks['car_1']
+    still = stander.pose(0.0)
+    for t in np.linspace(0.0, 2 * walker.length / walker.speed, 300):
+        pose = walker.pose(t)
+        assert math.dist((pose.east, pose.north), (still.east, still.north)) > 4.0 + 1.9 + 3.0
+        for other in (pose, still):
+            for u in np.linspace(0.0, car.length / car.speed, 120):
+                drive = car.pose(u)
+                assert math.dist((drive.east, drive.north), (other.east, other.north)) > 5.0
 
 
 def test_every_model_is_pinned_and_public_domain():

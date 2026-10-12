@@ -188,3 +188,28 @@ test('status parsing', () => {
   assert.match(T.parseStatus('[1]').error, /not a JSON object/);
   assert.match(T.parseStatus('null').error, /not a JSON object/);
 });
+
+test('navigation badge: the GPS first, then the vision corrections', () => {
+  const now = 100;
+  const gps = status => ({status, at: now - 1});
+  const source = name => ({source: name, at: now - 0.2});
+  // A healthy GPS is GPS navigation, whatever the fusion's corrections say
+  // (dead_reckoning means only that no DemNav/WildNav correction is active).
+  assert.deepEqual(T.navigationBadge(gps(0), source('dead_reckoning'), now),
+                   {text: 'Navigation: GPS', kind: 'ok'});
+  assert.deepEqual(T.navigationBadge(gps(2), source('demnav'), now),
+                   {text: 'Navigation: GPS + demnav', kind: 'ok'});
+  // No GPS fix: the corrections carry it, or nothing does.
+  assert.deepEqual(T.navigationBadge(gps(-1), source('demnav+wildnav'), now),
+                   {text: 'Navigation: demnav+wildnav (no GPS)', kind: 'warn'});
+  assert.deepEqual(T.navigationBadge(gps(-1), source('dead_reckoning'), now),
+                   {text: 'Navigation: dead reckoning (no GPS)', kind: 'bad'});
+  // Unknown GPS (no MAVROS fix for 5 s) is said so.
+  assert.deepEqual(T.navigationBadge({status: 0, at: now - 6}, source('dead_reckoning'), now),
+                   {text: 'Navigation: GPS unknown', kind: 'warn'});
+  assert.deepEqual(T.navigationBadge(null, source('wildnav'), now),
+                   {text: 'Navigation: wildnav (GPS unknown)', kind: 'warn'});
+  assert.deepEqual(T.navigationBadge(gps(-1), {source: 'demnav', at: now - 9}, now),
+                   {text: 'Navigation: dead reckoning (no GPS)', kind: 'bad'});
+  assert.deepEqual(T.navigationBadge(null, null, now), {text: 'Navigation: -', kind: ''});
+});

@@ -33,6 +33,12 @@ TakeoffBehavior or LandBehavior, starting (IDLE -> RUNNING on its
 is refused while TakeoffBehavior or LandBehavior runs, or while the
 platform is not flying.
 
+Time is the node's clock (tracking_core, "Time"): run with
+``use_sim_time`` in the simulators, whose /clock runs slower than real
+time, so that ``lost_timeout_s``, ``handover_window_s``, the filter, the
+lead and the reference's speed and yaw rate are simulation seconds, as
+ArduPilot's; wall time on the aircraft. Its timers run on that clock too.
+
 Publishes ``<prefix>/status`` (JSON, reliable + transient-local, 2 Hz and
 on every change) and ``<prefix>/target`` (PointStamped, navigation frame).
 """
@@ -371,16 +377,19 @@ class Tracker:
             before = core.state
             reason = ''
             pose = self.poses.at(stamp_ns(msg.header.stamp))
+            t = self._image_time(msg.header.stamp, now)
             if self.intrinsics is None:
                 reason = 'no camera_info'
             elif pose is None:
                 reason = 'no odometry at the image time'
+            elif t is None:
+                reason = 'the image stamp is in neither the node\'s nor the odometry\'s clock'
             if detection is None:
                 # The selected id is gone from this frame: a new id for the
                 # same object (tracking_core, "Track handover")?
                 if reason:
                     return
-                detection, measurement = self._handover(msg, pose, now)
+                detection, measurement = self._handover(msg, pose, now, t)
                 if detection is None:
                     return
             else:
@@ -390,8 +399,7 @@ class Tracker:
                 if reason:
                     core.geolocation_failed(reason, now)
                     return
-                measurement = tc.Measurement(geo.position, geo.covariance,
-                                             pose.stamp_ns * 1e-9)
+                measurement = tc.Measurement(geo.position, geo.covariance, t)
             # The kind is the one selected: kept across class changes within
             # it (car, van) and handovers.
             core.target_class = core.target_class or detection_class(detection) or None
@@ -413,9 +421,14 @@ class Tracker:
             pose, self.intrinsics, self.terrain.height_fn(now, self.bias_hold_s),
             self.mount_yaw, self.stabilized, self.config)
 
-    def _handover(self, msg, pose, now):
+    def _image_time(self, stamp, now):
+        """An image stamp in seconds of the node's clock (now), or None."""
+        mapped = self.poses.to_clock(stamp_ns(stamp), round(now * 1e9))
+        return None if mapped is None else mapped * 1e-9
+
+    def _handover(self, msg, pose, now, t):
         """(detection, measurement) of the track the selected target is
-        handed over to in this frame, or (None, None)."""
+        handed over to in this frame (image time t), or (None, None)."""
         core = self.core
         candidates, detections = {}, {}
         for item in msg.detections:
@@ -424,8 +437,8 @@ class Tracker:
                 continue
             geo = self._geolocate(item, pose, now)
             if geo is not None:
-                candidates[item.id] = (tc.Measurement(geo.position, geo.covariance,
-                                                      pose.stamp_ns * 1e-9), cls, box_side(item))
+                candidates[item.id] = (tc.Measurement(geo.position, geo.covariance, t),
+                                       cls, box_side(item))
                 detections[item.id] = item
         track_id = core.handover(candidates, now)
         if track_id is None:
@@ -499,7 +512,10 @@ class Tracker:
         for name in self.busy_names:
             if self.behaviors.get(name) == self.BehaviorStatus.RUNNING:
                 busy = name
-        return tc.Drone(pose.position, tc.yaw_of(pose.quaternion), agl, flying, busy)
+        # A body-fixed camera turns with the aircraft's tilt; a stabilised
+        # one does not.
+        return tc.Drone(pose.position, tc.yaw_of(pose.quaternion), agl, flying, busy,
+                        None if self.stabilized else pose.quaternion)
 
     # --- actions ----------------------------------------------------------
     def _execute(self, actions, hover_reason='stopped'):

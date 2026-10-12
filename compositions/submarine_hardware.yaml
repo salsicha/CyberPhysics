@@ -2,6 +2,12 @@
 
 services:
   submarine_mavros:
+    # MAVLink from BlueOS's router through its internal TCP server (the
+    # "Internal Link" endpoint, 127.0.0.1:5777): no BlueOS endpoint to add,
+    # and MAVROS joins as component 1:191, which no BlueOS service uses.
+    # The old default, UDP 14550 on the Pi, receives nothing on a stock
+    # BlueOS. BLUEOS_FCU_URL overrides it (applications/aerostack2/README.md,
+    # "BlueOS platform").
     image: salsicha/cyberphysics:submarine-${CYBERPHYSICS_TAG:-arm64}
     container_name: submarine_mavros
     stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
@@ -12,7 +18,7 @@ services:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
     command: >
       ros2 launch mavros apm.launch
-        fcu_url:=${BLUEOS_FCU_URL:-udp://0.0.0.0:14550@}
+        fcu_url:=${BLUEOS_FCU_URL:-tcp://127.0.0.1:5777}
 
   submarine_bridge:
     image: salsicha/cyberphysics:submarine-${CYBERPHYSICS_TAG:-arm64}
@@ -34,11 +40,17 @@ services:
         -p namespace:=${SUBMARINE_NAMESPACE:-sub0}
 
   submarine_rosbridge:
+    # Port 9092: BlueOS's Cable Guy holds 9090 on the host network. Host
+    # IPC and /dev/shm, or Fast DDS's shared-memory transport delivers it
+    # no messages (compositions/blueos_nav_core.yaml).
     image: salsicha/cyberphysics:submarine-${CYBERPHYSICS_TAG:-arm64}
     container_name: submarine_rosbridge
     stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     network_mode: host
+    ipc: host
     restart: unless-stopped
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
-    command: ros2 launch rosbridge_server rosbridge_websocket_launch.xml
+    volumes:
+      - /dev/shm:/dev/shm
+    command: ros2 launch rosbridge_server rosbridge_websocket_launch.xml port:=9092

@@ -1,6 +1,6 @@
 {
   "name": "aerodrone_mount_tamalpais_tracking_targets",
-  "description": "Moving ground targets for the tracking scenario, in the open field of the west clearing just north-west of home: a car lapping a 26 m x 16 m circuit, a person walking a 12 m x 6 m loop inside it and a person standing between them, all inside the downward camera's view from 40 m above the hold point whatever the drone's yaw.",
+  "description": "Moving ground targets for the tracking scenario, in the open field of the west clearing just north-west of home: a car lapping a 116 m x 26 m oval along the clearing at 3.5 m/s (70 % of the aircraft's 5 m/s speed limit, with 13 m-radius turns the aircraft can follow, and 90 m straights a slant follower stays behind it on), a person walking a 12 m x 6 m loop inside it and a person standing between them. From 50 m above the hold point the downward camera sees both people whatever the drone's yaw, and the car crossing it on every lap.",
   "mission": "wilderness_missions.json",
   "frame": "ENU metres about the mission origin (wilderness_missions.json origin, INITIAL_LAT/INITIAL_LON/ORIGIN_ALT)",
   "sample_spacing_m": 0.2,
@@ -44,9 +44,9 @@
       "name": "car_1",
       "class": "car",
       "model": "hatchback_blue",
-      "speed_mps": 5.0,
-      "corner_radius_m": 6.5,
-      "route_enu_m": [[-773.0, -223.0], [-747.0, -223.0], [-747.0, -207.0], [-773.0, -207.0]]
+      "speed_mps": 3.5,
+      "corner_radius_m": 13.0,
+      "route_enu_m": [[-802.7, -241.6], [-690.6, -211.5], [-697.3, -186.4], [-809.4, -216.5]]
     },
     {
       "name": "person_1",
@@ -54,7 +54,7 @@
       "model": "walking_person",
       "speed_mps": 1.5,
       "corner_radius_m": 2.0,
-      "route_enu_m": [[-769.0, -212.0], [-757.0, -212.0], [-757.0, -218.0], [-769.0, -218.0]]
+      "route_enu_m": [[-756.0, -211.0], [-744.0, -211.0], [-744.0, -217.0], [-756.0, -217.0]]
     },
     {
       "name": "person_2",
@@ -62,15 +62,15 @@
       "model": "casual_female",
       "speed_mps": 0.0,
       "heading_deg": 180.0,
-      "route_enu_m": [[-751.0, -215.0]]
+      "route_enu_m": [[-732.0, -209.0]]
     }
   ],
   "scenario": {
     "name": "tracking",
-    "description": "Arm, take off, fly to 40 m above the targets' ground over the centre of the car's circuit, nose east, and hold there until stopped, for the tracker to take over.",
+    "description": "Arm, take off, fly to 50 m above the targets' ground over the middle of the car's oval, nose east, and hold there until stopped, for the tracker to take over.",
     "takeoff_height_m": 35.0,
-    "hold_enu_m": [-760.0, -215.0],
-    "hold_agl_m": 40.0,
+    "hold_enu_m": [-750.0, -214.0],
+    "hold_agl_m": 50.0,
     "speed_mps": 3.0,
     "yaw_deg": 0.0
   }

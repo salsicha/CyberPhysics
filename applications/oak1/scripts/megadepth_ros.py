@@ -46,6 +46,43 @@ TRACKING_MEGADEPTH_RATE_HZ = 3.0
 TRACKLET_PUBLISHED = ('NEW', 'TRACKED')
 
 
+def open_device(pipeline, device_ip, logger, retry_period_s=5.0,
+                log_period_s=60.0, ok=lambda: True, sleep=time.sleep,
+                clock=time.monotonic):
+    """Open the OAK-1 with the pipeline, waiting until one is connected.
+
+    With no camera DepthAI raises RuntimeError ("Cannot find any device
+    with given deviceInfo"); the node used to exit and Docker restarted it
+    every few seconds (a crash loop of about 21 restarts in 10 minutes on
+    the Raspberry Pi 5). It now tries again every retry_period_s, says so
+    once and then every log_period_s, and returns the device as soon as
+    the camera is plugged in, or None when ok() turns false (shutdown).
+    """
+    explicit = bool(device_ip) and device_ip != 'auto'
+    where = f'at {device_ip}' if explicit else 'on USB or the network'
+    start = clock()
+    last_log = None
+    while ok():
+        try:
+            if explicit:
+                device = dai.Device(pipeline, dai.DeviceInfo(device_ip))
+            else:
+                device = dai.Device(pipeline)
+        except RuntimeError as exc:
+            now = clock()
+            if last_log is None or now - last_log >= log_period_s:
+                logger.warning(
+                    f'Waiting for an OAK-1 {where} ({exc}); retrying every '
+                    f'{retry_period_s:g} s, {now - start:.0f} s so far')
+                last_log = now
+            sleep(retry_period_s)
+            continue
+        if last_log is not None:
+            logger.info(f'OAK-1 connected after {clock() - start:.0f} s')
+        return device
+    return None
+
+
 def approximate_intrinsics(width, height):
     """Uncalibrated pinhole K for a width x height preview/still of the
     1080P stream. The 256x192 MegaDepth preview is a 4:3 crop, ~52 deg
@@ -106,6 +143,8 @@ class MegaDepthNode(Node):
             'blob_path',
             '/models/megadepth_192x256_openvino_2021.4_6shave.blob')
         self.declare_parameter('device_ip', 'auto')
+        # Seconds between attempts while no OAK-1 is connected.
+        self.declare_parameter('device_retry_period_s', 5.0)
         self.declare_parameter('image_topic', '/oak1/image_raw')
         self.declare_parameter('depth_topic', '/oak1/relative_depth')
         self.declare_parameter('camera_info_topic', '/oak1/camera_info')
@@ -200,11 +239,12 @@ class MegaDepthNode(Node):
             megadepth_rate_hz=md_rate,
             tracking=self.tracking)
 
-        device_ip = self.get_parameter('device_ip').value
-        if device_ip and device_ip != 'auto':
-            self.device = dai.Device(pipeline, dai.DeviceInfo(device_ip))
-        else:
-            self.device = dai.Device(pipeline)
+        self.device = open_device(
+            pipeline, self.get_parameter('device_ip').value, self.get_logger(),
+            float(self.get_parameter('device_retry_period_s').value),
+            ok=rclpy.ok)
+        if self.device is None:
+            raise KeyboardInterrupt('shut down while waiting for the OAK-1')
 
         self.camera_queue = self.device.getOutputQueue(
             oak1_pipeline.STREAM_CAMERA, maxSize=8, blocking=False)
@@ -447,7 +487,12 @@ class MegaDepthNode(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = MegaDepthNode()
+    try:
+        node = MegaDepthNode()
+    except KeyboardInterrupt:  # stopped while waiting for the camera
+        if rclpy.ok():
+            rclpy.shutdown()
+        return
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:

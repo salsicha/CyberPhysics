@@ -2,7 +2,7 @@
 
 The aerodrone follows a ground object picked in the web UI, in one of two
 modes, on the real aircraft (BlueOS: Raspberry Pi 5 + Navigator + downward
-OAK-1) and in the Gazebo, Genesis and Isaac simulations. This file is the
+OAK-1) and in the Gazebo and Isaac simulations. This file is the
 contract between the parts; change it only together with every part that
 uses it.
 
@@ -69,7 +69,19 @@ These were fixed while the parts were built and tested:
   ground level under the target.
 - Slant defaults: `slant_range_m` 60, `depression_deg` 70. The depression is
   raised above 60 deg when the camera's field of view is narrower than the
-  OAK-1's, so the target stays 4.5 deg inside the image.
+  OAK-1's, so the target stays 4.5 deg inside the image. With a body-fixed
+  camera (the OAK-1; Gazebo's and Isaac's) it is also raised by the
+  aircraft's tilt toward the target, which turns the camera away from it
+  (taken at once, let go over `tilt_release_s`, 5 s; at most 15 deg): in
+  the Gazebo test flights a 12 deg tilt put the car outside the image.
+- Centered yaw: a target moving at 2 m/s or more (`centered_yaw_min_speed_mps`)
+  is followed with its direction of travel along the image's long axis (the
+  end nearer the current yaw), where the image reaches farthest ahead of and
+  behind it; a slower one keeps the yaw (spun about a walking person's tight
+  turns, the detector found the person less often). The VisDrone detector
+  also finds a car lying along the long, horizontal, axis more often than
+  one lying along the short axis: in 92 % of the frames against 60 % in the
+  Gazebo test flights.
 - Status: `slant_range_m` and `depression_deg` report the measured geometry
   from the drone to the target, in both modes.
 - Commands: a numeric `target_id` is accepted. A rejected command sets state
@@ -79,7 +91,7 @@ These were fixed while the parts were built and tested:
 - Track handover: detector track IDs change under camera motion (a
   body-fixed camera on a manoeuvring aircraft moves the image by tens of
   pixels a frame; in the Gazebo test flights the followed car got a new ID
-  every 8-14 s, with Genesis' stabilised camera every 20-30 s).
+  every 8-14 s).
   When the selected ID is missing from a frame at most `handover_window_s`
   (2.5 s, within `lost_timeout_s`) after the target was last placed, the
   tracker follows a new ID of the same kind of object (vehicle: car, van,
@@ -96,7 +108,16 @@ These were fixed while the parts were built and tested:
   car's ID that the detector moves onto a person is treated as gone.
 - Speed: the effective horizontal limit is the lower of
   `TRACKING_MAX_SPEED_MPS` and ArduPilot's `WPNAV_SPEED`.
-- `lost_timeout_s` is wall-clock time.
+- Time: the tracker runs on its node clock, simulation time under
+  `use_sim_time` (the simulators set it: their /clock may run slower than
+  real time, Isaac's at about 0.2x), wall time on the aircraft.
+  `lost_timeout_s`, `handover_window_s`, the target filter's time steps and
+  velocities, the lead and the reference's speed and yaw-rate limits are
+  seconds of that clock, the one ArduPilot and the targets move in; a
+  detection's time is its image's stamp on that clock. (They were wall
+  time at first: 3 s was 0.6 s of Isaac's simulation, and there the
+  reference ran at five times the speed limit, held back only by
+  `max_reference_lead_m`.)
 - Profiles: `tracking` runs the detector and tracker; `tracking_truth`
   replaces the detector with one that projects `/simulation/targets` into
   the camera (simulators only).

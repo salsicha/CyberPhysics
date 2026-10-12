@@ -27,13 +27,17 @@
     lastCommand: null,    // the last command JSON published
     fix: null,
     odometry: null,
+    gps: null,            // {status, at}: MAVROS' raw GPS fix
+    correction: null,     // {source, at}: the navigation fusion's corrections
   };
   // Read by the browser test (tools/tracking_ui_browser_check.py).
   window.__trackingUi = {state, topicNames};
 
   // ---------------------------------------------------------------- ROS
   const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
-  const rosUrl = `${scheme}://${window.location.hostname || 'localhost'}:9090`;
+  // rosbridge listens on 9092 (compositions/blueos_nav_core.yaml): on the
+  // aircraft BlueOS's network manager holds the default 9090.
+  const rosUrl = `${scheme}://${window.location.hostname || 'localhost'}:9092`;
   const ros = new ROSLIB.Ros();
   let reconnectTimer = null;
 
@@ -74,9 +78,25 @@
       updateMapGoalReady();
       updateTargetMarker();
     });
+  // The badge combines the GPS with the vision corrections
+  // (TrackingLogic.navigationBadge): correction_source alone says
+  // dead_reckoning whenever no DemNav/WildNav correction is active.
+  topic('/mavros/global_position/raw/fix', 'sensor_msgs/msg/NavSatFix',
+        {throttle_rate: 1000, queue_length: 1})
+    .subscribe(message => {
+      state.gps = {status: message.status.status, at: Date.now() / 1000};
+      showNavigation();
+    });
   topic('/navigation/correction_source', 'std_msgs/msg/String').subscribe(message => {
-    $('nav-badge').textContent = `Navigation: ${message.data}`;
+    state.correction = {source: message.data, at: Date.now() / 1000};
+    showNavigation();
   });
+
+  function showNavigation() {
+    const badge = T.navigationBadge(state.gps, state.correction, Date.now() / 1000);
+    $('nav-badge').textContent = badge.text;
+    $('nav-badge').className = `badge ${badge.kind}`;
+  }
 
   ros.on('connection', () => {
     state.connected = true;
@@ -493,6 +513,7 @@
       updateButtons();
     }
     showStatus();
+    showNavigation();
     scheduleRender();
   }, 500);
 

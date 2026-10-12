@@ -195,7 +195,8 @@ def test_mock_boxes_have_stable_ids_inside_the_image():
 # Serving the page ------------------------------------------------------------
 
 def test_aircraft_serves_the_repository_page_next_to_rosbridge():
-    """The page connects to rosbridge on its own host's port 9090."""
+    """The page connects to rosbridge on its own host's port 9092 (BlueOS's
+    network manager holds 9090 on the aircraft)."""
     compositions = REPO / 'compositions'
     gui = yaml.safe_load((compositions / 'blueos_aerostack.yaml').read_text())[
         'services']['aerostack_gui']
@@ -207,5 +208,6 @@ def test_aircraft_serves_the_repository_page_next_to_rosbridge():
     rosbridge = yaml.safe_load((compositions / 'blueos_nav_core.yaml').read_text())[
         'services']['rosbridge']
     assert rosbridge['network_mode'] == 'host'
-    assert rosbridge['command'] == 'ros2 launch rosbridge_server rosbridge_websocket_launch.xml'
-    assert ':9090`' in (WEB / 'app.js').read_text()
+    assert rosbridge['command'] == (
+        'ros2 launch rosbridge_server rosbridge_websocket_launch.xml port:=9092')
+    assert ':9092`' in (WEB / 'app.js').read_text()

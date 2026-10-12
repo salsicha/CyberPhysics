@@ -14,8 +14,8 @@ in its next iteration (5 ms of simulation time), before the following
 camera frame. Targets named on /simulation/targets/hide are put under the
 terrain (tracking_targets.HIDE_TOPIC).
 
-Genesis and Isaac move the same tracks inside their own simulation loops
-(applications/genesis|isaac/scripts/aerodrone_navsim.py).
+Isaac moves the same tracks inside its own simulation loop
+(applications/isaac/scripts/aerodrone_navsim.py).
 """
 
 from __future__ import annotations

@@ -14,7 +14,8 @@
   is smaller (0.225 m wheelbase): read from its Racecar prefab
   (sharedassets2.assets), Lidar at (0, 1.25, 0) and ColorCamera/DepthCamera at
   (0, 1.45, 1.0) Unity units, where 1 unit = 0.1 m (the simulator scales
-  lidar and depth distances by 10 to report centimetres).
+  lidar and depth distances by 10 to report centimetres); the camera's
+  height and pitch are measured from its depth instead (below).
 -->
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="racecarneo">
   <!--
@@ -64,10 +65,16 @@
       <child link="racecarneo/lidar_link"/>
       <origin xyz="0 0 0.125" rpy="0 0 0"/>
     </joint>
+    <!-- The camera as the simulator renders it: its depth puts the floor
+         0.120 m below the camera, pitched 0.81 deg up (Demo World, 195
+         frames; the floor then within 2.4 mm of z = 0 from 0.3 to 4 m;
+         applications/racecarneo/README.md, "Depth for nvblox"), not at the
+         prefab's level 0.145 m, which lifted the near floor into nvblox's
+         0.02 m obstacle band. -->
     <joint name="camera_joint" type="fixed">
       <parent link="base_link"/>
       <child link="racecarneo/camera_link"/>
-      <origin xyz="0.10 0 0.145" rpy="0 0 0"/>
+      <origin xyz="0.10 0 0.120" rpy="0 -0.0141 0"/>
     </joint>
   </xacro:if>
 

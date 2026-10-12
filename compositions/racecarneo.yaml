@@ -89,6 +89,8 @@ services:
         -p max_steering_angle:=0.349
 
 
+  # Publishes /depth_anything/depth/image and points as on the car, but
+  # nvblox maps the simulator's own depth (below).
   racecarneo_depthanything:
     network_mode: host
     pull_policy: if_not_present
@@ -123,6 +125,16 @@ services:
               count: 1
               capabilities: [gpu, compute, utility]
 
+  # nvblox integrates the bridge's depth (/camera/depth/image_rect_raw, the
+  # simulator's depth camera, registered to the colour camera and described
+  # by its camera_info). From the simulated car's camera, 0.12 m above
+  # the floor, Depth Anything's vkitti depth reads about 13 times the true
+  # depth (applications/depthanything/README.md, "Accuracy"), which put
+  # nvblox's obstacles out of reach. The URDF's sim_geometry camera mount
+  # is measured from that depth (0.120 m, pitched 0.81 deg up): nvblox
+  # takes anything 0.02 m above the floor for an obstacle.
+  # RACECAR_NVBLOX_DEPTH_TOPIC=/depth_anything/depth/image maps Depth
+  # Anything's depth instead.
   racecarneo_nvblox:
     network_mode: host
     pull_policy: if_not_present
@@ -131,7 +143,6 @@ services:
     stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     depends_on:
       - racecarneo_bridge
-      - racecarneo_depthanything
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
       - FASTDDS_BUILTIN_TRANSPORTS=UDPv4?sockets_size=4194304
@@ -143,6 +154,7 @@ services:
     command: >
       ros2 launch /workspace/racecarneo_nvblox.launch.py
         config_file:=/workspace/config/nvblox.yaml
+        depth_image_topic:=${RACECAR_NVBLOX_DEPTH_TOPIC:-/camera/depth/image_rect_raw}
     deploy:
       resources:
         reservations:

@@ -103,8 +103,8 @@ def test_aerodrone_mission_picks_one_tree_for_flight_ready_and_the_mission(stack
 
 
 def test_ground_truth_comes_at_10_hz_or_more_of_simulation_time():
-    """Isaac publishes it with every camera frame, Gazebo's driver
-    every --period-s of simulation time."""
+    """Isaac publishes it with every camera frame, Gazebo's driver every
+    --period-s of simulation time."""
     driver = load_script(REPO / 'applications/gazebo/scripts/gazebo_tracking_targets.py',
                          'gazebo_tracking_targets_review')
     assert driver.parse_args([]).period_s <= 0.1

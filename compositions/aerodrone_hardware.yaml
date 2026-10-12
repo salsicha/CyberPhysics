@@ -33,13 +33,23 @@ services:
     restart: unless-stopped
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
-    devices:
-      - ${RANGEFINDER_DEVICE:-/dev/ttyUSB0}:/dev/rangefinder
+    # The adapter reaches the container through the host's /dev, mounted
+    # read-only at /host/dev, and these device cgroup rules (USB serial:
+    # ttyUSB* is major 188, ttyACM* 166), not through `devices:`. Docker
+    # refuses to start a container whose `devices:` entry does not exist,
+    # and `docker compose up` then stops with most of the stack never
+    # started (seen on the Pi 5 with no adapter plugged in). This way the
+    # node retries every second until the adapter appears, reopens it after
+    # an unplug, and a by-id path keeps working when it re-enumerates.
+    device_cgroup_rules:
+      - 'c 188:* rmw'
+      - 'c 166:* rmw'
     volumes:
+      - /dev:/host/dev:ro
       - /dev/shm:/dev/shm
     command: >
       python3 /scripts/rangefinder_node.py --ros-args
-        -p port:=/dev/rangefinder
+        -p port:=/host${RANGEFINDER_DEVICE:-/dev/ttyUSB0}
         -p model:=${RANGEFINDER_MODEL:-tfmini_s}
         -p topic:=${RANGEFINDER_TOPIC:-/aerodrone/rangefinder}
         -p frame_id:=rangefinder_link

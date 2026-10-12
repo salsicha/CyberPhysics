@@ -15,8 +15,10 @@ the MAVROS stream and republishes a stable ROS 2 topic contract.
 
 - BlueOS running on the onboard Raspberry Pi.
 - Navigator running ArduSub firmware.
-- MAVLink endpoint available to MAVROS, usually
-  `udp://0.0.0.0:14550@`.
+- MAVROS reaches the autopilot through BlueOS's MAVLink router, TCP
+  `tcp://127.0.0.1:5777` (`BLUEOS_FCU_URL` in `config/blueos.env`): no
+  BlueOS endpoint to add (`applications/aerostack2/README.md`, "BlueOS
+  platform"). rosbridge listens on 9092: BlueOS holds 9090.
 - Pressure/depth sensor, leak sensor, camera stream, lights, and thruster outputs
   configured in BlueOS/QGroundControl.
 - Tether and topside network validated before enabling ROS velocity setpoints.

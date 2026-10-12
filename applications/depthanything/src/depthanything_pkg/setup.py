@@ -23,7 +23,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'depth_node = depthanything_pkg.depth_node:main'
+            'depth_node = depthanything_pkg.depth_node:main',
+            'depth_accuracy = depthanything_pkg.depth_accuracy:main',
         ],
     },
 )

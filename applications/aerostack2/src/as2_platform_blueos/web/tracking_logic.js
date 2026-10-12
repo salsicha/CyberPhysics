@@ -1,6 +1,7 @@
 // Pure logic of the aerodrone web UI (index.html): tracking command
 // validation and JSON, detection/frame time alignment, display <-> image
-// pixel mapping, box hit testing and the map's ENU conversion. No DOM and
+// pixel mapping, box hit testing, the map's ENU conversion and the
+// navigation badge. No DOM and
 // no ROS here, so tests/test_aerodrone_tracking_ui.py runs it under node.
 // The command and topic contract is systems/aerodrone/tracking.md.
 (function (root, factory) {
@@ -273,6 +274,34 @@
     return {lat, lon};
   }
 
+  // The navigation badge, {text, kind} (kind: the badge's ok/warn/bad
+  // class). gps: {status, at} from MAVROS' raw GPS fix (NavSatFix status:
+  // -1 no fix, 0 or more a fix); correction: {source, at} from the
+  // navigation fusion's /navigation/correction_source, which names the
+  // vision corrections it applies (demnav, wildnav, demnav+wildnav) and
+  // says dead_reckoning whenever none is active, GPS or not: on its own it
+  // read "dead_reckoning" while the GPS was healthy. Either is unknown
+  // after staleAfterS without a message (times in seconds).
+  const CORRECTION_SOURCES = new Set(['demnav', 'wildnav', 'demnav+wildnav']);
+
+  function navigationBadge(gps, correction, nowS, staleAfterS = 5) {
+    const fresh = item => Boolean(item) && Number.isFinite(item.at) &&
+      nowS - item.at <= staleAfterS;
+    const gpsKnown = fresh(gps) && Number.isFinite(gps.status);
+    const vision = fresh(correction) && CORRECTION_SOURCES.has(correction.source)
+      ? correction.source : null;
+    if (gpsKnown && gps.status >= 0) {
+      return {text: `Navigation: GPS${vision ? ` + ${vision}` : ''}`, kind: 'ok'};
+    }
+    if (gpsKnown) {
+      return vision ? {text: `Navigation: ${vision} (no GPS)`, kind: 'warn'}
+        : {text: 'Navigation: dead reckoning (no GPS)', kind: 'bad'};
+    }
+    if (vision) return {text: `Navigation: ${vision} (GPS unknown)`, kind: 'warn'};
+    if (fresh(correction)) return {text: 'Navigation: GPS unknown', kind: 'warn'};
+    return {text: 'Navigation: -', kind: ''};
+  }
+
   // /tracking/status JSON, or {error} when it is not a status object.
   function parseStatus(text) {
     let status;
@@ -294,6 +323,6 @@
     trackCommand, stopCommand,
     stampSeconds, stampDifference, stampKey, parseDetections, DetectionHistory, boxAlpha,
     fitRect, displayToImage, imageToDisplay, hitTest,
-    latLonToEnu, enuToLatLon, parseStatus,
+    latLonToEnu, enuToLatLon, parseStatus, navigationBadge,
   };
 }));

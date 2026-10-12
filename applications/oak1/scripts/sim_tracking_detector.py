@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Object-tracking detector of the Gazebo, Genesis and Isaac simulations
+"""Object-tracking detector of the Gazebo and Isaac simulations
 (systems/aerodrone/tracking.md), where there is no OAK-1.
 
 Runs the same YOLO network as the aircraft (the ONNX its OAK-1 blob is

@@ -32,8 +32,10 @@ Printing and assembly instructions:
   under the Navigator. Check the Navigator's revision: the August 2025
   revision moved its magnetometer for Pi 5 compatibility; with an older
   board use the GPS puck's compass as the primary one. Run BlueOS 1.4 or
-  newer. No Active Cooler (it does not fit under the Navigator's
-  heatsink, which is the Pi's cooler), no NVMe HAT.
+  newer. Keep BlueOS's kernel: after an OS upgrade to Raspberry Pi OS's
+  6.12 kernel ArduPilot (4.5.3 to 4.7.1) does not start on the Pi 5
+  (`applications/navigator/README.md`). No Active Cooler (it does not fit
+  under the Navigator's heatsink, which is the Pi's cooler), no NVMe HAT.
 - **Pi 5 USB current.** Powered through the Navigator's header, the Pi
   limits its USB ports to 600 mA unless `usb_max_current_enable=1` is set
   in `/boot/firmware/config.txt`: set it before plugging in a USB camera.

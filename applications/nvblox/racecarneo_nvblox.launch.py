@@ -46,6 +46,7 @@ def generate_launch_description():
             base_config,
             sim_config,
             config_file,
+            LaunchConfiguration('overrides_file'),
         ],
     )
 
@@ -63,6 +64,11 @@ def generate_launch_description():
             'config_file',
             default_value='/workspace/config/nvblox.yaml',
             description='RACECAR Neo nvblox parameter override file',
+        ),
+        DeclareLaunchArgument(
+            'overrides_file',
+            default_value=config_file,
+            description='Parameters over config_file (default: config_file again, nothing more)',
         ),
         *[DeclareLaunchArgument(name, default_value=default, description=description)
           for name, default, description in TOPIC_ARGUMENTS],

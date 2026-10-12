@@ -229,6 +229,39 @@ def test_pose_history_maps_simulator_stamps_through_the_clock():
     assert frame.stamp_ns == pytest.approx(wall0 + 450_000_000, abs=1000)
 
 
+def test_image_stamps_are_put_on_the_trackers_clock():
+    """The tracker's clock is simulation time under use_sim_time, wall time
+    otherwise; a simulator's frames are stamped in simulation time. A stamp
+    already on the clock is kept, one on the other clock goes through the
+    /clock pairs (here a simulator at 0.2x real time, as Isaac)."""
+    history = tc.PoseHistory()
+    wall0, sim0 = 1_700_000_000_000_000_000, 120_000_000_000
+    for i in range(11):
+        history.add_clock(sim0 + i * 20_000_000, wall0 + i * 100_000_000)
+    frame = sim0 + 100_000_000
+    assert history.to_clock(frame, sim0 + 200_000_000) == frame           # use_sim_time
+    assert history.to_clock(frame, wall0 + 900_000_000) == pytest.approx(
+        wall0 + 500_000_000, abs=10)                                        # wall clock
+    assert history.to_clock(wall0 + 500_000_000, sim0 + 200_000_000) == pytest.approx(
+        sim0 + 100_000_000, abs=10)
+    assert history.to_clock(frame, 5_000_000_000_000) is None               # neither clock
+    assert tc.PoseHistory().to_clock(wall0, wall0 + 300_000_000) == wall0   # the aircraft
+
+
+def test_timeouts_are_seconds_of_the_trackers_clock():
+    """lost_timeout_s and handover_window_s count the clock the tracker is
+    given, the simulation's under use_sim_time: in a simulator at 0.2x real
+    time, 3 s of simulation are 15 s of wall time (the first tracker took
+    them as 3 s of wall time, 0.6 s of Isaac's simulation)."""
+    core = tc.TrackerCore(CONFIG)
+    core.handle_command(TRACK, 100.0, flying())
+    core.measurement(tc.Measurement(np.array([5.0, 5.0, 0.0]), COV, 100.0), 100.0)
+    core.target_class = 'car'
+    assert core.handover_open(102.4) and not core.handover_open(102.6)
+    assert core.tick(102.9) == [] and core.state == 'tracking'
+    assert core.tick(103.1) == [] and core.state == 'lost'
+
+
 # --- the filter ---------------------------------------------------------------
 def test_filter_converges_on_a_constant_velocity_target():
     """5 Hz fixes with 1 m of noise (attitude and box jitter at 50 m)."""
@@ -334,6 +367,54 @@ def test_field_of_view_limits_the_depression():
     assert point.depression_deg == pytest.approx(64.5, abs=0.05)
     status = core.status(10.0, drone.position)
     assert 'depression held at 64.5 deg' in status['message']
+
+
+def test_tilt_toward_a_bearing():
+    """The body's up axis leaning toward the bearing: a nose-down pitch
+    leans it ahead, a right roll to the right."""
+    assert tc.tilt_toward_deg(quaternion(pitch_deg=10.0), 0.0) == pytest.approx(10.0)
+    assert tc.tilt_toward_deg(quaternion(pitch_deg=10.0), math.pi) == pytest.approx(-10.0)
+    assert tc.tilt_toward_deg(quaternion(pitch_deg=10.0), math.pi / 2) == pytest.approx(0.0)
+    assert tc.tilt_toward_deg(quaternion(roll_deg=8.0, yaw_deg=90.0), 0.0) == pytest.approx(
+        8.0, abs=1e-6)
+
+
+SLANT70 = ('{"action": "track", "target_id": "3", "mode": "slant", '
+           '"slant_range_m": 60, "depression_deg": 70}')
+
+
+def test_aircraft_tilt_toward_the_target_raises_the_depression():
+    """Gazebo's body-fixed camera, a car 20.5 m east of the aircraft that
+    chases it, nose-down 12 deg (the Gazebo test flights' tilt where the
+    car left the image): the floor rises from 64.5 deg to 76.5, which
+    keeps the car 4.5 deg inside the image through the tilted camera; it
+    comes down over tilt_release_s once level, and a stabilised camera
+    (no camera_tilt_quaternion) never raises it."""
+    tilted = quaternion(pitch_deg=12.0)
+    core = tracking_core_at((20.5, 0.0, 0.0), SLANT70, now=0.0)
+    drone = tc.Drone((0.0, 0.0, 56.4), 0.0, 56.4, camera_tilt_quaternion=tilted)
+    point = core.setpoint(0.1, drone, flat(), 0.0, GAZEBO)
+    assert point.depression_deg == pytest.approx(76.5, abs=0.1)
+    assert 'aircraft tilt 12 deg' in core.status(0.1, drone.position)['message']
+    # The car through the tilted camera at that geometry: inside the edge.
+    standoff = 60.0 * math.cos(math.radians(point.depression_deg))
+    height = 60.0 * math.sin(math.radians(point.depression_deg))
+    pose_at = tc.Pose((20.5 - standoff, 0.0, height),
+                      quaternion(pitch_deg=12.0, yaw_deg=math.degrees(point.yaw)), 0, 0.0)
+    u, v, _ = tc.project_point((20.5, 0.0, 0.0), pose_at.position,
+                               tc.camera_world_rotation(pose_at.quaternion, 0.0), GAZEBO)
+    edge = min(u, GAZEBO.width - u)
+    assert math.degrees(math.atan((GAZEBO.cx - edge) / GAZEBO.fx)) <= 30.0 - 4.4
+    # Level again: down to 70 (the command) within a few release times.
+    level = tc.Drone((0.0, 0.0, 56.4), 0.0, 56.4, camera_tilt_quaternion=quaternion())
+    for k in range(1, 300):
+        point = core.setpoint(0.1 + 0.1 * k, level, flat(), 0.0, GAZEBO)
+    assert point.depression_deg == pytest.approx(70.0, abs=0.05)
+    assert core.tilt_raise < 0.05
+    # A stabilised camera does not turn with the aircraft.
+    core = tracking_core_at((20.5, 0.0, 0.0), SLANT70, now=0.0)
+    steady = tc.Drone((0.0, 0.0, 56.4), 0.0, 56.4)
+    assert core.setpoint(0.1, steady, flat(), 0.0, GAZEBO).depression_deg == pytest.approx(70.0)
 
 
 def test_reference_shaper_limits_speed_lead_and_turn_rate():
@@ -541,6 +622,29 @@ def test_setpoint_aims_at_the_target_predicted_lead_s_ahead():
     assert point.position[2] == pytest.approx(40.0)
 
 
+@pytest.mark.parametrize('mount_deg', [0.0, 90.0])
+def test_centered_yaw_lays_the_targets_travel_along_the_long_axis(mount_deg):
+    """A car driving north-east, followed centered: the set-point's yaw
+    puts its direction of travel along the image's long axis (the end
+    nearer the current yaw), so the projection of a point ahead of it lies
+    on that axis; a person walking keeps the yaw."""
+    mount = math.radians(mount_deg)
+    core = tracking_core_at((0.0, 0.0, 0.0), now=0.0)
+    core.filter.x[3:] = (2.5, 2.5, 0.0)
+    point = core.setpoint(0.0, flying(), flat(), mount, GAZEBO)
+    above = tc.Pose((0.0, 0.0, 40.0), quaternion(yaw_deg=math.degrees(point.yaw)), 0, 0.0)
+    rotation = tc.camera_world_rotation(above.quaternion, mount)
+    u, v, _ = tc.project_point((10.0, 10.0, 0.0), above.position, rotation, GAZEBO)
+    assert v == pytest.approx(GAZEBO.cy, abs=1e-6) and abs(u - GAZEBO.cx) > 100.0
+    assert abs(tc.wrap_angle(point.yaw)) <= math.pi / 2 + 1e-9  # nearer yaw 0
+    # Walking pace (1.5 m/s), under centered_yaw_min_speed_mps: the yaw stays.
+    core.filter.x[3:] = (1.2, 0.9, 0.0)
+    assert core.setpoint(0.1, flying(), flat(), mount, GAZEBO).yaw == pytest.approx(point.yaw)
+    core = tracking_core_at((0.0, 0.0, 0.0), now=0.0)
+    core.filter.x[3:] = (1.2, 0.9, 0.0)
+    assert core.setpoint(0.0, flying(), flat(), mount, GAZEBO).yaw == pytest.approx(0.0)
+
+
 # --- the ground-truth detector --------------------------------------------------
 def test_routes_are_continuous_at_their_speed():
     for spec in ('car_1,car,stadium,60,0,120,30,4.0', 'c,car,circle,0,0,25,0,3.0',
@@ -737,7 +841,8 @@ def test_tracker_node_hands_a_vanished_id_over_on_its_detections():
     node.intrinsics, node.mount_yaw, node.stabilized = GAZEBO, 0.0, False
     node.terrain, node.bias_hold_s = tracker_node.Terrain(), 30.0
     node.origin = None
-    node.poses = NS(at=lambda stamp: pose((9.6, 0.0, 40.0)))   # straight above the car
+    node.poses = NS(at=lambda stamp: pose((9.6, 0.0, 40.0)),   # straight above the car
+                    to_clock=lambda stamp, reference: stamp)
     logs, published = [], []
     node.node = NS(get_logger=lambda: NS(info=logs.append, warn=logs.append))
     node.now = lambda: 2.4

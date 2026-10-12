@@ -1,0 +1,27 @@
+{
+  "name": "racecar_turret_isaac_course",
+  "scenario": "systems/racecar_turret/scenarios/isaac_arena.json",
+  "default_frame_id": "map",
+  "action": "NavigateThroughPoses",
+  "missions": [
+    {
+      "id": "arena_lap",
+      "description": "One counter-clockwise lap of the arena around the central island, past the obstacles between the car's loop and the target's, to the south-west turn just short of the start. The lap ends there and not on the start line: Nav2's goal checker compares the car with the last pose only, so a last pose on the way out would end the course at once. Poses are in the map frame, which SLAM starts at the car's spawn pose (the scenario's origin).",
+      "spawn_pose_id": "origin",
+      "tolerance": {"xy_m": 0.25, "yaw_rad": 0.35},
+      "speed_limit_mps": 0.35,
+      "waypoints": [
+        {"id": "south_west", "pose": [4.0, 0.0, 0.0]},
+        {"id": "south_east", "pose": [9.0, 0.0, 0.0]},
+        {"id": "east_turn", "pose": [12.5, 1.2, 0.785]},
+        {"id": "east", "pose": [13.5, 4.0, 1.571]},
+        {"id": "north_turn", "pose": [12.5, 6.8, 2.356]},
+        {"id": "north_east", "pose": [9.0, 8.0, 3.142]},
+        {"id": "north_west", "pose": [4.0, 8.0, 3.142]},
+        {"id": "west_turn", "pose": [0.5, 6.8, -2.356]},
+        {"id": "west", "pose": [-0.5, 4.0, -1.571]},
+        {"id": "south_turn", "pose": [0.5, 1.2, -0.785]}
+      ]
+    }
+  ]
+}

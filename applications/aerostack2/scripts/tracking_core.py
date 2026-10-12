@@ -41,12 +41,27 @@ ConstantVelocityFilter is a 3D constant-velocity Kalman filter of the
 target's position with Mahalanobis gating. The follow modes' set-points
 (centered_setpoint, slant_setpoint) aim at the target predicted ``lead_s``
 ahead, plus what TrackerCore.adapt_lead learns, which makes up ArduPilot's
-lag behind a moving position target;
+lag behind a moving position target. The centered set-point yaws so a
+moving target's direction of travel lies along the image's long axis
+(centered_yaw); a slower one (a walking person) keeps the yaw.
 ReferenceShaper limits how fast the reference moves (the maximum speed) and
 how far it runs ahead of the aircraft. Heights are kept within
 [min_agl_m, max_agl_m] of the ground below the set-point; the slant
 depression is kept where the camera still sees the target
-(min_depression_for_fov).
+(min_depression_for_fov), a body-fixed camera's also when the aircraft
+tilts toward the target (TrackerCore.update_tilt_raise).
+
+Time
+----
+Every time here is the tracker node's clock: simulation time under
+use_sim_time (the simulators, whose /clock may run slower than real
+time: Isaac's at about 0.2x), wall time on the aircraft. Timeouts
+(``lost_timeout_s``, ``handover_window_s``), the filter's time steps and
+velocities, the lead, the reference's speed and yaw rate are seconds of
+that clock, the clock ArduPilot and the targets move in. A measurement's
+time is its image's stamp in that clock (PoseHistory.to_clock); the
+camera pose at the stamp still comes from the odometry's own clock
+(MAVROS stamps it in wall time in the simulators).
 
 Track handover
 --------------
@@ -106,6 +121,12 @@ class TrackerConfig:
     slant_range_m: float = 60.0
     depression_deg: float = 70.0
     fov_margin_deg: float = 4.5
+    # Slant, body-fixed camera: the aircraft's tilt toward the target turns
+    # the camera away from it; the depression floor rises by that tilt
+    # (update_tilt_raise), taken at once and let go over tilt_release_s,
+    # at most max_tilt_raise_deg.
+    tilt_release_s: float = 5.0
+    max_tilt_raise_deg: float = 15.0
     pixel_sigma_px: float = 3.0
     attitude_sigma_deg: float = 1.0
     terrain_sigma_m: float = 3.0
@@ -122,6 +143,11 @@ class TrackerConfig:
     handover_window_s: float = 2.5
     handover_max_m: float = 4.0
     handover_size_ratio: float = 2.0
+    # Centered: a target moving at least this fast is followed with its
+    # direction of travel along the image's long axis (centered_yaw); a
+    # walking person (1.5 m/s, tight turns) keeps the yaw: spun about it in
+    # Gazebo, its recall fell from 0.7 to 0.55.
+    centered_yaw_min_speed_mps: float = 2.0
 
 
 def same_kind(a, b):
@@ -230,12 +256,38 @@ class PoseHistory:
         s0, w0, rate = segment
         return int(w0 + (sim_ns - s0) / rate)
 
+    def _wall_to_sim(self, wall_ns):
+        clock = self._clock
+        if len(clock) < 2 or wall_ns < clock[0][1] or (
+                wall_ns > clock[-1][1] + self.clock_extrapolation_ns):
+            return None
+        segment = self._segment(1, wall_ns)
+        if segment is None:
+            return None
+        s0, w0, rate = segment
+        return int(s0 + (wall_ns - w0) * rate)
+
     def _rate(self, wall_ns):
         """Simulator seconds per wall second; 1 without /clock."""
         if len(self._clock) < 2:
             return 1.0
         segment = self._segment(1, wall_ns)
         return 1.0 if segment is None else segment[2]
+
+    def to_clock(self, stamp_ns, reference_ns):
+        """The stamp in the clock of reference_ns (the tracker's clock:
+        simulation time under use_sim_time, wall time on the aircraft), or
+        None: as it is within clock_domain_s of the reference, else mapped
+        through the recorded /clock pairs (a simulator-time frame stamp onto
+        wall time, or the reverse)."""
+        if stamp_ns <= 0:
+            return None
+        if abs(stamp_ns - reference_ns) <= self.clock_domain_ns:
+            return int(stamp_ns)
+        for mapped in (self._sim_to_wall(stamp_ns), self._wall_to_sim(stamp_ns)):
+            if mapped is not None and abs(mapped - reference_ns) <= self.clock_domain_ns:
+                return mapped
+        return None
 
     def to_odometry_time(self, stamp_ns):
         """The stamp in the odometry's clock, or None."""
@@ -310,14 +362,26 @@ def long_axis_half_fov_rad(intrinsics):
     return math.atan(0.5 * intrinsics.height / intrinsics.fy)
 
 
-def min_depression_for_fov(intrinsics, margin_deg):
+def min_depression_for_fov(intrinsics, margin_deg, tilt_deg=0.0):
     """Smallest depression (deg) that keeps a target on the long axis
-    margin_deg inside the image edge, never below the contract's 60."""
+    margin_deg inside the image edge, never below the contract's 60;
+    tilt_deg: how far the camera is turned away from the target (a
+    body-fixed camera on an aircraft tilting toward it)."""
     if intrinsics is None:
-        return MIN_DEPRESSION_DEG
+        return min(MAX_DEPRESSION_DEG, MIN_DEPRESSION_DEG + max(0.0, float(tilt_deg)))
     half = math.degrees(long_axis_half_fov_rad(intrinsics))
     return min(MAX_DEPRESSION_DEG,
-               max(MIN_DEPRESSION_DEG, 90.0 - (half - float(margin_deg))))
+               max(MIN_DEPRESSION_DEG,
+                   90.0 - (half - float(margin_deg)) + max(0.0, float(tilt_deg))))
+
+
+def tilt_toward_deg(quaternion, bearing_rad):
+    """How far (deg) the body's up axis leans toward the horizontal
+    bearing: a nadir camera fixed to the body then looks that far away from
+    a target there (negative: toward it)."""
+    up = quaternion_matrix(*quaternion)[:, 2]
+    along = up[0] * math.cos(bearing_rad) + up[1] * math.sin(bearing_rad)
+    return math.degrees(math.atan2(along, up[2]))
 
 
 def camera_world_rotation(quaternion, mount_yaw_rad, stabilized=False):
@@ -528,7 +592,7 @@ def geolocate(u, v, box_size, pose, intrinsics, height_fn, mount_yaw_rad,
 class ConstantVelocityFilter:
     """Kalman filter of the target's (east, north, up) position and
     velocity, white-acceleration process noise; times in seconds of the
-    odometry clock."""
+    tracker's clock (module doc, "Time")."""
 
     def __init__(self, position, covariance, t, config):
         self.config = config
@@ -671,6 +735,23 @@ def clamp_height(up, ground, config):
 def _ground(ground_fn, east, north, fallback):
     value = ground_fn(east, north) if ground_fn is not None else None
     return fallback if value is None else value
+
+
+def centered_yaw(velocity, mount_yaw_rad, current_yaw, intrinsics, config):
+    """The centered mode's yaw for a target moving at velocity (east,
+    north): its direction of travel along the image's long axis, the end
+    nearer current_yaw; None below centered_yaw_min_speed_mps (keep the
+    yaw). The long axis has the most image ahead of and behind the target,
+    where a lag behind it shows (4:3 at 60 deg: 30 deg either side of nadir
+    against 23 across; the OAK-1's 16:9 at 69: 34.5 against 21), and the
+    VisDrone detector finds a car lying along that (horizontal) axis more
+    often than one lying along the short one (92 % of the frames against 60 %
+    in Gazebo's flights)."""
+    speed = math.hypot(velocity[0], velocity[1])
+    if speed < config.centered_yaw_min_speed_mps:
+        return None
+    return long_axis_yaw(math.atan2(velocity[1], velocity[0]), mount_yaw_rad,
+                         current_yaw, intrinsics)
 
 
 def centered_setpoint(target, altitude_agl_m, yaw, ground_fn, config):
@@ -833,13 +914,16 @@ class Drone:
     agl_m: float = None        # height above ground, if known
     flying: bool = True
     busy: str = ''             # a behaviour that must not be pre-empted
+    # (x, y, z, w) world <- body when the camera turns with it (body-fixed);
+    # None for a roll/pitch-stabilised camera.
+    camera_tilt_quaternion: tuple = None
 
 
 @dataclass
 class Measurement:
     position: np.ndarray
     covariance: np.ndarray
-    t: float                   # seconds, odometry clock
+    t: float                   # seconds, the tracker's clock (the image stamp)
 
 
 @dataclass
@@ -862,6 +946,10 @@ class TrackerCore:
     following: bool = False
     retry_at: float = 0.0
     fov_min_depression: float = MIN_DEPRESSION_DEG
+    # Slant: the depression floor's rise for the aircraft's tilt toward
+    # the target (deg, update_tilt_raise) and when it was last updated.
+    tilt_raise: float = 0.0
+    tilt_at: float = None
     notes: tuple = ()
     # Learnt on top of lead_s: ArduPilot's lag behind a moving position
     # target, a property of the autopilot, kept across tracks.
@@ -1091,22 +1179,61 @@ class TrackerCore:
             self.command = replace(self.command, altitude_agl_m=agl)
         return agl
 
-    def _mode_setpoint(self, target, drone, ground_fn, mount_yaw_rad,
-                       intrinsics, notes):
+    def _mode_setpoint(self, state, drone, ground_fn, mount_yaw_rad,
+                       intrinsics, notes, steer=True):
+        """The mode's set-point for the target state (position, velocity);
+        steer: the centered yaw may follow the target's travel (not for the
+        set-point of the target now, which only measures the lag)."""
+        target = state[:3]
         if self.command.mode == 'centered':
             agl = self.resolved_agl(drone, target[2], ground_fn)
             yaw = self.yaw_hold if self.yaw_hold is not None else drone.yaw
+            travel = centered_yaw(state[3:5], mount_yaw_rad, yaw, intrinsics,
+                                  self.config) if steer else None
+            if travel is not None:
+                yaw = self.yaw_hold = travel
             return centered_setpoint(target, agl, yaw, ground_fn, self.config)
         self.fov_min_depression = min_depression_for_fov(
-            intrinsics, self.config.fov_margin_deg)
+            intrinsics, self.config.fov_margin_deg, self.tilt_raise)
         depression = max(self.command.depression_deg, self.fov_min_depression)
         if depression > self.command.depression_deg:
+            tilted = (f', aircraft tilt {self.tilt_raise:.0f} deg'
+                      if self.tilt_raise >= 0.5 else '')
             notes.append(f'depression held at {depression:.1f} deg '
-                         '(camera field of view)')
+                         f'(camera field of view{tilted})')
         return slant_setpoint(
             target, drone.position, self.command.slant_range_m, depression,
             self.bearing, mount_yaw_rad, drone.yaw, ground_fn, self.config,
             intrinsics)
+
+    def update_tilt_raise(self, now, drone, target):
+        """Slant with a body-fixed camera: the aircraft tilts toward where
+        it accelerates or flies against the drag, which turns the camera
+        away from a target it chases, out toward the image edge (in Gazebo
+        at 3.5 m/s, 12 deg of tilt put the car 40 px outside the image
+        where a level camera had it 100 px inside). The depression floor
+        rises by that tilt, at once, and comes down over tilt_release_s,
+        so the set-point does not chase every swing of the attitude."""
+        quaternion = drone.camera_tilt_quaternion
+        last, self.tilt_at = self.tilt_at, now
+        if quaternion is None or self.command is None or self.command.mode != 'slant':
+            self.tilt_raise = 0.0
+            return
+        d_east, d_north = target[0] - drone.position[0], target[1] - drone.position[1]
+        if math.hypot(d_east, d_north) > 1.0:
+            bearing = math.atan2(d_north, d_east)
+        elif self.bearing is not None:
+            bearing = self.bearing
+        else:
+            return
+        tilt = min(max(tilt_toward_deg(quaternion, bearing), 0.0),
+                   self.config.max_tilt_raise_deg)
+        if tilt >= self.tilt_raise:
+            self.tilt_raise = tilt
+        else:
+            dt = 0.0 if last is None else min(max(now - last, 0.0), 1.0)
+            self.tilt_raise += (tilt - self.tilt_raise) * min(
+                1.0, dt / max(self.config.tilt_release_s, 1e-3))
 
     def adapt_lead(self, now, drone, setpoint_now, velocity, turn_rate=0.0):
         """Learn the lead ArduPilot needs: while following a target moving
@@ -1141,13 +1268,14 @@ class TrackerCore:
             return None
         notes = []
         state_now = self.filter.predicted_turning(now)
-        setpoint_now = self._mode_setpoint(state_now[:3], drone, ground_fn,
-                                           mount_yaw_rad, intrinsics, [])
+        self.update_tilt_raise(now, drone, state_now[:3])
+        setpoint_now = self._mode_setpoint(state_now, drone, ground_fn,
+                                           mount_yaw_rad, intrinsics, [], steer=False)
         self.adapt_lead(now, drone, setpoint_now, state_now[3:5],
                         self.filter.turn_rate)
         lead = self.config.lead_s + self.lead_extra_s
         state = self.filter.predicted_turning(now + lead)
-        setpoint = self._mode_setpoint(state[:3], drone, ground_fn,
+        setpoint = self._mode_setpoint(state, drone, ground_fn,
                                        mount_yaw_rad, intrinsics, notes)
         if self.command.mode == 'slant':
             self.bearing = setpoint.bearing

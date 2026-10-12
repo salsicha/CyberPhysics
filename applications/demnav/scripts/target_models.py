@@ -13,7 +13,7 @@ in the cache is not downloaded again, so later runs work offline.
 ``bake`` (called by build_georeferenced_terrain.py, offline) turns a cached
 model into one simulator-neutral mesh: metres, z up, the model's front along
 +x, its footprint centred on the origin and its lowest point at z = 0, and a
-single texture atlas holding every material, so Gazebo, Genesis and Isaac
+single texture atlas holding every material, so Gazebo and Isaac
 draw exactly the same thing from ``model.obj``/``model.mtl``/``<name>_atlas.png``
 (and ``model_mesh.npz``, the same triangles as arrays, for Isaac). Wavefront
 OBJ and static COLLADA (polylist/triangles/polygons, node transforms, skin

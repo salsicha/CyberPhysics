@@ -32,6 +32,16 @@ one ArduPilot does not open (`SERIALx_PROTOCOL = -1`) and set
 the same sensor as an ArduPilot rangefinder (`RNGFND1_TYPE`): only one
 reader can own the port.
 
+In the aircraft stack (`compositions/aerodrone_hardware.yaml`) the
+container does not get the port through `devices:`, which Docker refuses
+when the adapter is missing (and `docker compose up` then stops with most
+of the stack not started). It sees the host's `/dev` read-only at
+`/host/dev` and may open only USB serial devices (`ttyUSB*`, `ttyACM*`,
+device cgroup rules), so the node waits for an unplugged adapter and
+reopens it after a re-plug. A Pi UART needs its rule added there too
+(`c 204:* rmw` for `ttyAMA*`); on BlueOS those UARTs are ArduPilot's
+SERIALx ports, so only one ArduPilot does not open.
+
 The sensor must stream its factory-default **9-byte/cm** frame
 (`0x59 0x59 Dist_L Dist_H Strength_L Strength_H Temp_L Temp_H Checksum`,
 checksum = low byte of the sum of the first eight bytes). TF-Luna can be
@@ -67,7 +77,7 @@ ros2 run tf2_ros static_transform_publisher --z -0.05 --pitch 1.5708 \
 
 | Parameter | Default | |
 |---|---|---|
-| `port` | `/dev/ttyUSB0` | serial device (`/dev/rangefinder` in the compose file) |
+| `port` | `/dev/ttyUSB0` | serial device (`/dev/rangefinder` in `compositions/rangefinder.yaml`, `/host$RANGEFINDER_DEVICE` in `aerodrone_hardware.yaml`) |
 | `baud_rate` | `115200` | |
 | `model` | `tfmini_s` | `tfmini_s` or `tf_luna`: range limits and FOV |
 | `topic` | `/aerodrone/rangefinder` | |

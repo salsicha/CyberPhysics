@@ -17,7 +17,8 @@ def test_hardware_commands_use_consistent_vehicle_identity(namespace):
     if version.returncode:
         pytest.skip('Docker Compose is not installed')
     env = dict(os.environ)
-    for key in ('DRONE_NAMESPACE', 'VEHICLE_NAMESPACE', 'COMPOSE_FILE', 'COMPOSE_ENV_FILES'):
+    for key in ('DRONE_NAMESPACE', 'VEHICLE_NAMESPACE', 'COMPOSE_FILE', 'COMPOSE_ENV_FILES',
+                'RANGEFINDER_DEVICE'):
         env.pop(key, None)
     if namespace:
         env.update(DRONE_NAMESPACE=namespace, VEHICLE_NAMESPACE=namespace)
@@ -64,11 +65,36 @@ def test_hardware_commands_use_consistent_vehicle_identity(namespace):
     # The downward Benewake rangefinder feeds DemNav's height above ground.
     rangefinder = services['rangefinder']
     assert rangefinder['image'].startswith('salsicha/cyberphysics:rangefinder-')
-    assert rangefinder['devices'][0]['target'] == '/dev/rangefinder'
-    assert 'port:=/dev/rangefinder' in rangefinder['command']
+    # No `devices:` entry: Docker refuses to start a container whose device
+    # is missing, and `compose up` then leaves the rest of the stack
+    # unstarted. The node reaches the adapter through the host's /dev
+    # (read-only) and USB-serial cgroup rules, and retries until it appears.
+    assert 'devices' not in rangefinder
+    assert sorted(rangefinder['device_cgroup_rules']) == ['c 166:* rmw', 'c 188:* rmw']
+    host_dev = [v for v in rangefinder['volumes'] if v['target'] == '/host/dev']
+    assert host_dev and host_dev[0]['source'] == '/dev' and host_dev[0]['read_only']
+    assert 'port:=/host/dev/ttyUSB0' in rangefinder['command']
     assert 'topic:=/aerodrone/rangefinder' in rangefinder['command']
     assert 'model:=tfmini_s' in rangefinder['command']
     assert 'gps_altitude_datum:=ellipsoid' in services['demnav']['command']
+
+
+def test_aerodrone_rangefinder_opens_the_by_id_path_through_the_host_dev():
+    if not shutil.which('docker'):
+        pytest.skip('Docker Compose is not installed')
+    if subprocess.run(['docker', 'compose', 'version'], capture_output=True).returncode:
+        pytest.skip('Docker Compose is not installed')
+    env = {key: value for key, value in os.environ.items()
+           if key not in ('COMPOSE_FILE', 'COMPOSE_ENV_FILES')}
+    device = '/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART-if00-port0'
+    env['RANGEFINDER_DEVICE'] = device
+    rendered = subprocess.run(
+        ['docker', 'compose', '-f', str(REPO / 'compositions/aerodrone_hardware.yaml'),
+         'config', '--format', 'json'],
+        env=env, check=True, capture_output=True, text=True)
+    rangefinder = json.loads(rendered.stdout)['services']['rangefinder']
+    # The by-id symlink (../../ttyUSB0) resolves inside the /host/dev mount.
+    assert f'port:=/host{device}' in rangefinder['command']
 
 
 def test_airplane_hardware_uses_its_namespaced_navigation_topics():

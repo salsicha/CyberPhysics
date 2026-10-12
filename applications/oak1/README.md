@@ -286,9 +286,8 @@ changes left (`systems/aerodrone/tracking.md`, "Track handover").
 ONNX Runtime runs without busy-waiting between frames: 0.9 instead of 3.2
 cores at 5 Hz, for 59 instead of 47 ms a frame (4 threads, outside the
 stack). In the test stacks the detector took 2.3-2.4 cores in Gazebo (5 Hz,
-71-79 ms a frame), 1.9 in Genesis (10 Hz of simulation time, 4.6 Hz of
-wall time, 54 ms) and 1.0 in Isaac (10 Hz, 2.0 Hz of wall time, 75 ms),
-with the JPEG encoding, scaling and publishing.
+71-79 ms a frame) and 1.0 in Isaac (10 Hz of simulation time, 2.0 Hz of
+wall time, 75 ms), with the JPEG encoding, scaling and publishing.
 
 ### To verify on the aircraft's OAK-1
 

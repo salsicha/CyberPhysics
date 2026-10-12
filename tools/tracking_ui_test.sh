@@ -42,7 +42,7 @@ docker run -d --name "$name" --network "$name" --user "$user" \
   -v "$repo/applications/aerostack2/scripts:/scripts:ro" \
   -v "$out:/out" \
   "$aerostack2" bash -c '
-    ros2 launch rosbridge_server rosbridge_websocket_launch.xml > /out/rosbridge.log 2>&1 &
+    ros2 launch rosbridge_server rosbridge_websocket_launch.xml port:=9092 > /out/rosbridge.log 2>&1 &
     python3 /scripts/mock_tracking_publisher.py --static --navigation \
       --command-log /out/commands.jsonl > /out/mock.log 2>&1 &
     exec python3 -m http.server 8080 --directory /web > /out/http.log 2>&1' > /dev/null

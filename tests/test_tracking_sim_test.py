@@ -252,3 +252,27 @@ def test_navigation_error_and_demnav_rates_per_step():
     result = sim_test.score(rows, [])['navigation']['centered']
     assert result['error_m']['median'] == 1.0
     assert result['demnav_frames_per_min'] == 360.0 and result['demnav_valid_per_min'] == 60.0
+
+
+def test_a_hold_is_above_a_point_the_target_passes():
+    """A 60 m x 24 m loop's middle is 12 m from its route: the hold is the
+    route sample nearest it, which the target passes every lap."""
+    ends = [(sign * (18.0 + 12.0 * math.cos(a / 10)), 12.0 * math.sin(a / 10), 1.0)
+            for a in range(-15, 16) for sign in (-1.0, 1.0)]
+    loop = ([(e, side, 1.0) for e in range(-18, 19, 2) for side in (-12.0, 12.0)] + ends)
+    east, north, up = sim_test.route_hold(loop)
+    assert abs(north) == pytest.approx(12.0) and abs(east) <= 2.0 and up == 1.0
+    standing = [(5.0, 6.0, 2.0)] * 10
+    assert sim_test.route_hold(standing) == (5.0, 6.0, 2.0)
+
+
+def test_attitude_of_the_truth_pose():
+    """Roll and pitch (deg) of an FLU attitude, the yaw left out."""
+    half = math.radians(10.0) / 2
+    pitch = (0.0, math.sin(half), 0.0, math.cos(half))
+    assert sim_test.tilt_deg(pitch) == pytest.approx((0.0, 10.0), abs=0.01)
+    yaw_then_roll = (math.sin(half) * math.cos(0.5), math.sin(half) * math.sin(0.5),
+                     0.0, math.cos(half))
+    roll, pitch = sim_test.tilt_deg((0.0, 0.0, 0.0, 1.0))
+    assert (roll, pitch) == (0.0, 0.0)
+    assert math.hypot(*sim_test.tilt_deg(yaw_then_roll)) == pytest.approx(10.0, abs=0.2)

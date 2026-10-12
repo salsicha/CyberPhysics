@@ -126,6 +126,8 @@ def test_simulator_env_matches_the_stack(name):
     assert env['TRACKING_CAMERA_STABILIZED'] == str(stabilized).lower()
     assert env['FASTRTPS_DEFAULT_PROFILES_FILE'] == SHM_PROFILE
     assert env['CYBERPHYSICS_TAG'] == 'latest'
+    # The tracker's timeouts and limits run on the simulation clock.
+    assert env['TRACKING_USE_SIM_TIME'] == 'true'
 
 
 def test_every_tracker_setting_in_tracking_env_reaches_the_tracker():
@@ -159,6 +161,7 @@ def test_simulator_tracking_services(name):
         assert service['image'] == 'salsicha/cyberphysics:demnav-latest'
     assert arguments(services['tracker'])['namespace'] == 'aerodrone'
     assert arguments(services['tracker'])['topic_prefix'] == '/tracking'
+    assert arguments(services['tracker'])['use_sim_time'] == 'true'
     assert arguments(services['tracking_truth_detector'])['camera_info_topic'] == (
         '/aerodrone/sensor_measurements/downward_rgb/camera_info')
     for service_name in ('tracking_rosbridge', 'tracking_ui'):
@@ -196,6 +199,7 @@ def test_aircraft_tracker(namespace):
     assert args['camera_mount_yaw_deg'] == '0.0'  # topics.env CAMERA_MOUNT_YAW_DEG
     assert args['camera_stabilized'] == 'false'
     assert args['rangefinder_topic'] == '/aerodrone/rangefinder'
+    assert args['use_sim_time'] == 'false'  # wall time on the aircraft
     assert tracker['image'] == 'salsicha/cyberphysics:demnav-arm64'
     dem = next(v for v in tracker['volumes'] if v['target'] == '/data/demnav_cache')
     assert dem['type'] == 'bind' and dem['source'] == '/data/demnav_cache'

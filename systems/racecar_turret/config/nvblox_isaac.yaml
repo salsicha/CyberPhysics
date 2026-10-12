@@ -1,0 +1,43 @@
+# nvblox in the RACECAR Turret Isaac arena (compositions/racecar_turret_isaac.yaml,
+# over systems/racecarneo/config/nvblox.yaml; applications/isaac/RACECAR_TURRET.md,
+# "Depth for nvblox"). With the camera's own depth nvblox maps the arena's
+# obstacles, and in static_tsdf mode the people walking around the car too:
+# their trails, and a person who crossed in front of the car below the
+# camera's view (the floor is visible from 0.75 m ahead of base_link), stayed
+# in the static map as obstacles and stopped Nav2 (start occupied, no valid
+# path). Here people moving through space nvblox has seen free go to its
+# dynamic occupancy layer, which decays, instead of the static TSDF
+# (NVIDIA's nvblox_dynamics.yaml values), and what the camera no longer sees
+# decays from the TSDF in about 3.5 s (0.8 every 0.2 s, nvblox's default
+# 0.95 takes about 15 s). Nav2 reads the combined (static and dynamic) slice.
+/**:
+  ros__parameters:
+    mapping_type: dynamic
+
+    static_mapper:
+      tsdf_decay_factor: 0.8
+      projective_integrator_weighting_mode: constant
+      projective_tsdf_integrator_invalid_depth_decay_factor: 0.8
+      # freespace integrator
+      max_tsdf_distance_for_occupancy_m: 0.15
+      max_unobserved_to_keep_consecutive_occupancy_ms: 200
+      min_duration_since_occupied_for_freespace_ms: 250
+      min_consecutive_occupancy_duration_for_reset_ms: 2000
+      check_neighborhood: true
+      initialize_to_high_confidence_freespace: false
+
+    dynamic_mapper:
+      projective_integrator_max_integration_distance_m: 5.0
+      projective_integrator_truncation_distance_vox: 4.0
+      free_region_occupancy_probability: 0.2
+      occupied_region_occupancy_probability: 0.9
+      unobserved_region_occupancy_probability: 0.35
+      occupied_region_half_width_m: 0.15
+      esdf_integrator_min_weight: 2.0
+      esdf_integrator_max_distance_m: 2.0
+      free_region_decay_probability: 0.55
+      occupied_region_decay_probability: 0.30
+      # The static slice's heights (nvblox.yaml).
+      esdf_slice_height: 0.10
+      esdf_slice_min_height: 0.02
+      esdf_slice_max_height: 0.55

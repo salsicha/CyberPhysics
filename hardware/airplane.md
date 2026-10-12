@@ -45,9 +45,12 @@ clips. Printing and assembly instructions:
 - **Raspberry Pi 5 + Navigator.** As for the aerodrone
   ([hardware/aerodrone.md](aerodrone.md#compatibility-notes)): buy the
   current Navigator revision (August 2025: magnetometer moved for Pi 5
-  compatibility) and run BlueOS 1.4 or newer. The Navigator kit's heatsink
-  is the Pi's cooler: no Active Cooler (it does not fit under the heatsink)
-  and no NVMe HAT (it does not stack with the Navigator).
+  compatibility) and run BlueOS 1.4 or newer. Keep BlueOS's kernel: after
+  an OS upgrade to Raspberry Pi OS's 6.12 kernel ArduPilot (4.5.3 to
+  4.7.1) does not start on the Pi 5 (`applications/navigator/README.md`).
+  The Navigator kit's heatsink is the Pi's cooler: no Active Cooler (it
+  does not fit under the heatsink) and no NVMe HAT (it does not stack with
+  the Navigator).
 - **Pi 5 USB current.** The Pi is powered through the Navigator's header,
   so it limits its USB ports to 600 mA unless `usb_max_current_enable=1` is
   set in `/boot/firmware/config.txt`; the OAK-1 alone draws up to 0.8 A.

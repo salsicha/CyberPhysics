@@ -16,6 +16,14 @@ def generate_launch_description():
         'min_depth': '0.05',
         'publish_pointcloud': 'true',
         'pointcloud_stride': '4',
+        # Optional per-frame scale alignment (README.md); empty: off.
+        'scale_reference_topic': '',
+        'scale_reference_min_m': '0.3',
+        'scale_reference_max_m': '4.0',
+        'scale_reference_stride': '8',
+        'scale_reference_min_samples': '100',
+        'scale_reference_max_age_s': '0.05',
+        'scale_hold_s': '1.0',
     }
 
     declarations = [

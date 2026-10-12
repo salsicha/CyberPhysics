@@ -13,7 +13,7 @@ position, ground height, heading and, for vehicles, the pitch and roll of
 the ground under their wheels. It writes the tracks to
 ``/data/navsim_assets/tracking_targets.json``.
 
-Gazebo, Genesis and Isaac load that file through ``Tracks`` and place each
+Gazebo and Isaac load that file through ``Tracks`` and place each
 target at ``Tracks.poses(t)`` for their own simulation time ``t``, so the
 three move the targets identically, and publish ``truth_message(t, ...)``
 on ``/simulation/targets`` (systems/aerodrone/tracking.md): ENU metres in
@@ -29,7 +29,7 @@ renders a hidden target ``HIDDEN_DEPTH_M`` under the terrain, where the
 camera cannot see it, and keeps publishing its truth on its route, marked
 ``"hidden": true`` (the occlusion of tools/tracking_sim_test.py).
 
-Plain numpy, no ROS: the builder, the three simulator adapters and the
+Plain numpy, no ROS: the builder, the two simulator adapters and the
 tests import it.
 """
 

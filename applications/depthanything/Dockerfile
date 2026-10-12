@@ -46,7 +46,7 @@ RUN . /venv/bin/activate && \
         matplotlib==3.11.0
 
 # Depth-Anything-V2 main as of 2026-03-24 and the model repo revision of the
-# metric VKITTI small checkpoint, checked by hash.
+# metric VKITTI (outdoor driving) small checkpoint, checked by hash.
 ARG DEPTH_ANYTHING_COMMIT=a561b849ebae10a6f5ef49e26c83cbbcd36c71bf
 ARG DEPTH_ANYTHING_WEIGHTS_REVISION=c725b8589bdf6ab04072cab74c0467830db80d6d
 ARG DEPTH_ANYTHING_WEIGHTS_SHA256=9203e538d35255c90dda4b7fedb47ff33fe725497bcca3b1e53b3a65ee63f0cb
@@ -60,6 +60,15 @@ RUN mkdir -p /opt/Depth-Anything-V2/checkpoints && \
     wget -O /opt/Depth-Anything-V2/checkpoints/depth_anything_v2_metric_vkitti_vits.pth \
       https://huggingface.co/depth-anything/Depth-Anything-V2-Metric-VKITTI-Small/resolve/${DEPTH_ANYTHING_WEIGHTS_REVISION}/depth_anything_v2_metric_vkitti_vits.pth && \
     echo "${DEPTH_ANYTHING_WEIGHTS_SHA256}  /opt/Depth-Anything-V2/checkpoints/depth_anything_v2_metric_vkitti_vits.pth" \
+      | sha256sum -c -
+
+# The metric Hypersim (indoor) small checkpoint the same way: metric_dataset
+# hypersim with max_depth 20 (README.md, "Accuracy").
+ARG DEPTH_ANYTHING_HYPERSIM_REVISION=3bc65d4e14a6786a61acec16453c50e12bf5f338
+ARG DEPTH_ANYTHING_HYPERSIM_SHA256=b782898d8a3e8be1f639de33837ed85e9b4b73e40f8f5e5cd99067588d722545
+RUN wget -O /opt/Depth-Anything-V2/checkpoints/depth_anything_v2_metric_hypersim_vits.pth \
+      https://huggingface.co/depth-anything/Depth-Anything-V2-Metric-Hypersim-Small/resolve/${DEPTH_ANYTHING_HYPERSIM_REVISION}/depth_anything_v2_metric_hypersim_vits.pth && \
+    echo "${DEPTH_ANYTHING_HYPERSIM_SHA256}  /opt/Depth-Anything-V2/checkpoints/depth_anything_v2_metric_hypersim_vits.pth" \
       | sha256sum -c -
 
 ENV PYTHONPATH="/opt/Depth-Anything-V2/metric_depth:/opt/Depth-Anything-V2"

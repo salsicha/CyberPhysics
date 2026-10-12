@@ -128,11 +128,21 @@ level 18, a 250 m search radius, and no more than 49 candidate tiles.
 
 ## Build-time cache seeding
 
-The Docker image seeds default Golden Gate Park satellite tiles and SIFT descriptors at build time (`37.7694, -122.4862`) into `/data/wildnav_cache`. Override these build args for another test area:
+The Docker image seeds default Golden Gate Park satellite tiles and SIFT descriptors at build time (`37.7694, -122.4862`) into `/usr/share/cyberphysics/wildnav_seed` (`WILDNAV_SEED_DIR`), and the entrypoint copies the seed files `/data/wildnav_cache` does not have into it on every start, unless the cache is mounted read-only. Override these build args for another test area:
 
 - `SEED_NAV_ASSETS=0` disables build-time seeding.
 - `NAV_ASSET_LAT` and `NAV_ASSET_LON` set the cache center.
 - `WILDNAV_ZOOM`, `WILDNAV_SEARCH_RADIUS_M`, `WILDNAV_MAX_TILES`, and `WILDNAV_FEATURE_BACKEND` control the seeded tile set.
 - `WILDNAV_TILE_URL` selects the XYZ imagery endpoint.
+
+The seed lives beside the cache, not in it, because the BlueOS stacks (`compositions/blueos_nav_core.yaml`) mount the host's `WILDNAV_CACHE_HOST` (`/data/wildnav_cache`) over `/data/wildnav_cache`, which used to hide it; the host directory now receives the seed on the container's first start. Before a flight without internet elsewhere, seed the host directory for the flight area at the stack's `WILDNAV_ZOOM`:
+
+```bash
+docker run --rm -v /data/wildnav_cache:/data/wildnav_cache salsicha/cyberphysics:wildnav-arm64 \
+  python3 -m wildnav_pkg.seed_cache --lat 37.9234 --lon -122.5967 --zoom 18 \
+    --search-radius-m 250 --max-tiles 49
+```
+
+On the Raspberry Pi 5 this fetched the 49 tiles and their descriptors in about 13 s.
 
 Generated satellite tiles and descriptor files belong in the image or a runtime volume, not in the repository. Confirm the selected imagery provider permits the intended use.
