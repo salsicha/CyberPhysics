@@ -1,0 +1,85 @@
+# Aerodrone object tracking (systems/aerodrone/tracking.md): the services the
+# aircraft and the Gazebo, Genesis and Isaac simulations share.
+#
+# Included, never run alone, by:
+#   - blueos_aerostack.yaml (the aircraft; aerodrone_hardware.yaml includes
+#     it), with no env file of its own: the fallbacks below are the
+#     aircraft's values (Compose resolves a nested include's env_file
+#     against the working directory, which breaks aerodrone_hardware.yaml);
+#   - aerostack2_sim.yaml, aerostack2_genesis.yaml, aerostack2_isaac.yaml,
+#     with topics.env, tracking.env and
+#     ../applications/aerostack2/config/tracking_<simulator>.env (image tag,
+#     DEM cache volume, camera mount, FastDDS profile). They also include
+#     aerodrone_tracking_sim.yaml: the services only the simulators run
+#     (ground-truth detector, rosbridge, the web page).
+#
+# Profiles:
+#   tracking        the tracker and the detector (YOLO), and in the
+#                   simulators rosbridge and the web page:
+#                     docker compose -f compositions/aerodrone_hardware.yaml --profile tracking up
+#                     docker compose -f compositions/aerostack2_sim.yaml --profile tracking up
+#   tracking_truth  simulators: the tracker, rosbridge and the web page with
+#                   the ground-truth detector in place of the detector, to
+#                   test the control apart from detection; enable it
+#                   without `tracking`.
+#
+# Adding a service here: it runs on the aircraft too. ROS containers take
+# the host network, IPC and /dev/shm, ROS_DOMAIN_ID and
+# FASTRTPS_DEFAULT_PROFILES_FILE (passed through: the simulators' env files
+# set it, it stays unset on the aircraft) and mount fastdds.xml, as
+# `tracker` does. A detector publishing <prefix>/detections belongs to
+# `tracking` only. Services may not depend on the including stack's
+# services (Compose loads this file on its own first); named volumes come
+# from the including stack through env (TRACKING_DEM_SOURCE).
+
+services:
+  tracker:
+    # Geolocates the selected track on the DemNav DEM in the camera pose at
+    # the image stamp, filters it and flies the centered or slant mode
+    # through Aerostack2's FollowReference behaviour
+    # (applications/aerostack2/scripts/aerodrone_tracker.py). The DemNav
+    # image: its DEM loader, geoid and camera geometry, on Aerostack2's.
+    # env_file: the parameters' values (tools/check_compose_env_defaults.py
+    # holds the fallbacks below to them).
+    profiles: [tracking, tracking_truth]
+    image: salsicha/cyberphysics:demnav-${CYBERPHYSICS_TAG:-arm64}
+    network_mode: host
+    ipc: host
+    restart: unless-stopped
+    env_file: [../systems/aerodrone/config/tracking.env]
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - FASTRTPS_DEFAULT_PROFILES_FILE
+    volumes:
+      - /dev/shm:/dev/shm
+      - ../systems/aerodrone/config/fastdds.xml:/workspace/systems/aerodrone/config/fastdds.xml:ro
+      - ../applications/aerostack2/scripts:/workspace/applications/aerostack2/scripts:ro
+      - ${TRACKING_DEM_SOURCE:-${DEMNAV_CACHE_HOST:-/data/demnav_cache}}:/data/demnav_cache:ro
+    command: >
+      python3 /workspace/applications/aerostack2/scripts/aerodrone_tracker.py --ros-args
+        -p namespace:=${DRONE_NAMESPACE:-drone0}
+        -p topic_prefix:=${TRACKING_TOPIC_PREFIX:-/tracking}
+        -p odometry_topic:=${NAVIGATION_ODOM_TOPIC:-/navigation/odometry}
+        -p origin_topic:=/navigation/origin
+        -p map_goal_topic:=/aerostack/map_goal
+        -p rangefinder_topic:=${RANGEFINDER_TOPIC:-/aerodrone/rangefinder}
+        -p camera_mount_yaw_deg:=${TRACKING_CAMERA_MOUNT_YAW_DEG:-${CAMERA_MOUNT_YAW_DEG:-0.0}}
+        -p camera_stabilized:=${TRACKING_CAMERA_STABILIZED:-false}
+        -p dem_cache_dir:=/data/demnav_cache
+        -p min_agl_m:=${TRACKING_MIN_AGL_M:-15.0}
+        -p max_agl_m:=${TRACKING_MAX_AGL_M:-120.0}
+        -p max_speed_mps:=${TRACKING_MAX_SPEED_MPS:-5.0}
+        -p max_vertical_speed_mps:=${TRACKING_MAX_VERTICAL_SPEED_MPS:-1.5}
+        -p max_yaw_rate_dps:=${TRACKING_MAX_YAW_RATE_DPS:-30.0}
+        -p max_reference_lead_m:=${TRACKING_MAX_REFERENCE_LEAD_M:-15.0}
+        -p lead_s:=${TRACKING_LEAD_S:-2.5}
+        -p lead_adapt_rate:=${TRACKING_LEAD_ADAPT_RATE:-0.2}
+        -p max_lead_extra_s:=${TRACKING_MAX_LEAD_EXTRA_S:-2.5}
+        -p lost_timeout_s:=${TRACKING_LOST_TIMEOUT_S:-3.0}
+        -p slant_range_m:=${TRACKING_SLANT_RANGE_M:-60.0}
+        -p depression_deg:=${TRACKING_DEPRESSION_DEG:-70.0}
+        -p fov_margin_deg:=${TRACKING_FOV_MARGIN_DEG:-4.5}
+        -p pixel_sigma_px:=${TRACKING_PIXEL_SIGMA_PX:-3.0}
+        -p attitude_sigma_deg:=${TRACKING_ATTITUDE_SIGMA_DEG:-1.0}
+        -p terrain_sigma_m:=${TRACKING_TERRAIN_SIGMA_M:-3.0}
+        -p process_accel_mps2:=${TRACKING_PROCESS_ACCEL_MPS2:-1.5}

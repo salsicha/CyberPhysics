@@ -89,4 +89,17 @@ def generate_launch_description():
                 'takeoff_plugin_name': 'takeoff_plugin_speed',
             }.items(),
         ),
+        # Object tracking (systems/aerodrone/tracking.md): the tracker
+        # moves a position reference in the navigation frame through this
+        # behaviour (POSITION/LOCAL_ENU, the platform's GUIDED position
+        # targets) and cancels it to hover. motion_behaviors_launch.py
+        # does not start it.
+        IncludeLaunchDescription(
+            package_launch(
+                'as2_behaviors_motion', 'follow_reference_behavior_launch.py'),
+            launch_arguments={
+                'namespace': namespace,
+                'use_sim_time': 'false',
+            }.items(),
+        ),
     ])

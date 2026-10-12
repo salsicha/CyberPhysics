@@ -32,12 +32,14 @@ import time
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "ardupilot_sitl" / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "demnav" / "scripts"))
 from ardupilot_json import (  # noqa: E402
     ArduPilotJSON,
     pwm_to_rotor_speed,
     quaternion_to_matrix,
     state_from_enu,
 )
+from tracking_targets import HIDE_TOPIC, TRUTH_TOPIC, Tracks, truth_json  # noqa: E402
 
 
 DRONE_SIZE_M = (0.47, 0.47, 0.11)
@@ -169,6 +171,86 @@ def add_terrain(stage, asset_dir):
     UsdShade.MaterialBindingAPI.Apply(mesh.GetPrim()).Bind(material)
 
 
+def add_target_material(stage, path, texture_file):
+    """UsdPreviewSurface reading a target model's baked texture atlas."""
+    from pxr import Sdf, UsdShade
+
+    material = UsdShade.Material.Define(stage, path)
+    surface = UsdShade.Shader.Define(stage, f"{path}/Surface")
+    surface.CreateIdAttr("UsdPreviewSurface")
+    surface.CreateInput("roughness", Sdf.ValueTypeNames.Float).Set(0.6)
+    texture = UsdShade.Shader.Define(stage, f"{path}/Texture")
+    texture.CreateIdAttr("UsdUVTexture")
+    texture.CreateInput("file", Sdf.ValueTypeNames.Asset).Set(str(texture_file))
+    texture.CreateInput("sourceColorSpace", Sdf.ValueTypeNames.Token).Set("sRGB")
+    for wrap in ("wrapS", "wrapT"):
+        texture.CreateInput(wrap, Sdf.ValueTypeNames.Token).Set("clamp")
+    reader = UsdShade.Shader.Define(stage, f"{path}/Primvar")
+    reader.CreateIdAttr("UsdPrimvarReader_float2")
+    reader.CreateInput("varname", Sdf.ValueTypeNames.Token).Set("st")
+    texture.CreateInput("st", Sdf.ValueTypeNames.Float2).ConnectToSource(
+        reader.ConnectableAPI(), "result")
+    surface.CreateInput("diffuseColor", Sdf.ValueTypeNames.Color3f).ConnectToSource(
+        texture.ConnectableAPI(), "rgb")
+    material.CreateSurfaceOutput().ConnectToSource(surface.ConnectableAPI(), "surface")
+    return material
+
+
+def add_tracking_targets(stage, asset_dir):
+    """The tracking targets of tracking_targets.json (cars, people:
+    build_georeferenced_terrain.py --targets) as visual-only meshes, no
+    physics, each under an Xform that place_tracking_targets moves.
+    Returns (Tracks, [(translate op, orient op)]), or (None, []) for
+    terrain without targets."""
+    from pxr import Sdf, UsdGeom, UsdShade, Vt
+
+    path = Path(asset_dir) / "tracking_targets.json"
+    if not path.is_file():
+        return None, []
+    tracks = Tracks.load(path)
+    UsdGeom.Xform.Define(stage, "/World/Targets")
+    materials = {}
+    ops = []
+    for track in tracks.tracks:
+        if track.model not in materials:
+            materials[track.model] = add_target_material(
+                stage, f"/World/Looks/Target_{track.model}", tracks.model_file(track, "texture"))
+        xform = UsdGeom.Xform.Define(stage, f"/World/Targets/{track.name}")
+        translate = xform.AddTranslateOp(precision=UsdGeom.XformOp.PrecisionDouble)
+        orient = xform.AddOrientOp(precision=UsdGeom.XformOp.PrecisionDouble)
+        data = np.load(tracks.model_file(track, "mesh_npz"))
+        positions = np.ascontiguousarray(data["positions"], dtype=np.float32)
+        mesh = UsdGeom.Mesh.Define(stage, f"/World/Targets/{track.name}/Model")
+        mesh.CreatePointsAttr(Vt.Vec3fArray.FromNumpy(positions))
+        mesh.CreateExtentAttr(Vt.Vec3fArray.FromNumpy(
+            np.stack([positions.min(axis=0), positions.max(axis=0)])))
+        mesh.CreateFaceVertexCountsAttr(Vt.IntArray([3] * len(data["triangles"])))
+        mesh.CreateFaceVertexIndicesAttr(Vt.IntArray.FromNumpy(
+            np.ascontiguousarray(data["triangles"].reshape(-1), dtype=np.int32)))
+        mesh.CreateNormalsAttr(Vt.Vec3fArray.FromNumpy(
+            np.ascontiguousarray(data["normals"], dtype=np.float32)))
+        mesh.SetNormalsInterpolation(UsdGeom.Tokens.vertex)
+        mesh.CreateSubdivisionSchemeAttr("none")
+        st = UsdGeom.PrimvarsAPI(mesh).CreatePrimvar(
+            "st", Sdf.ValueTypeNames.TexCoord2fArray, UsdGeom.Tokens.vertex)
+        st.Set(Vt.Vec2fArray.FromNumpy(np.ascontiguousarray(data["uvs"], dtype=np.float32)))
+        UsdShade.MaterialBindingAPI.Apply(mesh.GetPrim()).Bind(materials[track.model])
+        ops.append((translate, orient))
+    place_tracking_targets(ops, tracks.poses(0.0))
+    print(f"Isaac tracking targets: {', '.join(t.name for t in tracks.tracks)}", flush=True)
+    return tracks, ops
+
+
+def place_tracking_targets(ops, poses):
+    """Move each target to its pose (terrain ENU) before a render."""
+    from pxr import Gf
+
+    for (translate, orient), pose in zip(ops, poses):
+        translate.Set(Gf.Vec3d(pose.east, pose.north, pose.up))
+        w, x, y, z = pose.quaternion_wxyz()
+        orient.Set(Gf.Quatd(w, Gf.Vec3d(x, y, z)))
+
+
 def add_sky(stage):
     from pxr import UsdLux
 
@@ -288,6 +370,7 @@ def make_publisher(args):
     from rclpy.node import Node
     from rosgraph_msgs.msg import Clock
     from sensor_msgs.msg import CameraInfo, Image
+    from std_msgs.msg import String
 
     class SimPublisher(Node):
         def __init__(self):
@@ -301,6 +384,18 @@ def make_publisher(args):
             self.depth_publisher = self.create_publisher(Image, args.depth_topic, 10)
             self.depth_info_publisher = self.create_publisher(
                 CameraInfo, args.depth_info_topic, 10)
+            self.targets_publisher = self.create_publisher(String, TRUTH_TOPIC, 10)
+
+        def publish_targets(self, text):
+            """Tracking-target ground truth (systems/aerodrone/tracking.md)."""
+            msg = String()
+            msg.data = text
+            self.targets_publisher.publish(msg)
+
+        def subscribe_hide(self, tracks):
+            """Hide the targets named on HIDE_TOPIC (tracking_targets.py)."""
+            self.create_subscription(String, HIDE_TOPIC,
+                                     lambda msg: tracks.hide(msg.data), 10)
 
         def stamp(self):
             return self.get_clock().now().to_msg()
@@ -401,10 +496,15 @@ def main():
     physics_rate = env_float("ISAAC_PHYSICS_HZ", 1200.0)
     camera_rate = env_float("ISAAC_CAMERA_HZ", 10.0)
     world, rigid, home = build_world(asset_dir, physics_rate, camera_rate)
+    import omni.usd
+
+    tracks, target_ops = add_tracking_targets(omni.usd.get_context().get_stage(), asset_dir)
     camera = DownwardCamera()
 
     rclpy.init()
     publisher = make_publisher(args)
+    if tracks is not None:
+        publisher.subscribe_hide(tracks)
     transport = ArduPilotJSON(port=int(os.environ.get("ARDUPILOT_JSON_PORT", "9002")))
     ready_path.touch()
     previous_velocity = np.zeros(3)
@@ -477,6 +577,11 @@ def main():
             if tick % stride == 0:
                 # Render this physics state (no physics step) before ArduPilot
                 # sees it, then publish the frame, its pose and time together.
+                # The targets move with the simulation clock: the frame shows
+                # them where the ground truth published with it says.
+                if tracks is not None:
+                    poses = tracks.poses(tick * dt)
+                    place_tracking_targets(target_ops, tracks.placed(poses))
                 frames = camera.capture(world, 0.5 * dt)
                 stamp = publisher.stamp()
                 publisher.publish_clock(tick * dt)
@@ -486,6 +591,9 @@ def main():
                     publisher.publish_camera(stamp, *frames)
                 else:
                     print(f"Isaac camera: no frame rendered for t={tick * dt:.3f} s", flush=True)
+                if tracks is not None:
+                    publisher.publish_targets(
+                        truth_json(tick * dt, poses, tracks.origin, tracks.hidden))
                 rclpy.spin_once(publisher, timeout_sec=0.0)
             transport.send(state)
             if tick % max(1, int(physics_rate * 5.0)) == 0:

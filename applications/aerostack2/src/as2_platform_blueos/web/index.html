@@ -2,136 +2,236 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#11151b">
+  <link rel="icon" href="data:,">
   <title>CyberPhysics Aerostack Control</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <!-- Pinned versions with Subresource Integrity: a changed file is refused. -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="anonymous">
   <style>
-    html, body, #map { height: 100%; margin: 0; }
-    .panel {
-      position: absolute;
-      z-index: 1000;
-      top: 12px;
-      right: 12px;
-      width: 250px;
-      padding: 14px;
-      border-radius: 8px;
-      background: rgba(20, 24, 30, 0.94);
-      color: #f4f6f8;
-      font: 14px system-ui, sans-serif;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+    :root {
+      --bg: #11151b;
+      --card: #1b2129;
+      --line: #2c3540;
+      --fg: #eef2f6;
+      --muted: #9aa7b4;
+      --accent: #4cc3ff;
+      --box: #00e5ff;
+      --target: #ffb300;
+      --danger: #e5484d;
+      --ok: #3fb950;
+      --warn: #d29922;
+      --bar-height: 64px;
     }
-    .panel label, .panel button, .panel output { display: block; width: 100%; }
-    .panel input, .panel button {
-      box-sizing: border-box;
-      width: 100%;
-      margin: 5px 0 10px;
+    * { box-sizing: border-box; }
+    html, body { margin: 0; background: var(--bg); color: var(--fg); }
+    body { font: 15px/1.35 system-ui, -apple-system, "Segoe UI", sans-serif; }
+    button, input { font: inherit; }
+
+    .app {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 8px;
       padding: 8px;
+      padding-bottom: calc(var(--bar-height) + 16px + env(safe-area-inset-bottom));
     }
-    .panel button { cursor: pointer; }
-    #status { margin-top: 8px; color: #9dd6ff; }
+    .topbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .topbar h1 { font-size: 17px; margin: 0 auto 0 0; }
+    .badge {
+      padding: 3px 9px; border-radius: 999px; font-size: 13px; white-space: nowrap;
+      background: var(--line); color: var(--fg);
+    }
+    .badge.ok { background: #1f4d2b; }
+    .badge.bad { background: #5c1f22; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; }
+    .card h2 { font-size: 14px; margin: 0 0 8px; color: var(--muted); font-weight: 600;
+               text-transform: uppercase; letter-spacing: 0.04em; }
+
+    /* Camera */
+    .camera { display: flex; flex-direction: column; padding: 6px; min-height: 0; }
+    .camera-wrap {
+      position: relative; width: 100%; aspect-ratio: var(--camera-aspect, 4 / 3);
+      max-height: 70vh;
+      display: flex; align-items: center; justify-content: center;
+      background: #000; border-radius: 6px; overflow: hidden;
+    }
+    #camera { display: block; touch-action: manipulation; cursor: crosshair; }
+    .camera-note {
+      position: absolute; inset: auto 8px 8px 8px; padding: 6px 10px; border-radius: 6px;
+      background: rgba(0, 0, 0, 0.65); color: var(--fg); font-size: 14px; text-align: center;
+      pointer-events: none;
+    }
+    .camera-note:empty { display: none; }
+    .caption { display: flex; justify-content: space-between; gap: 8px; padding: 6px 2px 0;
+               color: var(--muted); font-size: 13px; flex-wrap: wrap; }
+    #hint.error { color: #ff8a8d; }
+
+    /* Side: actions, follow controls, tracker status */
+    .side { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+    .actionbar {
+      position: fixed; z-index: 2000; left: 0; right: 0; bottom: 0;
+      display: flex; align-items: center; gap: 10px;
+      min-height: var(--bar-height);
+      padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
+      background: var(--bg); border-top: 1px solid var(--line);
+    }
+    .state { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis;
+             white-space: nowrap; }
+    .state .chip { margin-right: 6px; }
+    .chip { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 13px;
+            text-transform: uppercase; letter-spacing: 0.04em; background: var(--line); }
+    .chip.idle { background: #39424e; }
+    .chip.acquiring { background: #1f4f7a; }
+    .chip.tracking { background: #1f6b34; }
+    .chip.lost { background: #7a5a12; }
+    .chip.error { background: #7a1f22; }
+    .chip.stale { opacity: 0.55; }
+    #stop {
+      min-width: 132px; min-height: 48px; padding: 10px 18px; border: 0; border-radius: 8px;
+      background: var(--danger); color: #fff; font-weight: 700; font-size: 16px; cursor: pointer;
+    }
+    #stop:disabled { background: #6b3a3c; color: #ccc; cursor: not-allowed; }
+
+    .controls, .status { padding: 12px; }
+    .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 0; margin-bottom: 10px;
+             border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+    .modes label { display: block; text-align: center; padding: 10px 6px; cursor: pointer;
+                   background: #141920; }
+    .modes input { position: absolute; opacity: 0; pointer-events: none; }
+    .modes label.checked { background: var(--accent); color: #04121c; font-weight: 700; }
+    .modes label.focused { outline: 2px solid var(--fg); outline-offset: -4px; }
+    .field { display: block; margin: 0 0 10px; }
+    .field span { display: block; color: var(--muted); font-size: 13px; margin-bottom: 3px; }
+    .field input {
+      width: 100%; min-height: 44px; padding: 8px 10px; border-radius: 6px;
+      border: 1px solid var(--line); background: #0d1116; color: var(--fg);
+    }
+    .field input:invalid, .field input.invalid { border-color: var(--danger); }
+    .derived { color: var(--muted); font-size: 13px; margin: -4px 0 10px; }
+    #mode-error { color: #ff8a8d; font-size: 14px; margin: 0 0 8px; }
+    #mode-error:empty { display: none; }
+    .secondary {
+      width: 100%; min-height: 44px; padding: 8px 12px; border-radius: 6px; cursor: pointer;
+      border: 1px solid var(--accent); background: transparent; color: var(--accent);
+      font-weight: 600;
+    }
+    .secondary:disabled { border-color: var(--line); color: var(--muted); cursor: not-allowed; }
+    #last-command { display: block; margin-top: 8px; color: var(--muted); font-size: 12px;
+                    font-family: ui-monospace, monospace; overflow-wrap: anywhere; }
+
+    .status dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px;
+                 margin: 0; }
+    .status dt { color: var(--muted); }
+    .status dd { margin: 0; overflow-wrap: anywhere; }
+
+    /* Map with the click-to-goal bar */
+    .mapcard { display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
+    .goalbar { display: flex; align-items: end; gap: 8px; padding: 8px; flex-wrap: wrap; }
+    .goalbar .field { margin: 0; flex: 1 1 140px; }
+    .goalbar button { min-height: 44px; flex: 1 1 140px; }
+    .goalbar output { flex: 1 1 100%; color: var(--muted); font-size: 13px; }
+    #map { height: 50vh; min-height: 260px; }
+
+    @media (min-width: 900px) {
+      .app {
+        height: 100vh; height: 100dvh;
+        grid-template-columns: minmax(0, 1fr) 360px;
+        grid-template-rows: auto minmax(0, 3fr) minmax(0, 2fr);
+        grid-template-areas: "top top" "camera side" "map side";
+        padding-bottom: 8px;
+      }
+      .topbar { grid-area: top; }
+      .camera { grid-area: camera; }
+      .camera-wrap { flex: 1; aspect-ratio: auto; max-height: none; min-height: 0; }
+      .side { grid-area: side; overflow-y: auto; }
+      .actionbar { position: static; border: 1px solid var(--line); border-radius: 8px;
+                   padding: 8px 12px; background: var(--card); }
+      .mapcard { grid-area: map; }
+      #map { flex: 1; height: auto; min-height: 0; }
+    }
   </style>
 </head>
 <body>
-  <div id="map"></div>
-  <section class="panel">
-    <strong>Aerostack map goal</strong>
-    <p>Click the map, set altitude, then send the local ENU goal.</p>
-    <label for="altitude">Altitude above origin (m)</label>
-    <input id="altitude" type="number" min="1" step="0.5" value="10">
-    <button id="send" disabled>Send selected goal</button>
-    <output id="selection">No goal selected</output>
-    <output id="status">Connecting to ROSBridge...</output>
-  </section>
+  <div class="app">
+    <header class="topbar">
+      <h1>Aerodrone</h1>
+      <span id="nav-badge" class="badge">Navigation: -</span>
+      <span id="ros-badge" class="badge">ROSBridge: connecting</span>
+    </header>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/roslib@1/build/roslib.min.js"></script>
-  <script>
-    const map = L.map('map').setView([51.505, -0.09], 16);
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
+    <section class="card camera" aria-label="Downward camera">
+      <div class="camera-wrap" id="camera-wrap">
+        <canvas id="camera" aria-label="Camera view; tap an object to follow it"></canvas>
+        <div class="camera-note" id="camera-note">Waiting for the camera</div>
+      </div>
+      <div class="caption">
+        <span id="hint">Tap an object to follow it</span>
+        <span id="frame-info"></span>
+      </div>
+    </section>
 
-    const status = document.getElementById('status');
-    const selection = document.getElementById('selection');
-    const send = document.getElementById('send');
-    const altitude = document.getElementById('altitude');
-    let selected = null;
-    let marker = null;
-    let fix = null;
-    let odometry = null;
-    let centered = false;
+    <aside class="side">
+      <div class="actionbar">
+        <div class="state" id="state-line"><span class="chip" id="state-chip">no status</span></div>
+        <button id="stop" type="button" disabled>Stop (hover)</button>
+      </div>
 
-    const ros = new ROSLIB.Ros({
-      url: `ws://${window.location.hostname}:9090`
-    });
-    ros.on('connection', () => status.value = 'ROSBridge connected');
-    ros.on('error', error => status.value = `ROSBridge error: ${error}`);
-    ros.on('close', () => status.value = 'ROSBridge disconnected');
+      <section class="card controls" aria-label="Follow mode">
+        <h2>Follow mode</h2>
+        <div class="modes" role="radiogroup" aria-label="Tracking mode">
+          <label class="checked"><input type="radio" name="mode" value="centered" checked> Centered</label>
+          <label><input type="radio" name="mode" value="slant"> Slant range</label>
+        </div>
+        <div id="centered-fields">
+          <label class="field"><span>Height above ground (m), 15-120; empty keeps the current height</span>
+            <input id="altitude-agl" type="number" inputmode="decimal" min="15" max="120"
+                   step="1" placeholder="current"></label>
+        </div>
+        <div id="slant-fields" hidden>
+          <label class="field"><span>Slant range (m)</span>
+            <input id="slant-range" type="number" inputmode="decimal" min="1" step="1"
+                   value="60"></label>
+          <label class="field"><span>Depression angle (deg), 60-90</span>
+            <input id="depression" type="number" inputmode="decimal" min="60" max="90"
+                   step="1" value="70"></label>
+          <p class="derived" id="slant-derived"></p>
+        </div>
+        <p id="mode-error" role="alert"></p>
+        <button id="apply" class="secondary" type="button" disabled>Apply to the current target</button>
+        <output id="last-command"></output>
+      </section>
 
-    const goalTopic = new ROSLIB.Topic({
-      ros,
-      name: '/aerostack/map_goal',
-      messageType: 'std_msgs/String'
-    });
-    new ROSLIB.Topic({
-      ros,
-      name: '/navigation/fix',
-      messageType: 'sensor_msgs/NavSatFix'
-    }).subscribe(message => {
-      fix = message;
-      if (!centered) {
-        map.setView([fix.latitude, fix.longitude], 17);
-        centered = true;
-      }
-      updateReady();
-    });
-    new ROSLIB.Topic({
-      ros,
-      name: '/navigation/odometry',
-      messageType: 'nav_msgs/Odometry'
-    }).subscribe(message => {
-      odometry = message;
-      updateReady();
-    });
-    new ROSLIB.Topic({
-      ros,
-      name: '/navigation/correction_source',
-      messageType: 'std_msgs/String'
-    }).subscribe(message => {
-      status.value = `Navigation source: ${message.data}`;
-    });
+      <section class="card status" aria-label="Tracker status">
+        <h2>Tracker</h2>
+        <dl>
+          <dt>State</dt><dd id="st-state">-</dd>
+          <dt>Mode</dt><dd id="st-mode">-</dd>
+          <dt>Target</dt><dd id="st-target">-</dd>
+          <dt>Range / angle</dt><dd id="st-range">-</dd>
+          <dt>Position</dt><dd id="st-position">-</dd>
+          <dt>Message</dt><dd id="st-message">-</dd>
+          <dt>Updated</dt><dd id="st-age">-</dd>
+        </dl>
+      </section>
+    </aside>
 
-    function updateReady() {
-      send.disabled = !(selected && fix && odometry);
-    }
+    <section class="card mapcard" aria-label="Map">
+      <div class="goalbar">
+        <label class="field"><span>Goal altitude above origin (m)</span>
+          <input id="altitude" type="number" inputmode="decimal" min="1" step="0.5" value="10"></label>
+        <button id="send" class="secondary" type="button" disabled>Send map goal</button>
+        <output id="selection">Click the map to choose a goal</output>
+      </div>
+      <div id="map"></div>
+    </section>
+  </div>
 
-    map.on('click', event => {
-      selected = event.latlng;
-      if (marker) {
-        marker.setLatLng(selected);
-      } else {
-        marker = L.marker(selected).addTo(map);
-      }
-      selection.value =
-        `${selected.lat.toFixed(7)}, ${selected.lng.toFixed(7)}`;
-      updateReady();
-    });
-
-    send.addEventListener('click', () => {
-      if (!selected || !fix || !odometry) return;
-      const metresPerDegree = 111320.0;
-      const east = (selected.lng - fix.longitude) * metresPerDegree *
-        Math.cos(fix.latitude * Math.PI / 180.0);
-      const north = (selected.lat - fix.latitude) * metresPerDegree;
-      const x = odometry.pose.pose.position.x + east;
-      const y = odometry.pose.pose.position.y + north;
-      const z = Number(altitude.value);
-      goalTopic.publish(new ROSLIB.Message({
-        data: `${x};${y};${z}`
-      }));
-      status.value = `Goal sent: ${x.toFixed(1)} E, ${y.toFixed(1)} N, ${z.toFixed(1)} m`;
-    });
-  </script>
+  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/roslib@1.4.1/build/roslib.min.js"
+          integrity="sha256-PFEN8rwEvp1bB++vsB619HPYpQktkykjUacVymDa+dY=" crossorigin="anonymous"></script>
+  <script src="tracking_logic.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>

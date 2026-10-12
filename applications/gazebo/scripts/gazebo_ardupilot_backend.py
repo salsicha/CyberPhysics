@@ -16,7 +16,12 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy, qos_profile_sensor_data
 from sensor_msgs.msg import Imu
 
 sys.path.insert(0, "/workspace/applications/ardupilot_sitl/scripts")
-from ardupilot_json import ArduPilotJSON, pwm_to_rotor_speed, state_from_enu  # noqa: E402
+from ardupilot_json import (  # noqa: E402
+    ArduPilotJSON,
+    body_velocity_to_enu,
+    pwm_to_rotor_speed,
+    state_from_enu,
+)
 
 
 class GazeboArduPilotBackend(Node):
@@ -32,6 +37,14 @@ class GazeboArduPilotBackend(Node):
         self.pose = None
         self.twist = None
         self.imu = None
+        # The ground-truth twist (as2 ground_truth_bridge, from Gazebo's
+        # OdometryPublisher) is the body-frame velocity, not ENU: true
+        # rotates it before it reaches ArduPilot, whose GPS velocity is
+        # otherwise turned by the vehicle's yaw (GPS glitch and EKF yaw
+        # reset once the vehicle has yawed away from east). Off by default
+        # until the Gazebo GPS-denied baselines are measured again with it.
+        self.twist_in_body_frame = os.environ.get(
+            "GAZEBO_TWIST_IN_BODY_FRAME", "false").strip().lower() in ("1", "true", "yes")
         self.transport = ArduPilotJSON(
             port=int(os.environ.get("ARDUPILOT_JSON_PORT", "9002")))
         self.actuator_pub = self.create_publisher(
@@ -88,9 +101,12 @@ class GazeboArduPilotBackend(Node):
                     self.imu.angular_velocity.z]
             accel = [self.imu.linear_acceleration.x, self.imu.linear_acceleration.y,
                      self.imu.linear_acceleration.z]
+        velocity = [linear.x, linear.y, linear.z]
+        if self.twist_in_body_frame:
+            velocity = body_velocity_to_enu(velocity, [q.w, q.x, q.y, q.z])
         state = state_from_enu(
             [p.x, p.y, p.z],
-            [linear.x, linear.y, linear.z],
+            velocity,
             [q.w, q.x, q.y, q.z],
             gyro,
             accel,

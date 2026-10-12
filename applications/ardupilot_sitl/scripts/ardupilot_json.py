@@ -113,6 +113,14 @@ def quaternion_to_matrix(quaternion_wxyz) -> np.ndarray:
     ])
 
 
+def body_velocity_to_enu(velocity_flu, quaternion_wxyz) -> list[float]:
+    """A body-frame (FLU) velocity in the world ENU frame of the attitude
+    quaternion (world <- body). Gazebo's OdometryPublisher, behind
+    /<model>/ground_truth/twist, reports the body-frame velocity."""
+    return (quaternion_to_matrix(quaternion_wxyz) @
+            np.asarray(velocity_flu, dtype=np.float64)).tolist()
+
+
 def matrix_to_quaternion(matrix) -> list[float]:
     m = np.asarray(matrix, dtype=np.float64)
     trace = float(np.trace(m))

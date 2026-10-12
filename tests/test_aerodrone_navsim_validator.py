@@ -498,8 +498,8 @@ def test_lite_stack_validator_watches_the_topics_its_matchers_consume():
 def test_every_ros_service_joins_the_stacks_ros_domain(name):
     """With ROS_DOMAIN_ID set, a ROS service without it runs on domain 0,
     splitting the stack (the validator then sees no DemNav/WildNav/fusion)."""
-    not_ros = {'demnav_assets', 'wildnav_assets', 'terrain_assets', 'navigator_sitl',
-               'isaacsim_cache_init'}
+    not_ros = {'demnav_assets', 'wildnav_assets', 'target_assets', 'terrain_assets',
+               'navigator_sitl', 'isaacsim_cache_init'}
     for service, spec in compose(REPO / 'compositions' / name).items():
         if service in not_ros:
             continue

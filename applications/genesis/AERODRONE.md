@@ -24,3 +24,12 @@ rotor reaction moments, as one body wrench: the URDF's propeller links have no
 offset from the body, so Genesis' `set_propellers_rpm()` cannot roll or pitch
 it. `config/aerodrone_sitl.params` pins that motor model and scales the
 ArduCopter rate gains to the Crazyflie's control authority.
+
+The tracking targets (a car and two people, `applications/aerostack2/README.md`,
+"Tracking targets and scenario") are fixed, collision-free meshes with their
+baked texture atlas; each camera frame moves them to their pose at the frame's
+simulation time (`set_pos`/`set_quat`) before rendering, and
+`/simulation/targets` is published with the frame.
+Targets named on `/simulation/targets/hide` are drawn 50 m under the
+terrain, out of the camera's sight (the tracking test's occlusion), their
+truth still on their route and marked `"hidden": true`.

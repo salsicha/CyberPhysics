@@ -20,13 +20,19 @@ from nav_msgs.msg import Odometry
 from rclpy.node import Node
 from rosgraph_msgs.msg import Clock
 from sensor_msgs.msg import CameraInfo, Image
+from std_msgs.msg import String
 
 sys.path.insert(0, "/workspace/applications/ardupilot_sitl/scripts")
+# tracking_targets.py: mounted there by the composition, in the repository
+# next to this application.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "demnav" / "scripts"))
+sys.path.insert(0, "/workspace/applications/demnav/scripts")
 from ardupilot_json import (  # noqa: E402
     ArduPilotJSON,
     quaternion_to_matrix,
     state_from_enu,
 )
+from tracking_targets import HIDE_TOPIC, TRUTH_TOPIC, Tracks, truth_json  # noqa: E402
 
 # Genesis' urdf/drones/cf2x.urdf: mass, thrust (N/rpm^2) and reaction
 # moment (N m/rpm^2) coefficients.
@@ -153,6 +159,7 @@ class GenesisSensorPublisher(Node):
         self.depth_pub = self.create_publisher(Image, args.depth_topic, 10)
         self.depth_info_pub = self.create_publisher(CameraInfo, args.depth_info_topic, 10)
         self.clock_pub = self.create_publisher(Clock, "/clock", 10)
+        self.targets_pub = self.create_publisher(String, TRUTH_TOPIC, 10)
 
     def camera_info(self, stamp, frame):
         width, height = self.args.width, self.args.height
@@ -175,6 +182,16 @@ class GenesisSensorPublisher(Node):
         msg = Clock()
         msg.clock.sec, msg.clock.nanosec = divmod(nanoseconds, 1_000_000_000)
         self.clock_pub.publish(msg)
+
+    def publish_targets(self, text):
+        """Tracking-target ground truth (systems/aerodrone/tracking.md)."""
+        msg = String()
+        msg.data = text
+        self.targets_pub.publish(msg)
+
+    def subscribe_hide(self, tracks):
+        """Hide the targets named on HIDE_TOPIC (tracking_targets.py)."""
+        self.create_subscription(String, HIDE_TOPIC, lambda msg: tracks.hide(msg.data), 10)
 
     def publish_truth(self, position, quaternion, velocity, angular):
         stamp = self.get_clock().now().to_msg()
@@ -216,6 +233,34 @@ class GenesisSensorPublisher(Node):
         depth_msg.data = array.array("B", depth.tobytes())
         self.depth_pub.publish(depth_msg)
         self.depth_info_pub.publish(self.camera_info(stamp, frame))
+
+
+def add_tracking_targets(gs, scene, assets):
+    """The tracking targets of assets/tracking_targets.json (cars, people:
+    build_georeferenced_terrain.py --targets), as visual-only fixed meshes
+    with their baked texture atlas, moved by place_tracking_targets.
+    Returns (Tracks, entities), or (None, []) for terrain without targets."""
+    path = Path(assets) / "tracking_targets.json"
+    if not path.is_file():
+        return None, []
+    tracks = Tracks.load(path)
+    entities = []
+    for track, pose in zip(tracks.tracks, tracks.poses(0.0)):
+        entities.append(scene.add_entity(
+            gs.morphs.Mesh(
+                file=str(tracks.model_file(track, "mesh")), fixed=True, collision=False,
+                pos=(pose.east, pose.north, pose.up), quat=pose.quaternion_wxyz()),
+            surface=gs.surfaces.Default(diffuse_texture=gs.textures.ImageTexture(
+                image_path=str(tracks.model_file(track, "texture"))))))
+    print(f"Genesis tracking targets: {', '.join(t.name for t in tracks.tracks)}", flush=True)
+    return tracks, entities
+
+
+def place_tracking_targets(entities, poses):
+    """Move each target to its pose (terrain ENU) before a render."""
+    for entity, pose in zip(entities, poses):
+        entity.set_pos((pose.east, pose.north, pose.up))
+        entity.set_quat(pose.quaternion_wxyz())
 
 
 def main():
@@ -274,6 +319,7 @@ def main():
         size=(3.0, 3.0, 0.2), fixed=True))
     drone = scene.add_entity(gs.morphs.Drone(
         file="urdf/drones/cf2x.urdf", pos=tuple(home.tolist())))
+    tracks, target_entities = add_tracking_targets(gs, scene, assets)
     # far: the CRUISE_AGL_M cruise plus the terrain's relief across the
     # footprint must stay in range of the depth image.
     camera = scene.add_camera(
@@ -288,6 +334,8 @@ def main():
 
     rclpy.init()
     publisher = GenesisSensorPublisher(args)
+    if tracks is not None:
+        publisher.subscribe_hide(tracks)
     transport = ArduPilotJSON(port=int(os.environ.get("ARDUPILOT_JSON_PORT", "9002")))
     Path("/tmp/genesis_sim_ready").touch()
     dt = 1.0 / args.rate_hz
@@ -353,8 +401,16 @@ def main():
                 # The node only publishes: no need to spin it every tick.
                 rclpy.spin_once(publisher, timeout_sec=0.0)
                 publisher.publish_clock(tick * dt)
+                # The targets move with the simulation clock; the frame
+                # shows them where the ground truth published with it says.
+                if tracks is not None:
+                    poses = tracks.poses(tick * dt)
+                    place_tracking_targets(target_entities, tracks.placed(poses))
                 rendered = camera.render(rgb=True, depth=True)
                 publisher.publish_camera(rendered[0], rendered[1])
+                if tracks is not None:
+                    publisher.publish_targets(
+                        truth_json(tick * dt, poses, tracks.origin, tracks.hidden))
                 publisher.publish_truth(position.tolist(), quaternion.tolist(),
                                         velocity.tolist(), angular.tolist())
             if tick % max(1, int(args.rate_hz * 5.0)) == 0:

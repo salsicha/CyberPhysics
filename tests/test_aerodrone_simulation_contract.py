@@ -140,7 +140,8 @@ class ComposeContractTest(unittest.TestCase):
                 self.assertIn("salsicha/cyberphysics:navigator-", text)
                 self.assertIn("as2_platform_blueos", text)
                 self.assertIn("flight_ready:", text)
-                self.assertIn("wilderness_mission.xml", text)
+                # The wilderness mission unless AERODRONE_MISSION picks another.
+                self.assertIn("${AERODRONE_MISSION:-wilderness}_mission.xml", text)
                 self.assertIn("build_georeferenced_terrain.py", text)
                 self.assertNotIn("aerodrone_sensor_sim.py", text)
 

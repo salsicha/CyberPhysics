@@ -1,0 +1,37 @@
+{
+  "name": "visdrone_yolov8n",
+  "input_width": 640,
+  "input_height": 352,
+  "classes": [
+    "pedestrian",
+    "people",
+    "bicycle",
+    "car",
+    "van",
+    "truck",
+    "tricycle",
+    "awning-tricycle",
+    "bus",
+    "motor",
+    "others"
+  ],
+  "outputs": [
+    "output1_yolov6r2",
+    "output2_yolov6r2",
+    "output3_yolov6r2"
+  ],
+  "strides": [
+    8,
+    16,
+    32
+  ],
+  "onnx": "visdrone_yolov8n_640x352.onnx",
+  "onnx_sha256": "4dd1d6a3cd807cb0be12b3eac1b35bff65e05a1fd51a4905dd81c866bf952ebc",
+  "weights_sha256": "060866322c84caa59d7cbd7874efbe1af5e957a862169f2ac6778a8e7e3c4851",
+  "source": "https://huggingface.co/dronefreak/visdrone-yolov8n@008d286027f26cba3823636edcb65a7e2b798beb",
+  "license": "AGPL-3.0 (weights); VisDrone2019-DET training data CC BY-NC-SA 3.0",
+  "blob": "visdrone_yolov8n_640x352_openvino_2021.4_6shave.blob",
+  "blob_sha256": "45ef84949890c45650564cc77f3c220c03693228acda0c8603542530857a4854",
+  "blob_openvino": "2021.4",
+  "blob_shaves": 6
+}

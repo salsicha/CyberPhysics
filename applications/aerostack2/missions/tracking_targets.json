@@ -1,0 +1,77 @@
+{
+  "name": "aerodrone_mount_tamalpais_tracking_targets",
+  "description": "Moving ground targets for the tracking scenario, in the open field of the west clearing just north-west of home: a car lapping a 26 m x 16 m circuit, a person walking a 12 m x 6 m loop inside it and a person standing between them, all inside the downward camera's view from 40 m above the hold point whatever the drone's yaw.",
+  "mission": "wilderness_missions.json",
+  "frame": "ENU metres about the mission origin (wilderness_missions.json origin, INITIAL_LAT/INITIAL_LON/ORIGIN_ALT)",
+  "sample_spacing_m": 0.2,
+  "models": {
+    "hatchback_blue": {
+      "fuel": "OpenRobotics/models/Hatchback blue",
+      "version": 5,
+      "license": "Creative Commons Zero v1.0 Universal",
+      "sha256": "1659265c26d026ae5dbb7edf9106acf2a479073ba213da04ca5699fb39b34892",
+      "mesh": "meshes/hatchback.obj",
+      "scale": 0.0254,
+      "rotate_rpy_deg": [0.0, 0.0, 90.0],
+      "material_colors": {"^Wheels": [0.08, 0.08, 0.08]},
+      "tilt_with_ground": true,
+      "wheelbase_m": 2.5,
+      "track_m": 1.5
+    },
+    "walking_person": {
+      "fuel": "OpenRobotics/models/Walking person",
+      "version": 3,
+      "license": "Creative Commons Zero v1.0 Universal",
+      "sha256": "89cbcc1fd470338823b9cdf82c79aaabd4c86d72935386065deccf1e481a5178",
+      "mesh": "meshes/walking.dae",
+      "rotate_rpy_deg": [0.0, 0.0, 90.0],
+      "exclude_materials": ["Teeth", "eye", "Eyebrow"],
+      "tilt_with_ground": false
+    },
+    "casual_female": {
+      "fuel": "OpenRobotics/models/Casual female",
+      "version": 4,
+      "license": "Creative Commons Zero v1.0 Universal",
+      "sha256": "e03944df8f010c7d6cf85fe61b2a9bf2899eed971e73fb76461f4705edeffe5d",
+      "mesh": "meshes/casual_female.dae",
+      "rotate_rpy_deg": [0.0, 0.0, 90.0],
+      "exclude_materials": ["tongue", "eye", "bodyMaterial"],
+      "tilt_with_ground": false
+    }
+  },
+  "targets": [
+    {
+      "name": "car_1",
+      "class": "car",
+      "model": "hatchback_blue",
+      "speed_mps": 5.0,
+      "corner_radius_m": 6.5,
+      "route_enu_m": [[-773.0, -223.0], [-747.0, -223.0], [-747.0, -207.0], [-773.0, -207.0]]
+    },
+    {
+      "name": "person_1",
+      "class": "person",
+      "model": "walking_person",
+      "speed_mps": 1.5,
+      "corner_radius_m": 2.0,
+      "route_enu_m": [[-769.0, -212.0], [-757.0, -212.0], [-757.0, -218.0], [-769.0, -218.0]]
+    },
+    {
+      "name": "person_2",
+      "class": "person",
+      "model": "casual_female",
+      "speed_mps": 0.0,
+      "heading_deg": 180.0,
+      "route_enu_m": [[-751.0, -215.0]]
+    }
+  ],
+  "scenario": {
+    "name": "tracking",
+    "description": "Arm, take off, fly to 40 m above the targets' ground over the centre of the car's circuit, nose east, and hold there until stopped, for the tracker to take over.",
+    "takeoff_height_m": 35.0,
+    "hold_enu_m": [-760.0, -215.0],
+    "hold_agl_m": 40.0,
+    "speed_mps": 3.0,
+    "yaw_deg": 0.0
+  }
+}

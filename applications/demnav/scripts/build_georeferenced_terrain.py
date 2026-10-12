@@ -39,6 +39,11 @@ def parse_args():
     parser.add_argument("--cruise-agl", type=float, default=0.0,
                         help="lowest height above ground of the en-route waypoints "
                              "(0 keeps the mission's own)")
+    parser.add_argument("--targets", default="",
+                        help="tracking_targets.json: add its moving targets, their "
+                             "tracks and the tracking mission tree (empty: none)")
+    parser.add_argument("--target-cache", default="/data/target_cache",
+                        help="Fuel models fetched by target_models.py fetch")
     return parser.parse_args()
 
 
@@ -283,7 +288,95 @@ def write_behavior_tree(grid, args, output_dir):
     return waypoint_count, first_point
 
 
-def write_gazebo_assets(args, output_dir, home):
+def tracking_go_to(label, east, north, up, speed, yaw_angle, settle_s):
+    """One waypoint of the tracking tree, flown like the wilderness tree's
+    (write_behavior_tree): its GoTo twice, 2 s apart, then a settle delay;
+    fixed yaw (as2 FIXED_YAW, 2) so the camera footprint is the same at
+    every hold."""
+    go_to = (f'      <Action ID="GoTo" max_speed="{speed:.2f}" '
+             f'pose="{east:.3f};{north:.3f};{up:.3f}" '
+             f'yaw_angle="{yaw_angle:.4f}" yaw_mode="2"/>')
+    return [
+        f'      <!-- {label} -->',
+        go_to,
+        '      <Delay delay_msec="2000"><AlwaysSuccess/></Delay>',
+        go_to,
+        f'      <Delay delay_msec="{int(settle_s * 1000)}"><AlwaysSuccess/></Delay>',
+    ]
+
+
+def write_tracking_tree(grid, args, output_dir, scenario, height, home):
+    """tracking_mission.xml: arm, take off, fly to hold_agl_m above the
+    rendered ground at the scenario's hold point and hover there until the
+    tree is stopped, issuing nothing more, so the tracker can take over (a
+    running GoTo would pre-empt it). Returns the hold point in the
+    navigation frame (ENU about home)."""
+    home_east, home_north = home
+    home_reference_up = terrain_collision_height(
+        grid, args.origin_alt, args.area_km, home_east, home_north) + 0.2
+    hold_east, hold_north = (float(v) for v in scenario["hold_enu_m"])
+    # Above the render mesh, the ground the camera sees and the targets
+    # stand on.
+    up = height(hold_east, hold_north) + float(scenario["hold_agl_m"]) - home_reference_up
+    target = (hold_east - home_east, hold_north - home_north, up)
+    actions = [
+        '      <Action ID="Arm" service_name="set_arming_state"/>',
+        '      <Action ID="Offboard" service_name="set_offboard_mode"/>',
+        f'      <Action ID="TakeOff" height="{float(scenario.get("takeoff_height_m", 35.0)):.1f}"'
+        ' speed="1.5"/>',
+        '      <Delay delay_msec="2000"><AlwaysSuccess/></Delay>',
+        *tracking_go_to(f'{scenario["name"]}/hold {scenario["hold_agl_m"]} m above ground',
+                        *target, float(scenario.get("speed_mps", 3.0)),
+                        math.radians(float(scenario.get("yaw_deg", 0.0))), 2.0),
+        '      <!-- Hover until stopped: the tracker takes over from here. -->',
+        '      <KeepRunningUntilFailure><Delay delay_msec="1000"><AlwaysSuccess/></Delay>'
+        '</KeepRunningUntilFailure>',
+    ]
+    xml = "\n".join([
+        '<?xml version="1.0"?>',
+        '<root main_tree_to_execute="TrackingMission">',
+        '  <BehaviorTree ID="TrackingMission">',
+        '    <Sequence>',
+        *actions,
+        '    </Sequence>',
+        '  </BehaviorTree>',
+        '</root>',
+        '',
+    ])
+    (output_dir / "tracking_mission.xml").write_text(xml, encoding="utf-8")
+    return target
+
+
+def write_tracking_targets(args, output_dir, origin_enu):
+    """Bake every target model into output_dir/models, resolve the routes
+    on the render mesh into output_dir/tracking_targets.json and return
+    (the configuration, the mesh height, the Gazebo world includes)."""
+    from target_models import bake
+    from tracking_targets import MeshHeight, Tracks, resolve_tracks
+
+    config = json.loads(Path(args.targets).read_text(encoding="utf-8"))
+    height = MeshHeight.load(output_dir / "terrain_mesh.npz")
+    for key, spec in config["models"].items():
+        source = Path(args.target_cache) / key
+        if not (source / "fuel.json").is_file():
+            raise FileNotFoundError(
+                f"tracking target model {key} is not in {args.target_cache}: "
+                "run target_models.py fetch (the target_assets service) first")
+        summary = bake(spec, source, output_dir / "models" / key, key)
+        print(f"tracking target model {json.dumps(summary)}", flush=True)
+    document = resolve_tracks(config, height, origin_enu)
+    (output_dir / "tracking_targets.json").write_text(
+        json.dumps(document, separators=(",", ":")) + "\n", encoding="utf-8")
+    includes = []
+    for pose in Tracks(document, output_dir).poses(0.0):
+        includes.append(
+            f"<include><uri>model://{pose.model}</uri><name>{pose.name}</name>"
+            f"<pose>{pose.east:.3f} {pose.north:.3f} {pose.up:.3f} "
+            f"{pose.roll:.5f} {pose.pitch:.5f} {pose.yaw:.5f}</pose></include>")
+    return config, height, "\n".join(includes)
+
+
+def write_gazebo_assets(args, output_dir, home, extra_world=""):
     model_dir = output_dir / "models" / "georeferenced_terrain"
     model_dir.mkdir(parents=True, exist_ok=True)
     for name in ("terrain.obj", "terrain.mtl", "orthophoto.jpg", "terrain_height.png"):
@@ -321,6 +414,7 @@ def write_gazebo_assets(args, output_dir, home):
 <light type="directional" name="sun"><pose>0 0 1000 0 0 0</pose><diffuse>1 0.96 0.88 1</diffuse>
 <specular>0.2 0.2 0.2 1</specular><direction>-0.45 0.2 -0.87</direction><cast_shadows>true</cast_shadows></light>
 <include><uri>model://georeferenced_terrain</uri></include>
+{extra_world}
 </world></sdf>
 """
     (output_dir / "mount_tamalpais.sdf").write_text(world, encoding="utf-8")
@@ -374,7 +468,17 @@ def main():
     waypoint_count, home = write_behavior_tree(grid, args, output_dir)
     if home is None:
         raise RuntimeError("mission contains no waypoints")
-    home_ground = write_gazebo_assets(args, output_dir, home)
+    tracking = None
+    includes = ""
+    if args.targets:
+        # The navigation origin is the home the manifest records below.
+        origin_up = terrain_collision_height(
+            np.load(find_dem(args)), args.origin_alt, args.area_km, *home) + 0.2
+        tracking, height, includes = write_tracking_targets(
+            args, output_dir, (home[0], home[1], origin_up))
+    home_ground = write_gazebo_assets(args, output_dir, home, includes)
+    if tracking is not None:
+        write_tracking_tree(grid, args, output_dir, tracking["scenario"], height, home)
     home_lat = args.lat + home[1] / METERS_PER_DEG_LAT
     home_lon = args.lon + home[0] / (
         METERS_PER_DEG_LAT * math.cos(math.radians(args.lat)))
@@ -398,6 +502,9 @@ def main():
         "assets": {"mesh": "terrain.obj", "mesh_npz": "terrain_mesh.npz",
                    "texture": "orthophoto.jpg", "behavior_tree": "wilderness_mission.xml"},
     }
+    if tracking is not None:
+        manifest["assets"].update({"tracking_targets": "tracking_targets.json",
+                                   "tracking_behavior_tree": "tracking_mission.xml"})
     (output_dir / "manifest.json").write_text(
         json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(manifest, indent=2))

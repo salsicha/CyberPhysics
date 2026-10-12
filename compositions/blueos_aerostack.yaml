@@ -7,6 +7,12 @@
 
 include:
   - blueos_nav_core.yaml
+  # Object tracking (systems/aerodrone/tracking.md), opt-in with
+  # `--profile tracking`. No env_file: aerodrone_tracking.yaml's fallbacks
+  # are this aircraft's values (a nested include's env_file would resolve
+  # against the working directory when aerodrone_hardware.yaml includes
+  # this file).
+  - aerodrone_tracking.yaml
 
 services:
   aerostack:
@@ -83,12 +89,15 @@ services:
           use_sim_time:=false
 
   aerostack_gui:
+    # The map-goal and object-tracking page (applications/aerostack2/README.md,
+    # "Map mission" and "Object tracking UI") on port 8080, served from the
+    # repository like the scripts above: a new page needs no image rebuild.
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-arm64}
     container_name: aerostack_gui
     network_mode: host
     restart: unless-stopped
     depends_on:
       - rosbridge
-    command: >
-      python3 -m http.server 8080
-        --directory /workspace/install/share/as2_platform_blueos/web
+    volumes:
+      - ../applications/aerostack2/src/as2_platform_blueos/web:/workspace/web:ro
+    command: python3 -m http.server 8080 --directory /workspace/web

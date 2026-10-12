@@ -45,3 +45,15 @@ DemNav (every depth frame) and WildNav (`WILDNAV_RATE_HZ`, 0.2 Hz) use.
 SITL loads only the shared ArduCopter parameters (`systems/aerodrone/config`):
 in flight Gazebo's quadrotor learns a hover throttle of 0.67, the hardware
 `MOT_THST_HOVER`, so unlike Genesis and Isaac it needs no backend compensation.
+
+The tracking targets (a car and two people, `applications/aerostack2/README.md`,
+"Tracking targets and scenario") are visual-only, gravity-free models the
+terrain builder puts in the world. The `gazebo_targets` service
+(`scripts/gazebo_tracking_targets.py`) moves them along their tracks every
+0.02 s of simulation time through the world's `set_pose` service (it starts
+the ros_gz_bridge for it) and publishes `/simulation/targets` at the same
+times. A camera frame can show a pose up to one update old (0.1 m for the
+car).
+Targets named on `/simulation/targets/hide` are drawn 50 m under the
+terrain, out of the camera's sight (the tracking test's occlusion), their
+truth still on their route and marked `"hidden": true`.

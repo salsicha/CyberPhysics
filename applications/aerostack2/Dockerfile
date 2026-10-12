@@ -51,6 +51,9 @@ RUN gpg --show-keys --with-colons /tmp/ros-snapshots.asc \
       "Pin-Priority: 1001" \
       > /etc/apt/preferences.d/cyberphysics-pins
 
+# vision_msgs carries the object-tracking detections
+# (systems/aerodrone/tracking.md) for the tracker, rosbridge and the
+# images built on this one (oak1).
 RUN apt update && apt install -q -y --no-install-recommends \
     python3-pip python3-venv python3-setuptools libgl1-mesa-dri \
     ros-${ROS_DISTRO}-as2-core ros-${ROS_DISTRO}-as2-msgs \
@@ -69,6 +72,7 @@ RUN apt update && apt install -q -y --no-install-recommends \
     ros-${ROS_DISTRO}-libmavconn \
     ros-${ROS_DISTRO}-mavlink \
     ros-${ROS_DISTRO}-rosbridge-suite \
+    ros-${ROS_DISTRO}-vision-msgs \
     geographiclib-tools python3-colcon-common-extensions && \
     rm -rf /var/lib/apt/lists/* && \
     for pin in mavros:${MAVROS_VERSION} mavros-extras:${MAVROS_VERSION} \
@@ -89,7 +93,8 @@ RUN . /opt/ros/${ROS_DISTRO}/setup.bash && \
       test -f "${share}/${file}" || { echo "missing ${share}/${file}"; exit 1; }; \
     done && \
     ros2 launch as2_gazebo_assets launch_simulation.py --show-args > /dev/null && \
-    ros2 launch as2_gazebo_assets drone_bridges.py --show-args > /dev/null
+    ros2 launch as2_gazebo_assets drone_bridges.py --show-args > /dev/null && \
+    python3 -c "from vision_msgs.msg import Detection2DArray"
 
 RUN /opt/ros/${ROS_DISTRO}/lib/mavros/install_geographiclib_datasets.sh
 

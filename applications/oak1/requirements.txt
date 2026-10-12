@@ -1,1 +1,7 @@
 depthai>=2.24,<3
+# The simulators' tracking detector (scripts/sim_tracking_detector.py) runs
+# the tracking ONNX on the CPU; 1.23.2 is the last release with Python 3.10
+# wheels (x86_64 and aarch64). It needs numpy >= 1.21.6, newer than the
+# system's: keep pip on 1.x, which ROS's cv_bridge and OpenCV are built for.
+onnxruntime==1.23.2
+numpy>=1.21.6,<2

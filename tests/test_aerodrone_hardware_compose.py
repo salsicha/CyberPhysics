@@ -28,7 +28,15 @@ def test_hardware_commands_use_consistent_vehicle_identity(namespace):
     )
     services = json.loads(rendered.stdout)['services']
     vehicle = namespace or 'aerodrone'
+    # Object tracking is opt-in (compositions/aerodrone_tracking.yaml): the
+    # `tracking` profile adds the tracker and nothing else to these 11.
     assert len(services) == 11
+    tracking = subprocess.run(
+        ['docker', 'compose', '-f', str(REPO / 'compositions/aerodrone_hardware.yaml'),
+         '--profile', 'tracking', 'config', '--format', 'json'],
+        env=env, check=True, capture_output=True, text=True,
+    )
+    assert set(json.loads(tracking.stdout)['services']) - set(services) == {'tracker'}
     assert all(service.get('image') for service in services.values())
     assert f'namespace:={vehicle}' in services['aerostack']['command']
     assert f'drone_id:={vehicle}' in services['behavior_tree']['command']

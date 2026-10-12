@@ -1,0 +1,97 @@
+# Aerodrone object tracking (systems/aerodrone/tracking.md): the services
+# only the simulations run. Included, never run alone, by
+# aerostack2_sim.yaml, aerostack2_genesis.yaml and aerostack2_isaac.yaml
+# beside aerodrone_tracking.yaml (the services they share with the
+# aircraft; profiles explained there), with topics.env, tracking.env and
+# ../applications/aerostack2/config/tracking_<simulator>.env.
+#
+# Never included by the aircraft stack: it runs its own rosbridge
+# (blueos_nav_core.yaml, port 9090) and web page (blueos_aerostack.yaml
+# aerostack_gui, port 8080) on the host network; these would clash.
+#
+# ROS containers here load the shared FastDDS profile like every
+# container of the simulator stacks (applications/aerostack2/README.md,
+# "DDS transport").
+
+services:
+  tracking_detector:
+    # The aircraft's detector on the simulated downward camera: the ONNX its
+    # OAK-1 blob is compiled from, on the CPU with ONNX Runtime, and a
+    # host-side tracker giving the IDs DepthAI's ObjectTracker gives on the
+    # aircraft (applications/oak1/scripts/sim_tracking_detector.py); the
+    # OAK-1 image, whose /models holds the network.
+    profiles: [tracking]
+    image: salsicha/cyberphysics:oak1-${CYBERPHYSICS_TAG:-latest}
+    network_mode: host
+    ipc: host
+    environment:
+      ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
+      FASTRTPS_DEFAULT_PROFILES_FILE: /workspace/systems/aerodrone/config/fastdds.xml
+    volumes:
+      - /dev/shm:/dev/shm
+      - ../systems/aerodrone/config/fastdds.xml:/workspace/systems/aerodrone/config/fastdds.xml:ro
+      - ../applications/oak1/scripts:/scripts:ro
+    command: >
+      python3 /scripts/sim_tracking_detector.py --ros-args
+        -p image_topic:=${WILDNAV_IMAGE_TOPIC:-/aerodrone/sensor_measurements/downward_rgb/image_raw}
+        -p camera_info_topic:=${WILDNAV_CAMERA_INFO_TOPIC:-/aerodrone/sensor_measurements/downward_rgb/camera_info}
+        -p topic_prefix:=${TRACKING_TOPIC_PREFIX:-/tracking}
+        -p model:=/models/${TRACKING_DETECTOR_MODEL:-visdrone_yolov8n_640x352}.json
+
+  tracking_truth_detector:
+    # /simulation/targets projected through the simulated camera into
+    # <prefix>/detections and camera_info, in place of the detector
+    # (applications/aerostack2/scripts/tracking_truth_detector.py).
+    # TRACKING_TRUTH_SYNTHETIC=true makes up its own moving targets.
+    profiles: [tracking_truth]
+    image: salsicha/cyberphysics:demnav-${CYBERPHYSICS_TAG:-latest}
+    network_mode: host
+    ipc: host
+    env_file: [../systems/aerodrone/config/topics.env]
+    environment:
+      ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
+      FASTRTPS_DEFAULT_PROFILES_FILE: /workspace/systems/aerodrone/config/fastdds.xml
+    volumes:
+      - /dev/shm:/dev/shm
+      - ../systems/aerodrone/config/fastdds.xml:/workspace/systems/aerodrone/config/fastdds.xml:ro
+      - ../applications/aerostack2/scripts:/workspace/applications/aerostack2/scripts:ro
+      - ${TRACKING_DEM_SOURCE:-/data/demnav_cache}:/data/demnav_cache:ro
+    command: >
+      python3 /workspace/applications/aerostack2/scripts/tracking_truth_detector.py --ros-args
+        -p topic_prefix:=${TRACKING_TOPIC_PREFIX:-/tracking}
+        -p targets_topic:=/simulation/targets
+        -p camera_info_topic:=${WILDNAV_CAMERA_INFO_TOPIC:-/aerodrone/sensor_measurements/downward_rgb/camera_info}
+        -p odometry_topic:=${NAVIGATION_ODOM_TOPIC:-/navigation/odometry}
+        -p camera_mount_yaw_deg:=${TRACKING_CAMERA_MOUNT_YAW_DEG:-0.0}
+        -p camera_stabilized:=${TRACKING_CAMERA_STABILIZED:-false}
+        -p synthetic_targets:=${TRACKING_TRUTH_SYNTHETIC:-false}
+        -p pixel_noise_px:=${TRACKING_TRUTH_PIXEL_NOISE_PX:-0.0}
+        -p dropout:=${TRACKING_TRUTH_DROPOUT:-0.0}
+        -p dem_cache_dir:=/data/demnav_cache
+
+  tracking_rosbridge:
+    # The web page's link to ROS (port 9090), as blueos_nav_core.yaml's
+    # rosbridge on the aircraft.
+    profiles: [tracking, tracking_truth]
+    image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
+    stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
+    network_mode: host
+    ipc: host
+    environment:
+      ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
+      FASTRTPS_DEFAULT_PROFILES_FILE: /workspace/systems/aerodrone/config/fastdds.xml
+    volumes:
+      - /dev/shm:/dev/shm
+      - ../systems/aerodrone/config/fastdds.xml:/workspace/systems/aerodrone/config/fastdds.xml:ro
+    command: ros2 launch rosbridge_server rosbridge_websocket_launch.xml
+
+  tracking_ui:
+    # The map-goal and object-tracking page on http://localhost:8080, served
+    # from the repository as blueos_aerostack.yaml's aerostack_gui does on
+    # the aircraft (applications/aerostack2/README.md).
+    profiles: [tracking, tracking_truth]
+    image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
+    network_mode: host
+    volumes:
+      - ../applications/aerostack2/src/as2_platform_blueos/web:/workspace/web:ro
+    command: python3 -m http.server 8080 --directory /workspace/web

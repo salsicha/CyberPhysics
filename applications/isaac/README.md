@@ -38,3 +38,12 @@ they hold the frame of the current simulation time (RTX delivers each frame
 two renders later), and publishes the frames, their camera_info, the ground
 truth and `/clock` with one stamp. The terrain is lit by a uniform sky dome,
 so the ground shows the orthophoto's own colours.
+
+The tracking targets (a car and two people, `applications/aerostack2/README.md`,
+"Tracking targets and scenario") are visual-only meshes under `/World/Targets`,
+built from the baked `model_mesh.npz` and texture atlas; each camera frame
+moves them to their pose at the frame's simulation time before rendering, and
+`/simulation/targets` is published with the frame.
+Targets named on `/simulation/targets/hide` are drawn 50 m under the
+terrain, out of the camera's sight (the tracking test's occlusion), their
+truth still on their route and marked `"hidden": true`.

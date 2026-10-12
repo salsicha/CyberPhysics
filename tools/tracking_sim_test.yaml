@@ -1,0 +1,65 @@
+# Object-tracking simulation test (tools/tracking_sim_test.sh), layered on
+# any of the three Aerodrone compositions with `--profile tracking` (the
+# YOLO detector, end to end) or `--profile tracking_truth` (the
+# ground-truth detector's boxes): tools/tracking_sim_test.py flies the
+# steps and records them. The wilderness mission is not flown (its profile
+# is never enabled).
+services:
+  wilderness_mission:
+    profiles: [wilderness_mission]
+
+  tracking_sim_test:
+    profiles: [tracking, tracking_truth]
+    image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
+    network_mode: host
+    ipc: host
+    depends_on:
+      flight_ready: {condition: service_completed_successfully}
+    environment:
+      ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
+      FASTRTPS_DEFAULT_PROFILES_FILE: /workspace/systems/aerodrone/config/fastdds.xml
+    volumes:
+      - /dev/shm:/dev/shm
+      - ../systems/aerodrone/config/fastdds.xml:/workspace/systems/aerodrone/config/fastdds.xml:ro
+      - ../tools:/workspace/tools:ro
+      - ${TRACKING_TEST_OUTPUT:-../generated/tracking_sim}:/out
+    command: >
+      python3 /workspace/tools/tracking_sim_test.py fly --output /out/recording.jsonl
+        --stack ${TRACKING_TEST_STACK:-gazebo} --detector ${TRACKING_TEST_DETECTOR:-real}
+        --world-origin ${INITIAL_LAT:-37.9234} ${INITIAL_LON:--122.5967}
+        --targets-topic ${TRACKING_TEST_TARGETS_TOPIC:-/simulation/targets}
+        --target ${TRACKING_TEST_TARGET:-car_1} --lost-target ${TRACKING_TEST_LOST_TARGET:-person_1}
+        --mount-yaw-deg ${TRACKING_TEST_MOUNT_YAW_DEG:-0.0}
+        --altitude ${TRACKING_TEST_ALTITUDE_M:-50.0}
+        --lost-altitude ${TRACKING_TEST_LOST_ALTITUDE_M:-40.0}
+        --slant-range ${TRACKING_TEST_SLANT_RANGE_M:-60.0}
+        --depression ${TRACKING_TEST_DEPRESSION_DEG:-70.0}
+        --centered-s ${TRACKING_TEST_CENTERED_S:-150} --slant-s ${TRACKING_TEST_SLANT_S:-150}
+    restart: "no"
+
+  tracking_truth_boxes:
+    # With the YOLO detector: /simulation/targets projected through the
+    # camera into /tracking/truth/detections (the ground-truth detector of
+    # aerodrone_tracking_sim.yaml, under another prefix), which the test
+    # pairs with the detector's tracks frame by frame to pick a target's id
+    # and score the detector. No DEM: the simulator's targets carry their
+    # ground height.
+    profiles: [tracking]
+    image: salsicha/cyberphysics:demnav-${CYBERPHYSICS_TAG:-latest}
+    network_mode: host
+    ipc: host
+    environment:
+      ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
+      FASTRTPS_DEFAULT_PROFILES_FILE: /workspace/systems/aerodrone/config/fastdds.xml
+    volumes:
+      - /dev/shm:/dev/shm
+      - ../systems/aerodrone/config/fastdds.xml:/workspace/systems/aerodrone/config/fastdds.xml:ro
+      - ../applications/aerostack2/scripts:/workspace/applications/aerostack2/scripts:ro
+    command: >
+      python3 /workspace/applications/aerostack2/scripts/tracking_truth_detector.py --ros-args
+        -p topic_prefix:=/tracking/truth
+        -p targets_topic:=/simulation/targets
+        -p camera_info_topic:=/aerodrone/sensor_measurements/downward_rgb/camera_info
+        -p odometry_topic:=/navigation/odometry
+        -p camera_mount_yaw_deg:=${TRACKING_TEST_MOUNT_YAW_DEG:-0.0}
+        -p camera_stabilized:=${TRACKING_TEST_CAMERA_STABILIZED:-false}

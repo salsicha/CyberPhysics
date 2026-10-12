@@ -3,6 +3,20 @@
 x-fastdds-profile: &fastdds-profile /workspace/systems/aerodrone/config/fastdds.xml
 x-fastdds-mount: &fastdds-mount ../systems/aerodrone/config/fastdds.xml:/workspace/systems/aerodrone/config/fastdds.xml:ro
 
+# Object tracking (systems/aerodrone/tracking.md), opt-in: `--profile tracking`
+# (tracker, detector, rosbridge and the web page on port 8080) or
+# `--profile tracking_truth` (the ground-truth detector in place of the
+# detector); compositions/aerodrone_tracking.yaml (shared with the aircraft)
+# and aerodrone_tracking_sim.yaml (simulators only).
+include:
+  - path: aerodrone_tracking.yaml
+    env_file: &tracking-env
+      - ../systems/aerodrone/config/topics.env
+      - ../systems/aerodrone/config/tracking.env
+      - ../applications/aerostack2/config/tracking_genesis.env
+  - path: aerodrone_tracking_sim.yaml
+    env_file: *tracking-env
+
 services:
   demnav_assets:
     image: salsicha/cyberphysics:demnav-${CYBERPHYSICS_TAG:-latest}
@@ -33,12 +47,29 @@ services:
         --cache-dir /data/wildnav_cache
     restart: "no"
 
+  target_assets:
+    # Tracking targets (cars, people; systems/aerodrone/tracking.md): the
+    # pinned Gazebo Fuel models of applications/aerostack2/missions/
+    # tracking_targets.json, downloaded once into the cache, their licence
+    # and SHA-256 checked (applications/demnav/scripts/target_models.py).
+    image: salsicha/cyberphysics:demnav-${CYBERPHYSICS_TAG:-latest}
+    network_mode: host
+    volumes:
+      - ../applications/demnav/scripts:/workspace/applications/demnav/scripts:ro
+      - ../applications/aerostack2/missions:/workspace/missions:ro
+      - tracking_targets_genesis_cache:/data/target_cache
+    command: >
+      /venv/bin/python3 /workspace/applications/demnav/scripts/target_models.py fetch
+        --targets /workspace/missions/tracking_targets.json --cache-dir /data/target_cache
+    restart: "no"
+
   terrain_assets:
     image: salsicha/cyberphysics:demnav-${CYBERPHYSICS_TAG:-latest}
     network_mode: none
     depends_on:
       demnav_assets: {condition: service_completed_successfully}
       wildnav_assets: {condition: service_completed_successfully}
+      target_assets: {condition: service_completed_successfully}
     env_file: [../systems/aerodrone/config/topics.env, ../applications/aerostack2/config/mount_tamalpais.env]
     volumes:
       - ../applications/ardupilot_sitl/scripts:/workspace/applications/ardupilot_sitl/scripts:ro
@@ -46,6 +77,7 @@ services:
       - ../applications/aerostack2/missions:/workspace/missions:ro
       - demnav_genesis_cache:/data/demnav_cache:ro
       - wildnav_genesis_cache:/data/wildnav_cache:ro
+      - tracking_targets_genesis_cache:/data/target_cache:ro
       - navsim_genesis_assets:/data/navsim_assets
     command: >
       /venv/bin/python3 /workspace/applications/demnav/scripts/build_georeferenced_terrain.py
@@ -54,6 +86,7 @@ services:
         --resolution-m ${DEM_RESOLUTION_M:-10.0} --zoom ${WILDNAV_ZOOM:-17}
         --mission /workspace/missions/wilderness_missions.json
         --cruise-agl ${CRUISE_AGL_M:-250.0}
+        --targets /workspace/missions/tracking_targets.json
     restart: "no"
 
   genesis:
@@ -80,6 +113,9 @@ services:
       - ../applications/genesis:/workspace/applications/genesis:ro
       - ../systems/aerodrone:/workspace/systems/aerodrone:ro
       - navsim_genesis_assets:/data/navsim_assets:ro
+      # Moves the tracking targets with the simulation clock and publishes
+      # /simulation/targets (tracking_targets.json, built by terrain_assets).
+      - ../applications/demnav/scripts/tracking_targets.py:/workspace/applications/demnav/scripts/tracking_targets.py:ro
     command: >
       python3 /workspace/applications/genesis/scripts/aerodrone_navsim.py
         --backend ${GENESIS_BACKEND:-cpu}
@@ -257,16 +293,19 @@ services:
     command: >
       python3 /workspace/applications/aerostack2/scripts/wait_for_mavros_navigation.py
         --namespace /mavros --timeout 900 --settle-seconds 3
-        --behavior-tree /data/navsim_assets/wilderness_mission.xml
+        --behavior-tree /data/navsim_assets/${AERODRONE_MISSION:-wilderness}_mission.xml
         --behavior-namespace /aerodrone
     restart: "no"
 
   wilderness_mission:
-    # run_behavior_tree.py starts the tree again only when it aborted while
-    # being built, before its first tick: the new process can take more
-    # than the tree's 1 s to discover a behaviour server. Stopping the stack
-    # mid-mission logs "Failed to cancel action server for GoToBehavior"
-    # although the goal is cancelled (README, "Mission start").
+    # AERODRONE_MISSION=tracking flies the tracking scenario instead of the
+    # wilderness mission: take off, hold 40 m above the moving targets and
+    # hover until stopped (tracking_mission.xml; flight_ready reads the
+    # same tree). run_behavior_tree.py starts the tree again only when it
+    # aborted while being built, before its first tick: the new process can
+    # take more than the tree's 1 s to discover a behaviour server. Stopping
+    # the stack mid-mission logs "Failed to cancel action server for
+    # GoToBehavior" although the goal is cancelled (README, "Mission start").
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
     stop_signal: SIGINT  # passed on to ros2 launch (which ignores SIGTERM)
     network_mode: host
@@ -288,7 +327,7 @@ services:
         --attempts 5 --retry-delay 5 --
         ros2 launch as2_behavior_tree behavior_trees.launch.py
         drone_id:=aerodrone use_sim_time:=false
-        tree:=/data/navsim_assets/wilderness_mission.xml server_timeout:=120000
+        tree:=/data/navsim_assets/${AERODRONE_MISSION:-wilderness}_mission.xml server_timeout:=120000
 
   navsim_validator:
     # Navigation health check, opt-in (exits 0 or lists what is missing,
@@ -383,3 +422,4 @@ volumes:
   demnav_genesis_cache:
   wildnav_genesis_cache:
   navsim_genesis_assets:
+  tracking_targets_genesis_cache:

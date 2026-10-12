@@ -50,6 +50,15 @@ services:
         -p autopilot_corrections_topic:=${NAVIGATION_TOPIC_PREFIX:-/navigation}/autopilot_corrections_active
 
   oak1:
+    # MegaDepth for DemNav and stills for WildNav, and the object-tracking
+    # detector (systems/aerodrone/tracking.md): YOLO and DepthAI's
+    # ObjectTracker on the camera's Myriad X, publishing
+    # TRACKING_TOPIC_PREFIX/detections, /image/compressed and /camera_info.
+    # On by default (OAK1_TRACKING=false turns it off; the airplane's
+    # blueos.env does). The detector and MegaDepth share the Myriad X: while
+    # the detector runs at OAK1_TRACKING_RATE_HZ (5) MegaDepth runs ~2.9 Hz
+    # instead of ~4.6 Hz, so it runs only while something subscribes to the
+    # tracking topics (applications/oak1/README.md, "Object tracking").
     image: salsicha/cyberphysics:oak1-${CYBERPHYSICS_TAG:-arm64}
     container_name: ${OAK1_CONTAINER:-oak1}
     network_mode: host
@@ -74,6 +83,10 @@ services:
         -p highres_height:=${WILDNAV_IMAGE_HEIGHT:-720}
         -p highres_capture_hz:=${WILDNAV_IMAGE_RATE:-0.5}
         -p frame_id:=${CAMERA_FRAME_ID:-oak1_optical_frame}
+        -p tracking_enabled:=${OAK1_TRACKING:-true}
+        -p tracking_model:=/models/${TRACKING_DETECTOR_MODEL:-visdrone_yolov8n_640x352}.json
+        -p tracking_topic_prefix:=${TRACKING_TOPIC_PREFIX:-/tracking}
+        -p tracking_rate_hz:=${OAK1_TRACKING_RATE_HZ:-5.0}
 
   demnav:
     image: salsicha/cyberphysics:demnav-${CYBERPHYSICS_TAG:-arm64}

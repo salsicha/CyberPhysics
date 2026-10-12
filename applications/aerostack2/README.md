@@ -61,8 +61,199 @@ the goal. The page converts the click to the DemNav local ENU frame and
 publishes it to `/aerostack/map_goal`. An Aerostack2 behavior tree consumes the
 goal and invokes the `GoTo` behavior.
 
-The map page loads Leaflet, OpenStreetMap tiles, and roslib.js from their public
-CDNs, so the browser needs network access.
+The page loads Leaflet 1.9.4 and roslib 1.4.1 from jsDelivr, pinned with
+Subresource Integrity (a changed file is refused), and OpenStreetMap tiles, so
+the browser needs network access.
+
+## Object tracking UI
+
+The same page (`src/as2_platform_blueos/web/`: `index.html`, `app.js`, and
+`tracking_logic.js`, the logic without DOM or ROS) also follows a ground
+object with the aerodrone, through the topics of
+`systems/aerodrone/tracking.md`. It works on a phone or tablet (one column,
+Stop pinned to the bottom of the screen) and on a desktop (camera and map
+beside the controls).
+
+- **Camera.** `/tracking/image/compressed` is drawn on a canvas with a box
+  around every detection of `/tracking/detections`, labelled with its track ID,
+  class and score. Boxes are in the pixels of `/tracking/camera_info`'s image
+  and scaled to the displayed size; a click or tap is mapped back to those
+  pixels and selects the smallest box under it, or the nearest within 14 screen
+  pixels (small objects under a finger). Each frame is drawn with the
+  detections of its own stamp, else the nearest within 0.5 s, fainter the
+  further away they are; after 2 s without a new frame the view dims and taps
+  are refused.
+- **Follow.** Tapping a box publishes a `track` command on `/tracking/command`
+  in the selected mode. *Centered* takes a height above ground of 15-120 m, or
+  nothing to keep the current height (the field is then left out). *Slant
+  range* takes the slant range and the depression angle (60-90 deg) and accepts
+  only ranges whose height above the target, R sin(theta), is 15-120 m; it
+  shows the resulting stand-off and height. Invalid values publish nothing.
+  *Apply* sends the mode's current values to the current target, and *Stop
+  (hover)* publishes `{"action": "stop"}`.
+- **Status.** `/tracking/status`: state, mode, target (and whether it is in
+  view), slant range and depression angle, target position and speed, message
+  and age. The target's box is drawn thick amber; a tapped target the tracker
+  has not yet reported is dashed amber.
+- **Map.** The click-to-goal above is unchanged. The map also shows the drone
+  and the target, whose ENU position is converted the way the goal is, about the
+  current `/navigation/fix` and `/navigation/odometry`.
+
+Commands are published only while rosbridge is connected: roslib queues what
+is published while disconnected and would send a stale command on
+reconnection. The page reconnects every 2 s. `?prefix=/name` selects another
+`TRACKING_TOPIC_PREFIX`.
+
+`tools/tracking_ui_test.sh` runs the page in headless Chromium (Playwright)
+against rosbridge and `scripts/mock_tracking_publisher.py`, a stand-in for the
+detector and the tracker that publishes made-up detections, frames and status
+and logs the commands it receives; it clicks and taps boxes in both modes,
+checks the published JSON, Stop, the map goal and the phone layout, and saves
+screenshots. `tests/test_aerodrone_tracking_ui.py` checks the page's wiring
+and pinned libraries, the mock, and (with node) `tests/js/tracking_logic.test.js`.
+
+## Object tracker
+
+`scripts/aerodrone_tracker.py` (the `tracker` service of
+`compositions/aerodrone_tracking.yaml`, `--profile tracking`) follows the object
+picked in the page: it reads `/tracking/detections` and `/tracking/camera_info`
+and publishes `/tracking/status` and `/tracking/target`
+(`systems/aerodrone/tracking.md`). Its logic is plain Python in
+`scripts/tracking_core.py`; it runs in the DemNav image, whose DEM loader,
+geoid and camera geometry it uses.
+
+- **Geolocation.** The selected track's box centre is a ray through the camera
+  in its pose at the image stamp: position and attitude interpolated from
+  `/navigation/odometry` (simulator-time stamps mapped through `/clock`, as in
+  DemNav), the camera mount (`camera_mount_yaw_deg`, roll/pitch-stabilised
+  cameras) and the intrinsics. The ray is marched to the ground of the DemNav
+  DEM (`/data/demnav_cache`, the same cache DemNav fills; SRTM heights put on
+  the ellipsoid with the geoid and expressed about `/navigation/origin`). The
+  DEM knows the ground under the target, which a 60-degree slant view of a
+  hillside needs (6 m of rise moves the fix 3.5 m); the aircraft's Benewake
+  rangefinders reach 8-12 m and tracking flies 15-120 m above ground, so a
+  fresh rangefinder reading only removes the DEM's offset below the aircraft.
+  Without a DEM the ground is flat at the rangefinder's height, else at the
+  home's (the status says so).
+- **Filter.** A constant-velocity Kalman filter of the target's position, with
+  Mahalanobis gating (five rejections in a row restart it where the target now
+  is). A target unseen for `lost_timeout_s` (3 s) is lost.
+- **Track handover.** The detector's track IDs change when its image-space
+  tracker loses an object, which the body-fixed camera of a manoeuvring
+  aircraft makes common. When the selected ID is missing from a frame within
+  `handover_window_s` (2.5 s) of the target's last placement, the tracker
+  follows a new ID of the same kind (vehicle, two-wheeler, else the same
+  class) and box size (within `handover_size_ratio`, 2) placed within
+  `handover_max_m` (4 m) plus half the distance the target covered meanwhile
+  of its position predicted along its arc, inside the filter's gate, if it is
+  the only such one there; the status then carries the new ID ("handed over
+  from ..."). A target occluded for longer is selected again by the
+  operator. The selected ID counts only while its class is of the kind first
+  seen (a car's ID moved onto a person is treated as gone).
+- **Control.** The aircraft flies through Aerostack2's `FollowReference`
+  behaviour (`as2_behaviors_motion`, started by `blueos_autonomy.launch.py`):
+  the behaviour sends its position reference in `earth` (the navigation
+  frame), the motion controller passes it through to the platform's
+  POSITION/LOCAL_ENU mode, ArduPilot GUIDED position targets. The tracker moves
+  the reference through the behaviour's `_behavior/modify` service at 10 Hz and
+  cancels the goal to hover (the behaviour then sets HOVER). If the tracker dies
+  the aircraft holds the last reference; it never keeps flying a velocity. The
+  centered set-point is above the target at `altitude_agl_m` above its ground;
+  the slant set-point is `R cos(theta)` short of the target on its bearing from
+  the aircraft and `R sin(theta)` above it, yawed so the target lies on the
+  image's long axis. ArduPilot trails a moving GUIDED position target (by
+  about 3 s at 4 m/s in Gazebo: its position shaping brakes toward every
+  new target), so both aim at the target predicted ahead, along its arc when
+  it turns (a coordinated turn at the filtered heading's rate): `lead_s`
+  (2.5 s) plus a lead learnt from how far the aircraft trails a target
+  driving straight (`lead_adapt_rate`, within `max_lead_extra_s` either
+  way). The reference
+  moves at most `max_speed_mps` (ArduPilot flies position targets at
+  `WPNAV_SPEED`, 5 m/s, at most anyway) and stays within
+  `max_reference_lead_m` of the aircraft; heights stay 15-120 m above the
+  ground under the set-point, and the depression is raised until the target
+  stays `fov_margin_deg` inside the image's long axis (60 deg with the OAK-1,
+  64.5 with Gazebo's 60-degree camera).
+- **Pre-emption.** A track command stops a running `GoToBehavior` or
+  `FollowPathBehavior` (their `_behavior/stop` service): the drone's map-goal
+  tree then ends and `restart: always` starts it again for the next goal.
+  Tracking ends (state `idle`, "pre-empted by ...") on a map goal
+  (`/aerostack/map_goal`) or when any of those behaviours, `TakeoffBehavior` or
+  `LandBehavior` starts. A track command is refused during take-off or landing
+  and while the platform is not flying. A refused command leaves an active
+  track as it is; while idle it shows as state `error` with the reason.
+
+The parameters and their deployed values are in
+`systems/aerodrone/config/tracking.env`; `aerodrone_tracking.yaml` repeats them
+as the aircraft's fallbacks. The simulators include it with
+`config/tracking_<simulator>.env` (DEM cache volume, camera mount) and add
+`compositions/aerodrone_tracking_sim.yaml`: rosbridge and the page (the
+aircraft runs its own) and `scripts/tracking_truth_detector.py`
+(`--profile tracking_truth`, instead of the detector), which projects
+`/simulation/targets` through the camera in the navigation pose into
+detections, so the control can be tested apart from detection.
+`tools/tracking_sim_test.sh <gazebo|genesis|isaac>` flies and scores the
+tracking end to end (`tools/tracking_sim_test.py`, layered on the composition
+by `tools/tracking_sim_test.yaml` with `--profile tracking`): the YOLO detector
+on the simulated camera, the tracker, and the scenario's car and people. Like
+the operator in the page, the test picks a target by the ID of its box: it
+pairs each detection frame with `/simulation/targets` projected through the
+camera (the ground-truth detector, run beside the detector on
+`/tracking/truth/detections`) and takes the nearest box of the target's kind
+and size. A track command cancels a running GoTo; the car is followed
+centered 50 m above it (from 40 m it left the image as the aircraft trailed
+it) and slant (60 m at 70 deg) for 150 s each, the test clicking the car's
+new box whenever the tracker loses it; a person, tracked from 40 m, is hidden
+under the terrain for 8 s (`/simulation/targets/hide`): lost and hovering,
+then selected again; `stop` leaves the aircraft idle and hovering; a map goal
+and a GoTo end tracking. `TRACKING_TEST_DETECTOR=truth` runs the
+`tracking_truth` profile instead, the ground-truth detector's boxes named
+after the targets (`TRACKING_TRUTH_SYNTHETIC=true`: its own targets).
+`score.json` gives, per step and against simulator truth: the fraction of the
+time tracking, the distance from the car (centered), the slant range and
+depression errors, the target estimate's error, the detector's recall of the
+target, its IDs and ID switches, the share of frames whose ID the tracker
+followed, the operator's re-selections and the times to tracking again, the
+lost, stop and pre-emption checks, the detection rate, and the host's and
+containers' CPU (sampled every 15 s). `THRESHOLDS` in the script sets the pass
+marks: the target well inside the image (centered within 0.25 / 0.35 of the
+height, median / p95; slant range within 5 / 12 m, depression within 8 deg
+and at most 8 deg shallower, p95), tracking 90 % of the time, recall 0.8, at
+most 3 re-selections in 150 s.
+
+Measured 2026-10-11 (`ROS_DOMAIN_ID=91`; median / p95 against truth; the
+scenario's car laps its circuit at the aircraft's 5 m/s speed limit, and the
+aircraft cuts inside its corners: with the ground-truth detector Gazebo kept
+11.2 / 15.3 m centered, every check passing):
+
+| | Gazebo | Genesis | Isaac |
+|---|---|---|---|
+| centered: distance from the car, m | 10.4 / 16.0 | 8.3 / 17.3 | 9.5 / 14.8 |
+| centered: tracking, re-selections | 97 %, 4 | 95 %, 5 | 98 %, 5 |
+| slant: range / depression error | 2.0 / 5.1 m, 5.6 / 16.4 deg | 1.9 / 4.8 m, 3.9 / 13.6 deg | 2.0 / 5.9 m, 5.8 / 11.0 deg |
+| slant: tracking, re-selections | 94 %, 7 | 93 %, 7 | 72 %, 49 |
+| target estimate error (centered, slant) | 1.5, 1.6 m | 0.3, 0.4 m | 0.3, 0.6 m |
+| car recall; its IDs (centered, slant) | 0.88, 0.91; 12, 19 | 0.77, 0.74; 6, 8 | 0.99, 0.92; 6, 51 |
+| lost (hidden 8 s): lost after, tracking again after shown | 2.5 s, 1.2 s (new ID) | 1.4 s, 0.6 s | 0.0 s, 0.7 s |
+| stop, map goal, GoTo | pass | pass | pass |
+| detections (simulation / wall time), per frame | 5.0 / 5.0 Hz, 71 ms | 10 / 4.6 Hz, 54 ms | 10 / 2.0 Hz, 75 ms |
+| host CPU busy (20 cores) | 53 % | 25 % | 33 % |
+
+Every stack fails on re-selections, Genesis also on its recall (0.77 / 0.74
+from 50 m) and Isaac's slant on its tracking fraction: the operator re-selects
+the car when it leaves the image as the aircraft trails it, or when the
+detector misses it for longer than `lost_timeout_s`, which is wall-clock time
+and so 1.5 s of Genesis' (0.5x real time) and 0.6 s of Isaac's (0.2x)
+simulation. Isaac's slant lost the car at the image edge every few seconds,
+and its person was already lost when it was hidden (the 0.0 s). Isaac ran
+before the host tracker's last two changes (sizes within 2 times in every
+association, the long reach only for recently seen tracks) and the tracker's
+kind check, which removed Gazebo's following of people instead of the car.
+Gazebo's ground-truth twist is the body-frame velocity, which
+`gazebo_ardupilot_backend.py` hands ArduPilot as ENU unless
+`GAZEBO_TWIST_IN_BODY_FRAME=true` (the test's `tools/tracking_sim_test_gazebo.yaml`
+sets it): without it ArduPilot's GPS velocity turns with the yaw, and the slant
+mode's yaw ended in a GPS glitch, EKF failsafe and emergency yaw reset.
 
 
 ## Aerodrone simulation
@@ -87,7 +278,7 @@ The kernel caps the socket buffers at `net.core.rmem_max` and `net.core.wmem_max
 
 ### Mission start
 
-`flight_ready` (`scripts/wait_for_mavros_navigation.py`) completes once MAVROS has a GPS fix and local odometry and every server the mission tree calls can be discovered: it reads `wilderness_mission.xml` and waits for the action servers of its TakeOff, GoTo and Land nodes (`/aerodrone/TakeoffBehavior`, `GoToBehavior`, `LandBehavior`) and the services of its Arm, Offboard and Disarm nodes, with the availability checks the tree itself makes. `wilderness_mission` starts after it, through `scripts/run_behavior_tree.py`.
+`flight_ready` (`scripts/wait_for_mavros_navigation.py`) completes once MAVROS has a GPS fix and local odometry and every server the mission tree calls can be discovered: it reads the mission tree (`wilderness_mission.xml`, or `tracking_mission.xml` with `AERODRONE_MISSION=tracking`, "Tracking targets and scenario") and waits for the action servers of its TakeOff, GoTo and Land nodes (`/aerodrone/TakeoffBehavior`, `GoToBehavior`, `LandBehavior`) and the services of its Arm, Offboard and Disarm nodes, with the availability checks the tree itself makes. `wilderness_mission` starts after it, through `scripts/run_behavior_tree.py`.
 
 as2_behavior_tree (1.1.3) creates every node of the tree before the first tick, and each action node then gives its action server a hard-coded 1 s (`BtActionNode::createActionClient`; `server_timeout`, in milliseconds, only bounds the goal acknowledgement and the cancel). The exception it throws when that second runs out is built as `std::string("Action server %s not available", name)`, which C++ reads as a range between two unrelated pointers, so the process dies of `std::length_error` (`basic_string::_M_create`) instead, and `ros2 launch` still exits 0. In one Isaac run the tree's new process had not discovered `TakeoffBehavior`, up for 3.5 minutes by then, within that second. Nothing is commanded before the first tick, so `run_behavior_tree.py` starts the tree again (5 attempts, 5 s apart) when it aborted while being built and no node had left IDLE; a tree that ticked is never started again. The service exits non-zero when the tree process died or the tree ended in FAILURE (as2_behavior_tree itself exits 0 then; the wrapper reads the root's last status transition from the tree's log), so scripts and CI can tell a failed mission from a finished one.
 
@@ -132,3 +323,12 @@ Aerodrone navsim validation FAILED after 45.0 s; 4 problem(s):
 ### GPS-denied test
 
 `tools/gps_denied_sim_test.sh <gazebo|genesis|isaac>` runs a composition with the `validation` profile and its `denial` profile, and scores the flight (`tools/gps_denied_sim_test.md`). The profile adds two services, both from this application's scripts: `gps_denier` (`scripts/gps_denier.py`) disables GPS 1 (`SIM_GPS_DISABLE=1`) `GPS_DENIAL_START_S` (60 s) after the mission reaches cruise, for `GPS_DENIAL_DURATION_S` (150 s), and records `GPS_DENIAL_RECOVERY_S` (60 s) more after restoring it, all of it simulation time (`/clock`; the defaults are in `config/mount_tamalpais.env`); `gps_denial_recorder` (`scripts/gps_denial_recorder.py`) records ground truth, ArduPilot's position, the fused fix and its covariance, the corrections and the DemNav/WildNav fixes. `tools/gps_denied_sim_scorer.py` reports fused and autopilot error, per-source fix errors, covariance consistency and route-keeping before, during and after the denial, and checks them against per-stack thresholds. The validator must pass as well (exit 3 otherwise), as in the lite test.
+
+### Tracking targets and scenario
+
+The three simulations render moving ground targets for the object tracker (`systems/aerodrone/tracking.md`), all from one definition, `missions/tracking_targets.json`: in the open field 60 m north-west of home, a car (`car_1`, Gazebo Fuel's "Hatchback blue") laps a 26 m x 16 m circuit with 6.5 m corners at 5 m/s (14.6 s a lap), a person (`person_1`, "Walking person") walks a 12 m x 6 m loop inside it at 1.5 m/s (21.7 s) and another (`person_2`, "Casual female") stands between them. Each starts its loop at simulation time 0 and goes round at constant speed.
+
+- **Models.** The `target_assets` service downloads each pinned Fuel model version into the stack's `tracking_targets_<simulator>_cache` volume (the first run needs the network, like the DEM and imagery seeds) and checks its SHA-256 and its licence on Fuel (all CC0, `THIRD_PARTY_NOTICES.md`). `terrain_assets` (`--targets`) bakes each into one textured mesh, metres, z up, front along +x, its lowest point at z = 0, with every material in one texture atlas (`applications/demnav/scripts/target_models.py`): `model.obj` and `<model>_atlas.png` for Gazebo and Genesis, the same triangles in `model_mesh.npz` for Isaac, under `/data/navsim_assets/models/<model>`.
+- **Routes on the ground.** The builder resolves each route on the terrain the cameras see, the render mesh's triangles (`terrain_mesh.npz`, `terrain.obj`), into a track sampled every 0.2 m (`tracking_targets.json` in the assets; `applications/demnav/scripts/tracking_targets.py`): position, ground height and heading, and for the car the pitch and roll of the ground under its wheels. Every simulator places each target at its track pose for its own simulation time: Genesis and Isaac in their lock-step loop just before each camera frame (visual-only meshes, no physics); Gazebo through the `gazebo_targets` service (`applications/gazebo/scripts/gazebo_tracking_targets.py`), which sets the visual-only, gravity-free models' poses with the world's `set_pose` service every 0.02 s of `/clock` (the builder puts them in the world at their start).
+- **Ground truth.** `/simulation/targets` follows the contract: Genesis and Isaac publish it with each camera frame (10 Hz), Gazebo's driver every 0.02 s; `stamp` is simulation seconds (`/clock`). Positions are ENU metres about the navigation frame's origin, ArduPilot's EKF origin, which is the vehicle's home (`manifest.json` `home_enu_m`, the reference the simulators give ArduPilot positions about), not INITIAL_LAT/INITIAL_LON: the field is about (-40, 45) there. `up` is the ground under the target and `yaw` its heading, counter-clockwise from east. Projected through the camera, the truth falls on the rendered target. From a fixed camera 40 m above the field, the projected model silhouette and the target's rendered pixels overlap with an IoU of 0.92-0.98 for the car, their centroids within 1 px (Genesis, Isaac) and 1.7 px (Gazebo, where a frame can show a pose up to one 0.02 s update old). In the tracking scenario, through the drone's ground-truth pose at the hold, the car's centroid is within 0.4 px (Isaac), 1.2 px (Genesis) and 2 px (Gazebo) of the projected truth. Genesis' camera_info puts the principal point at (W/2, H/2); its renders put it half a pixel up and to the left, at ((W - 1)/2, (H - 1)/2), as Isaac's camera_info does.
+- **Tracking scenario.** `AERODRONE_MISSION=tracking docker compose -f compositions/aerostack2_<...>.yaml up` flies `tracking_mission.xml` instead of the wilderness mission (the `wilderness_mission` service runs it; `flight_ready` reads the same tree): arm, take off to 35 m, fly to the centre of the car's circuit, 40 m above the ground there and nose east (GoTo sent twice, like the wilderness waypoints, fixed yaw), then hover until stopped, commanding nothing more so the tracker can take over. From 40 m the downward camera covers 46 m x 35 m of ground (Gazebo, Isaac: 60 degrees across 640 x 480; Genesis renders `FOV_DEG`, 69 degrees: 55 m x 41 m); the targets stay inside its 35 m square whatever the yaw, with 2 m to spare. The car is about 60 x 30 px there and the people about 6 x 10 px.
