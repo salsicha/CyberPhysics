@@ -247,7 +247,9 @@ distance), so the composition feeds nvblox the camera's depth
 (`/camera/depth/image_rect_raw`). Depth Anything still runs and publishes
 `/depth_anything/*` as on the car; `RACECAR_TURRET_NVBLOX_DEPTH=
 /depth_anything/depth/image` maps it again. GPU time is `infer_image` on
-the RTX 4000 Ada Laptop GPU.
+the RTX 4000 Ada Laptop GPU. 151 frames of a later lap on the final tree
+(an evaluation of d below) gave the same within 0.02 of each median ratio
+(vkitti 9.05, hypersim 1.32).
 
 ### Obstacle maps
 
@@ -271,53 +273,66 @@ lidar (99.8 %).
 
 ### People in nvblox's map
 
-With the camera's depth nvblox also mapped the people, in its static map:
-a walking person left a trail of obstacles until the camera saw the floor
-there again or the TSDF decayed (about 15 s with nvblox's default 0.95 every
-0.2 s), and nothing clears the 0.75 m in front of `base_link` below the
-camera's view. In the first evaluation (b, below) `person_2` crossed just
-in front of the car, stayed in the map there after walking on, and Nav2
-aborted the course ("Start occupied", after a "no valid path" behind
-`person_1`'s trail had used up the recoveries). A faster decay of what the
-camera no longer sees (0.8 every 0.2 s, about 3.5 s; c) left the other run
-looping 2 minutes at the last corner, where `person_2` crosses the course,
-until it too aborted. nvblox's dynamic mode (d,
-`systems/racecar_turret/config/nvblox_isaac.yaml`: NVIDIA's
-`nvblox_dynamics.yaml` values, the static slice's heights, the faster
-decay; Nav2 reads the combined static and dynamic slice) puts people who
-walk into space it has seen free into a dynamic occupancy layer that
-decays instead. `RACECAR_TURRET_NVBLOX_OVERRIDES=/workspace/config/nvblox.yaml`
-with `RACECAR_TURRET_NVBLOX_SLICE=/nvblox_node/static_map_slice` maps in
-the car's static mode.
+With the camera's depth nvblox also maps the people. In its static mode (as
+on the car) a walking person left a trail of obstacles until the camera saw
+the floor there again or the TSDF decayed (about 15 s with nvblox's default
+0.95 every 0.2 s), and nothing clears the 0.75 m in front of `base_link`,
+below the camera's view. In the first evaluation (b, below) `person_2`
+crossed just in front of the car, stayed in the map there, and Nav2 aborted
+the course ("Start occupied"). A faster decay of what the camera no longer
+sees (0.8 every 0.2 s, about 3.5 s; c) did not stop it: `person_2`, waiting
+for the car as the scenario's people do, stood 0.6 m from it, nvblox mapped
+their whole body (the lidar sees a 0.22 m capsule), and after two minutes
+of recoveries Nav2 aborted again ("Start occupied").
 
-All on 2026-10-11 with the tracker in the tree at the time (uncommitted
-changes on top of b21cfec, so the aim figures differ from the table above;
-a is the baseline for them):
+nvblox's dynamic mode (`systems/racecar_turret/config/nvblox_isaac.yaml`:
+NVIDIA's `nvblox_dynamics.yaml` values, the static slice's heights, the
+faster decay) puts people who walk into space it has seen free into a
+dynamic occupancy layer that decays instead. With Nav2 on the combined
+(static and dynamic) slice (d) 5 of 6 runs completed; the sixth stopped
+where `person_1`'s and `person_2`'s routes cross the course, behind the
+trails the lidar leaves in SLAM's map and the obstacle layer ("exceeded
+maximum iterations" planning past them), with no nvblox obstacle within
+1 m of the car. The composition now gives Nav2 the static slice (e): the
+arena's obstacles from nvblox, the people from the lidar as before.
+`RACECAR_TURRET_NVBLOX_SLICE=/nvblox_node/combined_map_slice` gives Nav2
+nvblox's people too; `RACECAR_TURRET_NVBLOX_DEPTH=/depth_anything/depth/image`
+with `RACECAR_TURRET_NVBLOX_OVERRIDES=/workspace/config/nvblox.yaml` is the
+earlier setting.
 
-| | a) vkitti depth | b) camera depth, static map | c) b + faster decay | d) camera depth, dynamic mode (the composition) | e) d again |
+### Evaluations
+
+`tools/racecar_turret_isaac_test.sh` (a run with base-rotation compensation
+and target lead, and one without), 2026-10-11, with the tracker in the tree
+at the time (uncommitted changes on top of b21cfec, so the aim figures
+differ from the Results above). a) is the earlier setting on the tree before
+the turret's dart launcher (one run, alongside the depth recording),
+a') the same on the final tree:
+
+| | a) / a') Depth Anything vkitti | b) camera depth, static map | c) b + faster decay | d) camera depth, dynamic mode, combined slice | e) dynamic mode, static slice (the composition) |
 |---|---|---|---|---|---|
-| Runs (compensated / not) | 1 / 0 | 1 / 1 | 1 / 1 | 1 / 1 | E_RUNS |
-| Course | completed 150.7 s | aborted at 130 s / completed 158.7 s | completed 148.4 s / aborted at 276 s | completed 148.8 / 148.7 s | E_COURSE |
-| Collisions | 0 | 0 / 0 | 0 / 0 | 0 / 0 | E_COLL |
-| Mean speed | 0.245 m/s | 0.227 / 0.232 | 0.248 / 0.225 | 0.246 / 0.246 | E_SPEED |
-| nvblox: outlines mapped | 0 % | 68 / 82 % | 80 / 93 % | 81 / 82 % | E_NVBLOX |
-| nvblox: observed but carved free | 85 % | 2 / 1 % | 1 / 4 % | 3 / 1 % | E_CARVED |
-| nvblox phantoms (inside the arena) | 0 | 0.05 / 0.10 m² | 0 / 0 | 0 / 0.01 m² | E_PHANTOM |
-| Costmap: outlines lethal | 99.8 % | 100 / 100 % | 100 / 100 % | 100 / 100 % | E_COSTMAP |
-| Aim error, mean / p95 (trackable) | 5.0 / 31.7° | 5.8 / 30.8°, 4.5 / 27.0° | 2.4 / 17.4°, 7.3 / 36.8° | 3.0 / 20.7°, 5.3 / 30.1° | E_AIM |
-| On target / locked | 83 / 81 % | 78 / 80 %, 83 / 83 % | 90 / 88 %, 86 / 82 % | 89 / 87 %, 82 / 82 % | E_ON |
-| Operator re-selections | 4 | 4, 4 | 3, 3 | 3, 4 | E_RESEL |
-| Aim error while following, mean / p95 | 0.77 / 1.13° | 0.82 / 1.33°, 1.20 / 3.98° | 0.76 / 1.11°, 1.43 / 4.72° | 1.01 / 1.44°, 1.46 / 4.06° | E_FOLLOW |
-| Every threshold met | no (aim mean, p95) | no | no | yes | E_PASSED |
+| Runs | 1 + 2 | 2 | 2 | 6 (3 evaluations) | 4 (2 evaluations) |
+| Course completed | 3 of 3, 148.7-150.7 s | 1 of 2 (aborted at 130 s) | 1 of 2 (aborted at 276 s) | 5 of 6, 148.3-151.1 s (one aborted at 111 s) | 4 of 4, 148.2-155.6 s |
+| Collisions | 0 | 0 | 0 | 0 | 0 |
+| Mean speed (completed runs) | 0.245-0.246 m/s | 0.232 | 0.248 | 0.243-0.246 | 0.236-0.248 |
+| nvblox: obstacle outlines mapped | 0 % | 68, 82 % | 80, 93 % | 79-83 % (48 % in the aborted run) | 81-83 % |
+| nvblox: observed but carved free | 84-85 % | 1-2 % | 1-4 % | 1-4 % | 0-2 % |
+| nvblox: phantoms in the arena | 0 | 0.05, 0.10 m² | 0 | 0-0.01 m² | 0 |
+| Costmap: obstacle outlines lethal | 99.7-99.8 % | 100 % | 100 % | 97-100 % (94 % in the aborted run) | 99.9-100 % |
+| Aim while following, compensated: mean / p95 | 0.77-1.08 / 1.13-1.44° | 0.82 / 1.33° | 0.76 / 1.11° | 0.99-1.04 / 1.40-1.44° | 0.92-0.95 / 1.42-1.46° |
+| Every threshold met | a' (a missed the aim mean and p95) | no | no | 2 of 3 evaluations | 2 of 2 evaluations |
 
-Driving is back to the baseline's (148-149 s, 0.246 m/s, no collisions)
-with nvblox now mapping 81-82 % of the obstacles' outlines and no phantom
-worth the name. The aim differs between runs by identity switches, as in
-the table above, not by the depth: while following the target the
-compensated runs aimed within 0.76-1.01° mean and 1.11-1.44° p95 in every
-configuration. Resources: nvblox 0.89 GB of GPU memory (1.0 GB with the
-vkitti depth, which allocated blocks up to 12 m away) and 0.34 cores in
-dynamic mode (0.17-0.19 static); the GPU peak 4.0 GB.
+"Outlines mapped" is the share of the obstacles' outlines nvblox had as an
+obstacle at some point of the lap (the camera sees about 85 % of them);
+nvblox forgets what is more than 12 m away (`map_clearing_radius_m`), so at
+the end of a lap it holds 6-8 %. The costmap has the obstacles in every
+configuration, from SLAM's map and the lidar; with the camera's depth
+nvblox adds the arena's obstacles to it as on the car it would add what
+the lidar's plane misses. The aim figures differ between runs by identity
+switches (the operator's re-selections), as in the Results, not by the
+depth. Resources: nvblox 0.89 GB of GPU memory (1.0 GB with the vkitti
+depth, which allocated blocks out to 12 m) and 0.32-0.48 cores in dynamic
+mode (0.17-0.19 in static mode); the GPU's peak 4.0-4.2 GB.
 
 ## Fidelity gaps
 

@@ -23,12 +23,13 @@
 # above the floor, Depth Anything's vkitti depth reads about 9 times the
 # true depth and nvblox mapped none of the arena's obstacles from it
 # (RACECAR_TURRET.md, "Depth for nvblox"). nvblox maps in dynamic mode
-# (systems/racecar_turret/config/nvblox_isaac.yaml) so that the people
-# walking around the car do not stay in its map. Depth Anything still runs
-# and publishes as on the car; RACECAR_TURRET_NVBLOX_DEPTH=/depth_anything/depth/image
-# feeds nvblox from it again, RACECAR_TURRET_NVBLOX_OVERRIDES=/workspace/config/nvblox.yaml
-# with RACECAR_TURRET_NVBLOX_SLICE=/nvblox_node/static_map_slice maps in the
-# car's static mode.
+# (systems/racecar_turret/config/nvblox_isaac.yaml): the people walking
+# around the car go to its dynamic layer, and Nav2 reads the static slice
+# (people come from the lidar, as before). Depth Anything still runs and
+# publishes as on the car. RACECAR_TURRET_NVBLOX_DEPTH=/depth_anything/depth/image
+# with RACECAR_TURRET_NVBLOX_OVERRIDES=/workspace/config/nvblox.yaml is the
+# earlier setting (the car's); RACECAR_TURRET_NVBLOX_SLICE=
+# /nvblox_node/combined_map_slice gives Nav2 the people nvblox sees too.
 #
 # The ROS containers do not share /dev/shm, so Fast DDS uses UDP only with
 # 4 MiB socket buffers (racecarneo.yaml); Isaac Sim runs as another user.
@@ -307,14 +308,14 @@ services:
     environment: *ros-env
     volumes:
       - ../systems/racecarneo/config:/workspace/config:ro
-    # The nvblox costmap layers read nvblox's combined (static and dynamic)
-    # slice: nvblox_isaac.yaml maps in dynamic mode.
+    # The nvblox costmap layers read RACECAR_TURRET_NVBLOX_SLICE (default
+    # nav2.yaml's static slice; see the header).
     command:
       - bash
       - -c
       - >-
         sed -e 's/use_sim_time: false/use_sim_time: true/'
-        -e 's#/nvblox_node/static_map_slice#${RACECAR_TURRET_NVBLOX_SLICE:-/nvblox_node/combined_map_slice}#'
+        -e 's#/nvblox_node/static_map_slice#${RACECAR_TURRET_NVBLOX_SLICE:-/nvblox_node/static_map_slice}#'
         /workspace/config/nav2.yaml > /tmp/nav2.yaml &&
         exec ros2 launch nav2_bringup navigation_launch.py use_sim_time:=true
         params_file:=/tmp/nav2.yaml autostart:=true
@@ -406,7 +407,7 @@ services:
     command: >
       python3 /workspace/tools/racecar_turret_map_coverage.py record
         --output-dir /out/maps --period-s 5
-        --slice-topic ${RACECAR_TURRET_NVBLOX_SLICE:-/nvblox_node/combined_map_slice}
+        --slice-topic ${RACECAR_TURRET_NVBLOX_SLICE:-/nvblox_node/static_map_slice}
         --ros-args -p use_sim_time:=true
     restart: "no"
 

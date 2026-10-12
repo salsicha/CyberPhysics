@@ -224,27 +224,33 @@ circling Demo World, `applications/depthanything/README.md`, "Accuracy"):
 anything farther than about 0.9 m lands beyond nvblox's 12 m integration
 distance (in the Isaac arena the same error left nvblox's map without a
 single obstacle and the obstacles carved out as free space,
-`applications/isaac/RACECAR_TURRET.md`, "Depth for nvblox"). The indoor hypersim model reads 2.9 times; aligned to the
-bridge's depth every frame, either model still puts obstacles 3.5-5 m away
-at about half their distance. The simulator's own depth has none of this,
+`applications/isaac/RACECAR_TURRET.md`, "Depth for nvblox"). The indoor
+hypersim model reads 2.9 times; aligned to the bridge's depth every
+frame, either model still puts obstacles 3.5-5 m away at about half their
+distance. The simulator's own depth has none of this,
 so nvblox maps it, as a RealSense's depth would be mapped on the car.
 
 nvblox counts everything 0.02-0.55 m above the floor as an obstacle, so it
 needs the camera's mount to about a centimetre. The prefab's level
 0.145 m (the URDF's earlier `sim_geometry` mount) put the floor 0.3-0.6 m
 ahead 19 mm high and 44 % of it in that band: with the bridge's depth
-nvblox filled the space in front of the car, and both goals below
-aborted ("no valid path found"). The simulator's depth fits a flat floor
+nvblox filled the space in front of the car, and the goals (3.0, -1.5)
+and (5.0, -1.5) aborted ("no valid path found"). The simulator's depth fits a flat floor
 0.120 m below the camera with the camera pitched 0.81 degrees up (floor
 residual under 2.4 mm from 0.3 to 4 m, 0-3 % in the band), which the URDF
-now uses. With it, on 2026-10-11 (one stack): the stack validator passed,
-the goals (3.0, -1.5, -30 deg) and then (5.0, -1.5, 0 deg) succeeded, and
-89-96 % of SLAM's wall cells in the area nvblox had observed had an
-nvblox obstacle within 0.15 m. About 60 % of nvblox's obstacle cells are
-not within 0.15 m of SLAM's walls; some are streaks along the camera's
-rays a few metres out, and the Demo World has no ground truth to say how
-many of the rest are objects off the lidar's plane or the inside of thick
-obstacles. Not checked further.
+now uses. With it, on 2026-10-11, two stacks: the stack validator passed
+in both; the goals (3.0, -1.5, -30 deg) and then (5.0, -1.5, 0 deg)
+succeeded in both (16.1 and 15.6 s for the first), and in the second the
+goal (1.0, -3.0, -90 deg) after them too (53.6 s, turning around); and
+89-99 % of SLAM's wall cells in the area nvblox had observed had an nvblox
+obstacle within 0.15 m. In both the planner failed to replan ("no valid
+path found") two or three times in the first 4 s of the first goal, while
+the maps fill in, and the car kept to its first plan; not compared with
+the earlier setting. More than half of nvblox's obstacle cells (53-80 %)
+are not within 0.15 m of SLAM's walls; some are streaks along the
+camera's rays a few metres out, and the Demo World has no ground truth to
+say how many of the rest are objects off the lidar's plane or the inside
+of thick obstacles. Not checked further.
 
 Closed-loop status: the stack comes up unattended and Nav2 reaches goals in
 Demo World. The goal tables below were measured with nvblox on Depth

@@ -120,6 +120,10 @@ def test_frames_pair_by_stamp_once_per_period():
     pairer.add('color', int(1.2e9), 'c1')
     assert pairer.add('depth', int(1.2e9), 'd1') is None  # waits for the estimate
     assert pairer.add('estimate', int(1.2e9), 'e1')['color'] == 'c1'
+    # A simulator restarted (its clock back to zero) is recorded again.
+    pairer.add('color', int(0.1e9), 'c2')
+    pairer.add('depth', int(0.1e9), 'd2')
+    assert pairer.add('estimate', int(0.1e9), 'e2')['color'] == 'c2'
     no_estimate = acc.FramePairer(period_ns=0, need_estimate=False)
     no_estimate.add('depth', 5, 'd')
     assert no_estimate.add('color', 5, 'c') == {'color': 'c', 'depth': 'd'}

@@ -279,7 +279,8 @@ class FramePairer:
         kinds = {'color', 'depth'} | ({'estimate'} if self.need_estimate else set())
         if not kinds <= set(entry):
             return None
-        if self.last_saved is not None and stamp - self.last_saved < self.period_ns:
+        # A stamp before the last saved one is a restarted simulator clock.
+        if self.last_saved is not None and 0 <= stamp - self.last_saved < self.period_ns:
             return None
         self.last_saved = stamp
         for old in [s for s in self.pending if s <= stamp]:

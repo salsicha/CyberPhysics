@@ -148,6 +148,10 @@ are obstacles): the share of floor pixels whose point lands in that band
   recalibrated max_depth) is no better.
 - The per-frame scale itself is steady for vkitti (0.104-0.115, p10-p90)
   and wanders for hypersim (0.60-0.87).
+- Repeated on 151 frames of a later lap (on the final tree, nvblox on
+  the camera's depth, Depth Anything still running): vkitti 9.05 and
+  hypersim 1.32 times the true depth; the aligned rows' errors within
+  0.05 m and 1.5 points of the table, the slice columns within 1 point.
 - GPU time: `infer_image` per 640x480 frame on an RTX 4000 Ada Laptop GPU
   (the network alone 42 ms), 0.29 GB of PyTorch memory; the same for both
   checkpoints. Alignment adds 0.1 ms (the median) plus 0.3 ms (scaling and
@@ -181,7 +185,12 @@ evidence above:
    the GPU time it takes is free (48 ms per frame on the laptop GPU above;
    not measured on the Orin Nano, where the image's PyTorch is CPU-only
    today). nvblox reads 16-bit millimetre depth as Isaac ROS's RealSense
-   examples feed it; not tried on this composition.
+   examples feed it; not tried on this composition. With real depth nvblox
+   also maps the people around the car: in Isaac its static mode (the
+   car's `nvblox.yaml`) kept them as obstacles and stopped Nav2 twice in
+   four runs, its dynamic mode with Nav2 on the static slice
+   (`systems/racecar_turret/config/nvblox_isaac.yaml`) completed 4 of 4
+   (`applications/isaac/RACECAR_TURRET.md`, "People in nvblox's map").
 2. **Depth Anything hypersim with scale alignment to the RealSense**
    (`metric_dataset:=hypersim max_depth:=20.0
    scale_reference_topic:=/camera/aligned_depth_to_color/image_raw`): the

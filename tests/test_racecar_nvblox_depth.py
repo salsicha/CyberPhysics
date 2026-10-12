@@ -55,7 +55,7 @@ def test_the_nvblox_launch_takes_an_overrides_file_that_defaults_to_nothing_new(
     assert 'overrides_file' not in command('racecarneo_hardware.yaml', 'racecarneo_nvblox')
 
 
-def test_the_isaac_arena_maps_people_as_dynamic_and_nav2_reads_the_combined_slice():
+def test_the_isaac_arena_maps_people_as_dynamic_and_nav2_reads_the_static_slice():
     overrides = yaml.safe_load((REPO / 'systems/racecar_turret/config/nvblox_isaac.yaml').read_text())
     params = overrides['/**']['ros__parameters']
     assert params['mapping_type'] == 'dynamic'
@@ -72,10 +72,11 @@ def test_the_isaac_arena_maps_people_as_dynamic_and_nav2_reads_the_combined_slic
                for v in services('racecar_turret_isaac.yaml')['racecar_turret_nvblox']['volumes'])
     assert 'use_sim_time: true' in nvblox
     nav2 = command('racecar_turret_isaac.yaml', 'racecar_turret_nav2')
-    assert 's#/nvblox_node/static_map_slice#${RACECAR_TURRET_NVBLOX_SLICE:-/nvblox_node/combined_map_slice}#' in nav2
+    # Nav2 and the map recorder read the same slice, by default nav2.yaml's
+    # static one (the people come from the lidar).
+    assert 's#/nvblox_node/static_map_slice#${RACECAR_TURRET_NVBLOX_SLICE:-/nvblox_node/static_map_slice}#' in nav2
     recorder = command('racecar_turret_isaac.yaml', 'racecar_turret_map_recorder')
-    assert '--slice-topic ${RACECAR_TURRET_NVBLOX_SLICE:-/nvblox_node/combined_map_slice}' in recorder
-    # nav2.yaml itself (the car's) reads the static slice.
+    assert '--slice-topic ${RACECAR_TURRET_NVBLOX_SLICE:-/nvblox_node/static_map_slice}' in recorder
     assert '/nvblox_node/static_map_slice' in (REPO / 'systems/racecarneo/config/nav2.yaml').read_text()
 
 

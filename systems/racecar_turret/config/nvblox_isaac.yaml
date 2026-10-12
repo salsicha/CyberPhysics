@@ -9,7 +9,8 @@
 # dynamic occupancy layer, which decays, instead of the static TSDF
 # (NVIDIA's nvblox_dynamics.yaml values), and what the camera no longer sees
 # decays from the TSDF in about 3.5 s (0.8 every 0.2 s, nvblox's default
-# 0.95 takes about 15 s). Nav2 reads the combined (static and dynamic) slice.
+# 0.95 takes about 15 s). Nav2 reads the static slice: the arena's
+# obstacles from nvblox, the people from the lidar.
 /**:
   ros__parameters:
     mapping_type: dynamic
