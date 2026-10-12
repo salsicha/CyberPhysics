@@ -1,10 +1,14 @@
-"""GPS mast: lifts the GPS/compass puck about 130 mm above the top plate,
-away from the power wiring and the USB 3 cable."""
+"""GPS mast: lifts the GPS/compass puck about 210 mm above the top plate,
+away from the power wiring, the USB 3 cable and, in the launcher
+configuration, the battery on the deck (at least 150 mm). Its column stands
+behind the flange's bolt circle, over the plate's rear edge, so that the
+battery on the deck can sit far enough aft."""
 from hardware.parts.aerodrone import _frame as F
 from hardware.parts.common import printing
 from hardware.parts.common.footprints import HolybroM10GPS
 
-FLANGE_T = 5.0
+FLANGE_T = 6.0
+COLUMN_FOOT_D = 26.0               # the flange round the column's foot
 COLUMN_D = 18.0
 SEAT_D = 58.0
 SEAT_T = 3.0
@@ -33,7 +37,7 @@ PART = {
     ],
     "inserts": [],
     "fasteners": [
-        {"item": "M3 x 10 socket head cap screw", "qty": 3, "use": "GPS mast to top plate"},
+        {"item": "M3 x 12 socket head cap screw", "qty": 3, "use": "GPS mast to top plate"},
         {"item": "double-sided foam tape (VHB), 50 mm disc", "qty": 1, "use": "GPS puck on the mast seat"},
     ],
     "fit_test": False,
@@ -46,14 +50,18 @@ PART = {
 
 def build():
     from hardware.parts.common import cad
-    x, y = F.MAST_XY
+    bx, by = F.MAST_XY
+    x, y = F.MAST_COLUMN_XY
     z0 = F.TOP_Z[1]
     seat_z = z0 + F.MAST_HEIGHT
     cone_h = (SEAT_D - COLUMN_D) / 2          # 45 degrees
     cone_z = seat_z - SEAT_T - cone_h
     lip_id = max(HolybroM10GPS.V1[0], HolybroM10GPS.V2[0]) + 2 * PUCK_CLEARANCE
+    # Flange: the bolt circle's disc and the column's foot, joined.
     body = cad.fuse_all([
-        cad.cyl(F.MAST_FLANGE_D, FLANGE_T, (x, y, z0)),
+        cad.cyl(F.MAST_FLANGE_D, FLANGE_T, (bx, by, z0)),
+        cad.cyl(COLUMN_FOOT_D, FLANGE_T, (x, y, z0)),
+        cad.box(min(x, bx), max(x, bx), -COLUMN_FOOT_D / 2, COLUMN_FOOT_D / 2, z0, z0 + FLANGE_T),
         cad.cyl(COLUMN_D, cone_z - z0 - FLANGE_T + 0.01, (x, y, z0 + FLANGE_T - 0.01)),
         cad.cone(COLUMN_D, SEAT_D, cone_h, (x, y, cone_z)),
         cad.cyl(SEAT_D, SEAT_T, (x, y, seat_z - SEAT_T)),

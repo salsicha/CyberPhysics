@@ -13,9 +13,9 @@ from hardware.parts.common.footprints import (
 RIB_Y = (14.0, -14.0)
 RIB_T = 3.0
 RIB_H = 10.0
-RIB_X = (F.PLATE_HALF + 1.0, 140.0)
+RIB_X = (F.PLATE_HALF + 1.0, 140.0 + F.NOSE_SHIFT)
 POCKET_D = 13.0
-CABLE_NOTCH_X = (95.0, 125.0)
+CABLE_NOTCH_X = (95.0 + F.NOSE_SHIFT, 125.0 + F.NOSE_SHIFT)
 CABLE_NOTCH_DEPTH = 6.0
 TRIPOD_ACCESS_D = 9.0
 

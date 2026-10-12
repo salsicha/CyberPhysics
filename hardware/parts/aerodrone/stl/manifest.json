@@ -213,23 +213,23 @@
    },
    "stl": "hardware/parts/aerodrone/stl/gps_mast.stl",
    "step": "generated/parts/aerodrone/gps_mast.step",
-   "volume_cm3": 64.31,
-   "area_cm2": 156.9,
+   "volume_cm3": 89.08,
+   "area_cm2": 217.6,
    "print_size_mm": [
-    58.0,
+    75.0,
     57.8,
-    132.0
+    213.0
    ],
    "footprint_mm": [
-    68.0,
+    85.0,
     67.8
    ],
-   "triangles": 1428,
+   "triangles": 1480,
    "estimate": {
-    "mass_g": 33.5,
-    "time_min": 80,
-    "mass_g_all": 33.5,
-    "time_min_all": 80
+    "mass_g": 47.6,
+    "time_min": 118,
+    "mass_g_all": 47.6,
+    "time_min_all": 118
    },
    "validation": {
     "passed": true,
@@ -240,7 +240,7 @@
     "min_wall_mm": 1.97,
     "min_wall_p1_mm": 1.99,
     "min_wall_required_mm": 1.2,
-    "bed_contact_mm2": 987,
+    "bed_contact_mm2": 1557,
     "errors": []
    },
    "mates_with": [
@@ -260,7 +260,7 @@
    "inserts": [],
    "fasteners": [
     {
-     "item": "M3 x 10 socket head cap screw",
+     "item": "M3 x 12 socket head cap screw",
      "qty": 3,
      "use": "GPS mast to top plate"
     },
@@ -273,6 +273,106 @@
    "notes": [
     "Arrow on the GPS puck toward the nose (or set COMPASS_ORIENT to match).",
     "The cable notch in the lip faces the nose; run the cable down the mast with two cable ties."
+   ]
+  },
+  {
+   "id": "halow_cradle",
+   "name": "HaLowLink 2 cradle (on the top deck)",
+   "quantity": 1,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "on top of the aircraft in full sun, next to a router that runs warm",
+   "flight_critical": false,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 3,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 30,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "flat: the base on the plate, walls and antenna stay up",
+    "rotate": []
+   },
+   "stl": "hardware/parts/aerodrone/stl/halow_cradle.stl",
+   "step": "generated/parts/aerodrone/halow_cradle.step",
+   "volume_cm3": 36.55,
+   "area_cm2": 253.4,
+   "print_size_mm": [
+    85.7,
+    93.4,
+    37.0
+   ],
+   "footprint_mm": [
+    85.7,
+    93.4
+   ],
+   "triangles": 2164,
+   "estimate": {
+    "mass_g": 33.7,
+    "time_min": 64,
+    "mass_g_all": 33.7,
+    "time_min_all": 64
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 1.5,
+    "min_wall_p1_mm": 1.8,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 3509,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "Morse Micro HaLowLink 2 (in its case)",
+     "dimensions": "88 x 68 x 24 mm, 0.3 mm clearance each side",
+     "source": "Morse Micro HaLowLink 2 product brief, Rev 9 (https://www.morsemicro.com/resources/product_brief/HaLowLink-2_Product-Brief.pdf): 'Dimensions: 88 x 68 x 24mm', 'Weight HaLowLink only: 102g', 'HaLowLink + stand + antenna: 168g', 'Power: 5V...2A', '1x USB-C port (power and Ethernet data)', '2x Gigabit Ethernet ports', 'Temperature range: 0 - 40C', SMA connector; HaLowLink user guide 2.11 (https://static.gl-inet.com/www/images/products/user-guide/haLowlink2_user-guide.pdf): Extender mode, 6.3 'Virtual Wire', dipole antenna 2.34 dBi, 20 cm RF exposure distance",
+     "verified": true
+    },
+    {
+     "part": "SMA bulkhead jack (the extension's far end), the HaLowLink 2's antenna on it",
+     "dimensions": "6.6 mm hole for the 1/4-36 UNS thread, vertical; the unit's SMA 23 mm from its end (scaled from the brief)",
+     "source": "Morse Micro HaLowLink 2 product brief, Rev 9 (https://www.morsemicro.com/resources/product_brief/HaLowLink-2_Product-Brief.pdf): 'Dimensions: 88 x 68 x 24mm', 'Weight HaLowLink only: 102g', 'HaLowLink + stand + antenna: 168g', 'Power: 5V...2A', '1x USB-C port (power and Ethernet data)', '2x Gigabit Ethernet ports', 'Temperature range: 0 - 40C', SMA connector; HaLowLink user guide 2.11 (https://static.gl-inet.com/www/images/products/user-guide/haLowlink2_user-guide.pdf): Extender mode, 6.3 'Virtual Wire', dipole antenna 2.34 dBi, 20 cm RF exposure distance",
+     "verified": false
+    },
+    {
+     "part": "top_deck (printed)",
+     "dimensions": "five M3 x 5 into its short inserts at ((8.0, 30.0), (8.0, -30.0), (24.0, 30.0), (24.0, -30.0), (62.0, 21.0))",
+     "source": "hardware/parts/aerodrone/_frame.py",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M3 x 5 socket head cap screw",
+     "qty": 5,
+     "use": "HaLowLink cradle to the top deck (heads recessed)"
+    },
+    {
+     "item": "hook-and-loop strap, 20 mm, 300 mm",
+     "qty": 1,
+     "use": "HaLowLink 2 round the cradle's walls"
+    },
+    {
+     "item": "zip tie 2.5 mm",
+     "qty": 1,
+     "use": "SMA extension cable to the cradle's arm"
+    }
+   ],
+   "notes": [
+    "Check the unit's fit and the bulkhead jack's fit in the stay before relying on them.",
+    "Keep the case on: Morse Micro's brief gives no bare-board option; the unit runs from 0 to 40 C."
    ]
   },
   {
@@ -412,8 +512,8 @@
    },
    "stl": "hardware/parts/aerodrone/stl/hub_top_plate.stl",
    "step": "generated/parts/aerodrone/hub_top_plate.step",
-   "volume_cm3": 175.77,
-   "area_cm2": 664.8,
+   "volume_cm3": 176.07,
+   "area_cm2": 671.0,
    "print_size_mm": [
     181.0,
     181.0,
@@ -423,12 +523,12 @@
     191.0,
     191.0
    ],
-   "triangles": 6104,
+   "triangles": 7112,
    "estimate": {
-    "mass_g": 102.9,
-    "time_min": 181,
-    "mass_g_all": 102.9,
-    "time_min_all": 181
+    "mass_g": 103.8,
+    "time_min": 183,
+    "mass_g_all": 103.8,
+    "time_min_all": 183
    },
    "validation": {
     "passed": true,
@@ -436,10 +536,10 @@
     "closed_manifold": true,
     "bodies": 1,
     "fits_bed": true,
-    "min_wall_mm": 2.29,
+    "min_wall_mm": 2.28,
     "min_wall_p1_mm": 2.29,
     "min_wall_required_mm": 1.2,
-    "bed_contact_mm2": 22931,
+    "bed_contact_mm2": 22881,
     "errors": []
    },
    "mates_with": [
@@ -450,7 +550,7 @@
      "verified": true
     },
     {
-     "part": "hub_bottom_plate, stack_tray, gps_mast (printed)",
+     "part": "hub_bottom_plate, stack_tray, gps_mast, top_deck (printed)",
      "dimensions": "bolt and insert positions from _frame.py",
      "source": "hardware/parts/aerodrone/_frame.py",
      "verified": true
@@ -466,6 +566,11 @@
      "size": "M3",
      "qty": 3,
      "where": "top face, GPS mast flange"
+    },
+    {
+     "size": "M3",
+     "qty": 4,
+     "where": "top face, top deck posts"
     }
    ],
    "fasteners": [
@@ -571,6 +676,410 @@
    "notes": [
     "The legs splay 20 deg outward: the feet sit 150 mm from the centre, outside the OAK-1's 69 x 55 deg view.",
     "Ground clearance: 126 mm under the OAK-1 lens, about 130 mm under the battery."
+   ]
+  },
+  {
+   "id": "launcher_breech_down",
+   "name": "Launcher breech, downward (no pedestal; aerodrone)",
+   "quantity": 1,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "carries the launcher under the hub, outdoors in the sun",
+   "flight_critical": false,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 25,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "upright: the underside (the cam guide's face) on the plate, channel open upward",
+    "rotate": [
+     [
+      "Y",
+      90
+     ]
+    ]
+   },
+   "stl": "hardware/parts/aerodrone/stl/launcher_breech_down.stl",
+   "step": "generated/parts/aerodrone/launcher_breech_down.step",
+   "volume_cm3": 48.94,
+   "area_cm2": 270.4,
+   "print_size_mm": [
+    92.0,
+    74.9,
+    45.2
+   ],
+   "footprint_mm": [
+    92.0,
+    74.9
+   ],
+   "triangles": 3020,
+   "estimate": {
+    "mass_g": 41.5,
+    "time_min": 79,
+    "mass_g_all": 41.5,
+    "time_min_all": 79
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 1.3,
+    "min_wall_p1_mm": 1.3,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 5553,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "K&S Precision Metals 8140 brass tube (barrel)",
+     "dimensions": "17/32 in OD (13.49 mm) in a 13.69 mm seat, ID 0.503 in on the bore; on the aerodrone its rear face stops on the 1.5 mm dart detent ring",
+     "source": "ksmetals.com, round brass tube 17/32 in x 0.014 in wall, SKU 8140 (OD/ID +-0.002 in)",
+     "verified": true
+    },
+    {
+     "part": "turret launcher_tube, launcher_shuttle, launcher_clip, launcher_barrel_clamp (printed)",
+     "dimensions": "the turret breech's channel, sockets and inserts, unchanged",
+     "source": "hardware/parts/turret/_launcher.py",
+     "verified": true
+    },
+    {
+     "part": "launcher_cam_guide (printed)",
+     "dimensions": "four M3 inserts underneath at (x_L, y_L) = ((-4.0, 9.0), (-4.0, -9.0), (80.0, 22.0), (80.0, 38.0))",
+     "source": "hardware/parts/turret/_launcher.py",
+     "verified": true
+    }
+   ],
+   "inserts": [
+    {
+     "size": "M3",
+     "qty": 2,
+     "where": "rear plate, lower flange screws"
+    },
+    {
+     "size": "M3-short",
+     "qty": 2,
+     "where": "rear plate, upper flange screws"
+    },
+    {
+     "size": "M3",
+     "qty": 4,
+     "where": "wall bosses, cover screws, from the top"
+    },
+    {
+     "size": "M3",
+     "qty": 2,
+     "where": "front wall, barrel clamp screws"
+    },
+    {
+     "size": "M3",
+     "qty": 4,
+     "where": "underside, cam guide screws"
+    }
+   ],
+   "fasteners": [],
+   "notes": [
+    "Same fit checks as the turret's breech: the shuttle must slide its 17 mm in the channel with the cover screwed on, without play or a tight spot (sand the shuttle, not the channel).",
+    "Use this breech, not the turret's: the turret's has the pedestal for the camera yoke."
+   ]
+  },
+  {
+   "id": "launcher_cam_guide",
+   "name": "Launcher cam guide (pad on the downward breech)",
+   "quantity": 1,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "the PETG cam plate slides on it (PETG on ASA wears least); outdoors",
+   "flight_critical": false,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 30,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "the keel face (front) on the plate, shelf and lip up",
+    "rotate": [
+     [
+      "Y",
+      90
+     ]
+    ]
+   },
+   "stl": "hardware/parts/aerodrone/stl/launcher_cam_guide.stl",
+   "step": "generated/parts/aerodrone/launcher_cam_guide.step",
+   "volume_cm3": 59.17,
+   "area_cm2": 207.9,
+   "print_size_mm": [
+    100.0,
+    94.0,
+    13.3
+   ],
+   "footprint_mm": [
+    100.0,
+    94.0
+   ],
+   "triangles": 2084,
+   "estimate": {
+    "mass_g": 35.6,
+    "time_min": 64,
+    "mass_g_all": 35.6,
+    "time_min_all": 64
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 2.3,
+    "min_wall_p1_mm": 2.3,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 7818,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "launcher_breech_down (printed)",
+     "dimensions": "four M3 x 10 into its underside inserts at (x_L, y_L) = ((-4.0, 9.0), (-4.0, -9.0), (80.0, 22.0), (80.0, 38.0))",
+     "source": "hardware/parts/turret/_launcher.py",
+     "verified": true
+    },
+    {
+     "part": "turret launcher_cam (printed cam plate)",
+     "dimensions": "shelf 0.2 mm under it, lip 0.3 mm over it, over x_L 0..60 mm",
+     "source": "hardware/parts/turret/_launcher.py",
+     "verified": true
+    },
+    {
+     "part": "launcher_hanger (printed)",
+     "dimensions": "keel against the front face, four M3 x 8 into short inserts",
+     "source": "hardware/parts/aerodrone/_frame.py",
+     "verified": true
+    }
+   ],
+   "inserts": [
+    {
+     "size": "M3-short",
+     "qty": 4,
+     "where": "front face, keel screws"
+    }
+   ],
+   "fasteners": [
+    {
+     "item": "M3 x 10 socket head cap screw",
+     "qty": 4,
+     "use": "cam guide to the breech's underside inserts (heads in counterbores)"
+    }
+   ],
+   "notes": [
+    "Screw it to the breech before the hanger: the upper two screws are under the keel.",
+    "With the rack in place, the cam plate must slide its 39 mm on the shelf and under the lip without catching; ease the lip's lead-in with a file if it does."
+   ]
+  },
+  {
+   "id": "launcher_dart_detent",
+   "name": "Launcher dart detent (TPU ring, aerodrone)",
+   "quantity": 1,
+   "material": "TPU95A",
+   "material_fallback": null,
+   "material_reason": "a soft lip the dart's foam pushes through",
+   "flight_critical": false,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu TPU 95A HF (or Bambu TPU 95A)",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 2,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 100,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "flat",
+    "rotate": []
+   },
+   "stl": "hardware/parts/aerodrone/stl/launcher_dart_detent.stl",
+   "step": "generated/parts/aerodrone/launcher_dart_detent.step",
+   "volume_cm3": 0.06,
+   "area_cm2": 2.0,
+   "print_size_mm": [
+    13.8,
+    13.8,
+    1.5
+   ],
+   "footprint_mm": [
+    13.8,
+    13.8
+   ],
+   "triangles": 336,
+   "estimate": {
+    "mass_g": 0.1,
+    "time_min": 1,
+    "mass_g_all": 0.1,
+    "time_min_all": 1
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 0.92,
+    "min_wall_p1_mm": 0.92,
+    "min_wall_required_mm": 0.8,
+    "bed_contact_mm2": 37,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "launcher_breech_down (printed): barrel seat",
+     "dimensions": "OD 13.84 mm in the 13.69 mm seat, 1.5 mm thick, against the chamber's front face",
+     "source": "hardware/parts/turret/_launcher.py",
+     "verified": true
+    },
+    {
+     "part": "Elite-size foam dart",
+     "dimensions": "lip 12 mm for a 12.7 mm dart",
+     "source": "community measurements (see _launcher.py); no Hasbro drawing",
+     "verified": false
+    }
+   ],
+   "inserts": [],
+   "fasteners": [],
+   "notes": [
+    "Push it into the barrel seat from the front, before the barrel, until it is flush with the chamber's front face (a straight edge across the chamber); the barrel then stops on it.",
+    "Check by hand (safety on, no spring force: before the tube is fitted): a dart dropped into the chamber muzzle down must stay when the launcher is shaken; pushed with a finger it must pass with a light push. Darts vary: too tight, set LIP_ID to 12.3 mm; too loose, 11.7 mm; and repeat the chronograph check."
+   ]
+  },
+  {
+   "id": "launcher_hanger",
+   "name": "Launcher hanger (flange, keel, rib)",
+   "quantity": 1,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "carries the 0.43 kg launcher under the hub, outdoors in the sun",
+   "flight_critical": true,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 5,
+    "sparse_infill_density_pct": 25,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "outer brim only, 5 mm",
+    "orientation": "upside down: the flange's top face on the plate, keel standing up (the rib's slope and the saddle's 45 deg underside need no supports)",
+    "rotate": [
+     [
+      "X",
+      180
+     ]
+    ]
+   },
+   "stl": "hardware/parts/aerodrone/stl/launcher_hanger.stl",
+   "step": "generated/parts/aerodrone/launcher_hanger.step",
+   "volume_cm3": 112.49,
+   "area_cm2": 475.8,
+   "print_size_mm": [
+    122.0,
+    65.0,
+    213.0
+   ],
+   "footprint_mm": [
+    132.0,
+    75.0
+   ],
+   "triangles": 2116,
+   "estimate": {
+    "mass_g": 86.9,
+    "time_min": 186,
+    "mass_g_all": 86.9,
+    "time_min_all": 186
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 1.6,
+    "min_wall_p1_mm": 3.0,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 5646,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "hub_bottom_plate (printed)",
+     "dimensions": "four M3 inserts at x = -45/35 mm, y = +-25 mm (the battery tray's)",
+     "source": "hardware/parts/aerodrone/_frame.py",
+     "verified": true
+    },
+    {
+     "part": "launcher_cam_guide (printed)",
+     "dimensions": "keel against its front face, four M3 x 8 into its inserts",
+     "source": "hardware/parts/aerodrone/_frame.py",
+     "verified": true
+    },
+    {
+     "part": "turret launcher_tube (printed plunger tube)",
+     "dimensions": "saddle for the 36.8 mm tube, 0.3 mm clear, a zip tie round it",
+     "source": "hardware/parts/turret/_launcher.py",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M3 x 10 socket head cap screw",
+     "qty": 4,
+     "use": "hanger flange to the bottom plate's battery-tray inserts"
+    },
+    {
+     "item": "M3 x 8 socket head cap screw",
+     "qty": 4,
+     "use": "hanger keel to the cam guide's inserts"
+    },
+    {
+     "item": "zip tie 2.5 mm",
+     "qty": 4,
+     "use": "plunger tube to the hanger's saddle (1); servo cables to the keel (3)"
+    },
+    {
+     "item": "Dyneema or Kevlar cord, 1.5 mm, 300 mm",
+     "qty": 1,
+     "use": "safety lanyard: launcher (round the plunger tube, above the saddle) to the hub, slack"
+    }
+   ],
+   "notes": [
+    "Flight-critical in the sense that a failure drops a 0.43 kg launcher from the aircraft: check it for cracks and the eight screws for tightness before every flight, and fit the safety lanyard.",
+    "The battery tray stays off while the launcher is fitted; the battery goes on the battery deck."
    ]
   },
   {
@@ -972,23 +1481,23 @@
    },
    "stl": "hardware/parts/aerodrone/stl/sensor_nose.stl",
    "step": "generated/parts/aerodrone/sensor_nose.step",
-   "volume_cm3": 43.41,
-   "area_cm2": 220.9,
+   "volume_cm3": 54.91,
+   "area_cm2": 273.4,
    "print_size_mm": [
-    110.0,
+    135.0,
     80.0,
     15.0
    ],
    "footprint_mm": [
-    110.0,
+    135.0,
     80.0
    ],
    "triangles": 2832,
    "estimate": {
-    "mass_g": 32.2,
-    "time_min": 58,
-    "mass_g_all": 32.2,
-    "time_min_all": 58
+    "mass_g": 40.2,
+    "time_min": 72,
+    "mass_g_all": 40.2,
+    "time_min_all": 72
    },
    "validation": {
     "passed": true,
@@ -999,7 +1508,7 @@
     "min_wall_mm": 1.52,
     "min_wall_p1_mm": 2.0,
     "min_wall_required_mm": 1.2,
-    "bed_contact_mm2": 8153,
+    "bed_contact_mm2": 10153,
     "errors": []
    },
    "mates_with": [
@@ -1234,6 +1743,284 @@
     "Replaces the Raspberry Pi mounting standoff of the Navigator kit; the heatsink and Navigator stack as in Blue Robotics' Navigator Hardware Setup.",
     "Check the Pi 5 underside clears the tray (microSD socket) before tightening."
    ]
+  },
+  {
+   "id": "tall_leg_foot",
+   "name": "Tall leg foot (TPU, launcher configuration)",
+   "quantity": 4,
+   "material": "TPU95A",
+   "material_fallback": null,
+   "material_reason": "soft pad that takes the landing shock and grips the ground",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu TPU 95A HF (or Bambu TPU 95A)",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 3,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 40,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "flat sole on the plate, socket leaning out",
+    "rotate": []
+   },
+   "stl": "hardware/parts/aerodrone/stl/tall_leg_foot.stl",
+   "step": "generated/parts/aerodrone/tall_leg_foot.step",
+   "volume_cm3": 7.66,
+   "area_cm2": 34.2,
+   "print_size_mm": [
+    36.6,
+    22.0,
+    26.2
+   ],
+   "footprint_mm": [
+    36.6,
+    22.0
+   ],
+   "triangles": 548,
+   "estimate": {
+    "mass_g": 6.6,
+    "time_min": 30,
+    "mass_g_all": 26.4,
+    "time_min_all": 120
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 4.05,
+    "min_wall_p1_mm": 4.14,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 594,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "carbon fibre tube 12 mm OD",
+     "dimensions": "socket 11.7 mm (press fit), 16 mm deep",
+     "source": "design requirement (purchased tube)",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [],
+   "notes": [
+    "Push onto the tube's end; a drop of CA glue if it works loose."
+   ]
+  },
+  {
+   "id": "tall_leg_socket",
+   "name": "Tall leg socket (launcher configuration)",
+   "quantity": 4,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "outdoor, in the sun; takes the landing loads of the long legs",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 5,
+    "top_shell_layers": 6,
+    "bottom_shell_layers": 6,
+    "sparse_infill_density_pct": 40,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "upside down: the flange's top face on the plate (the block leans out at 36 deg, no supports)",
+    "rotate": [
+     [
+      "X",
+      180
+     ]
+    ]
+   },
+   "stl": "hardware/parts/aerodrone/stl/tall_leg_socket.stl",
+   "step": "generated/parts/aerodrone/tall_leg_socket.step",
+   "volume_cm3": 22.4,
+   "area_cm2": 94.1,
+   "print_size_mm": [
+    68.5,
+    16.0,
+    54.7
+   ],
+   "footprint_mm": [
+    68.5,
+    16.0
+   ],
+   "triangles": 1666,
+   "estimate": {
+    "mass_g": 21.2,
+    "time_min": 46,
+    "mass_g_all": 84.9,
+    "time_min_all": 184
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 1.8,
+    "min_wall_p1_mm": 1.92,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 686,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "hub_bottom_plate (printed)",
+     "dimensions": "two M3 inserts on the arm axis at r = 68 and 80 mm (the landing leg's)",
+     "source": "hardware/parts/aerodrone/_frame.py",
+     "verified": true
+    },
+    {
+     "part": "carbon fibre tube 12 x 10 mm",
+     "dimensions": "12.2 mm split bore, two M3 pinch screws",
+     "source": "design requirement (purchased tube)",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M3 x 16 socket head cap screw",
+     "qty": 2,
+     "use": "tall leg socket to the bottom plate (heads in counterbores)"
+    },
+    {
+     "item": "M3 x 20 socket head cap screw",
+     "qty": 2,
+     "use": "tall leg socket pinch clamp on the carbon tube"
+    },
+    {
+     "item": "M3 nyloc nut",
+     "qty": 2,
+     "use": "tall leg socket pinch clamp"
+    }
+   ],
+   "notes": [
+    "The tube goes in from below up to the stop; tighten the pinch screws until the tube cannot turn by hand.",
+    "Only with the launcher: without it, fit the standard landing legs (the aircraft stands lower)."
+   ]
+  },
+  {
+   "id": "top_deck",
+   "name": "Top deck (HaLowLink 2; the battery with the launcher)",
+   "quantity": 1,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "on top of the aircraft in full sun, under a pack that reaches about 60 C",
+   "flight_critical": true,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 3,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 20,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "upside down: the deck's top face on the plate, posts up",
+    "rotate": [
+     [
+      "X",
+      180
+     ]
+    ]
+   },
+   "stl": "hardware/parts/aerodrone/stl/top_deck.stl",
+   "step": "generated/parts/aerodrone/top_deck.step",
+   "volume_cm3": 93.45,
+   "area_cm2": 507.4,
+   "print_size_mm": [
+    180.0,
+    148.0,
+    50.0
+   ],
+   "footprint_mm": [
+    180.0,
+    148.0
+   ],
+   "triangles": 3556,
+   "estimate": {
+    "mass_g": 63.9,
+    "time_min": 119,
+    "mass_g_all": 63.9,
+    "time_min_all": 119
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 1.41,
+    "min_wall_p1_mm": 3.0,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 17448,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "hub_top_plate (printed)",
+     "dimensions": "four M3 inserts at ((-40.0, 42.0), (-40.0, -42.0), (12.0, 42.0), (12.0, -42.0))",
+     "source": "hardware/parts/aerodrone/_frame.py",
+     "verified": true
+    },
+    {
+     "part": "4S LiPo pack, across the aircraft",
+     "dimensions": "up to 160 x 50 x 40 mm, its 50 mm side between the strap slots",
+     "source": "Requirement of this design: 4S 4000-5000 mAh pack, at most 160 x 50 x 40 mm, about 550 g",
+     "verified": true
+    },
+    {
+     "part": "Navigator connector envelope (plugged leads)",
+     "dimensions": "deck underside 65 mm above the arm plane, 4.8 mm over the 15 mm budget",
+     "source": "hardware/parts/common/footprints.py (BlueRoboticsNavigator.CONNECTOR_HEIGHT, unverified)",
+     "verified": false
+    },
+    {
+     "part": "halow_cradle (printed)",
+     "dimensions": "M3 short inserts at ((8.0, 30.0), (8.0, -30.0), (24.0, 30.0), (24.0, -30.0), (62.0, 21.0))",
+     "source": "hardware/parts/aerodrone/_frame.py",
+     "verified": true
+    }
+   ],
+   "inserts": [
+    {
+     "size": "M3-short",
+     "qty": 5,
+     "where": "top face, HaLowLink cradle screws, pressed flush (through holes)"
+    }
+   ],
+   "fasteners": [
+    {
+     "item": "M3 x 50 socket head cap screw",
+     "qty": 4,
+     "use": "top deck posts to the top plate inserts (heads recessed in the deck)"
+    }
+   ],
+   "notes": [
+    "With the launcher: a lost battery is a crash; two straps, each through its own slot pair, checked before every flight (the tray's two straps and anti-slip pad move to the deck).",
+    "Check before printing that the plugged Navigator leads stay under the deck (the connector height is a budget, not a drawing).",
+    "The battery lead runs down beside the stack, through the top plate's side window, to the power module."
+   ]
   }
  ],
  "plates": [
@@ -1270,10 +2057,14 @@
     {
      "id": "motor_mount",
      "qty": 1
+    },
+    {
+     "id": "tall_leg_socket",
+     "qty": 4
     }
    ],
-   "time_min": 233,
-   "mass_g": 127
+   "time_min": 419,
+   "mass_g": 212
   },
   {
    "name": "C",
@@ -1281,12 +2072,16 @@
    "layer_height_mm": 0.2,
    "parts": [
     {
+     "id": "top_deck",
+     "qty": 1
+    },
+    {
      "id": "landing_leg",
-     "qty": 2
+     "qty": 1
     }
    ],
-   "time_min": 98,
-   "mass_g": 51
+   "time_min": 171,
+   "mass_g": 90
   },
   {
    "name": "D",
@@ -1307,7 +2102,36 @@
    "layer_height_mm": 0.2,
    "parts": [
     {
+     "id": "landing_leg",
+     "qty": 1
+    },
+    {
      "id": "sensor_nose",
+     "qty": 1
+    },
+    {
+     "id": "launcher_breech_down",
+     "qty": 1
+    }
+   ],
+   "time_min": 203,
+   "mass_g": 107
+  },
+  {
+   "name": "F",
+   "material": "ASA",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "launcher_hanger",
+     "qty": 1
+    },
+    {
+     "id": "launcher_cam_guide",
+     "qty": 1
+    },
+    {
+     "id": "halow_cradle",
      "qty": 1
     },
     {
@@ -1315,11 +2139,11 @@
      "qty": 1
     }
    ],
-   "time_min": 144,
-   "mass_g": 66
+   "time_min": 438,
+   "mass_g": 204
   },
   {
-   "name": "F",
+   "name": "G",
    "material": "PETG",
    "layer_height_mm": 0.2,
    "parts": [
@@ -1344,38 +2168,68 @@
    "mass_g": 88
   },
   {
-   "name": "G",
+   "name": "H",
    "material": "TPU95A",
    "layer_height_mm": 0.2,
    "parts": [
     {
+     "id": "tall_leg_foot",
+     "qty": 4
+    },
+    {
      "id": "leg_foot",
      "qty": 4
+    },
+    {
+     "id": "launcher_dart_detent",
+     "qty": 1
     },
     {
      "id": "stack_grommet",
      "qty": 8
     }
    ],
-   "time_min": 106,
-   "mass_g": 22
+   "time_min": 227,
+   "mass_g": 48
   }
  ],
  "assembly": {
-  "battery_centre_x_mm": -23.5,
+  "battery_centre_x_mm": -31.2,
   "battery_on_tray": true,
   "cg_mm": [
    -0.0,
-   0.0,
-   -13.1
+   0.4,
+   1.0
   ],
-  "takeoff_mass_g": 2072,
-  "bodies": 139,
+  "takeoff_mass_g": 2331,
+  "bodies": 153,
   "interferences": "none",
   "intended_press_fits": 12,
   "camera_view_clear": "yes (69 x 55 deg + 2 deg margin)",
   "rangefinder_beam_clear": "yes",
   "propeller_clearance": "yes (5 mm radial, 3 mm below and 9 mm above the disc)",
+  "launcher_battery_on_deck_mm": "pack centre at x -35.8, y 0.1 for a centred CG with a full clip (the straps and the GPS mast allow x -46.2..-25.8)",
+  "launcher_cg_mm": "full clip (6 darts): (-0.0, -0.0, -5.2); empty clip: (0.1, 0.0, -4.7), battery not moved; tolerance 3 mm from the hub centre",
+  "launcher_bore_to_cg_mm": "0.00 (full clip), 0.07 (empty): the bore is the vertical line through the hub centre",
+  "launcher_bodies": 240,
+  "launcher_interferences": "none (cocked with a full clip, primed)",
+  "launcher_camera_view_clear": "yes: launcher, hanger, tall legs and deck out of the OAK-1's 69 x 55 deg view + 2 deg, cocked and primed",
+  "launcher_rangefinder_beam_clear": "yes",
+  "halow_antenna_clearance_mm": "vertical, from the HaLowLink's SMA on the top deck: arm tubes 107, GPS mast and puck 131, launcher 131, battery 85, propeller discs 71",
+  "launcher_propeller_clearance": "yes",
+  "launcher_view_margin_mm": "the view's rear edge (with the margin) passes 7 mm in front of the barrel at the muzzle (227 mm below the lens)",
+  "launcher_clearance_mm": "5.5 at the closest (launcher_collar_screw / hub_bottom_plate, primed): the launcher clears the airframe, legs, deck and sensors in both states",
+  "launcher_mount_clearance_mm": "2.5 from the hanger and cam guide to the rest (launcher_hanger / sensor_nose)",
+  "launcher_dart_path": "clear: a 14 mm path from the muzzle straight down to the ground meets nothing",
+  "launcher_ground_clearance_mm": "muzzle 50 above the ground on the feet (lowest point launcher_barrel at 50); legs 338 mm under the hub, feet at (+-230, +-230); tip-over 33 deg (CG 351 mm above the ground)",
+  "launcher_compass_to_battery_mm": "160 from the GPS/compass to the battery's centre (at least 150; run ArduPilot's compass-motor calibration)",
+  "launcher_mass_g": "launcher 415 with a full clip (printed 261, two servos 110, spring, barrel, hardware, darts); the configuration adds +644 g in all (hanger, cam guide, deck, tall legs, servo adapter, regulator, wiring; less the tray and landing legs)",
+  "launcher_takeoff_mass_g": "2975 with a full clip, 2969 empty",
+  "flight_impact": [
+   "without the launcher 2331 g: thrust-to-weight 2.29 (table maximum, 1332 g per motor) or 2.06 (T1045 rated 1.2 kg), hover 58 % throttle at 16 V (about 62 % at 14.8 V), 21.4 A, about 11.2 min on 5000 mAh to 20 % left",
+   "with the launcher, full clip 2975 g: thrust-to-weight 1.79 (table maximum, 1332 g per motor) or 1.61 (T1045 rated 1.2 kg), hover 66 % throttle at 16 V (about 71 % at 14.8 V), 29.0 A, about 8.3 min on 5000 mAh to 20 % left"
+  ],
+  "launcher_passed": true,
   "passed": true
  }
 }
