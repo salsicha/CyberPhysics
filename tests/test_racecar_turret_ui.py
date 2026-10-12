@@ -286,6 +286,17 @@ def test_turret_status_parsing_and_summary():
     assert idle['aim_error_deg'] is None and idle['target_id'] == ''
     assert logic.parse_turret_status('{"mode": "warp"}')['mode'] == 'unknown'
     assert logic.parse_turret_status('oops') is None
+    assert status['stamp'] is None
+    assert logic.parse_turret_status('{"mode": "idle", "stamp": 12.5}')['stamp'] == 12.5
+
+
+def test_status_copies_and_reordered_statuses_are_dropped():
+    # Each status arrives twice (two subscriptions); a copy can come late
+    assert logic.newer_status(None, 10.0) and logic.newer_status(10.0, None)
+    assert logic.newer_status(10.0, 10.1)
+    assert not logic.newer_status(10.1, 10.1)  # the copy
+    assert not logic.newer_status(10.1, 10.0)  # older, reordered
+    assert logic.newer_status(1000.0, 5.0)  # the tracker restarted
 
 
 def test_contract_modes_and_sources_match_interfaces_md():
@@ -305,3 +316,95 @@ def test_freshness():
 def test_quaternion_helpers_round_trip():
     for yaw in (-2.5, 0.0, 1.0, 3.0):
         assert logic.yaw_from_quaternion(*logic.quaternion_from_yaw(yaw)) == pytest.approx(yaw)
+
+
+# --- Foam dart launcher ---------------------------------------------------------
+
+READY = {'mode': 'auto', 'target_id': '7', 'target_class': 'person', 'locked': True,
+         'aim_error_deg': 0.6, 'base_compensation': True, 'detections': 2, 'message': '',
+         'launcher': 'ready', 'darts': 2, 'tags': 1, 'tagged_ids': ['3'],
+         'last_tag': {'target_id': '3', 'result': 'fired', 'reason': '', 'stamp': 12.5},
+         'fire_block': '', 'auto_next': True}
+
+
+def status_with(**changes):
+    return logic.parse_turret_status(json.dumps(dict(READY, **changes)))
+
+
+def test_turret_status_carries_the_launcher_fields():
+    status = logic.parse_turret_status(json.dumps(READY))
+    assert (status['launcher'], status['darts'], status['tags'], status['tagged_ids'],
+            status['auto_next'], status['fire_block']) == ('ready', 2, 1, ('3',), True, '')
+    assert status['last_tag'] == {'target_id': '3', 'result': 'fired', 'reason': '', 'stamp': 12.5}
+    # A tracker without the launcher's fields, or odd values: never ready to fire
+    old = logic.parse_turret_status('{"mode": "auto", "target_id": "7", "locked": true}')
+    assert (old['launcher'], old['darts'], old['tagged_ids'], old['last_tag'],
+            old['fire_block']) == ('none', 0, (), None, None)
+    odd = status_with(launcher='launching', darts='many', tagged_ids='3', fire_block=0,
+                      last_tag='x')
+    assert (odd['launcher'], odd['darts'], odd['tagged_ids'], odd['fire_block'],
+            odd['last_tag']) == ('none', 0, (), None, None)
+    for state in logic.LAUNCHER_STATES:
+        assert f'"{state}"' in (REPO / 'systems/racecar_turret/interfaces.md').read_text()
+
+
+def test_fire_button_is_enabled_only_while_every_condition_holds():
+    assert logic.fire_button(status_with(), armed=True, actuator_ready=True) == (True, '')
+    assert logic.fire_command(status_with()) == {'action': 'tag', 'target_id': '7'}
+    cases = [
+        (None, True, True, 'no status from the tracker'),
+        (status_with(launcher='none', fire_block='no launcher'), True, True, 'no launcher'),
+        (status_with(), False, True, 'turret disarmed'),
+        (status_with(), None, True, 'turret disarmed'),          # no e-stop state yet
+        (status_with(), True, False, 'actuator not ready'),
+        (status_with(), True, None, 'actuator not ready'),
+        (status_with(mode='manual'), True, True, 'no locked target'),
+        (status_with(mode='estop'), True, True, 'no locked target'),
+        (status_with(target_id=''), True, True, 'no locked target'),
+        (status_with(fire_block='too close'), True, True, 'too close'),
+        (status_with(fire_block='aim error over 2 deg'), True, True, 'aim error over 2 deg'),
+        (status_with(fire_block=None), True, True, 'the tracker does not report fire_block'),
+        (status_with(locked=False), True, True, 'target not locked'),
+        (status_with(darts=0), True, True, 'no darts'),
+        (status_with(launcher='priming'), True, True, 'launcher priming'),
+        (status_with(launcher='fault'), True, True, 'launcher fault'),
+    ]
+    for status, armed, ready, reason in cases:
+        assert logic.fire_button(status, armed, ready) == (False, reason)
+
+
+def test_reload_auto_next_and_launcher_summary():
+    assert logic.reload_command(6) == {'action': 'reload', 'darts': 6}
+    assert logic.reload_command(6.0) == {'action': 'reload', 'darts': 6}
+    assert logic.reload_command('3') == {'action': 'reload', 'darts': 3}
+    for bad in (-1, 2.5, 'x', None, math.nan, 5000):
+        assert logic.reload_command(bad) is None
+    assert logic.auto_next_command(True) == {'action': 'auto_next', 'enabled': True}
+    assert logic.auto_next_command(0) == {'action': 'auto_next', 'enabled': False}
+    assert logic.launcher_summary(status_with()) == (
+        'Launcher: ready, 2 darts, 1 tag; last: fired #3')
+    refused = status_with(darts=1, tags=0, last_tag={
+        'target_id': '9', 'result': 'refused', 'reason': '9 is not the locked target (7)',
+        'stamp': 1})
+    assert logic.launcher_summary(refused) == (
+        'Launcher: ready, 1 dart, 0 tags; last: refused #9 (9 is not the locked target (7))')
+    assert logic.launcher_summary(status_with(launcher='none')) == 'Launcher: none fitted'
+    assert 'no status' in logic.launcher_summary(None)
+
+
+def test_tagged_boxes_are_marked():
+    segments = logic.parse_segments(SEGMENTS)
+    svg = logic.detections_svg(segments, 320, 240, target_id='7', locked=True, tagged_ids=('3',))
+    rects = re.findall(r'<rect [^>]*stroke="(#\w+)"[^>]*?(stroke-dasharray="[\d. ]+")?/>', svg)
+    assert [colour for colour, _ in rects] == ['#a78bfa', '#22c55e', '#22d3ee']
+    assert rects[0][1] and not rects[1][1]
+    assert 'person 0.90 #3 tagged' in svg
+    # The locked target stays green even when tagged
+    assert 'tagged' in logic.detections_svg(segments, 320, 240, '3', True, ('3',))
+    assert '#22c55e' in logic.detections_svg(segments, 320, 240, '3', True, ('3',))
+
+
+def test_launcher_actions_are_in_the_contract():
+    contract = (REPO / 'systems/racecar_turret/interfaces.md').read_text()
+    for action in ('tag', 'next', 'clear_tags', 'reload', 'auto_next'):
+        assert f'"action": "{action}"' in contract

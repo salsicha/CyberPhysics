@@ -34,7 +34,34 @@ turret_arduino_bridge:
     servo_acceleration: 50  # goal acceleration, 100 steps/s^2
     # Wait this long for a servo's status packet before reporting a timeout
     servo_reply_timeout_s: 0.01
-    # STOP and the 500 ms watchdog hold the measured position; true: torque off
+    # STOP and the 500 ms watchdog hold pan/tilt's measured position (and
+    # return the launcher's trigger to 0, its rack stopped); true: pan/tilt
+    # torque off
     stop_disables_torque: false
+    # The foam dart launcher (systems/racecar_turret/interfaces.md): fitted
+    # or not comes from TURRET_ACTUATOR_FITTED in the env files, not from
+    # this file. Every transport clamps commands to these limits
+    # (hardware/parts/turret/_launcher.py): the priming rack in metres (0
+    # forward, 0.038 back primes it; the sear catches from 0.03425), the
+    # trigger in radians (0 safe, 0.6 lifts the sear 5.4 mm; 4.45 mm releases
+    # it). sts: the servo settings of the firmware's turret_config.h: the
+    # rack's pinion pitch radius is the design's (module 1.5, 18 teeth); the
+    # torque limits (0.1 % units) are the rack's 55 % (priming needs about
+    # 0.9-1.05 N m of 2.9) and the trigger's 30 % (it stalls against the
+    # safety catch when that is on); the steps at 0 and the directions are
+    # placeholders to set at bring-up (hardware/parts/turret/README.md).
+    actuator_min_m: 0.0
+    actuator_max_m: 0.038
+    actuator_servo_id: 14
+    actuator_zero_steps: 512
+    actuator_direction: 1
+    actuator_pinion_radius_m: 0.0135
+    actuator_torque_limit: 550
+    trigger_min_rad: 0.0
+    trigger_max_rad: 0.6
+    trigger_servo_id: 15
+    trigger_zero_steps: 2048
+    trigger_direction: 1
+    trigger_torque_limit: 300
     # The sts watchdog and 25 Hz position feedback run on the poll_rate_hz
     # timer (default 50 Hz): keep it at 50 Hz or more with sts.

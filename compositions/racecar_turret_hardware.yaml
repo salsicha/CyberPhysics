@@ -13,6 +13,13 @@
 #                   turret_tracker.yaml (lock/release/manual from the UI,
 #                   base-rotation compensation from /imu/data_raw)
 #
+# The foam dart launcher (the priming rack on a third ST3215, ID 14, and the
+# trigger servo, ID 15, on the tilt stage; interfaces.md, "Foam dart
+# launcher") is fitted: TURRET_ACTUATOR_FITTED (default true, as in
+# config/jetson_uart.env) switches it for the bridge and the tracker
+# together; false for a turret without one. It primes and fires only on the
+# UI's Fire, one dart per tap.
+#
 # robot_state_publisher runs the combined URDF (racecar_turret.urdf.xacro,
 # which includes the RACECAR's) and reads the turret joints from
 # /turret/joint_states. The web UI (port 8080) runs with UI_TURRET=1: car
@@ -183,6 +190,7 @@ services:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
       - *dds
       - TURRET_ARDUINO_PORT=${TURRET_ARDUINO_PORT:-/dev/ttyTHS1}
+      - TURRET_ACTUATOR_FITTED=${TURRET_ACTUATOR_FITTED:-true}
     devices:
       - ${TURRET_ARDUINO_PORT:-/dev/ttyTHS1}:${TURRET_ARDUINO_PORT:-/dev/ttyTHS1}
     volumes:
@@ -218,6 +226,7 @@ services:
       python3 /scripts/pantilt_yolo_tracker.py
       --ros-args
       --params-file /workspace/config/turret_tracker.yaml
+      -p actuator_fitted:=${TURRET_ACTUATOR_FITTED:-true}
     healthcheck:
       test: ["CMD-SHELL", "test -f /tmp/pantilt_yolo_ready"]
       interval: 10s

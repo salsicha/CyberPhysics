@@ -3,6 +3,7 @@
 Drives the bridge's real methods with ROS stubbed out and a fake serial port.
 """
 import math
+from array import array
 import sys
 import time
 from types import SimpleNamespace as NS
@@ -11,6 +12,24 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from conftest import REPO, install_ros_stubs, load_script
+
+
+class RclpyJointState:
+    """sensor_msgs/JointState as rclpy keeps it: position an array.array,
+    so concatenating a list to it fails as it does in ROS."""
+
+    def __init__(self):
+        self.header = NS(stamp=None)
+        self.name = []
+        self._position = array('d')
+
+    @property
+    def position(self):
+        return self._position
+
+    @position.setter
+    def position(self, values):
+        self._position = array('d', values)
 
 
 @pytest.fixture(scope='module')
@@ -23,7 +42,7 @@ def module():
         module = load_script(REPO / 'applications/pantiltros/scripts/turret_arduino_bridge.py',
                              'turret_arduino_bridge_review')
         module.Bool = lambda data: NS(data=data)
-        module.JointState = lambda: NS(header=NS(stamp=None), name=[], position=[])
+        module.JointState = RclpyJointState
         yield module
 
 
@@ -86,9 +105,17 @@ def command(pan, tilt):
 def test_parse_position_line(module):
     assert module.parse_position_line('POS pan_joint 0.25 tilt_joint -0.1') == (0.25, -0.1)
     assert module.parse_position_line('POS tilt_joint -0.1 pan_joint 0.25') == (0.25, -0.1)
+    assert module.parse_position_line(
+        'POS pan_joint 0.25 tilt_joint -0.1 actuator_joint 0.07 trigger_joint 0.6') == (
+        0.25, -0.1, 0.07, 0.6)
     for bad in ('POS pan_joint nan tilt_joint 0', 'POS pan_joint 1 tilt_joint',
                 'SET pan_joint 1 tilt_joint 0', 'POS pan_joint x tilt_joint 0',
-                'POS pan_joint 1 pan_joint 2', 'POS pan_joint inf tilt_joint 0'):
+                'POS pan_joint 1 pan_joint 2', 'POS pan_joint inf tilt_joint 0',
+                'POS pan_joint 1 tilt_joint 0 actuator_joint 0.03',  # the launcher comes in pairs
+                'POS pan_joint 1 tilt_joint 0 actuator_joint nan trigger_joint 0',
+                'POS pan_joint 1 tilt_joint 0 actuator_joint 1 actuator_joint 2',
+                'POS pan_joint 1 tilt_joint 0 trigger_joint 1 trigger_joint 2',
+                'POS pan_joint 1 tilt_joint 0 pan_joint 0 trigger_joint 0'):
         assert module.parse_position_line(bad) is None
 
 
@@ -160,3 +187,55 @@ def test_dry_run_is_never_ready(bridge):
     assert not bridge.actuator_ready()
     bridge._joint_command(command(0.1, 0.1))
     assert bridge.serial_handle.written == []
+
+
+def command4(pan, tilt, actuator=None, trigger=None):
+    names, values = ['pan_joint', 'tilt_joint'], [pan, tilt]
+    for name, value in (('actuator_joint', actuator), ('trigger_joint', trigger)):
+        if value is not None:
+            names.append(name)
+            values.append(value)
+    return NS(name=names, position=values)
+
+
+def test_launcher_travels_in_set_lines_when_fitted(bridge):
+    bridge.actuator_fitted = True
+    bridge._joint_command(command4(0.5, 0.1, 0.038, 0.6))
+    bridge._joint_command(command4(0.5, 0.1, 1.0, 5.0))       # clamped
+    bridge._joint_command(command4(0.5, 0.1, 0.02))           # no trigger_joint: 0
+    bridge._joint_command(command4(0.5, 0.1))                 # no launcher: rack stopped
+    bridge._joint_command(command4(0.5, 0.1, trigger=0.6))    # the trigger alone: ignored
+    bridge._joint_command(command4(0.5, 0.1, -0.2, -1.0))
+    assert bridge.serial_handle.written == [
+        'SET pan_joint 0.500000 tilt_joint 0.100000 actuator_joint 0.038000 trigger_joint 0.600000\n',
+        'SET pan_joint 0.500000 tilt_joint 0.100000 actuator_joint 0.038000 trigger_joint 0.600000\n',
+        'SET pan_joint 0.500000 tilt_joint 0.100000 actuator_joint 0.020000 trigger_joint 0.000000\n',
+        'SET pan_joint 0.500000 tilt_joint 0.100000\n',
+        'SET pan_joint 0.500000 tilt_joint 0.100000\n',
+        'SET pan_joint 0.500000 tilt_joint 0.100000 actuator_joint 0.000000 trigger_joint 0.000000\n']
+    bridge._joint_command(command4(0.5, 0.1, 0.02, math.nan))
+    assert len(bridge.serial_handle.written) == 6 and 'non-finite' in bridge.last_error
+    # Measured: the launcher joins the joint states when POS carries it
+    bridge.serial_handle.incoming = (
+        b'POS pan_joint 0.1 tilt_joint -0.2 actuator_joint 0.0375 trigger_joint 0.01\n'
+        b'POS pan_joint 0.1 tilt_joint -0.2\n')
+    bridge._poll()
+    states = [(list(c[0][0].name), list(c[0][0].position))
+              for c in bridge.joint_state_pub.publish.call_args_list]
+    assert states == [(['pan_joint', 'tilt_joint', 'actuator_joint', 'trigger_joint'],
+                       [0.1, -0.2, 0.0375, 0.01]),
+                      (['pan_joint', 'tilt_joint'], [0.1, -0.2])]
+    # The emergency stop's STOP makes the launcher safe in the firmware
+    bridge._emergency_stop(NS(data=True))
+    assert bridge.serial_handle.written[-1] == 'STOP\n'
+
+
+def test_without_a_launcher_lines_and_states_are_unchanged(bridge):
+    bridge._joint_command(command4(0.5, 0.1, 0.070, 0.6))
+    assert bridge.serial_handle.written == ['SET pan_joint 0.500000 tilt_joint 0.100000\n']
+    assert bridge.ignored_actuator_commands == 1
+    bridge.serial_handle.incoming = (
+        b'POS pan_joint 0.1 tilt_joint -0.2 actuator_joint 0.03 trigger_joint 0\n')
+    bridge._poll()
+    state = bridge.joint_state_pub.publish.call_args[0][0]
+    assert (list(state.name), list(state.position)) == (['pan_joint', 'tilt_joint'], [0.1, -0.2])

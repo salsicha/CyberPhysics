@@ -51,6 +51,33 @@ pantilt_yolo_tracker:
     base_compensation: false
     target_lead: false
     lock_tolerance_px: 36.0
+    # Foam dart launcher: compositions/turret_sim.yaml fits the simulated one
+    # (TURRET_ACTUATOR_FITTED); its operator script reloads and fires.
+    actuator_fitted: false
+    launcher_stroke_m: 0.038
+    trigger_fire_rad: 0.6
+    tag_dwell_s: 0.2
+    tag_max_aim_error_deg: 2.0
+    tag_min_interval_s: 2.0
+    tag_stroke_timeout_s: 3.0
+    tag_lock_timeout_s: 0.5
+    auto_next: false
+    darts: 0
+    person_aim_fraction: 0.6
+    person_max_box_fraction: 0.6
+    person_height_m: 1.7
+    # Aim offset for the dart's drop (pitch up, deg, against the camera's
+    # range in m; held at the ends), for a person, whose range comes from
+    # its box height and person_height_m. From the design's drop table at
+    # 25 m/s, level fire (2 m 3.4 cm, 4 m 15 cm, 6 m 36 cm, 8 m 70 cm below
+    # the bore line, from the muzzle 0.098 m ahead of the camera) minus the
+    # bore's 48 mm above the camera's axis: atan((drop - 0.048) / (range +
+    # 0.035)) about the tilt axis. NOMINAL: fit it to chronograph and range
+    # tests on the built launcher. Other classes get no offset.
+    aim_offset_range_m: [2.098, 4.098, 6.098, 8.098]
+    aim_offset_pitch_deg: [-0.38, 1.41, 2.91, 4.58]
+    # No no-fire zone (no_fire_zones_rad): nothing of the standalone turret
+    # is in the dart's path at any pan and tilt (the design's check).
     publish_annotated_image: true
     show_window: false
     window_name: PanTiltROS YOLO

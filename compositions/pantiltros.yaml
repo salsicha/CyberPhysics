@@ -40,6 +40,7 @@ services:
       -p annotated_image_topic:=${TURRET_ANNOTATED_TOPIC:-/turret/yolo/annotated_image}
       -p publish_annotated_image:=${TURRET_PUBLISH_ANNOTATED:-true}
       -p show_window:=${TURRET_SHOW_WINDOW:-false}
+      -p actuator_fitted:=${TURRET_ACTUATOR_FITTED:-false}
     healthcheck:
       test: ["CMD-SHELL", "test -f /tmp/pantilt_yolo_ready"]
       interval: 10s

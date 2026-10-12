@@ -5,6 +5,7 @@ Pure Python (no CadQuery). The geometry itself is checked by
 tests/test_printable_parts_build.py (committed STLs fresh, assembly checks
 passed) in the cad image.
 """
+import math
 import re
 import sys
 from pathlib import Path
@@ -23,6 +24,13 @@ from hardware.parts.turret import _frame as T  # noqa: E402
 
 RACECAR_URDF = REPO / "systems" / "racecarneo" / "urdf" / "racecarneo.urdf.xacro"
 TURRET_URDF = REPO / "systems" / "racecar_turret" / "urdf" / "racecar_turret.urdf.xacro"
+TURRET_MACRO = REPO / "systems" / "racecar_turret" / "urdf" / "turret.urdf.xacro"
+
+
+def _urdf_properties():
+    """xacro properties of the car URDF and the turret macro it includes."""
+    text = TURRET_URDF.read_text() + TURRET_MACRO.read_text()
+    return dict(re.findall(r'<xacro:property name="(\w+)" value="([^"]+)"/>', text))
 SCAN_FILTER = REPO / "systems" / "racecar_turret" / "config" / "scan_filter.yaml"
 
 
@@ -60,8 +68,7 @@ def test_camera_arm_fin_is_inside_the_lidar_blind_range():
 
 
 def test_turret_heights_match_the_racecar_turret_urdf():
-    text = TURRET_URDF.read_text()
-    props = dict(re.findall(r'<xacro:property name="(\w+)" value="([^"]+)"/>', text))
+    props = _urdf_properties()
     mount = [1000.0 * float(v) for v in props["turret_mount_xyz"].split()]
     assert (mount[0], mount[1], mount[2]) == (RT.PLATE_CENTER[0], RT.PLATE_CENTER[1], RT.PLATE_Z[0])
     pan = 1000.0 * float(props["pan_axis_height"])
@@ -71,6 +78,52 @@ def test_turret_heights_match_the_racecar_turret_urdf():
     assert T.TILT_Z + T.PLATE_T_URDF == pytest.approx(pan + tilt)
     assert T.CAMERA_X == pytest.approx(1000.0 * float(props["camera_forward"]))
     assert float(props["pan_limit"]) == pytest.approx(1.5708)
+
+
+def test_launcher_matches_the_turret_urdf():
+    from hardware.parts.turret import _gears as G
+    from hardware.parts.turret import _launcher as L
+    props = _urdf_properties()
+
+    def mm(name):
+        return tuple(1000.0 * float(v) for v in props[name].split())
+    assert mm("launcher_rack_origin") == pytest.approx(T.to_yoke((L.HOOK_X[0], 0.0, L.PT_Z)))
+    assert mm("launcher_prime") == pytest.approx((L.ACT_PRIME,))
+    assert mm("launcher_pinion_radius") == pytest.approx((G.PINION_R,))
+    assert mm("launcher_trigger_origin") == pytest.approx(
+        T.to_yoke((L.TRIG_SHAFT[0], L.TRIG_SHAFT[1] - L.HORN_FACE, L.TRIG_SHAFT[2])))
+    assert float(props["launcher_trigger_fire"]) == pytest.approx(L.TRIG_FIRE_RAD)
+    assert mm("launcher_muzzle_xyz") == pytest.approx(T.to_yoke((L.MUZZLE_X, 0.0, 0.0)))
+
+
+def test_launcher_stays_toy_power():
+    """At most about 30 m/s with a 1.0 g dart, even with the spring 10 %
+    stiff and 35 % of its energy reaching the dart (springers reach 15-30 %)."""
+    from hardware.parts.turret import _launcher as L
+    rate = L.SPRING["rate_n_mm"] * (1 + L.SPRING["rate_tol"])
+    assert L.muzzle_velocity(0.35, rate) <= 30.5
+    assert L.spring_energy_j() < 1.2
+    # The spring never goes solid, the stroke stays inside one servo turn.
+    assert L.SPRING_INSTALLED - L.DRAW_PRIME > L.SPRING["solid_len"] + 10.0
+    assert L.ACT_PRIME / 13.5 < math.radians(200)
+
+
+def test_launcher_feeds_and_catches():
+    from hardware.parts.turret import _launcher as L
+    # The clip's outlet and the chamber take the longest dart; the follower does not pass.
+    assert L.OUTLET[1] - L.OUTLET[0] > L.DART_LEN and L.CHAMBER[1] - L.CHAMBER[0] > L.DART_LEN
+    assert L.OUTLET[3] - L.OUTLET[2] > L.DART_D and L.CLIP_IN_Y[1] - L.CLIP_IN_Y[0] - 0.2 > L.OUTLET[3] - L.OUTLET[2]
+    # The shuttle's travel puts the trough under the outlet; the cam has finished before the sear catches.
+    assert L.shuttle_y(L.ACT_PRIME) == pytest.approx(L.TRAVEL)
+    assert L.CAM_PATH[-2][0] < L.ACT_CATCH < L.ACT_PRIME
+    # The sear's groove meets the sear at the caught draw; the trigger lifts it out; the safety does not.
+    catch, _ = L.groove_x(L.DRAW_CAUGHT)
+    assert catch == pytest.approx(L.SEAR_X[0])
+    lift = L.TRIG_ARM_R * math.sin(L.TRIG_FIRE_RAD) - 2.5
+    assert lift > L.sear_release_lift() + 0.5
+    assert L.SAFETY_GAP < L.sear_release_lift() - 2.0
+    # The rack's hook leaves the collar 3 mm short after a shot.
+    assert L.rod_x(0.0)["collar"][1] == pytest.approx(L.HOOK_X[0] - L.HOOK_GAP)
 
 
 def test_plate_posts_sit_in_the_fin_shadow_and_the_scan_filter_box():

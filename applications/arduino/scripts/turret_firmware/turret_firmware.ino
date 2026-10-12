@@ -1,21 +1,30 @@
-// PanTiltROS turret firmware: two Waveshare ST3215 / Feetech STS3215 serial
-// bus servos (pan and tilt) on a half-duplex adapter at the board's D0/D1
-// UART (Serial1), commanded by applications/pantiltros/scripts/turret_arduino_bridge.py.
+// PanTiltROS turret firmware: Waveshare ST3215 / Feetech STS3215 serial bus
+// servos (pan, tilt and, when fitted, the foam dart launcher's priming rack
+// and trigger) on a half-duplex adapter at the board's D0/D1 UART (Serial1),
+// commanded by applications/pantiltros/scripts/turret_arduino_bridge.py.
 //
 // One sketch, two front ends over the same core (src/turret_core.*):
 //   Arduino UNO R4 WiFi (arduino:renesas_uno:unor4wifi): the bridge's ASCII
 //     line protocol on the USB serial port, 115200 baud
-//       SET pan_joint <rad> tilt_joint <rad> / STOP      host -> firmware
-//       POS pan_joint <rad> tilt_joint <rad> / ERR <text> firmware -> host
+//       SET pan_joint <rad> tilt_joint <rad> [actuator_joint <m>]
+//           [trigger_joint <rad>] / STOP                host -> firmware
+//       POS pan_joint <rad> tilt_joint <rad> [actuator_joint <m> trigger_joint
+//           <rad>] / ERR <text>                         firmware -> host
 //   Arduino UNO Q MCU (arduino:zephyr:unoq): the same messages as RouterBridge
 //     RPC through arduino-router to the board's Linux side
-//       turret/set(pan, tilt) -> bool    turret/stop() -> bool
-//       turret/get_position() -> [pan, tilt], or [] without a fresh reading
-//       notifications turret/pos [pan, tilt] and turret/err [text]
+//       turret/set(pan, tilt) -> bool    (a fitted trigger to 0, the rack stopped)
+//       turret/set_all(pan, tilt, actuator, trigger) -> bool
+//       turret/stop() -> bool
+//       turret/get_position() -> [pan, tilt] or [pan, tilt, actuator, trigger],
+//         or [] without a fresh reading
+//       notifications turret/pos [pan, tilt] or [pan, tilt, actuator, trigger]
+//         and turret/err [text]
 //
-// Both: joint limits, a 500 ms watchdog that holds position when SETs stop,
-// STOP holds the measured position, POS at 25 Hz only from servo replies, and
-// ERR when a servo does not answer. Settings are in src/turret_config.h.
+// Both: joint limits, a 500 ms watchdog that holds pan/tilt, returns the
+// trigger to 0 and stops the rack when SETs stop, the same on STOP, POS at
+// 25 Hz only from servo replies (the launcher only when both its servos
+// answered), and ERR when a servo does not answer. Settings are in
+// src/turret_config.h.
 
 #include "src/turret_config.h"
 
@@ -77,27 +86,44 @@ struct Mailbox {
   bool set_pending;
   float set_pan;
   float set_tilt;
+  bool set_has_launcher;
+  float set_actuator;
+  float set_trigger;
   bool stop_pending;
   bool have_position;
   float pan;
   float tilt;
+  bool have_launcher;
+  float actuator;
+  float trigger;
 };
 
-Mailbox mailbox = {false, 0.0f, 0.0f, false, false, 0.0f, 0.0f};
+Mailbox mailbox = {false, 0.0f, 0.0f, false, 0.0f, 0.0f, false,
+                   false, 0.0f, 0.0f, false, 0.0f, 0.0f};
 struct k_mutex mailbox_lock;
 bool rpc_registered = false;
 uint32_t last_registration_error_ms = 0;
 
-bool rpcSet(float pan, float tilt) {
-  if (!std::isfinite(pan) || !std::isfinite(tilt)) {
+bool post(float pan, float tilt, bool has_launcher, float actuator, float trigger) {
+  if (!std::isfinite(pan) || !std::isfinite(tilt) ||
+      (has_launcher && (!std::isfinite(actuator) || !std::isfinite(trigger)))) {
     return false;
   }
   k_mutex_lock(&mailbox_lock, K_FOREVER);
   mailbox.set_pending = true;
   mailbox.set_pan = pan;
   mailbox.set_tilt = tilt;
+  mailbox.set_has_launcher = has_launcher;
+  mailbox.set_actuator = actuator;
+  mailbox.set_trigger = trigger;
   k_mutex_unlock(&mailbox_lock);
   return true;
+}
+
+bool rpcSet(float pan, float tilt) { return post(pan, tilt, false, 0.0f, 0.0f); }
+
+bool rpcSetAll(float pan, float tilt, float actuator, float trigger) {
+  return post(pan, tilt, true, actuator, trigger);
 }
 
 bool rpcStop() {
@@ -114,6 +140,10 @@ MsgPack::arr_t<float> rpcGetPosition() {
   if (mailbox.have_position) {
     position.push_back(mailbox.pan);
     position.push_back(mailbox.tilt);
+    if (mailbox.have_launcher) {
+      position.push_back(mailbox.actuator);
+      position.push_back(mailbox.trigger);
+    }
   }
   k_mutex_unlock(&mailbox_lock);
   return position;
@@ -121,7 +151,14 @@ MsgPack::arr_t<float> rpcGetPosition() {
 
 class BridgeOutput : public turret::Output {
  public:
-  void position(float pan, float tilt) override { Bridge.notify("turret/pos", pan, tilt); }
+  void position(float pan, float tilt, bool has_launcher, float actuator,
+                float trigger) override {
+    if (has_launcher) {
+      Bridge.notify("turret/pos", pan, tilt, actuator, trigger);
+    } else {
+      Bridge.notify("turret/pos", pan, tilt);
+    }
+  }
   void error(const char* text) override { Bridge.notify("turret/err", MsgPack::str_t(text)); }
 };
 
@@ -133,6 +170,7 @@ void setup() {
   Bridge.begin();
   servo_link.begin(TURRET_SERVO_BAUD);
   rpc_registered = Bridge.provide("turret/set", rpcSet);
+  rpc_registered = Bridge.provide("turret/set_all", rpcSetAll) && rpc_registered;
   rpc_registered = Bridge.provide("turret/stop", rpcStop) && rpc_registered;
   rpc_registered = Bridge.provide("turret/get_position", rpcGetPosition) && rpc_registered;
 }
@@ -143,6 +181,9 @@ void loop() {
   const bool do_set = mailbox.set_pending;
   const float pan = mailbox.set_pan;
   const float tilt = mailbox.set_tilt;
+  const bool has_launcher = mailbox.set_has_launcher;
+  const float actuator = mailbox.set_actuator;
+  const float trigger = mailbox.set_trigger;
   mailbox.stop_pending = false;
   mailbox.set_pending = false;
   k_mutex_unlock(&mailbox_lock);
@@ -151,17 +192,27 @@ void loop() {
     controller.stop(millis());
   }
   if (do_set) {  // after the STOP: a SET that arrived later releases it
-    controller.set(pan, tilt, millis());
+    if (has_launcher) {
+      controller.set(pan, tilt, actuator, trigger, millis());
+    } else {
+      controller.set(pan, tilt, millis());
+    }
   }
   controller.update(millis());
 
   float measured_pan = 0.0f;
   float measured_tilt = 0.0f;
+  float measured_actuator = 0.0f;
+  float measured_trigger = 0.0f;
   const bool have_position = controller.measured(measured_pan, measured_tilt);
+  const bool have_launcher = controller.measuredLauncher(measured_actuator, measured_trigger);
   k_mutex_lock(&mailbox_lock, K_FOREVER);
   mailbox.have_position = have_position;
   mailbox.pan = measured_pan;
   mailbox.tilt = measured_tilt;
+  mailbox.have_launcher = have_launcher;
+  mailbox.actuator = measured_actuator;
+  mailbox.trigger = measured_trigger;
   k_mutex_unlock(&mailbox_lock);
 
   if (!rpc_registered && millis() - last_registration_error_ms >= 2000) {
@@ -177,9 +228,11 @@ void loop() {
 
 class SerialOutput : public turret::Output {
  public:
-  void position(float pan, float tilt) override {
-    char line[64];
-    const size_t len = turret::formatPosition(line, sizeof(line), pan, tilt);
+  void position(float pan, float tilt, bool has_launcher, float actuator,
+                float trigger) override {
+    char line[128];
+    const size_t len = turret::formatPosition(line, sizeof(line), pan, tilt, has_launcher,
+                                              actuator, trigger);
     Serial.write(reinterpret_cast<const uint8_t*>(line), len);
   }
   void error(const char* text) override {
@@ -201,7 +254,8 @@ void handleLine() {
   const turret::Command command = turret::parseLine(reader.line());
   switch (command.type) {
     case turret::Command::kSet:
-      controller.set(command.pan, command.tilt, millis());
+      controller.setJoints(command.pan, command.tilt, command.has_actuator, command.actuator,
+                           command.has_trigger, command.trigger, millis());
       break;
     case turret::Command::kStop:
       controller.stop(millis());

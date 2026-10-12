@@ -1,5 +1,25 @@
 #!/usr/bin/env python3
-"""ROS 2 camera and actuator simulator for the shared PanTiltROS YOLO node."""
+"""ROS 2 camera and actuator simulator for the shared PanTiltROS YOLO node.
+
+With --actuator true the turret also carries the foam dart launcher
+(systems/racecar_turret/interfaces.md, "Foam dart launcher"): actuator_joint
+(the priming rack) and trigger_joint in the joint states and commands, moving
+at the ST3215's speed, with the sear between them (a shot when the trigger is
+driven to the fire angle after the rack was driven to the full draw), the
+trigger to 0 and the rack stopped by the emergency stop and when commands
+stop for 0.5 s (as the firmware does), and /turret/actuator_ready. --tag-at T
+plays the operator: from T seconds on it reloads ({"action": "reload",
+"darts": N}) and, when /turret/status says the Fire button is enabled
+(fire_block ""), presses it ({"action": "tag", "target_id": <locked id>}), up
+to --tag-attempts times, until the clip's N darts are shot; Fire never moves
+the aim. With --tag-lock true it first taps the tracked target's box
+({"action": "lock", "target_id": <id>}), so the tracker follows that one
+detection, which changes the tracking, and acknowledges a launcher fault by
+disarming and arming (0.5 s of /turret/emergency_stop) so it can fire again.
+The report's "launcher" section records the presses, the shots, each shot's
+cycle time and the true aim error at it; the tracking summary and its
+scoring are unchanged.
+"""
 
 from __future__ import annotations
 
@@ -14,7 +34,13 @@ import numpy as np
 import rclpy
 from diagnostic_msgs.msg import DiagnosticArray
 from rclpy.node import Node
-from rclpy.qos import qos_profile_sensor_data
+from rclpy.qos import (
+    DurabilityPolicy,
+    HistoryPolicy,
+    QoSProfile,
+    ReliabilityPolicy,
+    qos_profile_sensor_data,
+)
 from sensor_msgs.msg import CameraInfo, Image, JointState
 from std_msgs.msg import Bool, Float32, Float32MultiArray, String
 
@@ -33,6 +59,28 @@ def image_message(frame: np.ndarray, stamp: Any, frame_id: str) -> Image:
     return msg
 
 
+LATCHED_QOS = QoSProfile(
+    reliability=ReliabilityPolicy.RELIABLE,
+    durability=DurabilityPolicy.TRANSIENT_LOCAL,
+    history=HistoryPolicy.KEEP_LAST,
+    depth=1,
+)
+ACTUATOR_JOINT = "actuator_joint"
+TRIGGER_JOINT = "trigger_joint"
+# How long the operator disarms the turret to acknowledge a launcher fault
+OPERATOR_DISARM_S = 0.5
+# The tracker's contract topics outside the scenario's topic list
+OPERATOR_TOPICS = {
+    "actuator_ready": "/turret/actuator_ready",
+    "command": "/turret/command",
+    "status": "/turret/status",
+}
+
+
+def str2bool(value: str) -> bool:
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+
 def mono_image(msg: Image) -> np.ndarray | None:
     if msg.encoding != "mono8" or msg.step < msg.width:
         return None
@@ -44,12 +92,21 @@ def mono_image(msg: Image) -> np.ndarray | None:
 
 
 class TurretRosSimulator(Node):
+    # Launcher defaults (the metric tests build the node without __init__)
+    actuator_fitted = False
+    tag_at: float | None = None
+
     def __init__(
         self,
         scenario: dict[str, Any],
         output: Path,
         variant: str,
         save_frames: Path | None,
+        actuator: bool = False,
+        tag_at: float | None = None,
+        tag_attempts: int = 10,
+        tag_lock: bool = False,
+        darts: int = 3,
     ) -> None:
         super().__init__("turret_ros_sim")
         self.scenario = scenario
@@ -59,7 +116,12 @@ class TurretRosSimulator(Node):
         if save_frames is not None:
             save_frames.mkdir(parents=True, exist_ok=True)
 
-        self.sim = TurretSim(scenario, variant_name=variant)
+        self.actuator_fitted = actuator
+        self.tag_at = tag_at
+        self.tag_attempts = int(tag_attempts)
+        self.tag_lock = bool(tag_lock)
+        self.darts = int(darts)
+        self.sim = TurretSim(scenario, variant_name=variant, launcher=actuator)
         self.sim.cv2 = cv2
         self.sim.np = np
         self.sim.background = self.sim._render_background()
@@ -126,10 +188,113 @@ class TurretRosSimulator(Node):
         self.create_subscription(
             DiagnosticArray, topics["diagnostics"], self._diagnostics, 10
         )
+        if self.actuator_fitted:
+            self._init_tagging(topics)
         self.timer = self.create_timer(self.dt, self._tick)
         self.get_logger().info(
             f"Turret ROS simulation ready: {self.steps} frames at {1.0 / self.dt:.1f} Hz"
         )
+
+    def _init_tagging(self, topics: dict[str, str]) -> None:
+        names = {key: topics.get(key, default) for key, default in OPERATOR_TOPICS.items()}
+        self.ready_pub = self.create_publisher(Bool, names["actuator_ready"], LATCHED_QOS)
+        self.operator_pub = self.create_publisher(String, names["command"], 10)
+        for qos in (LATCHED_QOS, 10):
+            self.create_subscription(String, names["status"], self._status, qos)
+        self.status: dict[str, Any] | None = None
+        self.status_stamp = -math.inf  # the newest status accepted
+        self.presses: list[dict[str, Any]] = []
+        self.locks: list[dict[str, Any]] = []  # the operator's lock taps
+        self.last_tags: list[dict[str, Any]] = []  # each change of the status's last_tag
+        self.reloaded = False
+        # With --tag-lock: the operator's disarm intervals (start, end) that
+        # acknowledge launcher faults, and the faults acknowledged
+        self.operator_disarms: list[tuple[float, float]] = []
+        self.acknowledged: list[dict[str, Any]] = []
+        # (t, rack, trigger, the status's launcher state)
+        self.launcher_log: list[tuple[float, float, float, str]] = []
+        # Times of commands that prime (the rack further back than it is) or fire
+        self.priming_commands: list[float] = []
+        self.firing_commands: list[float] = []
+
+    def _status(self, msg: String) -> None:
+        try:
+            status = json.loads(msg.data)
+        except json.JSONDecodeError:
+            return
+        if not isinstance(status, dict):
+            return
+        stamp = status.get("stamp")
+        if isinstance(stamp, (int, float)) and not isinstance(stamp, bool):
+            # Both subscriptions get every message, and a copy can arrive
+            # after a newer status: keep only newer ones
+            if stamp <= self.status_stamp:
+                return
+            self.status_stamp = float(stamp)
+        self.status = status
+        last = status.get("last_tag")
+        if isinstance(last, dict) and (not self.last_tags or self.last_tags[-1]["tag"] != last):
+            self.last_tags.append({"t_s": self.current_t, "tag": last})
+
+    def _operate(self) -> None:
+        """The operator: reload, tap the target's box (with --tag-lock), then
+        press Fire when the page would enable it, until the clip is shot.
+        Never a tap while a cycle runs (a lock stops it). With --tag-lock a
+        launcher fault is acknowledged as on the page: disarm, then arm."""
+        status = self.status
+        if self.tag_at is None or self.current_t < self.tag_at or status is None:
+            return
+        if not self.reloaded:
+            self.operator_pub.publish(
+                String(data=json.dumps({"action": "reload", "darts": self.darts}))
+            )
+            self.reloaded = True
+            return
+        results = [entry["tag"].get("result") for entry in self.last_tags]
+        if results.count("fired") >= self.darts or len(self.presses) >= self.tag_attempts:
+            return
+        faults = [entry["t_s"] for entry in self.last_tags if entry["tag"].get("result") == "fault"]
+        if self.tag_lock and len(faults) > len(self.acknowledged):
+            # A fault latches until the turret is disarmed and armed again.
+            # The operator does that half a second later, clearing a primed
+            # launcher by hand first (no shot), as the docs require.
+            if self.current_t - faults[-1] >= 0.5:
+                self.operator_disarms.append((self.current_t, self.current_t + OPERATOR_DISARM_S))
+                self.acknowledged.append({"t_s": self.current_t, "cleared_primed": self.sim.primed})
+                self.sim.primed = False
+                self.get_logger().info(f"operator: disarm and arm at {self.current_t:.2f} s")
+            return
+        if results and results[-1] == "running" or status.get("launcher") != "ready":
+            return  # a cycle is under way, or the launcher is not ready
+        if self.presses and self.current_t - self.presses[-1]["t_s"] < 1.0:
+            return
+        target_id = status.get("target_id")
+        if not (status.get("locked") and target_id):
+            return
+        last_lock = self.locks[-1] if self.locks else None
+        if not self.tag_lock:
+            pass  # press Tag on whatever the tracker follows
+        elif last_lock is None or last_lock["target_id"] != target_id:
+            # Follow this detection by its ID, as a tap on its box does
+            if last_lock is None or self.current_t - last_lock["t_s"] >= 1.0:
+                self.operator_pub.publish(
+                    String(data=json.dumps({"action": "lock", "target_id": target_id}))
+                )
+                self.locks.append({"t_s": self.current_t, "target_id": target_id})
+            return
+        if self.tag_lock and self.current_t - last_lock["t_s"] < 0.3:
+            return
+        if status.get("fire_block") != "":
+            return
+        self.operator_pub.publish(
+            String(data=json.dumps({"action": "tag", "target_id": target_id}))
+        )
+        self.presses.append({
+            "t_s": self.current_t,
+            "target_id": target_id,
+            "aim_error_deg": status.get("aim_error_deg"),
+        })
+        self.get_logger().info(f"operator: fire at {target_id} at {self.current_t:.2f} s")
 
     def _joint_command(self, msg: JointState) -> None:
         positions = dict(zip(msg.name, msg.position))
@@ -139,6 +304,13 @@ class TurretRosSimulator(Node):
         tilt = float(positions["tilt_joint"])
         if not (math.isfinite(pan) and math.isfinite(tilt)):
             return
+        launcher = None  # (rack or None: stop it, trigger)
+        if self.actuator_fitted:
+            rack = positions.get(ACTUATOR_JOINT)
+            trigger = positions.get(TRIGGER_JOINT, 0.0) if rack is not None else 0.0
+            if not all(math.isfinite(value) for value in (rack or 0.0, trigger)):
+                return
+            launcher = (None if rack is None else float(rack), float(trigger))
         if self.sim.command_dropped(self.current_t):
             self.dropped_command_count += 1
             return
@@ -160,6 +332,15 @@ class TurretRosSimulator(Node):
         tilt = max(tilt_limits[0], min(tilt_limits[1], tilt))
         execute_at = self.current_t + float(self.scenario["pantilt"]["command_latency_s"])
         self.sim.command_queue.append((execute_at, pan, tilt))
+        if launcher is not None:
+            # Like the bridge: without actuator_joint the trigger goes to 0
+            # and the rack stops where it is
+            self.sim.launcher_queue.append((execute_at, *launcher))
+            rack, trigger = launcher
+            if rack is not None and rack > self.sim.rack + 1e-9:
+                self.priming_commands.append(self.current_t)
+            if trigger > 0.0:
+                self.firing_commands.append(self.current_t)
 
     def _segments(self, msg: String) -> None:
         try:
@@ -206,7 +387,9 @@ class TurretRosSimulator(Node):
             self._finish()
             return
         self.current_t = round(self.frame_index * self.dt, 6)
-        emergency_stop = self.sim.in_emergency_stop(self.current_t)
+        emergency_stop = self.sim.in_emergency_stop(self.current_t) or any(
+            start <= self.current_t < end for start, end in self.operator_disarms
+        )
         if not emergency_stop:
             self.emergency_stop_started = None
         elif self.emergency_stop_started is None:
@@ -216,6 +399,12 @@ class TurretRosSimulator(Node):
         self._record(ground_truth_masks, emergency_stop)
         stamp = self.get_clock().now().to_msg()
         self._publish_state(stamp, emergency_stop)
+        if self.actuator_fitted:
+            self.launcher_log.append((
+                self.current_t, self.sim.rack, self.sim.trigger,
+                str((self.status or {}).get("launcher", "")),
+            ))
+            self._operate()
         if not self.sim.camera_frame_dropped(self.current_t):
             self.image_pub.publish(
                 image_message(frame, stamp, self.scenario["camera"]["frame_id"])
@@ -268,6 +457,13 @@ class TurretRosSimulator(Node):
         state.position = [self.sim.pan, self.sim.tilt]
         state.velocity = [0.0, 0.0]
         state.effort = [0.0, 0.0]
+        if self.actuator_fitted:
+            # (extend: rclpy keeps these in array.array)
+            state.name.extend([ACTUATOR_JOINT, TRIGGER_JOINT])
+            state.position.extend([self.sim.rack, self.sim.trigger])
+            state.velocity.extend([0.0, 0.0])
+            state.effort.extend([0.0, 0.0])
+            self.ready_pub.publish(Bool(data=not emergency_stop))
         self.joint_state_pub.publish(state)
         self.estop_pub.publish(Bool(data=emergency_stop))
 
@@ -408,13 +604,63 @@ class TurretRosSimulator(Node):
             "topic_contract": self.scenario["topics"],
             "yolo_contract": self.scenario["yolo"],
         }
-        return {
+        report = {
             "scenario": self.scenario["name"],
             "variant": self.variant,
             "target_id": self.sim.target_id,
             "detector": {"backend": "pantiltros:ultralytics"},
             "summary": summary,
             "samples": self.records,
+        }
+        if self.actuator_fitted:
+            report["launcher"] = self._launcher_report()
+        return report
+
+    def _launcher_report(self) -> dict[str, Any]:
+        """The presses, the shots with their cycle times and the true aim
+        error at each, and any priming or firing command that no accepted
+        press explains."""
+        log = self.launcher_log
+        accepted = [entry["t_s"] for entry in self.last_tags
+                    if entry["tag"].get("result") == "running"]
+        window = 15.0  # a cycle (prime, chamber, trigger) ends well within this
+        unexplained = [t for t in self.priming_commands + self.firing_commands
+                       if not any(start - 0.5 <= t <= start + window for start in accepted)]
+        # Ground truth: how far the optical axis was from the true target
+        # when each shot left (a shot at a mis-detected box shows here)
+        truth = {sample["t_s"]: math.degrees(sample["derived"]["angular_error_norm_rad"])
+                 for sample in self.records if sample["derived"]["target_visible"]}
+        shots = []
+        for shot in self.sim.shots:
+            press = max((t for t in accepted if t <= shot), default=None)
+            ready = next((t for t, _, _, state in log
+                          if t > shot and state in ("ready", "empty")), None)
+            shots.append({
+                "t_s": shot,
+                "tag_at_s": press,
+                "press_to_shot_s": None if press is None else round(shot - press, 3),
+                "press_to_ready_s": (None if press is None or ready is None
+                                     else round(ready - press, 3)),
+                "true_aim_error_deg": truth.get(round(shot, 6)),
+            })
+        phases: list[list[Any]] = []
+        for t, _, _, state in log:
+            if state and (not phases or phases[-1][1] != state):
+                phases.append([t, state])
+        return {
+            "locks": self.locks,
+            "presses": self.presses,
+            "acknowledged_faults": self.acknowledged,
+            "last_tag_changes": self.last_tags,
+            "phases": phases,
+            "shots": shots,
+            "max_rack_m": max((rack for _, rack, _, _ in log), default=0.0),
+            "max_trigger_rad": max((trigger for _, _, trigger, _ in log), default=0.0),
+            "priming_command_count": len(self.priming_commands),
+            "firing_command_count": len(self.firing_commands),
+            "unexplained_command_count": len(unexplained),
+            "final_rack_m": log[-1][1] if log else 0.0,
+            "final_trigger_rad": log[-1][2] if log else 0.0,
         }
 
     def _finish(self) -> None:
@@ -423,6 +669,10 @@ class TurretRosSimulator(Node):
         self.output.parent.mkdir(parents=True, exist_ok=True)
         self.output.write_text(json.dumps(report, indent=2) + "\n")
         print(json.dumps(report["summary"], indent=2), flush=True)
+        if "launcher" in report:
+            launcher = {key: value for key, value in report["launcher"].items()
+                        if key not in ("last_tag_changes", "phases")}
+            print(json.dumps({"launcher": launcher}, indent=2), flush=True)
         self.get_logger().info(f"Wrote turret metrics to {self.output}")
         self.timer.cancel()
 
@@ -437,6 +687,20 @@ def main() -> None:
     )
     parser.add_argument("--variant", default="nominal")
     parser.add_argument("--save-frames")
+    parser.add_argument(
+        "--actuator", type=str2bool, default=False,
+        help="fit the dart launcher (true/false)",
+    )
+    parser.add_argument(
+        "--tag-at", type=float,
+        help="from this time (s) on, reload and press Fire when /turret/status enables it",
+    )
+    parser.add_argument("--tag-attempts", type=int, default=10)
+    parser.add_argument(
+        "--tag-lock", type=str2bool, default=False,
+        help="tap the target's box (lock by ID) before each Fire (true/false)",
+    )
+    parser.add_argument("--darts", type=int, default=3, help="the operator's reload")
     args, ros_args = parser.parse_known_args()
     scenario = json.loads(Path(args.scenario).read_text())
     rclpy.init(args=ros_args)
@@ -445,6 +709,11 @@ def main() -> None:
         Path(args.output),
         args.variant,
         Path(args.save_frames) if args.save_frames else None,
+        actuator=args.actuator,
+        tag_at=args.tag_at if args.actuator else None,
+        tag_attempts=args.tag_attempts,
+        tag_lock=args.tag_lock,
+        darts=args.darts,
     )
     try:
         while rclpy.ok() and not node.finished:

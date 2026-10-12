@@ -8,10 +8,15 @@ and its posts, and the checks run by tools/build_printable_parts.py:
     arm's fin already hides them, and whether they lie inside the
     laser_filters box of systems/racecar_turret/config/scan_filter.yaml;
     nothing else may be measured;
-  * pan sweep over +-90 deg against the plate, the posts and the car;
+  * pan sweep over +-90 deg against the plate, the posts and the car
+    (the RealSense and its camera arm included), at both tilt limits and
+    level, with the turret's foam dart launcher cocked and primed;
+  * line of fire: where a dart's path from the muzzle meets the car (a
+    no-fire zone for the tracker);
   * the turret camera's view at pan 0: the tilt below which the car's own
     front sensors enter it;
-  * cable runs (camera, UART, servo bus, 12 V) and the added mass.
+  * cable runs (camera, UART, servo bus, 12 V) and the added mass (the
+    launcher with a full clip included).
 """
 import math
 from pathlib import Path
@@ -21,6 +26,7 @@ from hardware.parts.racecarneo import _checks as C
 from hardware.parts.racecarneo import _frame as R
 from hardware.parts.racecarneo import assembly as car
 from hardware.parts.turret import _frame as T
+from hardware.parts.turret import _launcher as L
 from hardware.parts.turret import assembly as turret
 from hardware.parts.turret._footprints import ArducamB0385
 from hardware.parts.turret._footprints import WaveshareBusServoAdapterA as B
@@ -36,14 +42,16 @@ def to_car(shape):
     return cad.translate(shape, F.TURRET_ORIGIN)
 
 
-def printed_and_models(pan_deg=0.0, tilt_deg=0.0):
-    """[(name, part id or None, shape)] for everything on the car."""
+def printed_and_models(pan_deg=0.0, tilt_deg=0.0, state="cocked"):
+    """[(name, part id or None, shape)] for everything on the car, the
+    turret's launcher in ``state`` (turret.LAUNCHER_STATES)."""
     from hardware.parts.common import cad
     from hardware.parts.racecar_turret import plate_post, post_clip, turret_plate
     out = [(n, stem, s) for n, stem, s in car.printed()]
     out += [(n, None, s) for n, s, _ in car.purchased()]
-    static, pan_st, tilt_st = turret.stages("b0385")
-    turret_ids = {"pan_base", "pan_hub", "tilt_bracket", "camera_yoke", "camera_plate_b0385"}
+    static, pan_st, tilt_st = turret.stages("b0385", state)
+    turret_ids = {"pan_base", "pan_hub", "tilt_bracket", "camera_yoke", "camera_plate_b0385"} | {
+        f"launcher_{s}" for s in L.PRINTED}
     for n, s in static:
         if not n.startswith(TURRET_STATIC_SKIP):
             out.append((f"turret_{n}", n if n in turret_ids else None, to_car(s)))
@@ -97,6 +105,38 @@ def scan_filter_box():
     return None
 
 
+def no_fire_zone(items, pans=None):
+    """[(pan deg, lowest clear tilt deg, body)] where a dart's path
+    (turret.DART_PATH_D, turret.DART_PATH_MM from the muzzle) meets the car
+    at the bottom of the tilt range; the tilt is the first, in 1 deg steps,
+    that clears."""
+    from hardware.parts.common import cad
+    car = [(n, s, s.BoundingBox()) for n, stem, s in items if not n.startswith("turret_")]
+    path0 = turret.dart_path()
+    ox, oy = F.TURRET_ORIGIN[0], F.TURRET_ORIGIN[1]
+    lo = T.TILT_RANGE_DEG[0]
+
+    def hit(tilt, pan):
+        path = cad.rotate(to_car(turret.place_tilt(path0, tilt)), "Z", -pan, about=(ox, oy, 0))
+        pb = path.BoundingBox()
+        for n, s, b in car:
+            if C.bbox_overlap(pb, b) and path.intersect(s).Volume() > 0.01:
+                return n
+        return None
+
+    pans = pans or sorted(set(range(-90, 91, 15)) | set(range(-14, 15, 2)))
+    zone = []
+    for pan in pans:
+        n = hit(lo, pan)
+        if not n:
+            continue
+        tilt = math.ceil(lo)
+        while tilt < 0 and hit(tilt, pan):
+            tilt += 1
+        zone.append((pan, tilt, n))
+    return zone
+
+
 def check(entries=None):
     """Run the assembly checks; returns a report dict ('passed' is the
     overall result)."""
@@ -107,7 +147,8 @@ def check(entries=None):
     bodies = [(n, s) for n, _, s in items]
     press = car.PRESS_FITS + (("turret_pan_servo_horn", "turret_pan_hub", "hub disc on the horn"),
                               ("turret_tilt_servo_horn", "turret_camera_yoke", "yoke hubs on the horns"),
-                              ("post_clip", "plate_post", "clip grips the post"))
+                              ("post_clip", "plate_post", "clip grips the post"),
+                              ("turret_launcher_cam_pin", "turret_launcher_shuttle", "dowel pin pressed into the tab"))
     overlaps, allowed = C.interferences(bodies, press)
     report["bodies"] = len(bodies)
     report["interferences"] = overlaps or "none"
@@ -138,21 +179,44 @@ def check(entries=None):
                                               .format(**box) + "posts at " +
                                               ", ".join(f"({x:g}, {y:g})" for x, y in F.POSTS)) if in_box else outside
 
-    # Pan sweep: the rotating turret against the plate, the posts and the car.
-    static, pan_st, tilt_st = turret.stages("b0385")
-    movers0 = [(n, to_car(s)) for n, s in pan_st if not n.startswith("pan_servo_horn")]
-    movers0 += [(n, to_car(turret.place_tilt(s, 0.0))) for n, s in tilt_st]
+    # Pan sweep: the rotating turret against the plate, the posts and the
+    # car, at both tilt limits and level, launcher cocked and primed.
     car_static = [(n, s) for n, stem, s in items if not n.startswith("turret_") or n.startswith(
         ("turret_pan_base", "turret_pan_servo_case", "turret_base_bolt", "turret_pan_servo_screw"))]
-    worst = (math.inf, None, None)
+    worst = (math.inf, None, None, None, None)
     ox, oy = F.TURRET_ORIGIN[0], F.TURRET_ORIGIN[1]
-    for a in range(-int(T.PAN_LIMIT_DEG), int(T.PAN_LIMIT_DEG) + 1, 15):
-        movers = [(n, cad.rotate(s, "Z", -a, about=(ox, oy, 0))) for n, s in movers0]
-        d, pair = turret._min_distance(movers, car_static)
-        if d < worst[0]:
-            worst = (d, pair, a)
-    report["pan_sweep"] = f"clear over +-{T.PAN_LIMIT_DEG:g} deg; smallest gap {worst[0]:.1f} mm ({worst[1]} at {worst[2]:+d} deg)"
-    pan_ok = worst[0] >= turret.MIN_CLEARANCE_MM
+    for tilt, ext in turret.tilt_poses():
+        static, pan_st, tilt_st = turret.stages("b0385", ext)
+        movers0 = [(n, to_car(s)) for n, s in pan_st if not n.startswith("pan_servo_horn")]
+        movers0 += [(n, to_car(turret.place_tilt(s, tilt))) for n, s in tilt_st]
+        for a in range(-int(T.PAN_LIMIT_DEG), int(T.PAN_LIMIT_DEG) + 1, 15):
+            movers = [(n, cad.rotate(s, "Z", -a, about=(ox, oy, 0))) for n, s in movers0]
+            d, pair = turret._min_distance(movers, car_static)
+            if d < worst[0]:
+                worst = (d, pair, a, tilt, ext)
+    report["pan_sweep"] = (f"clear over +-{T.PAN_LIMIT_DEG:g} deg at both tilt limits and level, launcher cocked "
+                           f"and primed; smallest gap {worst[0]:.1f} mm ({worst[1]} at {worst[2]:+d} deg, tilt "
+                           f"{worst[3]:+.0f}, {worst[4]})")
+    # The launcher against the car's own sensors and posts (not the turret's
+    # pan base, which the line above covers), and a dart's path against the car.
+    car_only = [(n, s) for n, s in car_static if not n.startswith("turret_")]
+    near = (math.inf, None)
+    for tilt, st in turret.tilt_poses():
+        _, _, tilt_st = turret.stages("b0385", st)
+        act = [(n, to_car(turret.place_tilt(s, tilt))) for n, s in tilt_st if n.startswith(("launcher_", "act_", "trig_"))]
+        for a in range(-int(T.PAN_LIMIT_DEG), int(T.PAN_LIMIT_DEG) + 1, 15):
+            d, pair = turret._min_distance([(n, cad.rotate(s, "Z", -a, about=(ox, oy, 0))) for n, s in act], car_only)
+            if d < near[0]:
+                near = (d, f"{pair} at pan {a:+d}, tilt {tilt:+.0f}, {st}")
+    report["launcher_to_car_mm"] = f"{near[0]:.0f} at the closest ({near[1]})"
+    # Line of fire: where a dart's path from the muzzle meets the car (the
+    # RealSense and its arm in front, at steep nose-down tilts). Reported as
+    # a no-fire zone for the tracker, not a fault of the assembly.
+    zone = no_fire_zone(items)
+    report["line_of_fire"] = ("a dart's path clears the car at every pan and tilt" if not zone else
+                              "no-fire zone (the path meets the car): " + "; ".join(
+                                  f"pan {a:+d} deg below tilt {tc:+.0f} deg ({n})" for a, tc, n in zone))
+    pan_ok = worst[0] >= turret.MIN_CLEARANCE_MM and near[0] >= turret.MIN_CLEARANCE_MM
 
     # Turret camera view at pan 0: where the car enters it.
     _, front_x = turret.lens_front()
@@ -188,7 +252,17 @@ def check(entries=None):
 
     m = {stem: e.get("estimate", {}).get("mass_g", 0.0) for stem, e in entries.items()}
     printed_g = sum(m.get(stem, 0.0) for _, stem, _ in items if stem in ("turret_plate", "plate_post", "post_clip"))
-    report["added_mass_g"] = round(printed_g + 2 * turret.MASS_G["servo"] + turret.MASS_G["b0385"] + 150.0)
+    # The launcher's printed parts are the turret platform's: their estimates
+    # come from its committed manifest.
+    import json
+    manifest = REPO / "hardware" / "parts" / "turret" / "stl" / "manifest.json"
+    tm = {e["id"]: e.get("estimate", {}).get("mass_g", 0.0) for e in json.loads(manifest.read_text())["parts"]} \
+        if manifest.exists() else {}
+    launcher_g = (sum(tm.get(f"launcher_{s}", 0.0) for s in L.PRINTED if s != "muzzle_cap")
+                  + 2 * turret.MASS_G["servo"] + L.SPRING["mass_g"] + L.BARREL["mass_g"]
+                  + turret.MASS_G["launcher_hardware"] + L.CLIP_DARTS * L.DART_MASS_G)
+    total = printed_g + 2 * turret.MASS_G["servo"] + turret.MASS_G["b0385"] + 150.0 + launcher_g
+    report["added_mass_g"] = f"{total:.0f} (the launcher with a full clip {launcher_g:.0f} of it)"
     report["passed"] = (not overlaps and not visible and in_box and pan_ok)
     return report
 

@@ -12,9 +12,12 @@
 # On the UNO Q, from a checkout of this repository (builds the image on the
 # board on first start):
 #   docker compose -f compositions/turret_uno_q.yaml --profile board up -d
-# On the GPU host:
+# On the GPU host (tracker and the turret-only operator page on port 8080):
 #   docker compose -f compositions/turret_uno_q.yaml --profile host up
 #   (add --profile realsense for the repository's RealSense camera)
+# TURRET_ACTUATOR_FITTED (default true, as in config/arduino_uno_q.env)
+# switches the foam dart launcher for the bridge and the tracker; set it the
+# same on both machines.
 # Do not also run turret_hardware.yaml: its serial bridge would publish a
 # second /turret/actuator_ready.
 
@@ -43,6 +46,7 @@ services:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
       - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
       - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+      - TURRET_ACTUATOR_FITTED=${TURRET_ACTUATOR_FITTED:-true}
     volumes:
       # arduino-router's socket (root:root, 0666 with arduino-router 0.5.3;
       # the container runs as root anyway). Long syntax so a missing socket
@@ -68,6 +72,12 @@ services:
     extends:
       file: turret_hardware.yaml
       service: pantilt_yolo
+
+  turret_ui:
+    profiles: ["host"]
+    extends:
+      file: turret_hardware.yaml
+      service: turret_ui
 
   turret_realsense:
     profiles: ["realsense"]

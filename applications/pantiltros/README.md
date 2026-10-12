@@ -170,6 +170,158 @@ now also carries a stable `id` (string), `bbox_xyxy` (corners), `selected`
 detection of the same class continues within one box diagonal of the last
 position, and through gaps up to `track_timeout_s` (1 s).
 
+## Foam dart launcher
+
+Both turrets (this one and the RACECAR Turret's) carry a 3D-printed
+spring-plunger foam dart launcher on the tilt stage that the operator fires
+once per target ("tag"): Nerf Elite-size foam darts at toy power only (at
+most about 30 m/s, checked with a chronograph at bring-up), eye protection
+for everyone in range. The contract is `systems/racecar_turret/interfaces.md`,
+"Foam dart launcher"; the printed design is `hardware/parts/turret/_launcher.py`.
+Two joints: the priming rack (`actuator_joint`, metres, 0 forward; a third
+ST3215, ID 14, on a 13.5 mm pinion) and the trigger (`trigger_joint`,
+radians, 0 safe; a fourth ST3215, ID 15). The rack primes at 0.038 m
+(`launcher_stroke_m`; the sear catches the plunger from 0.03425 m) and the
+trigger fires at 0.6 rad (`trigger_fire_rad`; it lifts the sear 5.4 mm,
+and 4.45 mm, about 0.52 rad, releases it). With `actuator_fitted`
+(default false; the hardware compositions set it from
+`TURRET_ACTUATOR_FITTED`, default true there) the tracker adds both to its
+joint commands.
+
+Commands on `/turret/command`:
+
+- `{"action": "tag", "target_id": "7"}`: fire one dart at the locked target:
+  prime (the rack back past the sear), chamber (the rack
+  forward), fire (the trigger to the fire angle, held `tag_dwell_s`), the
+  trigger back to 0, then the shot is recorded and a dart is counted off.
+  Only when all of these hold, else it is refused with the reason
+  (`last_tag.result` `refused`, the status message and `fire_block`): the ID
+  is the locked target's (a stale tap is refused), the turret is armed and
+  `/turret/actuator_ready` is fresh and true, the last frame (within
+  `tag_lock_timeout_s`) shows the target locked with an aim error under
+  `tag_max_aim_error_deg` at its aim point, a person is not too close, the
+  launcher is at rest (rack forward, trigger at 0, measured) with no cycle
+  running, no latched fault and darts left, the line of fire is clear (see
+  below), and `tag_min_interval_s` has passed since the last shot.
+- `{"action": "reload", "darts": N}`: the clip count (`darts`, 0 at start-up).
+- `{"action": "next"}`: lock the untagged detection nearest the image centre
+  (aim only). With `auto_next` the tracker does that after each shot; it
+  never fires by itself.
+- `{"action": "clear_tags"}`: empty the tagged set.
+- `{"action": "auto_next", "enabled": true}`: switch `auto_next` (the UI's
+  toggle).
+
+Aim point: with the launcher, a `person` is aimed at, and its aim error and
+lock measured at, its torso: `person_aim_fraction` (0.6) of the box height
+from the top, never the head. A person box taller than
+`person_max_box_fraction` (0.6) of the image is "too close" (closer than
+about 2.7 m for a 1.7 m person with the RACECAR Turret's camera, fy 457 px
+at 640x480). Other classes keep the mask's centroid.
+
+The dart's drop is compensated by an aim offset for a person:
+`aim_offset_pitch_deg` (up) against `aim_offset_range_m` (from the camera),
+interpolated and held at the table's ends, the range estimated from the
+person's box height, `person_height_m` (1.7 m) and the camera's focal
+length. Other classes get no offset (their range is not known). The
+launcher profiles (`config/yolo_tracker*.yaml`,
+`systems/racecar_turret/config/turret_tracker.yaml`) carry the design's
+table: its drop below the bore line at 25 m/s, level fire (2 m 3.4 cm,
+4 m 15 cm, 6 m 36 cm, 8 m 70 cm from the muzzle, which is 0.098 m ahead of
+the camera), less the bore's 48 mm above the camera's axis, as a pitch
+about the tilt axis: -0.38 deg at 2.1 m (the bore's height wins: aim
+lower), 1.41 at 4.1 m, 2.91 at 6.1 m, 4.58 at 8.1 m. It is nominal: fit it
+to chronograph and range tests on the built launcher (shoot at a target at
+measured ranges, record where the darts land, and set the offsets that put
+them on the aim point). The tracker's default table is all zero. Without
+a launcher the aim is the centroid as before.
+
+Line of fire: `no_fire_zones_rad` lists boxes of pan and tilt (pan_min,
+pan_max, tilt_min, tilt_max, radians, four values per box) where a dart
+would hit the vehicle, widened by `no_fire_margin_rad` (0.05) for the
+turret's motion during the trigger's pull and the servos' lag. Firing is
+refused there ("line of fire blocked") while the measured pan and tilt, or
+the turret's current command, is in a box: before priming, and again from
+the moment of firing (the dart chambered) until the sear releases. Blocked
+at that moment is a fault with the launcher cocked (clear it by hand, as
+after any fault); blocked during the trigger's pull returns the trigger to
+0 at once and counts the dart as possibly gone. No joint command carries
+the trigger off 0 while the line is blocked, and without a fresh joint
+state the line counts as blocked. The RACECAR Turret's profiles set the
+car's zone (pan -0.17 to 0.26 rad with the tilt below -0.42 rad, where a
+dart hits the car's RealSense or camera arm); the standalone turret has
+none (its base clears the dart's path at every pan and tilt). The default
+is none.
+
+Each step is verified against the measured joints in `/turret/joint_states`
+(the rack within 2 mm, the trigger within 0.05 rad): a step not reached
+within `tag_stroke_timeout_s` (3 s; the 38 mm draw takes 0.92 s at the
+servo speed), or no measured position, is a fault. A shot leaves 2.0 s
+after Fire and the launcher is ready again after 2.5 s (on the turret
+simulator's launcher model, `tests/test_turret_launcher.py`), so with the
+2 s minimum interval a clip goes at about one dart every 4.5 s. Loaded
+(priming needs about 0.9-1.05 N m of the servo's 2.9), the rack may run
+slower than the commanded speed: measure the cycle at bring-up. With the
+safety catch on, the trigger stalls against it and the cycle faults ("trigger
+not reached"). The commanded draw and
+fire angle are also bounded in time: never longer than that timeout (plus
+the hold for the trigger) after the step began. A cycle in progress stops
+on the emergency stop, the actuator going not ready, any `lock`, `release`,
+`manual`, `center` or `next` command, the target not seen locked for
+`tag_lock_timeout_s`, and the tracker shutting down. Stopping, like a fault,
+returns the trigger to 0 and stops the rack where it is (a command without
+`actuator_joint`, which the bridge and firmware hold at the rack's present
+position; never a stale measurement of it), and the fault latches (status
+`launcher` `fault`, Fire refused) until the operator disarms and re-arms;
+the launcher is then returned to rest under supervision. A stop after the
+trigger released completes as a shot. After a fault the launcher may still
+be primed (the sear holds the plunger, the trigger at 0): put the safety
+catch on and clear it by hand before re-arming. A launcher found away from
+rest with no cycle running is returned to rest the same way. While the
+launcher is not verified at rest, commands carrying its goals go out at
+least every 0.1 s (holding pan and tilt), so the bridge's 500 ms watchdog
+never interrupts a cycle and does make it safe when the tracker stops.
+
+After a shot the target's ID joins the tagged set. `/turret/status` adds:
+
+```json
+{"launcher": "ready", "darts": 5, "tags": 1, "tagged_ids": ["7"],
+ "last_tag": {"target_id": "7", "result": "fired", "reason": "", "stamp": 1240.2},
+ "fire_block": "", "auto_next": false}
+```
+
+`launcher` is `none` (not fitted), `ready`, `priming`, `chambering`,
+`firing`, `empty` (ready, no darts) or `fault` (latched, returning to rest,
+or no measured position); `last_tag.result` is `refused`, `running`,
+`fired` or `fault`; `fire_block` is why firing at the locked target would be
+refused now (`""` when it would not; the UI's Fire button follows it).
+Parameters, with their defaults: `launcher_stroke_m` 0.038,
+`trigger_fire_rad` 0.6, `tag_dwell_s` 0.2 (the trigger's hold),
+`tag_max_aim_error_deg` 2.0, `tag_min_interval_s` 2.0,
+`tag_stroke_timeout_s` 3.0, `tag_lock_timeout_s` 0.5, `auto_next` false,
+`darts` 0, `person_aim_fraction` 0.6, `person_max_box_fraction` 0.6,
+`person_height_m` 1.7, `aim_offset_range_m` [1, 10], `aim_offset_pitch_deg`
+[0, 0] (the profiles set the drop table), `no_fire_zones_rad` [0, 0, 0, 0]
+(none), `no_fire_margin_rad` 0.05. Without a launcher the joint commands keep two joints and every fire
+command is refused ("no launcher").
+
+Safety: nothing but a `tag` command naming the locked target, with every
+gate holding, primes or fires the launcher; there is no automatic, timed or
+on-lock firing and no option for one. `tests/test_turret_launcher.py`
+checks it: random sessions of every other command, detections, joint states
+(also with the launcher found away from rest), e-stop and readiness toggles,
+IMU messages and timer ticks never produce a command that moves the trigger
+off 0 or the rack further back than it is, and the simulated sear never
+releases; with tag commands mixed in, every priming or firing command and
+every shot follows an accepted tag whose gates held, within its time bound;
+the stops (e-stop, release and the other aim commands, lock loss,
+readiness, faults, shutdown) leave the trigger at 0 and the rack stopped;
+a turret sweeping through a random no-fire zone while Fire is pressed
+over and over never releases a dart inside it; and a structural check of
+the source finds priming and firing reachable only from the tag handler,
+and firing entered only with the line of fire clear. The firmware, the bridge and the simulator return
+the trigger to 0 and stop the rack on STOP, the e-stop and the 500 ms
+watchdog.
+
 ## Run
 
 Run against the ROS camera and actuator topics already on the host:
@@ -212,6 +364,11 @@ Run on the Arduino turret with an existing ROS camera:
 docker compose -f compositions/turret_hardware.yaml up --build
 ```
 
+Its `turret_ui` service serves the operator page in its turret-only layout
+on port 8080 (`applications/nicegui`): the camera with the tracker's boxes
+(tap one to lock it), Release, Center, the aim joystick, Arm/Disarm and the
+dart launcher's Fire, Reload, Next, Clear tags and auto-next.
+
 With an Arduino UNO Q instead of the UNO R4 WiFi, the bridge runs on the
 board and the tracker on the GPU host (same `ROS_DOMAIN_ID`); see
 `hardware/turret.md`:
@@ -220,6 +377,8 @@ board and the tracker on the GPU host (same `ROS_DOMAIN_ID`); see
 docker compose -f compositions/turret_uno_q.yaml --profile board up -d   # on the UNO Q
 docker compose -f compositions/turret_uno_q.yaml --profile host up       # on the host
 ```
+
+The `host` profile includes the turret-only operator page (`turret_ui`).
 
 Add the repository's RealSense service when it supplies the camera:
 
@@ -252,13 +411,27 @@ startup and persists in `cache/turret/models/`.  Override it with
   `/turret/target/selected_id` (the configured `target_id` while following the
   start-up selection, the detection ID after a lock), `/turret/target/locked`
 - Output: `/turret/joint_commands`, `/turret/status`, `/turret/diagnostics`
+- With `actuator_fitted`: `actuator_joint` (the launcher's rack, metres) and
+  `trigger_joint` (radians) in `/turret/joint_states` and
+  `/turret/joint_commands`
 
 The Arduino bridge (`scripts/turret_arduino_bridge.py`) uses
 `config/arduino.env` and `config/arduino_bridge.yaml`. It writes
 `SET pan_joint <rad> tilt_joint <rad>` lines for joint commands and `STOP` when
 the emergency stop engages, and publishes `/turret/joint_states` only from
 `POS pan_joint <rad> tilt_joint <rad>` lines sent by the firmware; it never
-echoes commands as joint states. Commands arriving while the port is closed,
+echoes commands as joint states. With the dart launcher
+(`TURRET_ACTUATOR_FITTED=true` in the env files, the bridge's
+`actuator_fitted` parameter; limits and servo settings are `actuator_*` and
+`trigger_*` in `config/arduino_bridge.yaml`) a joint command that carries
+`actuator_joint` becomes `SET ... actuator_joint <m> trigger_joint <rad>`,
+both clamped to their limits (the rack 0..0.038 m, the trigger 0..0.6 rad),
+the trigger at 0 when the command does not carry it; one without
+`actuator_joint` is a `SET` of pan and tilt only, which returns the trigger
+to 0 and stops the rack where it is. `POS` lines carry both when both servos
+answered, and they then join the joint states; `STOP` and the firmware's
+watchdog return the trigger to 0 and stop the rack. Without a launcher, a
+command's launcher joints are ignored (counted in the diagnostics). Commands arriving while the port is closed,
 the Arduino is resetting, or the e-stop is engaged are dropped, not queued.
 `/turret/actuator_ready` is true only while commands are being written. The
 firmware is `applications/arduino/scripts/turret_firmware` (UNO R4 WiFi and
@@ -275,8 +448,10 @@ link:
   (`config/arduino_uno_q.env`, `compositions/turret_uno_q.yaml`). The same
   messages travel as msgpack-RPC through arduino-router's Unix socket
   (`router_socket`, default `/var/run/arduino-router.sock`) to the MCU:
-  requests `turret/set [pan, tilt]` and `turret/stop`, notifications
-  `turret/pos [pan, tilt]` and `turret/err [text]`. The bridge registers for
+  requests `turret/set [pan, tilt]` (`turret/set_all [pan, tilt, actuator,
+  trigger]` with the launcher) and `turret/stop`, notifications `turret/pos
+  [pan, tilt]` (`[pan, tilt, actuator, trigger]` when both launcher servos
+  answered) and `turret/err [text]`. The bridge registers for
   the notifications, probes the MCU with `turret/get_position` every second,
   and is ready only while the MCU answers (an RPC unanswered for
   `rpc_timeout_s`, 0.5 s, or a sketch that is not running makes it not ready).
@@ -300,7 +475,20 @@ link:
   `config/arduino_bridge.yaml` (`pan_servo_id` 12, `tilt_servo_id` 13,
   `*_zero_steps` 2048 and `*_direction` -1 for the `pan_tilt_ros`
   convention, `servo_speed` 2000 steps/s, `servo_acceleration` 50,
-  `servo_reply_timeout_s`, `stop_disables_torque`). The port opens
+  `servo_reply_timeout_s`, `stop_disables_torque`; the launcher's rack
+  `actuator_servo_id` 14, `actuator_pinion_radius_m` 0.0135 (the design's),
+  `actuator_torque_limit` 550 (55 %: priming needs about 0.9-1.05 N m of
+  the servo's 2.9), `actuator_zero_steps` and `actuator_direction`
+  (placeholders, set at bring-up), and its trigger `trigger_servo_id` 15,
+  `trigger_torque_limit` 300 (30 %: it stalls against the safety catch when
+  that is on), `trigger_zero_steps`, `trigger_direction` (placeholders);
+  the torque limits go to the servos' torque limit register at every
+  torque enable, and also cap the stall current). With the
+  launcher, its servos move in the same sync write; `STOP` and the 500 ms
+  hold return the trigger to 0 and stop the rack while pan and tilt hold
+  (`stop_disables_torque` applies to pan and tilt only), and a silent
+  launcher servo is reported like the others while pan and tilt positions
+  keep flowing. The port opens
   exclusively and is ready at once (no board reset to wait for); topics,
   e-stop handling and `/turret/actuator_ready` are those of the serial
   transport, and the diagnostics add `servo_ids`, `servo_state` and

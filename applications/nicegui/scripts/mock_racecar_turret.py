@@ -14,12 +14,20 @@ It acts on what the page sends (systems/racecar_turret/interfaces.md):
 NavigateToPose goals (an action server that drives straight to the goal,
 with feedback and cancel), /cmd_vel_teleop (priority, 0.5 s timeout),
 /racecarneo/stop_request, /turret/command (lock by id or point, release,
-manual, center) on a simulated pan/tilt turret whose view the people move
-through, and /turret/emergency_stop (engaged until a false arrives, like
-the tracker). --command-log FILE appends every command received as a JSON
-line, for scripted checks; --static keeps the people still.
+manual, center, and the dart launcher's tag (fire), next, clear_tags,
+reload and auto_next) on a simulated pan/tilt turret whose view the people
+move through, and /turret/emergency_stop (engaged until a false arrives,
+like the tracker). The launcher runs the tracker's fire cycle (prime the
+rack, chamber, trigger, trigger back, at the ST3215's speed) behind the
+contract's gates (a person aimed at the torso; too close above 0.6 of the
+image; the car's no-fire zone, aiming low ahead), with actuator_joint and
+trigger_joint in /turret/joint_states and
+the status fields; a refused fire says why. --command-log FILE appends every
+command received as a JSON line, for scripted checks; --static keeps the
+people still; --no-actuator plays a turret without a launcher.
 
     python3 mock_racecar_turret.py [--command-log FILE] [--no-control-status] [--static]
+                                   [--no-actuator]
 """
 import argparse
 import json
@@ -52,6 +60,17 @@ PAN_LIMIT, TILT_MIN, TILT_MAX, MAX_RATE = 1.5708, -0.65, 0.75, 1.5
 WHEELBASE, MAX_SPEED = 0.33, 0.35
 # People around the car: azimuth (rad, positive right of the car's heading),
 # elevation of the box centre (rad), distance (m), drift (rad/s), colour.
+# The dart launcher: the rack's draw and the trigger's fire angle, the
+# ST3215's speed (the rack on the 13.5 mm pinion), and the tracker's defaults
+# for the gates and the cycle, with the car's no-fire zone (pan_min, pan_max,
+# tilt_min, tilt_max, and its margin; systems/racecar_turret/config/
+# turret_tracker.yaml)
+STROKE, FIRE_RAD = 0.038, 0.6
+NO_FIRE_ZONE, NO_FIRE_MARGIN = (-0.17, 0.26, -1.5708, -0.42), 0.05
+SERVO_RAD_S = 2000 * 2 * math.pi / 4096
+RACK_SPEED = SERVO_RAD_S * 0.0135
+TRIGGER_HOLD_S, MAX_AIM_ERROR_DEG, MIN_INTERVAL_S, LOCK_ERROR_DEG = 0.2, 2.0, 2.0, 3.0
+PERSON_AIM_FRACTION, PERSON_MAX_BOX_FRACTION = 0.6, 0.6
 PEOPLE = [
     {'id': '3', 'class': 'person', 'az': -0.25, 'el': 0.0, 'dist': 4.0, 'drift': 0.05, 'rgb': (230, 80, 60)},
     {'id': '7', 'class': 'person', 'az': 0.15, 'el': -0.02, 'dist': 6.0, 'drift': -0.03, 'rgb': (70, 160, 240)},
@@ -80,6 +99,19 @@ class MockRacecarTurret(Node):
         self.message = 'waiting for the emergency stop to be released'
         self.people = [dict(person) for person in PEOPLE]
         self.detections = []
+        # Dart launcher
+        self.actuator_fitted = not args.no_actuator
+        self.rack = self.trigger = 0.0
+        self.phase = 'ready'  # ready, priming, chambering, firing, resetting, fault
+        self.phase_time = 0.0
+        self.cycle_target = ''
+        self.fault = ''
+        self.darts = 0
+        self.tagged_ids = []
+        self.last_tag = None
+        self.auto_next = False
+        self.last_cycle_end = -math.inf
+        self.last_locked = -math.inf
 
         group = ReentrantCallbackGroup()
         self.tf = TransformBroadcaster(self)
@@ -296,9 +328,12 @@ class MockRacecarTurret(Node):
             if self.estop:
                 self.mode, self.manual, self.centering = 'estop', None, False
                 self.message = 'emergency stop engaged'
+                self.abort_tag('emergency stop')
             elif self.mode == 'estop':
                 self.mode = 'auto' if self.target_id else 'idle'
                 self.message = ''
+                if self.phase == 'fault':  # disarming and arming acknowledges a fault
+                    self.phase, self.fault = 'ready', ''
 
     def on_turret_command(self, msg):
         try:
@@ -310,7 +345,24 @@ class MockRacecarTurret(Node):
             return
         action = command.get('action')
         with self.lock:
-            if action == 'manual':
+            if action in ('lock', 'release', 'manual', 'center', 'next'):
+                self.abort_tag(f'{action} command')
+            if action == 'tag':
+                self.tag(command.get('target_id'))
+            elif action == 'next':
+                self.next_target()
+            elif action == 'clear_tags':
+                self.tagged_ids, self.message = [], 'tags cleared'
+            elif action == 'reload':
+                darts = command.get('darts')
+                if isinstance(darts, int) and not isinstance(darts, bool) and darts >= 0 \
+                        and not self.cycle_target:
+                    self.darts, self.message = darts, f'reloaded: {darts} darts'
+                else:
+                    self.message = 'reload needs darts: a whole number from 0'
+            elif action == 'auto_next' and isinstance(command.get('enabled'), bool):
+                self.auto_next = command['enabled']
+            elif action == 'manual':
                 self.manual = (time.monotonic(), float(command.get('pan_rate', 0.0)),
                                float(command.get('tilt_rate', 0.0)))
                 self.target_id, self.centering = '', False
@@ -335,11 +387,147 @@ class MockRacecarTurret(Node):
     def set_mode(self, mode):
         self.mode = 'estop' if self.estop else mode
 
-    def detection_at(self, x, y):
-        hits = [d for d in self.detections
-                if abs(x - d['bbox_xywh'][0]) <= d['bbox_xywh'][2] / 2
-                and abs(y - d['bbox_xywh'][1]) <= d['bbox_xywh'][3] / 2]
-        return min(hits, key=lambda d: math.hypot(x - d['bbox_xywh'][0], y - d['bbox_xywh'][1]), default=None)
+    # --- Dart launcher (the tracker's fire cycle and gates, simplified) ----
+
+    def aim_point(self, detection):
+        """A person's torso (never the head), else the box centre; and
+        whether a person is too close."""
+        u, v, _, h = detection['bbox_xywh']
+        if detection['class'] != 'person':
+            return (u, v), False
+        return (u, v - h / 2 + PERSON_AIM_FRACTION * h), h > PERSON_MAX_BOX_FRACTION * HEIGHT
+
+    def target_detection(self):
+        return next((d for d in self.detections if d['id'] == self.target_id), None)
+
+    def aim_error(self):
+        target = self.target_detection()
+        if target is None:
+            return None
+        (u, v), _ = self.aim_point(target) if self.actuator_fitted else (target['bbox_xywh'][:2], 0)
+        return math.degrees(math.atan(math.hypot(u - WIDTH / 2, v - HEIGHT / 2) / FX))
+
+    def launcher_state(self):
+        if not self.actuator_fitted:
+            return 'none'
+        if self.phase == 'resetting':
+            return 'firing'
+        if self.phase == 'ready':
+            return 'ready' if self.darts > 0 else 'empty'
+        return self.phase
+
+    def fire_refusal(self, target_id):
+        if not self.actuator_fitted:
+            return 'no launcher'
+        if self.estop:
+            return 'emergency stop engaged'
+        if self.mode != 'auto' or not self.target_id:
+            return 'no locked target'
+        if not target_id:
+            return "tag needs the locked target's target_id"
+        if str(target_id) != self.target_id:
+            return f'{target_id} is not the locked target ({self.target_id})'
+        error = self.aim_error()
+        if error is None or error >= LOCK_ERROR_DEG:
+            return f'{target_id} is not locked'
+        if self.aim_point(self.target_detection())[1]:
+            return 'too close'
+        if error >= MAX_AIM_ERROR_DEG:
+            return f'aim error over {MAX_AIM_ERROR_DEG:g} deg'
+        if self.phase == 'fault':
+            return f'launcher fault: {self.fault}'
+        if self.cycle_target:
+            return 'a fire cycle is running'
+        if self.phase != 'ready' or self.rack > 0.002 or self.trigger > 0.05:
+            return 'launcher not at rest'
+        if self.darts <= 0:
+            return 'no darts'
+        if self.line_of_fire_blocked():
+            return 'line of fire blocked'
+        wait = MIN_INTERVAL_S - (time.monotonic() - self.last_cycle_end)
+        if wait > 0:
+            return f'{wait:.1f} s to the next shot'
+        return ''
+
+    def line_of_fire_blocked(self):
+        pan_min, pan_max, tilt_min, tilt_max = NO_FIRE_ZONE
+        return (pan_min - NO_FIRE_MARGIN <= self.pan <= pan_max + NO_FIRE_MARGIN
+                and tilt_min - NO_FIRE_MARGIN <= self.tilt <= tilt_max + NO_FIRE_MARGIN)
+
+    def tag(self, target_id):
+        now = time.monotonic()
+        refusal = self.fire_refusal(target_id)
+        if refusal:
+            self.last_tag = {'target_id': str(target_id or ''), 'result': 'refused',
+                             'reason': refusal, 'stamp': now}
+            self.message = f'fire refused: {refusal}'
+            return
+        self.phase, self.phase_time, self.cycle_target = 'priming', now, self.target_id
+        self.last_tag = {'target_id': self.target_id, 'result': 'running', 'reason': '', 'stamp': now}
+        self.last_locked = now
+        self.message = f'firing at {self.target_id}'
+
+    def abort_tag(self, reason):
+        if self.phase in ('priming', 'chambering', 'firing'):
+            now = time.monotonic()
+            self.fault = f'aborted while {self.phase} ({reason})'
+            self.last_tag = {'target_id': self.cycle_target, 'result': 'fault',
+                             'reason': self.fault, 'stamp': now}
+            self.message = f'launcher fault: {self.fault}'
+            self.phase, self.cycle_target, self.last_cycle_end = 'fault', '', now
+
+    def next_target(self):
+        candidates = [d for d in self.detections
+                      if d['id'] not in self.tagged_ids and d['id'] != self.target_id]
+        if not candidates:
+            self.message = 'next: no untagged detection'
+            return
+        nearest = min(candidates, key=lambda d: math.hypot(d['bbox_xywh'][0] - WIDTH / 2,
+                                                           d['bbox_xywh'][1] - HEIGHT / 2))
+        self.target_id, self.manual, self.centering = nearest['id'], None, False
+        self.message = f'locked on {nearest["class"]} {nearest["id"]}'
+        self.set_mode('auto')
+
+    def step_launcher(self, dt, now):
+        """The cycle: prime, chamber, trigger, trigger back, each against the
+        rack's and trigger's positions; the trigger at 0 and the rack stopped
+        on an abort or a fault (cleared by disarming and arming)."""
+        if self.phase in ('priming', 'chambering', 'firing'):
+            error = self.aim_error()
+            if error is not None and error < LOCK_ERROR_DEG:
+                self.last_locked = now
+            if self.mode != 'auto' or self.target_id != self.cycle_target or now - self.last_locked > 0.5:
+                self.abort_tag(f'lost the lock on {self.cycle_target}')
+            elif self.line_of_fire_blocked() and (
+                    self.phase == 'firing' or self.phase == 'chambering' and self.rack <= 0.002):
+                self.abort_tag('line of fire blocked')  # at the moment of firing
+        rack_goal, trigger_goal = self.rack, 0.0  # stopped, safe
+        if self.estop:
+            pass
+        elif self.phase == 'priming':
+            rack_goal = STROKE
+        elif self.phase in ('chambering', 'firing', 'resetting', 'ready'):
+            rack_goal = 0.0
+            trigger_goal = FIRE_RAD if self.phase == 'firing' else 0.0
+        self.rack += max(-RACK_SPEED * dt, min(RACK_SPEED * dt, rack_goal - self.rack))
+        self.trigger += max(-SERVO_RAD_S * dt, min(SERVO_RAD_S * dt, trigger_goal - self.trigger))
+        if self.phase == 'priming' and self.rack >= STROKE - 0.002:
+            self.phase, self.phase_time = 'chambering', now
+        elif self.phase == 'chambering' and self.rack <= 0.002:
+            self.phase, self.phase_time = 'firing', now
+        elif self.phase == 'firing' and self.trigger >= FIRE_RAD - 0.05:
+            if now - self.phase_time >= TRIGGER_HOLD_S:
+                self.phase = 'resetting'
+        elif self.phase == 'resetting' and self.trigger <= 0.05:
+            target, self.cycle_target = self.cycle_target, ''
+            self.phase, self.last_cycle_end = 'ready', now
+            self.darts = max(0, self.darts - 1)
+            if target not in self.tagged_ids:
+                self.tagged_ids.append(target)
+            self.last_tag = {'target_id': target, 'result': 'fired', 'reason': '', 'stamp': now}
+            self.message = f'fired at {target}; {self.darts} darts left'
+            if self.auto_next:
+                self.next_target()
 
     def step_turret(self):
         dt, now = 1.0 / 15.0, time.monotonic()
@@ -355,8 +543,8 @@ class MockRacecarTurret(Node):
                     self.pan += max(-MAX_RATE, min(MAX_RATE, self.manual[1])) * dt
                     self.tilt += max(-MAX_RATE, min(MAX_RATE, self.manual[2])) * dt
                 elif self.mode == 'auto' and target is not None:
-                    # Centre the box, as the tracker does.
-                    u, v = target['bbox_xywh'][:2]
+                    # Centre the box (a person's torso with the launcher), as the tracker does.
+                    u, v = self.aim_point(target)[0] if self.actuator_fitted else target['bbox_xywh'][:2]
                     self.pan += max(-MAX_RATE * dt, min(MAX_RATE * dt, 0.4 * math.atan((u - WIDTH / 2) / FX)))
                     self.tilt += max(-MAX_RATE * dt, min(MAX_RATE * dt, 0.4 * math.atan((HEIGHT / 2 - v) / FX)))
                 elif self.centering:
@@ -364,7 +552,10 @@ class MockRacecarTurret(Node):
                     self.tilt -= max(-MAX_RATE * dt, min(MAX_RATE * dt, 0.5 * self.tilt))
                 self.pan = max(-PAN_LIMIT, min(PAN_LIMIT, self.pan))
                 self.tilt = max(TILT_MIN, min(TILT_MAX, self.tilt))
+            if self.actuator_fitted:
+                self.step_launcher(dt, now)
             pan, tilt, people = self.pan, self.tilt, [dict(p) for p in self.people]
+            rack, tagged = self.rack, set(self.tagged_ids)
         stamp = self.get_clock().now().to_msg()
         frame = np.zeros((HEIGHT, WIDTH, 3), dtype=np.uint8)
         horizon = int(HEIGHT / 2 + FX * math.tan(tilt))
@@ -388,12 +579,17 @@ class MockRacecarTurret(Node):
             x1, y1, x2, y2 = int(u - w / 2), int(v - h / 2), int(u + w / 2), int(v + h / 2)
             cv2.rectangle(frame, (x1, y1), (x2, y2), person['rgb'], -1)
             cv2.circle(frame, (int(u), int(y1 - w * 0.35)), max(2, int(w * 0.35)), person['rgb'], -1)
+            if person['id'] in tagged:  # a tag mark on the chest
+                cv2.circle(frame, (int(u), int(v)), max(3, int(w * 0.25)), (180, 120, 250), -1)
             # The box as a detector would report it, clipped to the image.
             bx1, by1 = max(0, x1), max(0, int(y1 - w * 0.7))
             bx2, by2 = min(WIDTH, x2), min(HEIGHT, y2)
             detections.append({'id': person['id'], 'class': person['class'], 'confidence': 0.87,
                                'bbox_xywh': [(bx1 + bx2) / 2, (by1 + by2) / 2, bx2 - bx1, by2 - by1]})
         cv2.circle(frame, (WIDTH // 2, HEIGHT // 2), 6, (255, 255, 255), 1)
+        if self.actuator_fitted and rack > 0.0005:  # the rack drawn back, as a gauge
+            reach = int(60 * rack / STROKE)
+            cv2.line(frame, (WIDTH // 2, HEIGHT), (WIDTH // 2, HEIGHT - reach), (250, 120, 180), 8)
         with self.lock:
             self.detections = detections
         self.turret_image_pub.publish(self.image(frame, stamp, 'turret/camera_optical_frame'))
@@ -412,23 +608,28 @@ class MockRacecarTurret(Node):
         joints = JointState()
         joints.header.stamp = stamp
         joints.name, joints.position = ['pan_joint', 'tilt_joint'], [pan, tilt]
+        if self.actuator_fitted:
+            joints.name.extend(['actuator_joint', 'trigger_joint'])
+            with self.lock:  # (extend: rclpy keeps position in an array.array)
+                joints.position.extend([self.rack, self.trigger])
         self.joint_pub.publish(joints)
 
     def publish_turret_status(self):
         with self.lock:
-            target = next((d for d in self.detections if d['id'] == self.target_id), None)
-            error = None
-            if target is not None:
-                du = target['bbox_xywh'][0] - WIDTH / 2
-                dv = target['bbox_xywh'][1] - HEIGHT / 2
-                error = math.degrees(math.atan(math.hypot(du, dv) / FX))
+            target = self.target_detection()
+            error = self.aim_error()  # at the aim point: a person's torso with the launcher
             target_class = next((p['class'] for p in self.people if p['id'] == self.target_id), '')
             status = {'mode': self.mode, 'target_id': self.target_id, 'target_class': target_class,
-                      'locked': error is not None and error < 2.0,
+                      'locked': error is not None and error < LOCK_ERROR_DEG,
                       'aim_error_deg': None if error is None else round(error, 2),
                       'base_compensation': True, 'detections': len(self.detections),
                       'message': self.message if self.message or target is not None or not self.target_id
                       else 'target not in view'}
+            status.update({
+                'launcher': self.launcher_state(), 'darts': self.darts,
+                'tags': len(self.tagged_ids), 'tagged_ids': list(self.tagged_ids),
+                'last_tag': self.last_tag, 'fire_block': self.fire_refusal(self.target_id),
+                'auto_next': self.auto_next, 'stamp': time.time()})
         self.status_pub.publish(String(data=json.dumps(status)))
 
 
@@ -438,6 +639,7 @@ def main():
     parser.add_argument('--no-control-status', action='store_true',
                         help='leave /racecarneo/control_status to the real cmd_vel_to_ackermann')
     parser.add_argument('--static', action='store_true', help='keep the people still')
+    parser.add_argument('--no-actuator', action='store_true', help='a turret without the dart launcher')
     args = parser.parse_args(rclpy.utilities.remove_ros_args(sys.argv)[1:])
     rclpy.init()
     node = MockRacecarTurret(args)

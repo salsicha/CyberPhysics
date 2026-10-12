@@ -1,14 +1,19 @@
-"""RACECAR Neo and RACECAR Turret operator page, one NiceGUI page on port 8080.
+"""RACECAR Neo, RACECAR Turret and PanTiltROS turret operator page, one
+NiceGUI page on port 8080.
 
-Car (always): the SLAM map with the robot and the Nav2 path (tap it to
-send a NavigateToPose goal, or type one), cancel, a drive joystick
+Car (unless UI_CAR=0): the SLAM map with the robot and the Nav2 path (tap it
+to send a NavigateToPose goal, or type one), cancel, a drive joystick
 (/cmd_vel_teleop at 10 Hz while held; cmd_vel_to_ackermann gives it
 priority over Nav2), Stop/Resume (/racecarneo/stop_request), the drive
 status, the front camera and pipeline freshness. Turret (UI_TURRET=1, the
-RACECAR Turret): the turret camera with the tracker's boxes (tap one to
-lock it), Release, Center, an aim joystick, Arm/Disarm
-(/turret/emergency_stop) and the tracker status. Stop All stops the car,
-cancels Nav2 and engages the turret emergency stop. Topics and commands:
+RACECAR Turret; with UI_CAR=0 the standalone turret's turret-only layout):
+the turret camera with the tracker's boxes (tap one to lock it), Release,
+Center, an aim joystick, Arm/Disarm (/turret/emergency_stop), the tracker
+status, and the foam dart launcher: Fire (enabled only while /turret/status
+says every gate holds; one {"action": "tag", "target_id": <locked id>} per
+tap), Reload with the dart count, Next, Clear tags, an auto-next toggle, and
+the launcher's state, darts and tags. Stop All stops the car, cancels Nav2
+and engages the turret emergency stop. Topics and commands:
 systems/racecar_turret/interfaces.md.
 
 rclpy spins in a daemon thread; page handlers publish from NiceGUI's event
@@ -51,13 +56,19 @@ import racecar_ui_logic as logic  # noqa: E402
 from racecar_ui_logic import quaternion_from_yaw, yaw_from_quaternion  # noqa: E402,F401
 
 
-def env_flag(name: str) -> bool:
-    return os.environ.get(name, '').strip().lower() in ('1', 'true', 'yes', 'on')
+def env_flag(name: str, default: bool = False) -> bool:
+    value = os.environ.get(name, '').strip().lower()
+    return default if not value else value in ('1', 'true', 'yes', 'on')
 
 
-# UI_TURRET=1: the RACECAR Turret page (compositions/racecar_turret_*.yaml).
+# UI_TURRET=1: the RACECAR Turret page (compositions/racecar_turret_*.yaml);
+# with UI_CAR=0 too, the turret-only page of the standalone PanTiltROS
+# turret (compositions/turret_hardware.yaml). The car part needs no flag.
 TURRET = env_flag('UI_TURRET')
-TITLE = 'RACECAR Turret' if TURRET else 'RACECAR Neo'
+CAR = env_flag('UI_CAR', True) or not TURRET
+TITLE = ('RACECAR Turret' if CAR else 'PanTiltROS Turret') if TURRET else 'RACECAR Neo'
+# The camera the tracker uses (the standalone turret's may be a RealSense's)
+TURRET_CAMERA_TOPIC = os.environ.get('UI_TURRET_CAMERA_TOPIC', '/turret/camera/image_raw')
 # Manual driving at full stick, below cmd_vel_to_ackermann's own limits.
 DRIVE_LIMITS = logic.DriveLimits(
     max_speed=float(os.environ.get('UI_MAX_SPEED', '0.3')),
@@ -141,37 +152,46 @@ def placeholder_svg(text: str, width: int = 640, height: int = 480) -> bytes:
 
 
 class RacecarNeoGuiNode(Node):
-    def __init__(self, state: VehicleState, frames: Frames, turret: bool = False) -> None:
+    car = True  # the car part (the tests build the node without __init__)
+    cancel_clients: list = []
+
+    def __init__(self, state: VehicleState, frames: Frames, turret: bool = False,
+                 car: bool = True) -> None:
         super().__init__('racecarneo_nicegui')
         self.state = state
         self.frames = frames
         self.turret = turret
+        self.car = car
         self.bridge = CvBridge()
         self.frame_lock = threading.Lock()
         self.latest_frame = None
         self.latest_turret_frame = None
         self.latest_map = None
-        self.nav_client = ActionClient(self, NavigateToPose, 'navigate_to_pose')
-        self.cancel_clients = [self.create_client(CancelGoal, f'{action}/_action/cancel_goal')
-                               for action in NAV_ACTIONS]
-        self.tf_buffer = Buffer()
-        self.tf_listener = TransformListener(self.tf_buffer, self)
-        self.teleop_pub = self.create_publisher(Twist, '/cmd_vel_teleop', 10)
-        self.stop_pub = self.create_publisher(Bool, '/racecarneo/stop_request', LATCHED_QOS)
-        self.create_timer(0.1, self.update_map_pose)
-        self.create_timer(0.2, self.encode_latest_frame)
-        self.create_timer(0.5, self.render_map)
-        self.create_subscription(Odometry, '/odom', self.handle_odom, 10)
-        self.create_subscription(Image, '/camera/color/image_raw', self.handle_camera, qos_profile_sensor_data)
-        self.create_subscription(Image, '/depth_anything/depth/image', self.handle_depth, qos_profile_sensor_data)
-        self.create_subscription(OccupancyGrid, '/map', self.handle_map, LATCHED_QOS)
-        self.create_subscription(NavPath, '/plan', self.handle_plan, 10)
-        self.create_subscription(String, '/racecarneo/control_status', self.handle_control_status, 10)
+        self.cancel_clients = []
+        if car:
+            self.nav_client = ActionClient(self, NavigateToPose, 'navigate_to_pose')
+            self.cancel_clients = [self.create_client(CancelGoal, f'{action}/_action/cancel_goal')
+                                   for action in NAV_ACTIONS]
+            self.tf_buffer = Buffer()
+            self.tf_listener = TransformListener(self.tf_buffer, self)
+            self.teleop_pub = self.create_publisher(Twist, '/cmd_vel_teleop', 10)
+            self.stop_pub = self.create_publisher(Bool, '/racecarneo/stop_request', LATCHED_QOS)
+            self.create_timer(0.1, self.update_map_pose)
+            self.create_timer(0.2, self.encode_latest_frame)
+            self.create_timer(0.5, self.render_map)
+            self.create_subscription(Odometry, '/odom', self.handle_odom, 10)
+            self.create_subscription(Image, '/camera/color/image_raw', self.handle_camera,
+                                     qos_profile_sensor_data)
+            self.create_subscription(Image, '/depth_anything/depth/image', self.handle_depth,
+                                     qos_profile_sensor_data)
+            self.create_subscription(OccupancyGrid, '/map', self.handle_map, LATCHED_QOS)
+            self.create_subscription(NavPath, '/plan', self.handle_plan, 10)
+            self.create_subscription(String, '/racecarneo/control_status', self.handle_control_status, 10)
         if turret:
             self.turret_command_pub = self.create_publisher(String, '/turret/command', 10)
             self.turret_estop_pub = self.create_publisher(Bool, '/turret/emergency_stop', LATCHED_QOS)
             self.create_timer(0.125, self.encode_turret_frame)
-            self.create_subscription(Image, '/turret/camera/image_raw', self.handle_turret_camera,
+            self.create_subscription(Image, TURRET_CAMERA_TOPIC, self.handle_turret_camera,
                                      qos_profile_sensor_data)
             self.create_subscription(String, '/turret/yolo/segments', self.handle_segments, 10)
             # Latched readers get the last value from transient-local publishers;
@@ -330,7 +350,8 @@ class RacecarNeoGuiNode(Node):
         self.teleop_pub.publish(msg)
 
     def request_stop(self, stop: bool) -> None:
-        self.stop_pub.publish(Bool(data=bool(stop)))
+        if self.car:
+            self.stop_pub.publish(Bool(data=bool(stop)))
 
     # --- Turret ------------------------------------------------------------
 
@@ -355,7 +376,9 @@ class RacecarNeoGuiNode(Node):
 
     def handle_turret_status(self, msg: String) -> None:
         status = logic.parse_turret_status(msg.data)
-        if status is not None:
+        previous = self.state.turret_status
+        if status is not None and logic.newer_status(
+                previous['stamp'] if previous is not None else None, status['stamp']):
             self.state.turret_status = status
             self.state.turret_status_time = time.monotonic()
 
@@ -374,8 +397,9 @@ class RacecarNeoGuiNode(Node):
             self.turret_estop_pub.publish(Bool(data=bool(engaged)))
 
     def stop_all(self) -> None:
-        self.request_stop(True)
-        self.cancel_navigation('Stop all')
+        if self.car:
+            self.request_stop(True)
+            self.cancel_navigation('Stop all')
         self.set_turret_estop(True)
 
 
@@ -385,7 +409,7 @@ node_holder: dict[str, Optional[RacecarNeoGuiNode]] = {'node': None}
 JOYSTICK_JS = (Path(__file__).parent / 'joystick.js').read_text()
 PLACEHOLDERS = {
     'camera': placeholder_svg('Waiting for /camera/color/image_raw'),
-    'turret': placeholder_svg('Waiting for /turret/camera/image_raw'),
+    'turret': placeholder_svg(f'Waiting for {TURRET_CAMERA_TOPIC}'),
     'map': placeholder_svg('Waiting for /map'),
 }
 CSS = """
@@ -430,8 +454,11 @@ def number(value, default: float = 0.0) -> float:
 
 
 def freshness_html(now: float) -> str:
-    items = [('pose', state.pose_time), ('odom', state.odom_time), ('map', state.map_time),
-             ('camera', state.camera_time), ('depth', state.depth_time), ('drive', state.control_time)]
+    items = []
+    if CAR:
+        items += [('pose', state.pose_time), ('odom', state.odom_time), ('map', state.map_time),
+                  ('camera', state.camera_time), ('depth', state.depth_time),
+                  ('drive', state.control_time)]
     if TURRET:
         items += [('turret cam', state.turret_camera_time), ('detections', state.segments_time),
                   ('tracker', state.turret_status_time)]
@@ -454,14 +481,15 @@ def index() -> None:
     ui.query('body').classes('bg-slate-950 text-slate-100')
     ui.query('.nicegui-content').classes('p-0 gap-0')
     holds = {'drive': logic.Hold(), 'aim': logic.Hold()}
-    shown = {'map': 0, 'camera': 0, 'turret': 0, 'map_overlay': None, 'turret_overlay': None, 'armed': None}
+    shown = {'map': 0, 'camera': 0, 'turret': 0, 'map_overlay': None, 'turret_overlay': None, 'armed': None,
+             'fire': None, 'syncing': False, 'auto_next_sent': -math.inf}
 
     def stop_all() -> None:
         node = ros()
         if node is not None:
             node.stop_all()
-            ui.notify('Stop all: car stopped, Nav2 canceled' + (', turret disarmed' if TURRET else ''),
-                      type='negative')
+            parts = (['car stopped', 'Nav2 canceled'] if CAR else []) + (['turret disarmed'] if TURRET else [])
+            ui.notify('Stop all: ' + ', '.join(parts), type='negative')
 
     with ui.row().classes('sticky top-0 z-50 w-full items-center gap-2 px-3 py-2 '
                           'bg-slate-900/95 border-b border-slate-700 flex-nowrap'):
@@ -472,34 +500,38 @@ def index() -> None:
     fresh_html = ui.html('', sanitize=False).classes('w-full px-3 py-1 text-xs text-slate-300 '
                                                        'flex flex-wrap gap-y-1')
 
-    with ui.element('div').classes('w-full grid grid-cols-1 lg:grid-cols-2 gap-3 p-3 pb-56'):
+    # Car and turret side by side on a wide screen; the turret-only page one
+    # column, not wider than a tablet.
+    layout = 'lg:grid-cols-2' if CAR and TURRET else 'max-w-3xl mx-auto'
+    with ui.element('div').classes(f'w-full grid grid-cols-1 {layout} gap-3 p-3 pb-56'):
         # --- Car -----------------------------------------------------------
-        with ui.card().props('flat bordered').classes('w-full min-w-0 bg-slate-900 gap-2'):
-            with ui.row().classes('w-full items-center gap-2'):
-                ui.label('Car').classes('text-lg font-medium')
-                stopped_badge = ui.badge('STOPPED', color='red').classes('text-sm')
-            control_label = ui.label('').classes('text-sm text-cyan-200')
-            nav_status = ui.label('Waiting for Nav2').classes('text-sm')
-            pose_label = ui.label('Pose: --').classes('text-sm text-slate-300')
-            map_image = ui.interactive_image('/frames/map?v=0', events=['click'], sanitize=False) \
-                .classes('w-full rounded bg-slate-800').props('data-testid=map')
-            ui.label('Tap the map to send a Nav2 goal there').classes('text-xs text-slate-400')
-            with ui.row().classes('w-full gap-2'):
-                ui.button('Cancel goal', icon='cancel', on_click=lambda: cancel_goal()) \
-                    .props('outline color=cyan data-testid=cancel-goal')
-                ui.button('Stop', icon='stop', on_click=lambda: set_stop(True)) \
-                    .props('color=orange data-testid=car-stop')
-                ui.button('Resume', icon='play_arrow', on_click=lambda: set_stop(False)) \
-                    .props('color=green data-testid=car-resume')
-            with ui.expansion('Waypoint', icon='place').classes('w-full'):
-                with ui.row().classes('w-full gap-2 items-end'):
-                    x_input = ui.number('x', value=2.0, format='%.2f').classes('w-24')
-                    y_input = ui.number('y', value=0.0, format='%.2f').classes('w-24')
-                    yaw_input = ui.number('yaw rad', value=0.0, format='%.2f').classes('w-24')
-                    ui.button('Send waypoint', on_click=lambda: send_form_goal()) \
-                        .props('color=cyan data-testid=send-waypoint')
-            with ui.expansion('Front camera', icon='videocam').classes('w-full'):
-                camera = ui.interactive_image('/frames/camera?v=0', events=[]).classes('w-full rounded')
+        if CAR:
+            with ui.card().props('flat bordered').classes('w-full min-w-0 bg-slate-900 gap-2'):
+                with ui.row().classes('w-full items-center gap-2'):
+                    ui.label('Car').classes('text-lg font-medium')
+                    stopped_badge = ui.badge('STOPPED', color='red').classes('text-sm')
+                control_label = ui.label('').classes('text-sm text-cyan-200')
+                nav_status = ui.label('Waiting for Nav2').classes('text-sm')
+                pose_label = ui.label('Pose: --').classes('text-sm text-slate-300')
+                map_image = ui.interactive_image('/frames/map?v=0', events=['click'], sanitize=False) \
+                    .classes('w-full rounded bg-slate-800').props('data-testid=map')
+                ui.label('Tap the map to send a Nav2 goal there').classes('text-xs text-slate-400')
+                with ui.row().classes('w-full gap-2'):
+                    ui.button('Cancel goal', icon='cancel', on_click=lambda: cancel_goal()) \
+                        .props('outline color=cyan data-testid=cancel-goal')
+                    ui.button('Stop', icon='stop', on_click=lambda: set_stop(True)) \
+                        .props('color=orange data-testid=car-stop')
+                    ui.button('Resume', icon='play_arrow', on_click=lambda: set_stop(False)) \
+                        .props('color=green data-testid=car-resume')
+                with ui.expansion('Waypoint', icon='place').classes('w-full'):
+                    with ui.row().classes('w-full gap-2 items-end'):
+                        x_input = ui.number('x', value=2.0, format='%.2f').classes('w-24')
+                        y_input = ui.number('y', value=0.0, format='%.2f').classes('w-24')
+                        yaw_input = ui.number('yaw rad', value=0.0, format='%.2f').classes('w-24')
+                        ui.button('Send waypoint', on_click=lambda: send_form_goal()) \
+                            .props('color=cyan data-testid=send-waypoint')
+                with ui.expansion('Front camera', icon='videocam').classes('w-full'):
+                    camera = ui.interactive_image('/frames/camera?v=0', events=[]).classes('w-full rounded')
 
         # --- Turret --------------------------------------------------------
         if TURRET:
@@ -522,18 +554,44 @@ def index() -> None:
                         .props('color=green data-testid=turret-arm')
                     ui.button('Disarm', icon='power_off', on_click=lambda: set_turret_estop(True)) \
                         .props('color=orange data-testid=turret-disarm')
+                # The dart launcher: one shot per tap of Fire, at the locked target only
+                ui.separator().classes('bg-slate-700')
+                with ui.row().classes('w-full items-center gap-2'):
+                    fire_button = ui.button('Fire', icon='ads_click', on_click=lambda: fire()) \
+                        .props('color=red unelevated data-testid=turret-fire') \
+                        .classes('text-base font-bold px-5')
+                    fire_button.disable()
+                    ui.button('Next', icon='skip_next', on_click=lambda: turret_command({'action': 'next'})) \
+                        .props('outline color=cyan data-testid=turret-next')
+                    ui.button('Clear tags', icon='clear_all',
+                              on_click=lambda: turret_command({'action': 'clear_tags'})) \
+                        .props('outline color=cyan data-testid=turret-clear-tags')
+                    auto_next = ui.switch('Auto next', on_change=lambda e: on_auto_next(e.value)) \
+                        .props('color=cyan data-testid=turret-auto-next')
+                with ui.row().classes('w-full items-end gap-2'):
+                    darts_input = ui.number('darts', value=6, min=0, max=1000, step=1, format='%d') \
+                        .classes('w-24').props('data-testid=turret-darts')
+                    ui.button('Reload', icon='refresh', on_click=lambda: reload()) \
+                        .props('outline color=amber data-testid=turret-reload')
+                launcher_label = ui.label('').classes('text-sm text-violet-200') \
+                    .props('data-testid=turret-launcher')
+                fire_reason = ui.label('').classes('text-xs text-slate-400') \
+                    .props('data-testid=turret-fire-reason')
 
     # Joysticks: docked at the bottom so both thumbs reach them on a phone.
     with ui.row().classes('fixed bottom-0 left-0 right-0 z-40 justify-around items-center flex-nowrap '
                           'gap-2 px-3 pt-3 pb-7 bg-slate-900/95 border-t border-slate-700'):
-        ui.html('<div class="joy-pad" data-joystick="drive"><div class="joy-knob"></div>'
-                '<div class="joy-label">drive</div></div>', sanitize=False).props('data-testid=joy-drive')
+        if CAR:
+            ui.html('<div class="joy-pad" data-joystick="drive"><div class="joy-knob"></div>'
+                    '<div class="joy-label">drive</div></div>', sanitize=False).props('data-testid=joy-drive')
         dock_label = ui.label('').classes('text-xs text-slate-300 text-center whitespace-pre-line min-w-0')
         if TURRET:
             ui.html('<div class="joy-pad" data-joystick="aim"><div class="joy-knob"></div>'
                     '<div class="joy-label">aim</div></div>', sanitize=False).props('data-testid=joy-aim')
 
-    images = {'map': map_image, 'camera': camera}
+    images = {}
+    if CAR:
+        images.update(map=map_image, camera=camera)
     if TURRET:
         images['turret'] = turret_image
 
@@ -564,7 +622,8 @@ def index() -> None:
         x_input.value, y_input.value, yaw_input.value = round(x, 2), round(y, 2), round(yaw, 2)
         node.send_waypoint(x, y, yaw)
 
-    map_image.on_mouse(on_map_click)
+    if CAR:
+        map_image.on_mouse(on_map_click)
 
     def turret_command(command: dict) -> None:
         node = ros()
@@ -576,6 +635,37 @@ def index() -> None:
         if node is not None:
             node.set_turret_estop(engaged)
             ui.notify('Turret disarmed' if engaged else 'Turret armed', type='warning' if engaged else 'positive')
+
+    def turret_status(now: float):
+        return state.turret_status if logic.fresh(now, state.turret_status_time, 2.0 * STALE_S) else None
+
+    def fire_state(now: float):
+        return logic.fire_button(turret_status(now), state.turret_estop is False, state.actuator_ready)
+
+    def fire() -> None:
+        # Checked again at the tap: the button may not have caught up yet.
+        now = time.monotonic()
+        enabled, why = fire_state(now)
+        if not enabled:
+            ui.notify(f'Not firing: {why}', type='warning')
+            return
+        status = turret_status(now)
+        turret_command(logic.fire_command(status))
+        ui.notify(f'Fire at #{status["target_id"]}', type='positive')
+
+    def reload() -> None:
+        command = logic.reload_command(darts_input.value)
+        if command is None:
+            ui.notify('Reload: the dart count must be a whole number from 0', type='warning')
+            return
+        turret_command(command)
+        ui.notify(f'Reload: {command["darts"]} darts')
+
+    def on_auto_next(value) -> None:
+        if shown['syncing']:
+            return  # set from the tracker's status, not by the operator
+        shown['auto_next_sent'] = time.monotonic()
+        turret_command(logic.auto_next_command(bool(value)))
 
     def on_turret_click(e) -> None:
         size = frames.size('turret')
@@ -612,7 +702,7 @@ def index() -> None:
             return
         now = time.monotonic()
         vector = holds['drive'].tick(now)
-        if vector is not None:
+        if vector is not None and CAR:
             node.publish_teleop(*logic.drive_twist(*vector, DRIVE_LIMITS))
         vector = holds['aim'].tick(now)
         if vector is not None and TURRET:
@@ -623,32 +713,34 @@ def index() -> None:
     def refresh_ui() -> None:
         now = time.monotonic()
         fresh_html.content = freshness_html(now)
-        nav_status.text = state.nav_status
-        if logic.fresh(now, state.pose_time, STALE_S):
-            pose_label.text = f'Pose ({MAP_FRAME}): x={state.x:.2f}, y={state.y:.2f}, yaw={state.yaw:.2f}'
-        else:
-            pose_label.text = f'Pose ({MAP_FRAME}): waiting for {MAP_FRAME} -> {BASE_FRAME}'
-        control = state.control if logic.fresh(now, state.control_time, STALE_S) else None
-        control_label.text = logic.control_summary(control)
-        stopped_badge.set_visibility(bool(control and control['stopped']))
-        dock = [f'{"MANUAL" if holds["drive"].held(now) else "drive"}: '
-                f'{control["source"] if control else "?"}']
+        dock = []
         for name, image in images.items():
             version = frames.version(name)
             if version != shown[name]:
                 shown[name] = version
                 image.set_source(f'/frames/{name}?v={version}')
-        view = state.map_view
-        if view is not None:
-            robot = (state.x, state.y, state.yaw) if logic.fresh(now, state.pose_time, STALE_S) else None
-            # Nav2 republishes the plan while it navigates (also goals sent by others).
-            path = state.path if state.goal or logic.fresh(now, state.plan_time, 3.0) else ()
-            overlay = logic.map_overlay_svg(view, robot, path, state.goal)
-            if overlay != shown['map_overlay']:
-                shown['map_overlay'] = overlay
-                map_image.content = overlay
+        if CAR:
+            nav_status.text = state.nav_status
+            if logic.fresh(now, state.pose_time, STALE_S):
+                pose_label.text = f'Pose ({MAP_FRAME}): x={state.x:.2f}, y={state.y:.2f}, yaw={state.yaw:.2f}'
+            else:
+                pose_label.text = f'Pose ({MAP_FRAME}): waiting for {MAP_FRAME} -> {BASE_FRAME}'
+            control = state.control if logic.fresh(now, state.control_time, STALE_S) else None
+            control_label.text = logic.control_summary(control)
+            stopped_badge.set_visibility(bool(control and control['stopped']))
+            dock.append(f'{"MANUAL" if holds["drive"].held(now) else "drive"}: '
+                        f'{control["source"] if control else "?"}')
+            view = state.map_view
+            if view is not None:
+                robot = (state.x, state.y, state.yaw) if logic.fresh(now, state.pose_time, STALE_S) else None
+                # Nav2 republishes the plan while it navigates (also goals sent by others).
+                path = state.path if state.goal or logic.fresh(now, state.plan_time, 3.0) else ()
+                overlay = logic.map_overlay_svg(view, robot, path, state.goal)
+                if overlay != shown['map_overlay']:
+                    shown['map_overlay'] = overlay
+                    map_image.content = overlay
         if TURRET:
-            status = state.turret_status if logic.fresh(now, state.turret_status_time, 2.0 * STALE_S) else None
+            status = turret_status(now)
             turret_label.text = logic.turret_summary(status)
             if state.turret_estop is None:
                 badge = ('DISARMED (no e-stop state)', 'grey')
@@ -666,10 +758,27 @@ def index() -> None:
             if size is not None:
                 overlay = logic.detections_svg(segments, size[0], size[1],
                                                status['target_id'] if status else '',
-                                               bool(status and status['locked']))
+                                               bool(status and status['locked']),
+                                               status['tagged_ids'] if status else ())
             if overlay != shown['turret_overlay']:
                 shown['turret_overlay'] = overlay
                 turret_image.content = overlay
+            # The dart launcher
+            enabled, why = fire_state(now)
+            label = f'Fire #{status["target_id"]}' if enabled else 'Fire'
+            if (enabled, label) != shown['fire']:
+                shown['fire'] = (enabled, label)
+                fire_button.set_text(label)
+                fire_button.set_enabled(enabled)
+            launcher_label.text = logic.launcher_summary(status)
+            fire_reason.text = 'Ready to fire' if enabled else f'Fire: {why}'
+            if (status is not None and status['auto_next'] != auto_next.value
+                    and now - shown['auto_next_sent'] > 2.0):
+                shown['syncing'] = True
+                try:
+                    auto_next.value = status['auto_next']
+                finally:
+                    shown['syncing'] = False
             dock.append(f'{"MANUAL" if holds["aim"].held(now) else "aim"}: {status["mode"] if status else "?"}')
         dock_label.text = '\n'.join(dock)
 
@@ -682,7 +791,7 @@ def main() -> None:
 
 def ros_main() -> None:
     rclpy.init()
-    node = RacecarNeoGuiNode(state, frames, turret=TURRET)
+    node = RacecarNeoGuiNode(state, frames, turret=TURRET, car=CAR)
     node_holder['node'] = node
     try:
         rclpy.spin(node)

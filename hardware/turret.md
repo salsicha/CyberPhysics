@@ -5,8 +5,9 @@ against the `applications/pantiltros` ROS 2 control stack. The turret should
 segment a realistic camera scene, select a target object, and drive pan/tilt
 servos to keep that object centered while it moves through the scene.
 
-The pan/tilt mechanism, its base (tripod adapter) and the camera mounts are
-printed: CadQuery sources, STLs and printing and assembly instructions in
+The pan/tilt mechanism, its base (tripod adapter), the camera mounts and the
+foam dart launcher are printed: CadQuery sources, STLs and printing and
+assembly instructions in
 [hardware/parts/turret/README.md](parts/turret/README.md); the generated
 part and fastener tables are under "3D-printed parts" below.
 
@@ -16,8 +17,38 @@ Baseline hardware
 
 - 1 x two-axis pan-tilt mechanism compatible with `pan_tilt_ros`: printed
   (see "3D-printed parts").
-- 2 x Waveshare ST3215, Waveshare ST3215-HS, or Feetech STS3215 serial bus
-  servos for pan and tilt.
+- 4 x Waveshare ST3215, Waveshare ST3215-HS, or Feetech STS3215 serial bus
+  servos: pan (ID 12), tilt (ID 13) and, on the tilt stage, the foam dart
+  launcher's priming actuator (ID 14) and trigger (ID 15)
+  (`systems/racecar_turret/interfaces.md`, "Foam dart launcher"). The two
+  launcher servos need their output horns only. The trigger is an ST3215
+  too: the smaller STS servo (STS3032) runs on 4.8-6 V only, and the 12 V
+  STS servos (STS3020/ST3020, STS3046, STS3250) are not lighter than an
+  ST3215.
+- Foam dart launcher, purchased parts (the rest is printed, see "Foam dart
+  launcher" below):
+  - 1 x **K&S Precision Metals 8140** round brass tube, 17/32" OD x 0.014"
+    wall (ID 0.503", 12.78 mm), 12" long: the barrel, cut to 45 mm (square,
+    deburred) with a tube cutter.
+  - 1 x **plunger spring**, music wire (ASTM A228), closed and ground ends:
+    rate **1.5 N/mm (8.6 lbf/in), +-10 %**, free length 80 mm, outside
+    diameter 28 mm (fits the 32 mm bore, over the 8 mm rod), wire 2.0 mm,
+    about 6 active / 8 total coils, solid length under 20 mm. A stock spring
+    to this specification from any spring maker; measure its rate before
+    fitting it (a 3 kg load must compress it about 20 mm). **Do not fit a
+    stiffer spring.**
+  - 1 x clip spring, music wire: OD about 12 mm, wire 0.6 mm, free length
+    about 110 mm, about 0.05 N/mm (a light magazine spring).
+  - 1 x sear spring: OD about 4.5 mm, wire 0.4 mm, free length about 16 mm,
+    about 0.3 N/mm.
+  - NBR 70 O-rings: 1 x 27 x 2.5 mm (plunger head), 1 x 10 x 2 mm (outlet
+    spigot); silicone grease.
+  - 1 x 3 x 10 mm steel dowel pin (ISO 8734): the shuttle's cam pin.
+  - Darts: **Elite-size foam darts only** (Nerf Elite or compatible, 12.7 mm
+    x about 72 mm). Genuine Nerf magazines are not supported: their
+    dimensions are not published; the printed clip holds six darts.
+  - Eye protection (safety glasses) for everyone in range, a chronograph for
+    the bring-up (any hobby chronograph that reads 10-50 m/s).
 - 1 x turret controller, either:
   - Arduino UNO R4 WiFi, Arduino SKU ABX00087, plugged into the compute host
     over USB (5 V logic). Buy the real Arduino board, not a clone, so the
@@ -48,21 +79,44 @@ Baseline hardware
 - 1 x compute host capable of running ROS 2, PanTiltROS, and Ultralytics YOLO
   segmentation. Use GPU acceleration for high-resolution YOLO26 segmentation
   tests.
-- 1 x regulated servo power supply sized for both servos at peak load.
+- 1 x regulated 12 V servo power supply sized for the four servos at peak
+  load: at least 12 A (150 W); see "For the printed mechanism".
+- 1 x inline fuse holder with a 5 A fuse between the supply and the bus
+  servo adapter (protects the adapter's 6 A servo port).
 - 1 x physical emergency-stop switch that removes servo power, plus a way to
   publish the software stop on `/turret/emergency_stop` (see below).
 - Cabling, strain relief, mounting hardware, and optional cable chain so the
-  pan/tilt range cannot pull camera or servo cables tight.
+  pan/tilt range cannot pull camera or servo cables tight. The servo bus is
+  a daisy chain of the servos' 3-pin cables (one usually comes with each
+  servo): adapter to pan servo about 20 cm, pan to tilt servo about 15 cm
+  (over the pan joint's loop), tilt to actuator servo about 25 cm (over the
+  tilt joint, with a loop at the tilt axis), actuator to trigger servo about
+  25 cm (along the launcher).
 
 For the printed mechanism:
 
 - The servos are the **12 V** versions (ST3215 30 kg.cm; the 7.4 V
   ST3215-C001 is 19.5 kg.cm): the Waveshare Bus Servo Adapter (A) takes
-  9-12.6 V and passes it to the servos. Two servos at locked rotor draw
-  2 x 2.7 A at 12 V; the adapter's servo port is marked 6 A maximum. Each
-  servo needs an output and an idler horn with 4 x M3 on a 14 mm circle
-  (Waveshare's pack shows two aluminium horns per servo; Feetech sells the
-  STS3215 without accessories: check yours).
+  9-12.6 V and passes it to the servos. Pan and tilt each need an output and
+  an idler horn with 4 x M3 on a 14 mm circle, the launcher's two servos
+  only their output horns (Waveshare's pack shows two aluminium horns per
+  servo; Feetech sells the STS3215 without accessories: check yours).
+- **12 V servo rail, four servos.** Four ST3215 at locked rotor draw
+  4 x 2.7 A = **10.8 A** at 12 V (130 W). Tracking draws well under 1 A per
+  servo; priming draws about 1 A on the actuator for under a second (the
+  spring's 65 N on the 13.5 mm pinion is 0.9 N m), the trigger a few hundred
+  milliamps. The rail must not brown out when they accelerate together, so
+  the supply is rated **at least 12 A** continuous (150 W). The adapter's
+  servo port is marked **6 A maximum**: a **5 A fuse** at the adapter's input
+  (a standard blade or 5 x 20 mm slow-blow fuse) carries normal operation
+  and short peaks and opens on a sustained stall before the port overheats.
+  Wire the 12 V side in 18 AWG (silicone); the servo bus is the servos' own
+  cables. Set the launcher servos' torque limits in the software: the
+  actuator about 55 % (1.6 N m, 120 N on the rack: 1.5 x what priming
+  needs, and well under the 220 N the pinion could push at full torque),
+  the trigger about 30 % (it only lifts the sear; with the safety on it
+  stalls against it). Their stall currents then drop to about 1.5 and 0.8 A,
+  leaving the rail's worst case near 7.7 A.
 - The camera plates take the **Arducam B0385** board (38 mm, M2 holes on a
   34 mm square, the RACECAR Turret's camera) or any camera with a 1/4"-20
   thread in its base (RealSense D435i, cased UVC cameras) up to about 150 g.
@@ -72,10 +126,16 @@ For the printed mechanism:
   3.3 V (its schematic powers the half-duplex buffers from 3.3 V): direct for
   the UNO Q and a Linux host; with the 5 V UNO R4 WiFi check that the board
   reads the adapter's 3.3 V TX reliably, or add a level shifter.
-- The emergency stop must switch the servo supply's current (5.4 A at 12 V
-  with both servos stalled). A 22 mm control switch is rated for much less
-  DC current: use an enclosed e-stop rated for the load, or let its contact
-  open a relay in the servo supply.
+- The emergency stop must switch the servo supply's current (10.8 A at 12 V
+  with the four servos stalled). A 22 mm control switch is rated for much
+  less DC current: use an enclosed e-stop rated for at least 15 A DC, or
+  let its normally-closed contact carry the coil current of a relay in the
+  servo supply: an automotive 12 V relay with contacts rated 20 A or more at
+  14 V DC (a 30 A ISO mini relay), its normally-open contact in the 12 V
+  line, a flyback diode (1N4007) across its coil, so that pressing the stop
+  or losing the supply opens the rail. A stop does not decock the launcher:
+  the sear keeps holding a cocked plunger; put the safety on and the muzzle
+  cap on before going near the muzzle.
 - Screws, inserts, the tripod nut and rubber feet: the generated fastener
   table below.
 
@@ -86,8 +146,33 @@ Why these parts are bought, not printed:
 | Servos and their horns | Motors and gearboxes; the aluminium horns carry the joint torque on a 25-tooth spline that printed plastic would strip. |
 | Camera, controller, adapter, supply | Electronics. |
 | Emergency stop, relay, fuses | Safety: rated parts that must open the servo supply every time. |
+| Launcher spring, barrel, O-rings, dowel pin | The spring sets the launcher's power: a rated, measured part, never a printed or improvised one. The brass barrel is straight and smooth to 0.05 mm; O-rings seal. |
 | Screws, inserts, nuts | Metal threads; printed threads strip and creep. The tripod thread is a steel 1/4"-20 nut held captive in the base plate. |
 | Cables, spiral wrap | Flex with the pan and tilt motion. |
+
+### Foam dart launcher: power and safety
+
+**Toy power, foam darts only.** The launcher is a spring-plunger springer
+for Elite-size foam darts, sized for **at most about 30 m/s (100 fps)**:
+
+- Spring energy at the sear: the 1.5 N/mm spring, preloaded 8 mm and drawn
+  31.25 mm, stores 0.5 x 1.5 x (39.25^2 - 8^2) N mm = **1.11 J** (1.22 J
+  with a spring 10 % stiff).
+- Plunger 32 mm x 31.25 mm = **25.1 cm3** for **15.2 cm3** of bore behind the
+  dart (12.78 mm x 118 mm: 73 mm in the chamber, 45 mm of barrel), a ratio
+  of 1.65.
+- A springer delivers 15-30 % of its spring's energy to the dart. With a
+  1.0 g dart: **21 m/s at 20 %, 25 m/s at 28 %, 28 m/s at 35 %**; even at
+  35 % with the stiffer spring it stays under 30 m/s (29 m/s). This is an
+  estimate: **measure the muzzle velocity with a chronograph at bring-up**,
+  ten shots; the mean must be under 30 m/s, and any shot over 30 m/s means
+  a softer spring (never a stiffer one).
+- Rules: **eye protection for everyone in range; foam darts only** (nothing
+  else in the clip or the barrel, no hard tips); **no stronger springs**,
+  no barrel or plunger changes for more power; **the safety catch on and
+  the muzzle cap fitted** for transport, maintenance and whenever someone
+  works near the turret; the turret only fires on the operator's Fire
+  command (`systems/racecar_turret/interfaces.md`) and never at heads.
 
 ## 3D-printed parts
 
@@ -97,7 +182,8 @@ Printer: Bambu Lab P1S. Plates, settings, post-processing and assembly:
 [parts/turret/README.md](parts/turret/README.md). Print the "fit test
 first" parts before the rest; print one of the two camera plates, and the
 base plate only for the standalone turret (the RACECAR Turret stands on its
-own plate). Times and masses are estimates.
+own plate). The `launcher_*` parts are the foam dart launcher (a turret
+without one leaves them out). Times and masses are estimates.
 
 <!-- BEGIN GENERATED: printed-parts (tools/build_printable_parts.py) -->
 | Part | Qty | Material | Bambu Studio settings (P1S, 0.4 mm) | Est. time (each) | Est. mass (each) | File |
@@ -105,11 +191,29 @@ own plate). Times and masses are estimates.
 | Base plate (standalone turret, tripod adapter) | 1 | PETG | 0.20 mm, 3 walls, 25% gyroid, no supports, brim outer brim only, 5 mm | 2 h 26 min | 88 g | [base_plate.stl](parts/turret/stl/base_plate.stl) |
 | Camera plate, Arducam B0385 | 1 | ASA | 0.20 mm, 3 walls, 40% gyroid, no supports | 11 min | 5.5 g | [camera_plate_b0385.stl](parts/turret/stl/camera_plate_b0385.stl) |
 | Camera plate, 1/4"-20 shelf | 1 | ASA | 0.20 mm, 4 walls, 40% gyroid, no supports | 26 min | 12 g | [camera_plate_tripod.stl](parts/turret/stl/camera_plate_tripod.stl) |
-| Camera yoke (tilt stage) (fit test first) | 1 | ASA | 0.20 mm, 4 walls, 40% gyroid, no supports | 21 min | 9.2 g | [camera_yoke.stl](parts/turret/stl/camera_yoke.stl) |
+| Camera yoke (tilt stage) (fit test first) | 1 | ASA | 0.20 mm, 4 walls, 40% gyroid, no supports | 23 min | 10 g | [camera_yoke.stl](parts/turret/stl/camera_yoke.stl) |
+| Launcher barrel clamp | 1 | ASA | 0.20 mm, 4 walls, 60% gyroid, no supports | 14 min | 7.0 g | [launcher_barrel_clamp.stl](parts/turret/stl/launcher_barrel_clamp.stl) |
+| Launcher breech (with the pedestal on the camera yoke) (fit test first) | 1 | ASA | 0.20 mm, 4 walls, 25% gyroid, no supports | 1 h 46 min | 55 g | [launcher_breech.stl](parts/turret/stl/launcher_breech.stl) |
+| Launcher cam plate | 1 | PETG | 0.20 mm, 4 walls, 60% gyroid, no supports | 12 min | 6.7 g | [launcher_cam.stl](parts/turret/stl/launcher_cam.stl) |
+| Launcher rear cap, sear housing and trigger servo cradle (fit test first) | 1 | ASA | 0.20 mm, 4 walls, 25% gyroid, no supports | 59 min | 28 g | [launcher_cap.stl](parts/turret/stl/launcher_cap.stl) |
+| Launcher clip and breech cover (fit test first) | 1 | ASA | 0.20 mm, 3 walls, 20% gyroid, no supports | 1 h 22 min | 38 g | [launcher_clip.stl](parts/turret/stl/launcher_clip.stl) |
+| Launcher clip cap | 1 | PETG | 0.20 mm, 3 walls, 40% gyroid, no supports | 8 min | 4.1 g | [launcher_clip_cap.stl](parts/turret/stl/launcher_clip_cap.stl) |
+| Launcher rod collar | 1 | PETG | 0.20 mm, 4 walls, 100% gyroid, no supports | 1 min | 0.6 g | [launcher_collar.stl](parts/turret/stl/launcher_collar.stl) |
+| Launcher clip follower | 1 | PETG | 0.20 mm, 3 walls, 40% gyroid, no supports | 9 min | 4.8 g | [launcher_follower.stl](parts/turret/stl/launcher_follower.stl) |
+| Launcher muzzle cap | 1 | TPU95A | 0.20 mm, 3 walls, 40% gyroid, no supports | 8 min | 1.5 g | [launcher_muzzle_cap.stl](parts/turret/stl/launcher_muzzle_cap.stl) |
+| Launcher pinion (on the actuator servo's horn) (fit test first) | 1 | ASA | 0.20 mm, 4 walls, 100% gyroid, no supports | 8 min | 3.9 g | [launcher_pinion.stl](parts/turret/stl/launcher_pinion.stl) |
+| Launcher plunger (head and rod) (fit test first) | 1 | PETG | 0.20 mm, 4 walls, 100% gyroid, no supports | 45 min | 17 g | [launcher_plunger.stl](parts/turret/stl/launcher_plunger.stl) |
+| Launcher priming rack | 1 | PETG | 0.20 mm, 4 walls, 60% gyroid, no supports | 30 min | 14 g | [launcher_rack.stl](parts/turret/stl/launcher_rack.stl) |
+| Launcher safety catch | 1 | PETG | 0.20 mm, 4 walls, 100% gyroid, no supports | 3 min | 0.9 g | [launcher_safety.stl](parts/turret/stl/launcher_safety.stl) |
+| Launcher sear | 1 | PETG | 0.20 mm, 4 walls, 100% gyroid, no supports | 2 min | 1.0 g | [launcher_sear.stl](parts/turret/stl/launcher_sear.stl) |
+| Launcher actuator servo mount (fit test first) | 1 | ASA | 0.20 mm, 4 walls, 25% gyroid, no supports | 57 min | 28 g | [launcher_servo_mount.stl](parts/turret/stl/launcher_servo_mount.stl) |
+| Launcher shuttle (sliding breech block) (fit test first) | 1 | PETG | 0.20 mm, 4 walls, 40% gyroid, no supports | 41 min | 23 g | [launcher_shuttle.stl](parts/turret/stl/launcher_shuttle.stl) |
+| Launcher trigger arm (on the trigger servo's horn) (fit test first) | 1 | ASA | 0.20 mm, 4 walls, 100% gyroid, no supports | 4 min | 1.3 g | [launcher_trigger_arm.stl](parts/turret/stl/launcher_trigger_arm.stl) |
+| Launcher plunger tube (fit test first) | 1 | ASA | 0.20 mm, 6 walls, 40% gyroid, supports tree(auto), on build plate only | 1 h 27 min | 41 g | [launcher_tube.stl](parts/turret/stl/launcher_tube.stl) |
 | Pan base (pan servo) (fit test first) | 1 | ASA | 0.20 mm, 4 walls, 40% gyroid, no supports | 1 h 09 min | 36 g | [pan_base.stl](parts/turret/stl/pan_base.stl) |
 | Pan hub (on the pan horn) (fit test first) | 1 | ASA | 0.20 mm, 4 walls, 50% gyroid, no supports | 22 min | 11 g | [pan_hub.stl](parts/turret/stl/pan_hub.stl) |
 | Tilt bracket (on the pan horn) (fit test first) | 1 | ASA | 0.20 mm, 4 walls, 40% gyroid, no supports | 34 min | 16 g | [tilt_bracket.stl](parts/turret/stl/tilt_bracket.stl) |
-| **Total, all pieces** | | | | **5 h 29 min** | **177 g** | |
+| **Total, all pieces** | | | | **15 h 07 min** | **454 g** | |
 <!-- END GENERATED: printed-parts -->
 
 ### Fasteners
@@ -122,19 +226,26 @@ Totals for one turret with both camera plates, from the parts' metadata
 |---|---|---|
 | 1/4"-20 UNC hex nut | 1 | tripod thread, captive under the pan base (base_plate, 1) |
 | 1/4"-20 UNC x 3/8" button head screw | 1 | camera to the tripod plate shelf (camera_plate_tripod, 1) |
+| 3 x 10 mm steel dowel pin (ISO 8734) | 1 | cam pin in the shuttle's tab, pressed in (launcher_shuttle, 1) |
 | M2 x 10 pan head screw (or PA2.0 x 10 self-tapping) | 2 | pan servo to the pan base, from below into the idler-face holes (pan_base, 2) |
 | M2 x 3 mm brass heat-set insert (CNC Kitchen type, 3.2 mm hole) | 8 | Bus Servo Adapter standoffs, from the top (base_plate, 4); standoffs, from the top (camera_plate_b0385, 4) |
 | M2 x 5 socket head cap screw | 8 | Bus Servo Adapter (A) to the base plate standoffs (base_plate, 4); Arducam B0385 board to the camera plate standoffs (camera_plate_b0385, 4) |
-| M2 x 6 socket head cap screw (or PA2.0 x 6 self-tapping) | 2 | tilt servo into the tilt bracket's -y wall (heads in counterbores, 4 mm into the case) (tilt_bracket, 2) |
+| M2 x 6 socket head cap screw (or PA2.0 x 6 self-tapping) | 6 | trigger servo into the cap's cradle wall (heads in counterbores) (launcher_cap, 2); actuator servo into the mount's wall (heads in counterbores) (launcher_servo_mount, 2); tilt servo into the tilt bracket's -y wall (heads in counterbores, 4 mm into the case) (tilt_bracket, 2) |
 | M2 x 8 socket head cap screw (or PA2.0 x 8 self-tapping) | 2 | tilt servo into the tilt bracket's +y wall (heads in counterbores, 4 mm into the case) (tilt_bracket, 2) |
-| M3 x 10 socket head cap screw | 4 | pan base to the base plate or turret plate (pan_base, 4) |
-| M3 x 3 mm brass heat-set insert (CNC Kitchen type, 4 mm hole) | 8 | Arduino standoffs, from the top (base_plate, 4); crossbar, from the front, through holes pressed flush (camera_yoke, 4) |
-| M3 x 5 socket head cap screw | 16 | Arduino UNO to the base plate standoffs (base_plate, 4); camera yoke to the tilt servo's output and idler horns (no longer: the tip must stay inside the horn flange) (camera_yoke, 8); pan hub to the pan servo's horn (no longer: the tip must stay inside the horn flange) (pan_hub, 4) |
-| M3 x 5.7 mm brass heat-set insert (CNC Kitchen type, 4 mm hole) | 8 | pan base screws, from the top (base_plate, 4); column top face (tilt bracket screws) (pan_hub, 4) |
-| M3 x 6 socket head cap screw | 8 | camera plate to the camera yoke's crossbar inserts (camera_plate_b0385, 4); tripod plate to the camera yoke's crossbar inserts (camera_plate_tripod, 4) |
-| M3 x 8 socket head cap screw | 4 | tilt bracket to the pan hub (heads recessed in the floor) (tilt_bracket, 4) |
+| M3 nyloc nut | 3 | barrel clamp pinch screw (launcher_barrel_clamp, 1); clip cap pins (launcher_clip, 2) |
+| M3 x 10 socket head cap screw | 14 | launcher pedestal to the yoke's pad, from below (a long 2.5 mm key between the crossbar and the tilt servo) (camera_yoke, 2); launcher clip (cover) to the breech (launcher_clip, 4); actuator servo mount to the tube's lugs (launcher_servo_mount, 2); tube flange to the breech, lower pair (launcher_tube, 2); pan base to the base plate or turret plate (pan_base, 4) |
+| M3 x 12 socket head cap screw | 3 | rear cap to the plunger tube's rear flange (launcher_cap, 3) |
+| M3 x 14 socket head cap screw | 2 | barrel clamp to the breech's front wall (launcher_barrel_clamp, 2) |
+| M3 x 25 socket head cap screw | 3 | barrel clamp pinch screw (launcher_barrel_clamp, 1); clip cap pins, across the clip (launcher_clip, 2) |
+| M3 x 3 mm brass heat-set insert (CNC Kitchen type, 4 mm hole) | 12 | Arduino standoffs, from the top (base_plate, 4); crossbar, from the front, through holes pressed flush (camera_yoke, 4); rear plate, upper flange screws (launcher_breech, 2); rack screws, from the top (launcher_cam, 2) |
+| M3 x 5 socket head cap screw | 24 | Arduino UNO to the base plate standoffs (base_plate, 4); camera yoke to the tilt servo's output and idler horns (no longer: the tip must stay inside the horn flange) (camera_yoke, 8); pinion to the actuator servo's horn (no longer: the tip must stay inside the horn flange) (launcher_pinion, 4); trigger arm to the trigger servo's horn (no longer: the tip must stay inside the horn flange) (launcher_trigger_arm, 4); pan hub to the pan servo's horn (no longer: the tip must stay inside the horn flange) (pan_hub, 4) |
+| M3 x 5.7 mm brass heat-set insert (CNC Kitchen type, 4 mm hole) | 24 | pan base screws, from the top (base_plate, 4); rear plate, lower flange screws (launcher_breech, 2); wall bosses, cover screws, from the top (launcher_breech, 4); front wall, barrel clamp screws (launcher_breech, 2); pedestal underside, yoke pad screws (launcher_breech, 2); rod's tail end, along the rod (the collar's screw) (launcher_plunger, 1); rear flange (cap screws), along the tube (launcher_tube, 3); lugs at -y (actuator servo mount), from below (launcher_tube, 2); column top face (tilt bracket screws) (pan_hub, 4) |
+| M3 x 6 socket head cap screw | 10 | camera plate to the camera yoke's crossbar inserts (camera_plate_b0385, 4); tripod plate to the camera yoke's crossbar inserts (camera_plate_tripod, 4); rack to the cam plate (launcher_rack, 2) |
+| M3 x 8 socket head cap screw | 7 | rod collar to the plunger rod's tail (launcher_collar, 1); tube flange to the breech, upper pair (launcher_tube, 2); tilt bracket to the pan hub (heads recessed in the floor) (tilt_bracket, 4) |
+| NBR 70 O-ring 10 x 2 mm | 1 | tube outlet spigot in the breech (launcher_tube, 1) |
+| NBR 70 O-ring 27 x 2.5 mm | 1 | plunger head seal (launcher_plunger, 1) |
 | adhesive rubber foot, 10-12 mm | 4 | base plate corners, for bench use (base_plate, 4) |
-| zip tie 2.5 mm | 6 | servo bus and USB cables on the base plate (base_plate, 3); camera USB cable at the camera plate's bottom slot (camera_plate_b0385, 1); servo cables at the pan base's rear hook (pan_base, 1); cable loop at the tilt bracket's rear hook (tilt_bracket, 1) |
+| zip tie 2.5 mm | 8 | servo bus and USB cables on the base plate (base_plate, 3); camera USB cable at the camera plate's bottom slot (camera_plate_b0385, 1); trigger servo cable at the cap's cradle (launcher_cap, 1); actuator servo cable at the mount (launcher_servo_mount, 1); servo cables at the pan base's rear hook (pan_base, 1); cable loop at the tilt bracket's rear hook (tilt_bracket, 1) |
 <!-- END GENERATED: fasteners -->
 
 ## Integration, firmware and ROS contract
@@ -159,8 +270,11 @@ either.
 
 Firmware (`turret_firmware.ino`, shared core in `src/`):
 
-- Servos: two ST3215/STS3215 on a half-duplex bus at 1 Mbps on the board's
-  D0/D1 UART (`Serial1`), Feetech STS protocol implemented in `src/sts_servo.*`
+- Servos: the ST3215/STS3215s of pan and tilt and, with the foam dart
+  launcher, its priming actuator (ID 14) and trigger (ID 15)
+  (`applications/arduino/README.md` has the launcher's settings), on a
+  half-duplex bus at 1 Mbps on the board's D0/D1 UART (`Serial1`), Feetech
+  STS protocol implemented in `src/sts_servo.*`
   (no external servo library): sync write of goal position, speed and
   acceleration (registers 41-47), present position read (register 56), torque
   enable (register 40). Defaults in `src/turret_config.h`: pan ID 12, tilt ID
@@ -196,13 +310,15 @@ supply.
   container for flashing firmware.
 - Serial protocol (ASCII lines, `\n` terminated, radians, 115200 baud by
   default, see `config/arduino.env`):
-  - host to firmware `SET pan_joint <pan> tilt_joint <tilt>`: move to the
-    position (already clamped to the joint limits by the bridge);
+  - host to firmware `SET pan_joint <pan> tilt_joint <tilt>` (with the
+    launcher also `actuator_joint <m>` and `trigger_joint <rad>`): move to
+    the position (already clamped to the joint limits by the bridge);
   - host to firmware `STOP`: stop moving and hold (or disable torque). Sent
     when the software e-stop engages, on bridge shutdown, and after
     (re)connecting while the e-stop is engaged;
-  - firmware to host `POS pan_joint <pan> tilt_joint <tilt>`: measured joint
-    positions, e.g. at 20-50 Hz. These are the only source of
+  - firmware to host `POS pan_joint <pan> tilt_joint <tilt>` (and the
+    launcher's joints when its servos answered): measured joint positions,
+    e.g. at 20-50 Hz. These are the only source of
     `/turret/joint_states`; the bridge never echoes commands;
   - firmware to host `ERR <text>`: shown in the bridge diagnostics.
 - The firmware also stops on its own when no `SET` arrives for 0.5 s, applies
@@ -360,8 +476,8 @@ multicast over Wi-Fi or Ethernet).
 
 Direct from a Linux host (no Arduino)
 
-The bridge's `sts` transport (`TURRET_ARDUINO_TRANSPORT=sts`) drives the two
-servos from any Linux host with a UART or a USB bus servo adapter, without a
+The bridge's `sts` transport (`TURRET_ARDUINO_TRANSPORT=sts`) drives the
+servos (pan, tilt and the launcher's two) from any Linux host with a UART or a USB bus servo adapter, without a
 microcontroller: Feetech STS packets at 1 Mbps on the host's serial port,
 through a half-duplex adapter that also feeds the servos from the servo
 supply. The RACECAR Turret (`systems/racecar_turret`) uses it on the car's

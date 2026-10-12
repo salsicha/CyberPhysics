@@ -7,6 +7,7 @@ scenarios mirror test_turret_bridge.py (serial transport): no fabricated joint
 states, e-stop and link gating, plus RPC-specific failures.
 """
 import math
+from array import array
 import select
 import shutil
 import socket
@@ -23,6 +24,24 @@ from conftest import REPO, install_ros_stubs, load_script
 msgpack = pytest.importorskip('msgpack')
 
 
+class RclpyJointState:
+    """sensor_msgs/JointState as rclpy keeps it: position an array.array,
+    so concatenating a list to it fails as it does in ROS."""
+
+    def __init__(self):
+        self.header = NS(stamp=None)
+        self.name = []
+        self._position = array('d')
+
+    @property
+    def position(self):
+        return self._position
+
+    @position.setter
+    def position(self, values):
+        self._position = array('d', values)
+
+
 @pytest.fixture(scope='module')
 def module():
     with patch.dict(sys.modules):
@@ -33,7 +52,7 @@ def module():
         module = load_script(REPO / 'applications/pantiltros/scripts/turret_arduino_bridge.py',
                              'turret_arduino_bridge_uno_q')
         module.Bool = lambda data: NS(data=data)
-        module.JointState = lambda: NS(header=NS(stamp=None), name=[], position=[])
+        module.JointState = RclpyJointState
         yield module
 
 
@@ -97,7 +116,7 @@ class FakeRouter:
             if self.mcu == 'absent':
                 self.send([1, msgid, [2, f'method {method} not available'], None])
             elif self.mcu == 'running':
-                if method == 'turret/set':
+                if method in ('turret/set', 'turret/set_all'):
                     self.send([1, msgid, None, all(math.isfinite(v) for v in params)])
                 elif method == 'turret/stop':
                     self.send([1, msgid, None, True])
@@ -194,8 +213,10 @@ def last_ready(bridge):
 def test_parse_position_params(module):
     assert module.parse_position_params([0.25, -0.1]) == (0.25, -0.1)
     assert module.parse_position_params((1, 0)) == (1.0, 0.0)
-    for bad in ([], [0.1], [0.1, 0.2, 0.3], [math.nan, 0.0], [0.0, math.inf],
-                ['0.1', 0.2], [True, 0.0], None, 'POS', {'pan_joint': 0.1}):
+    assert module.parse_position_params([0.25, -0.1, 0.07, 0.6]) == (0.25, -0.1, 0.07, 0.6)
+    for bad in ([], [0.1], [0.1, 0.2, 0.3], [0.1, 0.2, 0.3, 0.4, 0.5], [math.nan, 0.0],
+                [0.0, math.inf], [0.1, 0.2, 0.0, math.nan], ['0.1', 0.2], [True, 0.0], None,
+                'POS', {'pan_joint': 0.1}):
         assert module.parse_position_params(bad) is None
 
 
@@ -451,3 +472,59 @@ def test_link_matches_responses_and_expires_requests(module, router):
         'method x not available (code 2)'
     assert module.rpc_error_code([5, 'route already exists: x']) == 5
     assert module.rpc_error_code('text') is None
+
+
+def launcher_command(pan, tilt, actuator=None, trigger=None):
+    names, values = ['pan_joint', 'tilt_joint'], [pan, tilt]
+    for name, value in (('actuator_joint', actuator), ('trigger_joint', trigger)):
+        if value is not None:
+            names.append(name)
+            values.append(value)
+    return NS(name=names, position=values)
+
+
+def test_launcher_travels_with_set_all_and_joins_the_joint_states(bridge, router):
+    bridge.actuator_fitted = True
+    connect(bridge, router)
+    bridge._joint_command(launcher_command(0.2, 0.1, 0.038, 0.6))
+    bridge._joint_command(launcher_command(0.2, 0.1, 5.0, 5.0))
+    bridge._joint_command(launcher_command(0.2, 0.1, 0.02))   # trigger to 0
+    bridge._joint_command(command(0.2, 0.1))                  # no launcher: turret/set
+    router.pump()
+    assert router.requests[-4:] == [('turret/set_all', [0.2, 0.1, 0.038, 0.6]),
+                                    ('turret/set_all', [0.2, 0.1, 0.038, 0.6]),
+                                    ('turret/set_all', [0.2, 0.1, 0.02, 0.0]),
+                                    ('turret/set', [0.2, 0.1])]
+    router.notify('turret/pos', [0.2, 0.1, 0.0375, 0.0])
+    router.notify('turret/pos', [0.2, 0.1])  # a launcher servo did not answer
+    bridge._poll()
+    states = [(list(c[0][0].name), list(c[0][0].position))
+              for c in bridge.joint_state_pub.publish.call_args_list]
+    assert states == [(['pan_joint', 'tilt_joint', 'actuator_joint', 'trigger_joint'],
+                       [0.2, 0.1, 0.0375, 0.0]),
+                      (['pan_joint', 'tilt_joint'], [0.2, 0.1])]
+    bridge._emergency_stop(NS(data=True))  # the firmware's STOP makes the launcher safe
+    router.pump()
+    assert router.methods()[-1] == 'turret/stop'
+
+
+def test_firmware_without_set_all_is_named(bridge, router):
+    bridge.actuator_fitted = True
+    connect(bridge, router)
+    router.mcu = 'absent'
+    bridge._joint_command(launcher_command(0.0, 0.0, 0.0, 0.0))
+    router.pump()
+    bridge._poll()
+    assert 'turret/set_all not available' in bridge.last_error
+    assert 'without the launcher' in bridge.last_error
+
+
+def test_without_a_launcher_the_rpc_is_unchanged(bridge, router):
+    connect(bridge, router)
+    bridge._joint_command(launcher_command(0.2, 0.1, 0.070, 0.6))
+    router.pump()
+    assert router.requests[-1] == ('turret/set', [0.2, 0.1])
+    assert bridge.ignored_actuator_commands == 1
+    router.notify('turret/pos', [0.2, 0.1, 0.03, 0.0])  # firmware built with the launcher
+    bridge._poll()
+    assert list(bridge.joint_state_pub.publish.call_args[0][0].name) == ['pan_joint', 'tilt_joint']

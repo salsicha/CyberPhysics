@@ -75,7 +75,20 @@
     "quantization_rad": 0.00153,
     "backlash_rad": 0.003,
     "deadband_rad": 0.0025,
-    "emergency_stop_intervals_s": []
+    "emergency_stop_intervals_s": [],
+    "launcher": {
+      "joints": [
+        "actuator_joint",
+        "trigger_joint"
+      ],
+      "stroke_m": 0.038,
+      "sear_catch_m": 0.03425,
+      "pinion_radius_m": 0.0135,
+      "trigger_fire_rad": 0.6,
+      "trigger_release_rad": 0.5194,
+      "speed_steps_s": 2000,
+      "watchdog_s": 0.5
+    }
   },
   "yolo": {
     "family": "YOLOE-26",

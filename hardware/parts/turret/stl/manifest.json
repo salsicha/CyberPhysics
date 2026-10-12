@@ -367,23 +367,23 @@
    },
    "stl": "hardware/parts/turret/stl/camera_yoke.stl",
    "step": "generated/parts/turret/camera_yoke.step",
-   "volume_cm3": 9.65,
-   "area_cm2": 60.1,
+   "volume_cm3": 10.75,
+   "area_cm2": 67.0,
    "print_size_mm": [
-    30.2,
+    30.8,
     47.2,
     32.8
    ],
    "footprint_mm": [
-    30.2,
+    30.8,
     47.2
    ],
-   "triangles": 2384,
+   "triangles": 2752,
    "estimate": {
-    "mass_g": 9.2,
-    "time_min": 21,
-    "mass_g_all": 9.2,
-    "time_min_all": 21
+    "mass_g": 10.3,
+    "time_min": 23,
+    "mass_g_all": 10.3,
+    "time_min_all": 23
    },
    "validation": {
     "passed": true,
@@ -392,9 +392,9 @@
     "bodies": 1,
     "fits_bed": true,
     "min_wall_mm": 1.28,
-    "min_wall_p1_mm": 1.54,
+    "min_wall_p1_mm": 1.55,
     "min_wall_required_mm": 1.2,
-    "bed_contact_mm2": 1367,
+    "bed_contact_mm2": 1385,
     "errors": []
    },
    "mates_with": [
@@ -415,6 +415,12 @@
      "dimensions": "four M3 x 3 inserts in the crossbar",
      "source": "hardware/parts/turret/_frame.py",
      "verified": true
+    },
+    {
+     "part": "launcher_breech (printed)",
+     "dimensions": "two M3 x 10 from below through the pad into the pedestal's inserts",
+     "source": "hardware/parts/turret/_frame.py",
+     "verified": true
     }
    ],
    "inserts": [
@@ -429,10 +435,1590 @@
      "item": "M3 x 5 socket head cap screw",
      "qty": 8,
      "use": "camera yoke to the tilt servo's output and idler horns (no longer: the tip must stay inside the horn flange)"
+    },
+    {
+     "item": "M3 x 10 socket head cap screw",
+     "qty": 2,
+     "use": "launcher pedestal to the yoke's pad, from below (a long 2.5 mm key between the crossbar and the tilt servo)"
     }
    ],
    "notes": [
     "With the tilt servo at its centre (step 2048), press both horns on so a hole pair lies at 45 deg, then fit the yoke with the crossbar forward; set the camera level with the zero offset afterwards."
+   ]
+  },
+  {
+   "id": "launcher_barrel_clamp",
+   "name": "Launcher barrel clamp",
+   "quantity": 1,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "outdoors on the RACECAR Turret",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 60,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "the rear face on the plate",
+    "rotate": [
+     [
+      "Y",
+      -90
+     ]
+    ]
+   },
+   "stl": "hardware/parts/turret/stl/launcher_barrel_clamp.stl",
+   "step": "generated/parts/turret/launcher_barrel_clamp.step",
+   "volume_cm3": 7.05,
+   "area_cm2": 39.9,
+   "print_size_mm": [
+    27.1,
+    30.0,
+    12.0
+   ],
+   "footprint_mm": [
+    27.1,
+    30.0
+   ],
+   "triangles": 1548,
+   "estimate": {
+    "mass_g": 7.0,
+    "time_min": 14,
+    "mass_g_all": 7.0,
+    "time_min_all": 14
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 1.57,
+    "min_wall_p1_mm": 1.76,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 639,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "K&S Precision Metals 8140 brass tube (barrel)",
+     "dimensions": "17/32 in OD (13.49 mm) in a 13.64 mm split collar",
+     "source": "ksmetals.com, round brass tube 17/32 in x 0.014 in wall, SKU 8140",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M3 x 14 socket head cap screw",
+     "qty": 2,
+     "use": "barrel clamp to the breech's front wall"
+    },
+    {
+     "item": "M3 x 25 socket head cap screw",
+     "qty": 1,
+     "use": "barrel clamp pinch screw"
+    },
+    {
+     "item": "M3 nyloc nut",
+     "qty": 1,
+     "use": "barrel clamp pinch screw"
+    }
+   ],
+   "notes": []
+  },
+  {
+   "id": "launcher_breech",
+   "name": "Launcher breech (with the pedestal on the camera yoke)",
+   "quantity": 1,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "carries the launcher on the tilt stage; outdoors on the RACECAR Turret",
+   "flight_critical": false,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 25,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "upright: the pedestal's underside on the plate, channel open upward",
+    "rotate": []
+   },
+   "stl": "hardware/parts/turret/stl/launcher_breech.stl",
+   "step": "generated/parts/turret/launcher_breech.step",
+   "volume_cm3": 73.67,
+   "area_cm2": 331.9,
+   "print_size_mm": [
+    92.0,
+    80.2,
+    60.5
+   ],
+   "footprint_mm": [
+    92.0,
+    80.2
+   ],
+   "triangles": 2736,
+   "estimate": {
+    "mass_g": 55.2,
+    "time_min": 106,
+    "mass_g_all": 55.2,
+    "time_min_all": 106
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 1.3,
+    "min_wall_p1_mm": 1.3,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 1042,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "K&S Precision Metals 8140 brass tube (barrel)",
+     "dimensions": "17/32 in OD (13.49 mm) in a 13.69 mm seat, ID 0.503 in on the bore; its rear face flush with the chamber's front face",
+     "source": "ksmetals.com, round brass tube 17/32 in x 0.014 in wall, SKU 8140 (OD/ID +-0.002 in)",
+     "verified": true
+    },
+    {
+     "part": "launcher_tube (printed)",
+     "dimensions": "outlet spigot 13.6 mm with a 10 x 2 O-ring in a 13.9 mm socket; four M3 inserts for its flange",
+     "source": "hardware/parts/turret/_launcher.py",
+     "verified": true
+    },
+    {
+     "part": "launcher_shuttle, launcher_clip, launcher_barrel_clamp (printed)",
+     "dimensions": "channel 54.9 x 76 mm, 0.15 mm clearance; four M3 inserts in the wall bosses; two in the front wall",
+     "source": "hardware/parts/turret/_launcher.py",
+     "verified": true
+    },
+    {
+     "part": "camera_yoke (printed)",
+     "dimensions": "two M3 from below the yoke's pad into the pedestal's inserts",
+     "source": "hardware/parts/turret/_frame.py",
+     "verified": true
+    }
+   ],
+   "inserts": [
+    {
+     "size": "M3",
+     "qty": 2,
+     "where": "rear plate, lower flange screws"
+    },
+    {
+     "size": "M3-short",
+     "qty": 2,
+     "where": "rear plate, upper flange screws"
+    },
+    {
+     "size": "M3",
+     "qty": 4,
+     "where": "wall bosses, cover screws, from the top"
+    },
+    {
+     "size": "M3",
+     "qty": 2,
+     "where": "front wall, barrel clamp screws"
+    },
+    {
+     "size": "M3",
+     "qty": 2,
+     "where": "pedestal underside, yoke pad screws"
+    }
+   ],
+   "fasteners": [],
+   "notes": [
+    "Print it with the shuttle and the clip first: the shuttle must slide its 17 mm in the channel with the cover screwed on, without play or a tight spot (sand the shuttle, not the channel)."
+   ]
+  },
+  {
+   "id": "launcher_cam",
+   "name": "Launcher cam plate",
+   "quantity": 1,
+   "material": "PETG",
+   "material_fallback": null,
+   "material_reason": "the pin slides in its slot",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu PETG Basic",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 60,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "flat",
+    "rotate": []
+   },
+   "stl": "hardware/parts/turret/stl/launcher_cam.stl",
+   "step": "generated/parts/turret/launcher_cam.step",
+   "volume_cm3": 5.75,
+   "area_cm2": 38.8,
+   "print_size_mm": [
+    60.0,
+    24.4,
+    4.5
+   ],
+   "footprint_mm": [
+    60.0,
+    24.4
+   ],
+   "triangles": 584,
+   "estimate": {
+    "mass_g": 6.7,
+    "time_min": 12,
+    "mass_g_all": 6.7,
+    "time_min_all": 12
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 1.3,
+    "min_wall_p1_mm": 1.68,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 1278,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "3 x 10 mm dowel pin (in the shuttle)",
+     "dimensions": "slot 3.4 mm",
+     "source": "hardware/parts/turret/_launcher.py",
+     "verified": true
+    }
+   ],
+   "inserts": [
+    {
+     "size": "M3-short",
+     "qty": 2,
+     "where": "rack screws, from the top"
+    }
+   ],
+   "fasteners": [],
+   "notes": []
+  },
+  {
+   "id": "launcher_cap",
+   "name": "Launcher rear cap, sear housing and trigger servo cradle",
+   "quantity": 1,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "holds a servo that runs warm; outdoors on the RACECAR Turret",
+   "flight_critical": false,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 25,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "the cap's front face on the plate, housing and cradle up",
+    "rotate": [
+     [
+      "Y",
+      90
+     ]
+    ]
+   },
+   "stl": "hardware/parts/turret/stl/launcher_cap.stl",
+   "step": "generated/parts/turret/launcher_cap.step",
+   "volume_cm3": 33.63,
+   "area_cm2": 183.8,
+   "print_size_mm": [
+    52.0,
+    84.2,
+    62.3
+   ],
+   "footprint_mm": [
+    52.0,
+    84.2
+   ],
+   "triangles": 2262,
+   "estimate": {
+    "mass_g": 27.9,
+    "time_min": 59,
+    "mass_g_all": 27.9,
+    "time_min_all": 59
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 1.3,
+    "min_wall_p1_mm": 1.55,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 3039,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "Waveshare ST3215 servo (trigger, ID 15)",
+     "dimensions": "case 45.22 x 24.72 x 32 mm; M2 into the idler-face hole pair at X = 42.86, +-10.25 mm",
+     "source": "Waveshare ST3215 dimension drawing (https://www.waveshare.com/img/devkit/accessories/ST3215-Servo/ST3215-Servo-details-size.jpg, on https://www.waveshare.com/st3215-servo.htm) and Feetech STS3215 outline and horn drawings (https://www.feetechrc.com/525603.html); ratings from https://www.waveshare.com/wiki/ST3215_Servo",
+     "verified": true
+    },
+    {
+     "part": "ST3215 bus plugs",
+     "dimensions": "on the idler face at X 20.9-26.8 mm, clear of the cradle wall (scaled)",
+     "source": "Waveshare ST3215 dimension drawing (https://www.waveshare.com/img/devkit/accessories/ST3215-Servo/ST3215-Servo-details-size.jpg, on https://www.waveshare.com/st3215-servo.htm) and Feetech STS3215 outline and horn drawings (https://www.feetechrc.com/525603.html); ratings from https://www.waveshare.com/wiki/ST3215_Servo",
+     "verified": false
+    },
+    {
+     "part": "launcher_tube, launcher_sear, launcher_safety (printed)",
+     "dimensions": "three M3 x 12 into the tube's rear flange; sear slot; safety slot",
+     "source": "hardware/parts/turret/_launcher.py",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M3 x 12 socket head cap screw",
+     "qty": 3,
+     "use": "rear cap to the plunger tube's rear flange"
+    },
+    {
+     "item": "M2 x 6 socket head cap screw (or PA2.0 x 6 self-tapping)",
+     "qty": 2,
+     "use": "trigger servo into the cap's cradle wall (heads in counterbores)"
+    },
+    {
+     "item": "zip tie 2.5 mm",
+     "qty": 1,
+     "use": "trigger servo cable at the cap's cradle"
+    }
+   ],
+   "notes": [
+    "Fit the cap screws before the trigger servo: its horn covers them."
+   ]
+  },
+  {
+   "id": "launcher_clip",
+   "name": "Launcher clip and breech cover",
+   "quantity": 1,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "on the tilt stage outdoors; the roof must stay flat",
+   "flight_critical": false,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 3,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 20,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "roof down: the cover's underside on the plate, clip up",
+    "rotate": []
+   },
+   "stl": "hardware/parts/turret/stl/launcher_clip.stl",
+   "step": "generated/parts/turret/launcher_clip.step",
+   "volume_cm3": 35.56,
+   "area_cm2": 368.3,
+   "print_size_mm": [
+    77.3,
+    72.4,
+    97.2
+   ],
+   "footprint_mm": [
+    77.3,
+    72.4
+   ],
+   "triangles": 1920,
+   "estimate": {
+    "mass_g": 38.1,
+    "time_min": 82,
+    "mass_g_all": 38.1,
+    "time_min_all": 82
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 1.3,
+    "min_wall_p1_mm": 1.3,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 4571,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "Elite-size foam dart",
+     "dimensions": "outlet 13.4 x 73.8 mm, clip 15 mm wide, six darts",
+     "source": "community measurements (blasterhub.com darts comparison, blastercentral.com); no Hasbro drawing",
+     "verified": false
+    },
+    {
+     "part": "launcher_breech (printed)",
+     "dimensions": "four M3 x 10 into the wall bosses",
+     "source": "hardware/parts/turret/_launcher.py",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M3 x 10 socket head cap screw",
+     "qty": 4,
+     "use": "launcher clip (cover) to the breech"
+    },
+    {
+     "item": "M3 x 25 socket head cap screw",
+     "qty": 2,
+     "use": "clip cap pins, across the clip"
+    },
+    {
+     "item": "M3 nyloc nut",
+     "qty": 2,
+     "use": "clip cap pins"
+    }
+   ],
+   "notes": [
+    "Reload: take out the two pins, lift the cap, spring and follower out, drop up to six darts in, refit."
+   ]
+  },
+  {
+   "id": "launcher_clip_cap",
+   "name": "Launcher clip cap",
+   "quantity": 1,
+   "material": "PETG",
+   "material_fallback": null,
+   "material_reason": "takes the clip spring",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu PETG Basic",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 3,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 40,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "flat, spring boss up",
+    "rotate": [
+     [
+      "X",
+      180
+     ]
+    ]
+   },
+   "stl": "hardware/parts/turret/stl/launcher_clip_cap.stl",
+   "step": "generated/parts/turret/launcher_clip_cap.step",
+   "volume_cm3": 3.7,
+   "area_cm2": 28.8,
+   "print_size_mm": [
+    73.2,
+    14.8,
+    9.0
+   ],
+   "footprint_mm": [
+    73.2,
+    14.8
+   ],
+   "triangles": 180,
+   "estimate": {
+    "mass_g": 4.1,
+    "time_min": 8,
+    "mass_g_all": 4.1,
+    "time_min_all": 8
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 3.0,
+    "min_wall_p1_mm": 3.0,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 1084,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "launcher_clip (printed)",
+     "dimensions": "under the two M3 pins",
+     "source": "hardware/parts/turret/_launcher.py",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [],
+   "notes": []
+  },
+  {
+   "id": "launcher_collar",
+   "name": "Launcher rod collar",
+   "quantity": 1,
+   "material": "PETG",
+   "material_fallback": null,
+   "material_reason": "the rack's hook pushes it: tough",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu PETG Basic",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 100,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "flat",
+    "rotate": [
+     [
+      "Y",
+      90
+     ]
+    ]
+   },
+   "stl": "hardware/parts/turret/stl/launcher_collar.stl",
+   "step": "generated/parts/turret/launcher_collar.step",
+   "volume_cm3": 0.43,
+   "area_cm2": 4.5,
+   "print_size_mm": [
+    14.0,
+    14.0,
+    3.0
+   ],
+   "footprint_mm": [
+    14.0,
+    14.0
+   ],
+   "triangles": 336,
+   "estimate": {
+    "mass_g": 0.6,
+    "time_min": 1,
+    "mass_g_all": 0.6,
+    "time_min_all": 1
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 3.0,
+    "min_wall_p1_mm": 3.0,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 144,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "launcher_plunger, launcher_rack (printed)",
+     "dimensions": "14 mm on the 8 mm rod's end (M3 insert); the hook's slot is 8.8 mm",
+     "source": "hardware/parts/turret/_launcher.py",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M3 x 8 socket head cap screw",
+     "qty": 1,
+     "use": "rod collar to the plunger rod's tail"
+    }
+   ],
+   "notes": []
+  },
+  {
+   "id": "launcher_follower",
+   "name": "Launcher clip follower",
+   "quantity": 1,
+   "material": "PETG",
+   "material_fallback": null,
+   "material_reason": "slides in the clip",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu PETG Basic",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 3,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 40,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "flat, spring boss up",
+    "rotate": []
+   },
+   "stl": "hardware/parts/turret/stl/launcher_follower.stl",
+   "step": "generated/parts/turret/launcher_follower.step",
+   "volume_cm3": 4.79,
+   "area_cm2": 30.6,
+   "print_size_mm": [
+    73.2,
+    14.8,
+    10.0
+   ],
+   "footprint_mm": [
+    73.2,
+    14.8
+   ],
+   "triangles": 180,
+   "estimate": {
+    "mass_g": 4.8,
+    "time_min": 9,
+    "mass_g_all": 4.8,
+    "time_min_all": 9
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 4.0,
+    "min_wall_p1_mm": 4.0,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 1084,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "launcher_clip (printed)",
+     "dimensions": "14.8 mm in the 15 mm clip; the outlet is 13.4 mm",
+     "source": "hardware/parts/turret/_launcher.py",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [],
+   "notes": []
+  },
+  {
+   "id": "launcher_muzzle_cap",
+   "name": "Launcher muzzle cap",
+   "quantity": 1,
+   "material": "TPU95A",
+   "material_fallback": null,
+   "material_reason": "grips the barrel and does not scratch it",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu TPU 95A HF (or Bambu TPU 95A)",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 3,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 40,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "closed end on the plate",
+    "rotate": [
+     [
+      "Y",
+      90
+     ]
+    ]
+   },
+   "stl": "hardware/parts/turret/stl/launcher_muzzle_cap.stl",
+   "step": "generated/parts/turret/launcher_muzzle_cap.step",
+   "volume_cm3": 1.22,
+   "area_cm2": 16.0,
+   "print_size_mm": [
+    21.7,
+    16.6,
+    12.0
+   ],
+   "footprint_mm": [
+    21.7,
+    16.6
+   ],
+   "triangles": 540,
+   "estimate": {
+    "mass_g": 1.5,
+    "time_min": 8,
+    "mass_g_all": 1.5,
+    "time_min_all": 8
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 1.25,
+    "min_wall_p1_mm": 1.47,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 218,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "K&S Precision Metals 8140 brass tube (barrel)",
+     "dimensions": "13.74 mm bore, 10 mm deep",
+     "source": "ksmetals.com, round brass tube 17/32 in x 0.014 in wall, SKU 8140",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [],
+   "notes": [
+    "Fit it, and the safety, whenever the launcher is carried or worked on."
+   ]
+  },
+  {
+   "id": "launcher_pinion",
+   "name": "Launcher pinion (on the actuator servo's horn)",
+   "quantity": 1,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "on a servo that runs warm; runs against the PETG rack",
+   "flight_critical": false,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 100,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "flat: the horn face on the plate, counterbores up",
+    "rotate": [
+     [
+      "X",
+      90
+     ]
+    ]
+   },
+   "stl": "hardware/parts/turret/stl/launcher_pinion.stl",
+   "step": "generated/parts/turret/launcher_pinion.step",
+   "volume_cm3": 3.64,
+   "area_cm2": 28.7,
+   "print_size_mm": [
+    29.4,
+    29.1,
+    8.0
+   ],
+   "footprint_mm": [
+    29.4,
+    29.1
+   ],
+   "triangles": 3084,
+   "estimate": {
+    "mass_g": 3.9,
+    "time_min": 8,
+    "mass_g_all": 3.9,
+    "time_min_all": 8
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 1.63,
+    "min_wall_p1_mm": 1.68,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 503,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "Waveshare ST3215 output horn (actuator servo)",
+     "dimensions": "4 x M3 on a 14 mm circle; M3 x 5 through 3 mm of gear",
+     "source": "Waveshare ST3215 dimension drawing (https://www.waveshare.com/img/devkit/accessories/ST3215-Servo/ST3215-Servo-details-size.jpg, on https://www.waveshare.com/st3215-servo.htm) and Feetech STS3215 outline and horn drawings (https://www.feetechrc.com/525603.html); ratings from https://www.waveshare.com/wiki/ST3215_Servo",
+     "verified": true
+    },
+    {
+     "part": "Waveshare ST3215 horn thread",
+     "dimensions": "M3 tapped (Feetech's horn drawing; Waveshare's does not state it)",
+     "source": "Waveshare ST3215 dimension drawing (https://www.waveshare.com/img/devkit/accessories/ST3215-Servo/ST3215-Servo-details-size.jpg, on https://www.waveshare.com/st3215-servo.htm) and Feetech STS3215 outline and horn drawings (https://www.feetechrc.com/525603.html); ratings from https://www.waveshare.com/wiki/ST3215_Servo",
+     "verified": false
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M3 x 5 socket head cap screw",
+     "qty": 4,
+     "use": "pinion to the actuator servo's horn (no longer: the tip must stay inside the horn flange)"
+    }
+   ],
+   "notes": []
+  },
+  {
+   "id": "launcher_plunger",
+   "name": "Launcher plunger (head and rod)",
+   "quantity": 1,
+   "material": "PETG",
+   "material_fallback": null,
+   "material_reason": "tough: it takes the shot's impact and the sear's load",
+   "flight_critical": false,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu PETG Basic",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 100,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "head down, rod vertical",
+    "rotate": [
+     [
+      "Y",
+      90
+     ]
+    ]
+   },
+   "stl": "hardware/parts/turret/stl/launcher_plunger.stl",
+   "step": "generated/parts/turret/launcher_plunger.step",
+   "volume_cm3": 13.14,
+   "area_cm2": 54.7,
+   "print_size_mm": [
+    31.4,
+    31.3,
+    105.5
+   ],
+   "footprint_mm": [
+    31.4,
+    31.3
+   ],
+   "triangles": 1214,
+   "estimate": {
+    "mass_g": 16.7,
+    "time_min": 45,
+    "mass_g_all": 16.7,
+    "time_min_all": 45
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 1.99,
+    "min_wall_p1_mm": 1.99,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 771,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "NBR 70 O-ring 27 x 2.5 mm (plunger head)",
+     "dimensions": "groove root 27.6 mm, 3.4 mm wide, in the 32 mm bore",
+     "source": "standard metric O-ring size; groove for a light dynamic squeeze",
+     "verified": false
+    },
+    {
+     "part": "launcher_cap, launcher_sear, launcher_rack (printed)",
+     "dimensions": "rod 8 mm; groove core 5 mm; collar 14 mm",
+     "source": "hardware/parts/turret/_launcher.py",
+     "verified": true
+    }
+   ],
+   "inserts": [
+    {
+     "size": "M3",
+     "qty": 1,
+     "where": "rod's tail end, along the rod (the collar's screw)"
+    }
+   ],
+   "fasteners": [
+    {
+     "item": "NBR 70 O-ring 27 x 2.5 mm",
+     "qty": 1,
+     "use": "plunger head seal"
+    }
+   ],
+   "notes": [
+    "Silicone grease on the O-ring. The collar goes on after the rod is through the cap."
+   ]
+  },
+  {
+   "id": "launcher_rack",
+   "name": "Launcher priming rack",
+   "quantity": 1,
+   "material": "PETG",
+   "material_fallback": null,
+   "material_reason": "tough at the teeth and the hook; slides on the ASA mount",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu PETG Basic",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 60,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "on its side: the tooth profile on the plate",
+    "rotate": [
+     [
+      "X",
+      90
+     ]
+    ]
+   },
+   "stl": "hardware/parts/turret/stl/launcher_rack.stl",
+   "step": "generated/parts/turret/launcher_rack.step",
+   "volume_cm3": 12.06,
+   "area_cm2": 70.7,
+   "print_size_mm": [
+    119.0,
+    37.1,
+    36.0
+   ],
+   "footprint_mm": [
+    119.0,
+    37.1
+   ],
+   "triangles": 568,
+   "estimate": {
+    "mass_g": 14.4,
+    "time_min": 30,
+    "mass_g_all": 14.4,
+    "time_min_all": 30
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 1.3,
+    "min_wall_p1_mm": 1.8,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 1081,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "launcher_pinion, launcher_servo_mount, launcher_cam, launcher_plunger (printed)",
+     "dimensions": "module 1.5, 20 deg stub teeth; hook on the 14 mm collar; two M3 into the cam plate",
+     "source": "hardware/parts/turret/_gears.py",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M3 x 6 socket head cap screw",
+     "qty": 2,
+     "use": "rack to the cam plate"
+    }
+   ],
+   "notes": [
+    "PTFE dry lube on the teeth and where it slides."
+   ]
+  },
+  {
+   "id": "launcher_safety",
+   "name": "Launcher safety catch",
+   "quantity": 1,
+   "material": "PETG",
+   "material_fallback": null,
+   "material_reason": "a sliding part with a detent",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu PETG Basic",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 100,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "flat, grip up",
+    "rotate": []
+   },
+   "stl": "hardware/parts/turret/stl/launcher_safety.stl",
+   "step": "generated/parts/turret/launcher_safety.step",
+   "volume_cm3": 0.68,
+   "area_cm2": 6.4,
+   "print_size_mm": [
+    20.3,
+    8.0,
+    9.0
+   ],
+   "footprint_mm": [
+    20.3,
+    8.0
+   ],
+   "triangles": 20,
+   "estimate": {
+    "mass_g": 0.9,
+    "time_min": 3,
+    "mass_g_all": 0.9,
+    "time_min_all": 3
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 3.0,
+    "min_wall_p1_mm": 3.0,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 162,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "launcher_cap, launcher_sear (printed)",
+     "dimensions": "slot 8.4 x 3.4 mm in the housing",
+     "source": "hardware/parts/turret/_launcher.py",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [],
+   "notes": [
+    "SAFE engages only with the plunger caught (the sear down); uncocked, nothing can fire."
+   ]
+  },
+  {
+   "id": "launcher_sear",
+   "name": "Launcher sear",
+   "quantity": 1,
+   "material": "PETG",
+   "material_fallback": null,
+   "material_reason": "tough, low wear on the rod",
+   "flight_critical": false,
+   "fit_test": false,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu PETG Basic",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 100,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "flat: the plate on the build plate",
+    "rotate": [
+     [
+      "Y",
+      90
+     ]
+    ]
+   },
+   "stl": "hardware/parts/turret/stl/launcher_sear.stl",
+   "step": "generated/parts/turret/launcher_sear.step",
+   "volume_cm3": 0.78,
+   "area_cm2": 7.9,
+   "print_size_mm": [
+    18.0,
+    24.0,
+    3.0
+   ],
+   "footprint_mm": [
+    18.0,
+    24.0
+   ],
+   "triangles": 212,
+   "estimate": {
+    "mass_g": 1.0,
+    "time_min": 2,
+    "mass_g_all": 1.0,
+    "time_min_all": 2
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 2.49,
+    "min_wall_p1_mm": 2.49,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 254,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "launcher_plunger, launcher_cap (printed)",
+     "dimensions": "notch 5.4 mm over the 5 mm groove core; 4.45 mm lift releases it",
+     "source": "hardware/parts/turret/_launcher.py",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [],
+   "notes": []
+  },
+  {
+   "id": "launcher_servo_mount",
+   "name": "Launcher actuator servo mount",
+   "quantity": 1,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "holds a servo that runs warm; outdoors on the RACECAR Turret",
+   "flight_critical": false,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 25,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "on its side: the outer wall on the plate",
+    "rotate": [
+     [
+      "X",
+      90
+     ]
+    ]
+   },
+   "stl": "hardware/parts/turret/stl/launcher_servo_mount.stl",
+   "step": "generated/parts/turret/launcher_servo_mount.step",
+   "volume_cm3": 29.27,
+   "area_cm2": 176.5,
+   "print_size_mm": [
+    57.3,
+    47.4,
+    52.3
+   ],
+   "footprint_mm": [
+    57.3,
+    47.4
+   ],
+   "triangles": 1156,
+   "estimate": {
+    "mass_g": 27.8,
+    "time_min": 57,
+    "mass_g_all": 27.8,
+    "time_min_all": 57
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 1.3,
+    "min_wall_p1_mm": 2.0,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 2476,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "Waveshare ST3215 servo (actuator, ID 14)",
+     "dimensions": "case 45.22 x 24.72 x 32 mm; M2 into the idler-face hole pair at X = 42.86, +-10.25 mm",
+     "source": "Waveshare ST3215 dimension drawing (https://www.waveshare.com/img/devkit/accessories/ST3215-Servo/ST3215-Servo-details-size.jpg, on https://www.waveshare.com/st3215-servo.htm) and Feetech STS3215 outline and horn drawings (https://www.feetechrc.com/525603.html); ratings from https://www.waveshare.com/wiki/ST3215_Servo",
+     "verified": true
+    },
+    {
+     "part": "ST3215 bus plugs",
+     "dimensions": "window in the wall at X 20.9-26.8 mm (scaled)",
+     "source": "Waveshare ST3215 dimension drawing (https://www.waveshare.com/img/devkit/accessories/ST3215-Servo/ST3215-Servo-details-size.jpg, on https://www.waveshare.com/st3215-servo.htm) and Feetech STS3215 outline and horn drawings (https://www.feetechrc.com/525603.html); ratings from https://www.waveshare.com/wiki/ST3215_Servo",
+     "verified": false
+    },
+    {
+     "part": "launcher_tube (printed)",
+     "dimensions": "two M3 x 10 into the lugs' inserts",
+     "source": "hardware/parts/turret/_launcher.py",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M3 x 10 socket head cap screw",
+     "qty": 2,
+     "use": "actuator servo mount to the tube's lugs"
+    },
+    {
+     "item": "M2 x 6 socket head cap screw (or PA2.0 x 6 self-tapping)",
+     "qty": 2,
+     "use": "actuator servo into the mount's wall (heads in counterbores)"
+    },
+    {
+     "item": "zip tie 2.5 mm",
+     "qty": 1,
+     "use": "actuator servo cable at the mount"
+    }
+   ],
+   "notes": []
+  },
+  {
+   "id": "launcher_shuttle",
+   "name": "Launcher shuttle (sliding breech block)",
+   "quantity": 1,
+   "material": "PETG",
+   "material_fallback": null,
+   "material_reason": "slides in the ASA breech: PETG on ASA wears less than ASA on ASA",
+   "flight_critical": false,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu PETG Basic",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 40,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "upright: the underside on the plate, trough up",
+    "rotate": []
+   },
+   "stl": "hardware/parts/turret/stl/launcher_shuttle.stl",
+   "step": "generated/parts/turret/launcher_shuttle.step",
+   "volume_cm3": 18.4,
+   "area_cm2": 139.9,
+   "print_size_mm": [
+    75.7,
+    73.0,
+    15.8
+   ],
+   "footprint_mm": [
+    75.7,
+    73.0
+   ],
+   "triangles": 312,
+   "estimate": {
+    "mass_g": 23.2,
+    "time_min": 41,
+    "mass_g_all": 23.2,
+    "time_min_all": 41
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 2.0,
+    "min_wall_p1_mm": 2.0,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 1947,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "Elite-size foam dart",
+     "dimensions": "12.7 mm x up to 73.5 mm in a 13.2 mm trough 76 mm long",
+     "source": "community measurements (blasterhub.com darts comparison, blastercentral.com); no Hasbro drawing",
+     "verified": false
+    },
+    {
+     "part": "launcher_breech (printed)",
+     "dimensions": "0.15 mm clearance in the channel",
+     "source": "hardware/parts/turret/_launcher.py",
+     "verified": true
+    },
+    {
+     "part": "3 x 10 mm steel dowel pin",
+     "dimensions": "pressed into a 2.9 mm hole in the tab",
+     "source": "ISO 2338 / ISO 8734 dowel pins, 3 mm nominal",
+     "verified": true
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "3 x 10 mm steel dowel pin (ISO 8734)",
+     "qty": 1,
+     "use": "cam pin in the shuttle's tab, pressed in"
+    }
+   ],
+   "notes": [
+    "Grease its top and end faces lightly (silicone grease): they seal the chamber."
+   ]
+  },
+  {
+   "id": "launcher_trigger_arm",
+   "name": "Launcher trigger arm (on the trigger servo's horn)",
+   "quantity": 1,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "on a servo that runs warm",
+   "flight_critical": false,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 4,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 100,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "none",
+    "brim": "auto",
+    "orientation": "flat: the hub on the plate, pin up",
+    "rotate": [
+     [
+      "X",
+      -90
+     ]
+    ]
+   },
+   "stl": "hardware/parts/turret/stl/launcher_trigger_arm.stl",
+   "step": "generated/parts/turret/launcher_trigger_arm.step",
+   "volume_cm3": 1.17,
+   "area_cm2": 11.8,
+   "print_size_mm": [
+    27.0,
+    22.0,
+    8.9
+   ],
+   "footprint_mm": [
+    27.0,
+    22.0
+   ],
+   "triangles": 1020,
+   "estimate": {
+    "mass_g": 1.3,
+    "time_min": 4,
+    "mass_g_all": 1.3,
+    "time_min_all": 4
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 2.27,
+    "min_wall_p1_mm": 2.3,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 365,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "Waveshare ST3215 output horn (trigger servo)",
+     "dimensions": "4 x M3 on a 14 mm circle; M3 x 5 through the 3 mm hub",
+     "source": "Waveshare ST3215 dimension drawing (https://www.waveshare.com/img/devkit/accessories/ST3215-Servo/ST3215-Servo-details-size.jpg, on https://www.waveshare.com/st3215-servo.htm) and Feetech STS3215 outline and horn drawings (https://www.feetechrc.com/525603.html); ratings from https://www.waveshare.com/wiki/ST3215_Servo",
+     "verified": true
+    },
+    {
+     "part": "Waveshare ST3215 horn thread",
+     "dimensions": "M3 tapped (Feetech's horn drawing; Waveshare's does not state it)",
+     "source": "Waveshare ST3215 dimension drawing (https://www.waveshare.com/img/devkit/accessories/ST3215-Servo/ST3215-Servo-details-size.jpg, on https://www.waveshare.com/st3215-servo.htm) and Feetech STS3215 outline and horn drawings (https://www.feetechrc.com/525603.html); ratings from https://www.waveshare.com/wiki/ST3215_Servo",
+     "verified": false
+    }
+   ],
+   "inserts": [],
+   "fasteners": [
+    {
+     "item": "M3 x 5 socket head cap screw",
+     "qty": 4,
+     "use": "trigger arm to the trigger servo's horn (no longer: the tip must stay inside the horn flange)"
+    }
+   ],
+   "notes": []
+  },
+  {
+   "id": "launcher_tube",
+   "name": "Launcher plunger tube",
+   "quantity": 1,
+   "material": "ASA",
+   "material_fallback": null,
+   "material_reason": "a pressure vessel on the tilt stage outdoors",
+   "flight_critical": false,
+   "fit_test": true,
+   "print": {
+    "printer": "Bambu Lab P1S, 0.4 mm stainless steel nozzle (stock)",
+    "filament_profile": "Bambu ASA",
+    "plate": "Textured PEI Plate",
+    "process": "0.20mm Standard",
+    "layer_height_mm": 0.2,
+    "wall_loops": 6,
+    "top_shell_layers": 5,
+    "bottom_shell_layers": 4,
+    "sparse_infill_density_pct": 40,
+    "sparse_infill_pattern": "gyroid",
+    "supports": "tree(auto), on build plate only",
+    "brim": "auto",
+    "orientation": "standing on the rear flange, bore vertical (round); tree supports under the front flange",
+    "rotate": [
+     [
+      "Y",
+      -90
+     ]
+    ]
+   },
+   "stl": "hardware/parts/turret/stl/launcher_tube.stl",
+   "step": "generated/parts/turret/launcher_tube.step",
+   "volume_cm3": 38.53,
+   "area_cm2": 261.8,
+   "print_size_mm": [
+    48.0,
+    48.9,
+    95.2
+   ],
+   "footprint_mm": [
+    48.0,
+    48.9
+   ],
+   "triangles": 2792,
+   "estimate": {
+    "mass_g": 41.2,
+    "time_min": 87,
+    "mass_g_all": 41.2,
+    "time_min_all": 87
+   },
+   "validation": {
+    "passed": true,
+    "valid_brep": true,
+    "closed_manifold": true,
+    "bodies": 1,
+    "fits_bed": true,
+    "min_wall_mm": 1.3,
+    "min_wall_p1_mm": 1.3,
+    "min_wall_required_mm": 1.2,
+    "bed_contact_mm2": 964,
+    "errors": []
+   },
+   "mates_with": [
+    {
+     "part": "NBR 70 O-ring 10 x 2 mm (outlet spigot)",
+     "dimensions": "groove root 10.6 mm, 2.6 mm wide, in a 13.9 mm socket",
+     "source": "standard metric O-ring size; groove for about 15 % squeeze",
+     "verified": false
+    },
+    {
+     "part": "launcher_plunger (printed)",
+     "dimensions": "bore 32 mm, head 31.4 mm",
+     "source": "hardware/parts/turret/_launcher.py",
+     "verified": true
+    },
+    {
+     "part": "launcher_breech, launcher_cap, launcher_servo_mount (printed)",
+     "dimensions": "four M3 through the front flange; three M3 inserts in the rear flange, two in the lugs",
+     "source": "hardware/parts/turret/_launcher.py",
+     "verified": true
+    }
+   ],
+   "inserts": [
+    {
+     "size": "M3",
+     "qty": 3,
+     "where": "rear flange (cap screws), along the tube"
+    },
+    {
+     "size": "M3",
+     "qty": 2,
+     "where": "lugs at -y (actuator servo mount), from below"
+    }
+   ],
+   "fasteners": [
+    {
+     "item": "M3 x 10 socket head cap screw",
+     "qty": 2,
+     "use": "tube flange to the breech, lower pair"
+    },
+    {
+     "item": "M3 x 8 socket head cap screw",
+     "qty": 2,
+     "use": "tube flange to the breech, upper pair"
+    },
+    {
+     "item": "NBR 70 O-ring 10 x 2 mm",
+     "qty": 1,
+     "use": "tube outlet spigot in the breech"
+    }
+   ],
+   "notes": [
+    "Six walls make the 2.4 mm wall solid (airtight). Smooth the bore with fine wet sandpaper and silicone grease; the plunger's O-ring must slide without catching."
    ]
   },
   {
@@ -748,7 +2334,27 @@
    "layer_height_mm": 0.2,
    "parts": [
     {
+     "id": "launcher_breech",
+     "qty": 1
+    },
+    {
+     "id": "launcher_clip",
+     "qty": 1
+    },
+    {
      "id": "pan_base",
+     "qty": 1
+    },
+    {
+     "id": "launcher_cap",
+     "qty": 1
+    },
+    {
+     "id": "launcher_servo_mount",
+     "qty": 1
+    },
+    {
+     "id": "launcher_tube",
      "qty": 1
     },
     {
@@ -770,10 +2376,22 @@
     {
      "id": "pan_hub",
      "qty": 1
+    },
+    {
+     "id": "launcher_pinion",
+     "qty": 1
+    },
+    {
+     "id": "launcher_barrel_clamp",
+     "qty": 1
+    },
+    {
+     "id": "launcher_trigger_arm",
+     "qty": 1
     }
    ],
-   "time_min": 189,
-   "mass_g": 89
+   "time_min": 608,
+   "mass_g": 293
   },
   {
    "name": "B",
@@ -783,25 +2401,78 @@
     {
      "id": "base_plate",
      "qty": 1
+    },
+    {
+     "id": "launcher_shuttle",
+     "qty": 1
+    },
+    {
+     "id": "launcher_rack",
+     "qty": 1
+    },
+    {
+     "id": "launcher_cam",
+     "qty": 1
+    },
+    {
+     "id": "launcher_clip_cap",
+     "qty": 1
+    },
+    {
+     "id": "launcher_follower",
+     "qty": 1
+    },
+    {
+     "id": "launcher_plunger",
+     "qty": 1
+    },
+    {
+     "id": "launcher_sear",
+     "qty": 1
+    },
+    {
+     "id": "launcher_collar",
+     "qty": 1
+    },
+    {
+     "id": "launcher_safety",
+     "qty": 1
     }
    ],
-   "time_min": 152,
-   "mass_g": 88
+   "time_min": 303,
+   "mass_g": 160
+  },
+  {
+   "name": "C",
+   "material": "TPU95A",
+   "layer_height_mm": 0.2,
+   "parts": [
+    {
+     "id": "launcher_muzzle_cap",
+     "qty": 1
+    }
+   ],
+   "time_min": 14,
+   "mass_g": 2
   }
  ],
  "assembly": {
-  "bodies": 54,
-  "interferences": "none",
-  "intended_press_fits": 0,
-  "tilt_sweep_b0385": "clear from -37.2 to 43.0 deg; smallest gap 0.6 mm (yoke_screw_1_-5_-5 / tilt_servo_case at -37 deg)",
-  "tilt_sweep_d435i": "clear from -37.2 to 43.0 deg; smallest gap 0.6 mm (yoke_screw_1_-5_-5 / tilt_servo_case at -37 deg)",
-  "pan_sweep": "clear over +-90 deg; smallest gap 0.6 mm (hub_screw_0_7 / pan_servo_case at -90 deg)",
-  "camera_view_clear": "yes (B0385 70 x 46 deg + 2 deg margin, at both tilt limits and level)",
+  "bodies": 119,
+  "interferences": "none (shot, cocked, primed, firing, safe)",
+  "intended_press_fits": 1,
+  "tilt_sweep_b0385": "clear from -37.2 to 43.0 deg, launcher cocked and primed; smallest gap 0.6 mm (yoke_screw_1_-5_-5 / tilt_servo_case at -37 deg, cocked)",
+  "tilt_sweep_d435i": "clear from -37.2 to 43.0 deg, launcher cocked and primed; smallest gap 0.6 mm (yoke_screw_1_-5_-5 / tilt_servo_case at -37 deg, cocked)",
+  "pan_sweep": "clear over +-90 deg at both tilt limits and level, launcher cocked and primed; smallest gap 0.6 mm (hub_screw_0_7 / pan_servo_case at -90 deg, tilt -37, cocked)",
+  "camera_view_clear": "yes (B0385 70 x 46 deg; D435i colour 69 x 42 deg on the tripod plate; each + 2 deg margin, at both tilt limits and level, launcher cocked and primed, clip full)",
+  "d435i_depth_view": "the D435i's 87 x 58 deg depth view sees launcher_barrel",
   "tilt_axis_mm": "95 above the mounting surface (100 above turret/base_link with a 5 mm plate; URDF 0.045 + 0.055 m)",
   "camera_mm": "B0385 sensor 33.2, lens front 49.7 ahead of the tilt axis, on its height; URDF turret/camera_link 35",
+  "launcher": "bore 48 mm above the camera's axis, parallel, on its centre line; muzzle (turret/muzzle) (133, 0, 48) mm in turret/tilt_link; actuator_joint 0..0.038 m (sear catches from 34.25 mm), origin (-103.5, 0, 58); trigger_joint 0 safe, 0.6 rad fires, axis at (-109, 21.375, 59); spring 1.5 N/mm, 1.11 J at the sear; 25.1 cm3 plunger for 15.2 cm3 of bore; 21-28 m/s at 20-35 % efficiency (chronograph at bring-up)",
+  "line_of_fire": "a dart's path (14 mm, 2 m from the muzzle) clears the turret's base at every pan and tilt; closest 81 mm (dart_path / base_plate at pan -60, tilt -37)",
   "cable_loop_mm": "hook to hook 45-74 mm over the pan range: leave 120 mm of cable between the two ties",
-  "moving_mass_g": "tilt stage 30, pan stage 112",
-  "tilt_load": "about 0.009 N m with the B0385 (2.94 N m stall); 0.037 N m with a D435i",
+  "launcher_mass_g": "428 with a full clip (printed 275, two servos 110, spring 16, barrel 7.5, hardware 14, darts 6); centre of mass -37 mm along the bore from the chamber's rear face, +2 mm toward the plunger tube, -1 mm sideways",
+  "moving_mass_g": "tilt stage 459 with the launcher and a full clip (31 without), pan stage 541",
+  "tilt_load": "worst static torque over the tilt range, full clip, against the tilt servo's 2.94 N m stall: B0385, cocked: 0.214 N m (14x margin); B0385, primed: 0.221 N m (13x margin); D435i, cocked: 0.194 N m (15x margin); D435i, primed: 0.201 N m (15x margin); centre of mass (-22, 47) mm from the tilt axis with the B0385 (without the launcher 0.008 N m)",
   "passed": true
  }
 }

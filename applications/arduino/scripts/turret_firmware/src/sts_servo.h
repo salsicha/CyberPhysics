@@ -28,12 +28,13 @@ const uint8_t kInstSyncWrite = 0x83;
 const uint8_t kRegTorqueEnable = 40;  // 0 off, 1 on; 128 recalibrates the midpoint: never written here
 const uint8_t kRegAcceleration = 41;  // 41 acc, 42-43 goal position, 44-45 goal time, 46-47 goal speed
 const uint8_t kRegGoalPosition = 42;
+const uint8_t kRegTorqueLimit = 48;  // 48-49, 0.1 % units; reset from EEPROM's max torque at power-up
 const uint8_t kRegPresentPosition = 56;
 
 const int32_t kStepsPerTurn = 4096;
 const int32_t kMaxStep = kStepsPerTurn - 1;
 
-// Largest packet built or parsed here (a two-servo sync write is 26 bytes)
+// Largest packet built or parsed here (a four-servo sync write is 40 bytes)
 const size_t kMaxPacket = 64;
 const size_t kMaxStatusParams = kMaxPacket - 6;
 
@@ -113,6 +114,8 @@ class Bus {
   Result ping(uint8_t id);
   Result readPosition(uint8_t id, int32_t& steps);
   Result writeTorque(uint8_t id, bool enable);
+  // Torque limit (0-1000, 0.1 % of the maximum; RAM, until the next power-up)
+  Result writeTorqueLimit(uint8_t id, uint16_t limit);
   Result syncWritePosition(const uint8_t* ids, const int32_t* steps, size_t count,
                            uint16_t speed, uint8_t acceleration);
   // Error byte of the last status packet (0 = no fault)

@@ -1,6 +1,18 @@
 # PanTiltROS tracking against a synthetic ROS camera and actuator plant.
 # YOLO and closed-loop control live in applications/pantiltros; the simulator
 # contains only the scene renderer, actuator dynamics, telemetry, and scoring.
+#
+# The plant carries the foam dart launcher (TURRET_ACTUATOR_FITTED, default
+# true: actuator_joint, the priming rack, and trigger_joint at the ST3215's
+# speed, with the sear between them; systems/racecar_turret/interfaces.md)
+# and the simulator plays the operator: from TURRET_TAG_AT seconds on it
+# reloads TURRET_DARTS darts and presses Fire whenever the tracker's
+# /turret/status enables it, until the clip is shot, so fire cycles run
+# closed loop. With TURRET_TAG_LOCK=true it first taps the target's box (a
+# lock by ID), which keeps the target's ID through YOLOE's duplicate boxes,
+# and acknowledges a launcher fault (disarm, arm) to fire again, both of
+# which change the tracking. The report's "launcher" section records the shots and their
+# cycle times; the tracking score is unchanged.
 
 x-pantiltros-image: &pantiltros-image
   image: salsicha/cyberphysics:pantiltros-${CYBERPHYSICS_TAG:-latest}
@@ -39,6 +51,7 @@ services:
       -p image_size:=${TURRET_YOLO_IMAGE_SIZE:-640}
       -p confidence:=${TURRET_YOLO_CONFIDENCE:-0.003}
       -p show_window:=${TURRET_SHOW_WINDOW:-false}
+      -p actuator_fitted:=${TURRET_ACTUATOR_FITTED:-true}
     healthcheck:
       test: ["CMD-SHELL", "test -f /tmp/pantilt_yolo_ready"]
       interval: 10s
@@ -69,6 +82,10 @@ services:
       --output /workspace/generated/turret/turret_tracking_metrics.json
       --variant ${TURRET_VARIANT:-nominal}
       --save-frames /workspace/generated/turret/frames
+      --actuator ${TURRET_ACTUATOR_FITTED:-true}
+      --tag-at ${TURRET_TAG_AT:-2.0}
+      --tag-lock ${TURRET_TAG_LOCK:-false}
+      --darts ${TURRET_DARTS:-3}
     restart: "no"
 
   turret_score:

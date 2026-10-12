@@ -1,5 +1,14 @@
 #!/usr/bin/env python3
-"""Shared ROS 2 YOLO perception and closed-loop control for PanTiltROS."""
+"""Shared ROS 2 YOLO perception and closed-loop control for PanTiltROS.
+
+With ``actuator_fitted`` the turret also carries the foam dart launcher
+(systems/racecar_turret/interfaces.md, "Foam dart launcher"): a priming rack
+(``actuator_joint``, metres, 0 forward) and a trigger (``trigger_joint``,
+radians, 0 safe), fired once per target. Only a ``{"action": "tag",
+"target_id": ...}`` command naming the locked target, while every gate
+holds, primes and fires it (FireCycle.start, called from _tag alone); every
+other event leaves the trigger at 0 and the rack forward or stopped.
+"""
 
 from __future__ import annotations
 
@@ -36,6 +45,14 @@ except ImportError:
 
 
 IDENTITY = np.eye(3)
+ACTUATOR_JOINT = "actuator_joint"  # the launcher's priming rack, metres, 0 forward
+TRIGGER_JOINT = "trigger_joint"  # the launcher's trigger, radians, 0 safe
+# How close the measured rack and trigger must come to a goal to count as there
+RACK_TOLERANCE_M = 0.002
+TRIGGER_TOLERANCE_RAD = 0.05
+# While the launcher is not verified at rest, commands carrying its goals go
+# out at least this often (the bridge's watchdog makes it safe after 0.5 s).
+LAUNCHER_KEEPALIVE_S = 0.1
 
 
 def clamp(value: float, low: float, high: float) -> float:
@@ -293,6 +310,200 @@ class DetectionTracks:
                 "bbox_xywh": list(detection["bbox_xywh"]),
                 "centroid_px": list(detection["centroid_px"]),
             }
+
+
+def parse_no_fire_zones(values: Any) -> list[tuple[float, float, float, float]]:
+    """no_fire_zones_rad (pan_min, pan_max, tilt_min, tilt_max, ...) as
+    boxes, without the empty ones (min == max). Raises ValueError on a
+    malformed list: a zone that silently stops working is worse than a
+    node that does not start."""
+    values = [float(value) for value in values]
+    if len(values) % 4 or not all(math.isfinite(value) for value in values):
+        raise ValueError("no_fire_zones_rad needs finite values in fours: "
+                         "pan_min, pan_max, tilt_min, tilt_max")
+    zones = []
+    for i in range(0, len(values), 4):
+        pan_min, pan_max, tilt_min, tilt_max = values[i:i + 4]
+        if pan_min > pan_max or tilt_min > tilt_max:
+            raise ValueError(f"no_fire_zones_rad box {i // 4}: a minimum above its maximum")
+        if pan_min < pan_max and tilt_min < tilt_max:
+            zones.append((pan_min, pan_max, tilt_min, tilt_max))
+    return zones
+
+
+def in_no_fire_zone(
+    zones: list[tuple[float, float, float, float]], pan: float, tilt: float,
+    margin: float = 0.0,
+) -> bool:
+    """Whether (pan, tilt) is in a zone widened by margin on every side."""
+    return any(pan_min - margin <= pan <= pan_max + margin
+               and tilt_min - margin <= tilt <= tilt_max + margin
+               for pan_min, pan_max, tilt_min, tilt_max in zones)
+
+
+class FireCycle:
+    """The dart launcher's fire cycle (no ROS dependencies): prime (the rack
+    back to the sear, ``stroke_m``), chamber (the rack forward again), fire
+    (the trigger to ``fire_rad``, held ``dwell_s``, then back to 0), each
+    step verified against the measured rack and trigger within
+    ``timeout_s``. The trigger moves only while update() is told the line
+    of fire is clear: chambered with it blocked, or blocked before the sear
+    released, is a fault.
+
+    start() is the only way in: goals() asks for the rack back only while
+    priming (for at most timeout_s) and for the trigger off 0 only while
+    firing (for at most timeout_s plus dwell_s), however late update() runs.
+    Anything else asks for the trigger at 0 and the rack forward or held
+    where it is (None). A cycle ends in a shot ("fired") or a fault: a step
+    not reached in time, no measured position, or an abort (the trigger to
+    0, the rack stopped). Faults latch until reset(); a launcher found away
+    from rest with no cycle running is returned to rest under supervision.
+    """
+
+    READY = "ready"
+    PRIMING = "priming"
+    CHAMBERING = "chambering"
+    FIRING = "firing"  # the trigger out and held
+    RESETTING = "resetting"  # the trigger back to 0 after the shot
+    FAULT = "fault"
+    RETURNING = "returning"  # back to rest after a fault or when found away from it
+
+    def __init__(
+        self,
+        stroke_m: float = 0.038,
+        fire_rad: float = 0.6,
+        dwell_s: float = 0.2,
+        timeout_s: float = 3.0,
+        rack_tolerance_m: float = RACK_TOLERANCE_M,
+        trigger_tolerance_rad: float = TRIGGER_TOLERANCE_RAD,
+    ) -> None:
+        if not 0.0 < rack_tolerance_m < stroke_m / 2.0:
+            raise ValueError("the rack tolerance must be positive and under half the stroke")
+        if not 0.0 < trigger_tolerance_rad < fire_rad / 2.0:
+            raise ValueError("the trigger tolerance must be positive and under half the angle")
+        if not (dwell_s >= 0.0 and timeout_s > 0.0):
+            raise ValueError("dwell_s must not be negative and timeout_s must be positive")
+        self.stroke = float(stroke_m)
+        self.fire = float(fire_rad)
+        self.dwell_s = float(dwell_s)
+        self.timeout_s = float(timeout_s)
+        self.rack_tolerance = float(rack_tolerance_m)
+        self.trigger_tolerance = float(trigger_tolerance_rad)
+        self.phase = self.READY
+        self.since = -math.inf  # when the phase began
+        self.released = -math.inf  # when the trigger reached the fire angle
+        self.target_id = ""  # the running cycle's target, "" without one
+        self.reason = ""  # the latched fault
+
+    @property
+    def running(self) -> bool:
+        return bool(self.target_id)
+
+    def goals(self, now: float) -> tuple[float | None, float]:
+        """(rack, trigger) to command; rack None: hold it where it is."""
+        if self.phase == self.PRIMING:
+            return (self.stroke if now - self.since <= self.timeout_s else None), 0.0
+        if self.phase == self.FIRING and now - self.since <= self.timeout_s + self.dwell_s:
+            return 0.0, self.fire
+        if self.phase == self.FAULT:
+            return None, 0.0
+        return 0.0, 0.0
+
+    def start(self, now: float, target_id: str) -> None:
+        """Begin a cycle on target_id. Only the tag command's handler calls
+        this, after checking every gate."""
+        self.phase, self.since, self.released = self.PRIMING, float(now), -math.inf
+        self.target_id, self.reason = str(target_id), ""
+
+    def abort(self, now: float, reason: str) -> tuple[str, str, str, bool] | None:
+        """End a cycle in progress: before the trigger released, a fault
+        (the trigger to 0, the rack stopped); after, it completes as fired.
+        Returns the fault's event, if any."""
+        if self.phase in (self.PRIMING, self.CHAMBERING):
+            return self._fault(now, f"aborted while {self.phase} ({reason})")
+        if self.phase == self.FIRING:
+            if self.released > -math.inf:
+                self.phase, self.since = self.RESETTING, float(now)  # the dart is gone
+                return None
+            return self._fault(now, f"aborted while firing ({reason}): the dart may have gone",
+                               shot=True)
+        return None
+
+    def reset(self, now: float) -> bool:
+        """Clear a latched fault; the launcher returns to rest under supervision."""
+        if self.phase != self.FAULT:
+            return False
+        self.phase, self.since, self.reason = self.RETURNING, float(now), ""
+        return True
+
+    def at_rest(self, rack: float | None, trigger: float | None) -> bool:
+        return (rack is not None and trigger is not None and rack <= self.rack_tolerance
+                and trigger <= self.trigger_tolerance)
+
+    def update(
+        self, now: float, rack: float | None, trigger: float | None, clear: bool = True
+    ) -> tuple[str, str, str, bool] | None:
+        """Advance on the measured rack and trigger (None: no fresh
+        measurement) and whether the line of fire is clear now. Returns
+        (target_id, result, reason, shot) when a cycle ends ("fired" or
+        "fault") or a fault latches (target_id "")."""
+        phase = self.phase
+        if phase in (self.READY, self.FAULT):
+            if phase == self.READY and (
+                (rack is not None and rack > 2.0 * self.rack_tolerance)
+                or (trigger is not None and trigger > 2.0 * self.trigger_tolerance)
+            ):
+                # Away from rest with no cycle (moved by hand, or left so at
+                # start-up): back to rest, verified as after a fault.
+                self.phase, self.since = self.RETURNING, float(now)
+            return None
+        if rack is None or trigger is None:
+            return self._fault(now, "no launcher position", shot=self.released > -math.inf)
+        late = now - self.since > self.timeout_s
+        if phase == self.PRIMING:
+            if rack >= self.stroke - self.rack_tolerance:
+                self.phase, self.since = self.CHAMBERING, float(now)
+            elif late:
+                return self._fault(now, f"priming not reached in {self.timeout_s:g} s")
+        elif phase == self.CHAMBERING:
+            if rack <= self.rack_tolerance:
+                if not clear:
+                    # The moment of firing, and the dart would hit the vehicle
+                    return self._fault(now, "line of fire blocked")
+                self.phase, self.since = self.FIRING, float(now)
+            elif late:
+                return self._fault(now, f"chambering not reached in {self.timeout_s:g} s")
+        elif phase == self.FIRING:
+            if self.released == -math.inf and not clear:
+                return self._fault(now, "line of fire blocked while firing: the dart may have gone",
+                                   shot=True)
+            if self.released == -math.inf and trigger >= self.fire - self.trigger_tolerance:
+                self.released = float(now)
+            if self.released > -math.inf:
+                if now - self.released >= self.dwell_s:
+                    self.phase, self.since = self.RESETTING, float(now)
+            elif late:
+                return self._fault(now, f"trigger not reached in {self.timeout_s:g} s")
+        elif phase == self.RESETTING:
+            if trigger <= self.trigger_tolerance:
+                event = (self.target_id, "fired", "", True)
+                self.phase, self.target_id = self.READY, ""
+                return event
+            if late:
+                return self._fault(now, f"trigger not back at 0 in {self.timeout_s:g} s",
+                                   shot=True)
+        elif phase == self.RETURNING:
+            if self.at_rest(rack, trigger):
+                self.phase = self.READY
+            elif late:
+                return self._fault(now, f"not back at rest in {self.timeout_s:g} s")
+        return None
+
+    def _fault(self, now: float, reason: str, shot: bool = False) -> tuple[str, str, str, bool]:
+        event = (self.target_id, "fault", reason, shot)
+        self.phase, self.since = self.FAULT, float(now)
+        self.target_id, self.reason = "", reason
+        return event
 
 
 class PanTiltController:
@@ -689,6 +900,49 @@ DEFAULT_PARAMETERS: dict[str, Any] = {
     # Wall-clock rate, so the UI sees the status however fast sim time runs.
     "status_rate_hz": 5.0,
     "lock_tolerance_px": 36.0,
+    # Foam dart launcher (systems/racecar_turret/interfaces.md): its priming
+    # rack (actuator_joint, m) and trigger (trigger_joint, rad) join the joint
+    # commands and states. A {"action": "tag"} command naming the locked
+    # target fires one dart (prime to launcher_stroke_m, chamber, trigger to
+    # trigger_fire_rad held tag_dwell_s, trigger back) only while it is locked
+    # within tag_max_aim_error_deg at the aim point, armed, the actuator
+    # ready, the launcher at rest with darts, and tag_min_interval_s after
+    # the last shot.
+    "actuator_fitted": False,
+    "launcher_stroke_m": 0.038,
+    "trigger_fire_rad": 0.6,
+    "tag_dwell_s": 0.2,
+    "tag_max_aim_error_deg": 2.0,
+    "tag_min_interval_s": 2.0,
+    # A step not measured within this long faults (the trigger to 0, the
+    # rack stopped; latched until the emergency stop is engaged and released).
+    "tag_stroke_timeout_s": 3.0,
+    # A cycle stops when its target has not been seen locked this long.
+    "tag_lock_timeout_s": 0.5,
+    # After a shot, aim at (lock) the nearest untagged detection; it never fires.
+    "auto_next": False,
+    # Darts in the clip at start-up; {"action": "reload", "darts": N} sets it.
+    "darts": 0,
+    # With the launcher, a person is aimed at (and its aim error measured at)
+    # the torso: person_aim_fraction of its box's height from the top; a box
+    # taller than person_max_box_fraction of the image is too close to fire.
+    "person_aim_fraction": 0.6,
+    "person_max_box_fraction": 0.6,
+    # The dart's drop: an aim offset (pitch up, deg) against the range (m),
+    # interpolated, the range estimated from a person's box height and
+    # person_height_m. The default table is all zero: no offset.
+    "person_height_m": 1.7,
+    "aim_offset_range_m": [1.0, 10.0],
+    "aim_offset_pitch_deg": [0.0, 0.0],
+    # Line of fire: boxes of joint positions where a dart would hit the
+    # vehicle, four values each: pan_min, pan_max, tilt_min, tilt_max (rad),
+    # widened by no_fire_margin_rad (the turret keeps moving during the
+    # trigger's pull). Firing is refused while the measured or the commanded
+    # pan and tilt are in one: before priming, and from the moment of firing
+    # until the sear releases. A box with min == max is empty: the default
+    # is none.
+    "no_fire_zones_rad": [0.0, 0.0, 0.0, 0.0],
+    "no_fire_margin_rad": 0.05,
     "publish_annotated_image": True,
     "show_window": False,
     "window_name": "PanTiltROS YOLO",
@@ -926,6 +1180,43 @@ class PanTiltYoloTracker(Node):
         self.lead_rate: np.ndarray | None = None
         self.lead_world = False
 
+        self.actuator_fitted = bool(self.parameter("actuator_fitted"))
+        self.tag_max_aim_error_deg = float(self.parameter("tag_max_aim_error_deg"))
+        self.tag_min_interval_s = float(self.parameter("tag_min_interval_s"))
+        self.tag_lock_timeout_s = float(self.parameter("tag_lock_timeout_s"))
+        self.auto_next = bool(self.parameter("auto_next"))
+        self.fire_cycle = FireCycle(
+            stroke_m=float(self.parameter("launcher_stroke_m")),
+            fire_rad=float(self.parameter("trigger_fire_rad")),
+            dwell_s=float(self.parameter("tag_dwell_s")),
+            timeout_s=float(self.parameter("tag_stroke_timeout_s")),
+        )
+        self.darts = max(0, int(self.parameter("darts")))
+        self.person_aim_fraction = float(self.parameter("person_aim_fraction"))
+        self.person_max_box_fraction = float(self.parameter("person_max_box_fraction"))
+        self.person_height_m = float(self.parameter("person_height_m"))
+        ranges = [float(value) for value in self.parameter("aim_offset_range_m")]
+        pitches = [float(value) for value in self.parameter("aim_offset_pitch_deg")]
+        if len(ranges) != len(pitches) or not ranges or any(
+            b <= a for a, b in zip(ranges, ranges[1:])
+        ):
+            raise ValueError(
+                "aim_offset_range_m (increasing) and aim_offset_pitch_deg need the same length"
+            )
+        self.aim_offset_table = (ranges, pitches)
+        self.no_fire_zones = parse_no_fire_zones(self.parameter("no_fire_zones_rad"))
+        self.no_fire_margin = float(self.parameter("no_fire_margin_rad"))
+        if not (math.isfinite(self.no_fire_margin) and self.no_fire_margin >= 0.0):
+            raise ValueError("no_fire_margin_rad must be 0 or more")
+        # Measured launcher: (stamp, rack metres, trigger radians)
+        self.launcher_measured: tuple[float, float, float] | None = None
+        self.shots = 0
+        self.tagged_ids: list[str] = []
+        self.last_tag: dict[str, Any] | None = None
+        self.last_cycle_end = -math.inf
+        self.tag_seen_time = -math.inf  # last frame with the cycle's target locked
+        self.last_send_time = -math.inf
+
     def parameter(self, name: str) -> Any:
         return self.get_parameter(name).value
 
@@ -946,6 +1237,11 @@ class PanTiltYoloTracker(Node):
             return  # use_sim_time and no /clock yet
         if stamp <= 0.0 or abs(stamp - now) > 2.0:
             stamp = now
+        if self.actuator_fitted:
+            rack = joint_position(msg, ACTUATOR_JOINT)
+            trigger = joint_position(msg, TRIGGER_JOINT)
+            if rack is not None and trigger is not None and finite(rack, trigger):
+                self.launcher_measured = (stamp, rack, trigger)
         if not self.controller.add_measured(stamp, pan, tilt):
             self.get_logger().warning(
                 "ignoring non-finite joint state", throttle_duration_sec=5.0
@@ -1011,7 +1307,15 @@ class PanTiltYoloTracker(Node):
             self.get_logger().warning(
                 "emergency stop " + ("engaged" if engaged else "released")
             )
+        released = self.estop_engaged and not engaged
         self.estop_engaged = engaged
+        if self.actuator_fitted:
+            now = self._now()
+            if engaged:
+                self._abort_tag(now, "emergency stop")
+            elif released and self.fire_cycle.reset(now):
+                # Disarming and re-arming acknowledges a launcher fault.
+                self._notify(now, "launcher fault reset: returning it to rest")
 
     def _actuator_ready(self, msg: Bool) -> None:
         self.actuator_ready = bool(msg.data)
@@ -1204,9 +1508,13 @@ class PanTiltYoloTracker(Node):
         aim_error_deg = None
         bbox: list[float] = []
         mask = np.zeros((height, width), dtype=np.uint8)
+        too_close = False
         if target is not None:
-            pixel_x = float(target["centroid_px"][0]) - cx
-            pixel_y = float(target["centroid_px"][1]) - cy
+            aim_x, aim_y = target["centroid_px"]
+            if self.actuator_fitted:
+                (aim_x, aim_y), too_close = self._aim_point(target, fy, height)
+            pixel_x = float(aim_x) - cx
+            pixel_y = float(aim_y) - cy
             angular_x = math.atan2(pixel_x, fx)
             angular_y = -math.atan2(pixel_y, fy)
             confidence = float(target["confidence"])
@@ -1222,11 +1530,16 @@ class PanTiltYoloTracker(Node):
             "time": self._now(),
             "width": width,
             "height": height,
+            "center": (cx, cy),
             "detections": len(detections),
             "target": target is not None,
+            "target_id": target["id"] if target is not None else "",
             "locked": locked,
             "aim_error_deg": aim_error_deg,
+            "too_close": too_close,
         }
+        if locked and self.fire_cycle.running and target["id"] == self.fire_cycle.target_id:
+            self.tag_seen_time = self.last_frame["time"]
 
         self.mask_pub.publish(mask_message(mask, source))
         self.bbox_pub.publish(Float32MultiArray(data=bbox))
@@ -1412,14 +1725,37 @@ class PanTiltYoloTracker(Node):
         command.header.stamp = self.get_clock().now().to_msg()
         command.name = ["pan_joint", "tilt_joint"]
         command.position = [pan, tilt]
+        if self.actuator_fitted:
+            # Every command carries the launcher: the rack back only while
+            # priming and the trigger off 0 only while firing, in a cycle a
+            # tag command started; otherwise the trigger at 0 and the rack
+            # forward, or stopped where it is: a command without
+            # actuator_joint, which the bridge and firmware hold at the
+            # rack's present position (never a stale measurement of it).
+            rack, trigger = self.fire_cycle.goals(now)
+            if trigger > 0.0 and not self._line_of_fire_clear(now):
+                trigger = 0.0  # blocked between control ticks: the next update faults the cycle
+            if rack is not None:
+                command.name.append(ACTUATOR_JOINT)
+                command.position.append(rack)
+            command.name.append(TRIGGER_JOINT)
+            command.position.append(trigger)
         self.command_pub.publish(command)
+        self.last_send_time = now
         if record:
             self.controller.record(now, pan, tilt)
 
     def _control_tick(self) -> None:
-        """Between camera frames: manual rates, centring, and keeping the
-        moving-base aim on the target."""
+        """Between camera frames: manual rates, centring, keeping the
+        moving-base aim on the target, and the dart launcher's fire cycle."""
         now = self._now()
+        if self.actuator_fitted:
+            self._update_tag(now)
+        self._control_step(now)
+        if self.actuator_fitted:
+            self._launcher_keepalive(now)
+
+    def _control_step(self, now: float) -> None:
         if self.mode == "idle" and self.goto is None:
             return
         if self.mode == "auto" and self.controller.aim is None:
@@ -1489,7 +1825,21 @@ class PanTiltYoloTracker(Node):
         except (TypeError, ValueError):
             command = None
         action = command.get("action") if isinstance(command, dict) else None
-        if action == "lock":
+        if action in ("lock", "release", "manual", "center", "next"):
+            # Anything that moves the aim ends a fire cycle in progress.
+            self._abort_tag(now, f"{action} command")
+        if action == "tag":
+            self._tag(command, now)
+        elif action == "next":
+            self._next(now)
+        elif action == "clear_tags":
+            self.tagged_ids.clear()
+            self._notify(now, "tags cleared")
+        elif action == "auto_next":
+            self._set_auto_next(command, now)
+        elif action == "reload":
+            self._reload(command, now)
+        elif action == "lock":
             self._lock(command, now)
         elif action == "release":
             self._set_mode("idle")
@@ -1583,6 +1933,259 @@ class PanTiltYoloTracker(Node):
         self.notice = (text, now)
         self.get_logger().info(text)
 
+    # --- Foam dart launcher ------------------------------------------------
+
+    def _aim_point(
+        self, target: dict[str, Any], fy: float, height: int
+    ) -> tuple[tuple[float, float], bool]:
+        """Where to aim at a target, in pixels, and whether it is too close.
+        A person: the torso, person_aim_fraction of the box height from the
+        top (never the head), raised by the drop offset for its range; else
+        the mask's centroid."""
+        if target["class"] != "person":
+            return (float(target["centroid_px"][0]), float(target["centroid_px"][1])), False
+        box_x, box_y, _, box_h = (float(value) for value in target["bbox_xywh"])
+        aim_y = box_y - box_h / 2.0 + self.person_aim_fraction * box_h
+        offset = self._aim_offset_rad(self.person_height_m * fy / max(box_h, 1.0))
+        aim_y -= fy * math.tan(offset)
+        return (box_x, aim_y), box_h > self.person_max_box_fraction * height
+
+    def _aim_offset_rad(self, range_m: float) -> float:
+        """The pitch offset (up) for the dart's drop at range_m, from the
+        table, held at its ends."""
+        ranges, pitches = self.aim_offset_table
+        return math.radians(float(np.interp(range_m, ranges, pitches)))
+
+    def _line_of_fire_clear(self, now: float) -> bool:
+        """Whether a dart fired now misses the vehicle: the measured pan and
+        tilt (fresh), and the last command while it is current, outside
+        every no-fire zone widened by the margin. Without zones, always."""
+        if not self.no_fire_zones:
+            return True
+        if not self.controller.has_feedback(now):
+            return False  # where the turret points is not known
+        positions = [self.controller.measured[-1][1:]]
+        if self.controller.continuing(now):
+            positions.append(self.controller.last_command[1:])
+        return not any(in_no_fire_zone(self.no_fire_zones, pan, tilt, self.no_fire_margin)
+                       for pan, tilt in positions)
+
+    def _launcher_position(self, now: float) -> tuple[float, float] | None:
+        """The measured (rack, trigger), if fresh."""
+        if self.launcher_measured is None:
+            return None
+        stamp, rack, trigger = self.launcher_measured
+        return (rack, trigger) if 0.0 <= now - stamp <= self.joint_state_timeout_s else None
+
+    def _actuator_ready_fresh(self, now: float) -> bool:
+        return (
+            self.actuator_ready
+            and now - self.actuator_ready_time <= self.actuator_ready_timeout_s
+        )
+
+    def _launcher_state(self, now: float) -> str:
+        if not self.actuator_fitted:
+            return "none"
+        phase = self.fire_cycle.phase
+        if phase in (FireCycle.FAULT, FireCycle.RETURNING) or self._launcher_position(now) is None:
+            return "fault"
+        if phase == FireCycle.RESETTING:
+            return "firing"
+        if phase == FireCycle.READY:
+            return "ready" if self.darts > 0 else "empty"
+        return phase
+
+    def _fire_refusal(self, now: float, target_id: Any) -> str:
+        """Why firing at target_id would be refused now; "" when every gate holds."""
+        if not self.actuator_fitted:
+            return "no launcher"
+        if self.estop_engaged:
+            return "emergency stop engaged"
+        if not self._actuator_ready_fresh(now):
+            return "actuator not ready"
+        gate = self._command_gate(now)
+        if gate not in COMMANDING:
+            return gate.replace("_", " ")
+        if self.mode != "auto" or not self.target_track:
+            return "no locked target"
+        if isinstance(target_id, bool) or not isinstance(target_id, (str, int)) or (
+            str(target_id) == ""
+        ):
+            return "tag needs the locked target's target_id"
+        target_id = str(target_id)
+        if target_id != self.target_track:
+            return f"{target_id} is not the locked target ({self.target_track})"
+        frame = self.last_frame
+        if (
+            frame is None
+            or not 0.0 <= now - frame["time"] <= self.tag_lock_timeout_s
+            or frame["target_id"] != target_id
+            or not frame["locked"]
+        ):
+            return f"{target_id} is not locked"
+        if frame["too_close"]:
+            return "too close"
+        error = frame["aim_error_deg"]
+        if error is None or not error < self.tag_max_aim_error_deg:
+            return f"aim error over {self.tag_max_aim_error_deg:g} deg"
+        cycle = self.fire_cycle
+        if cycle.phase == FireCycle.FAULT:
+            return f"launcher fault: {cycle.reason}"
+        if cycle.running:
+            return "a fire cycle is running"
+        measured = self._launcher_position(now)
+        if measured is None:
+            return "no launcher position"
+        if cycle.phase != FireCycle.READY or not cycle.at_rest(*measured):
+            return "launcher not at rest"
+        if self.darts <= 0:
+            return "no darts"
+        if not self._line_of_fire_clear(now):
+            return "line of fire blocked"
+        wait = self.tag_min_interval_s - (now - self.last_cycle_end)
+        if wait > 0.0:
+            return f"{wait:.1f} s to the next shot"
+        return ""
+
+    def _tag(self, command: dict[str, Any], now: float) -> None:
+        """{"action": "tag", "target_id": id}: one shot, if every gate holds."""
+        target_id = command.get("target_id")
+        refusal = self._fire_refusal(now, target_id)
+        if refusal:
+            self.last_tag = {
+                "target_id": "" if target_id is None else str(target_id),
+                "result": "refused",
+                "reason": refusal,
+                "stamp": now,
+            }
+            self._notify(now, f"fire refused: {refusal}")
+            return
+        target_id = self.target_track
+        self.fire_cycle.start(now, target_id)
+        self.tag_seen_time = now
+        self.last_tag = {"target_id": target_id, "result": "running", "reason": "", "stamp": now}
+        self._notify(now, f"firing at {target_id}")
+        self._launcher_keepalive(now, force=True)
+
+    def _abort_tag(self, now: float, reason: str) -> None:
+        cycle = self.fire_cycle
+        target_id = cycle.target_id
+        if not cycle.running:
+            return
+        event = cycle.abort(now, reason)
+        if event is not None:
+            self._tag_ended(now, *event)
+        else:
+            self._notify(now, f"{reason} after the shot at {target_id}: trigger back to 0")
+        self._launcher_keepalive(now, force=True)
+
+    def _update_tag(self, now: float) -> None:
+        cycle = self.fire_cycle
+        if cycle.running and cycle.phase in (
+            FireCycle.PRIMING, FireCycle.CHAMBERING, FireCycle.FIRING
+        ):
+            if not self._actuator_ready_fresh(now):
+                self._abort_tag(now, "actuator not ready")
+            elif self._command_gate(now) not in COMMANDING:
+                self._abort_tag(now, self._command_gate(now).replace("_", " "))
+            elif (
+                self.mode != "auto"
+                or self.target_track != cycle.target_id
+                or now - self.tag_seen_time > self.tag_lock_timeout_s
+            ):
+                self._abort_tag(now, f"lost the lock on {cycle.target_id}")
+        measured = self._launcher_position(now)
+        event = cycle.update(now, *(measured if measured is not None else (None, None)),
+                             clear=self._line_of_fire_clear(now))
+        if event is not None:
+            self._tag_ended(now, *event)
+
+    def _tag_ended(
+        self, now: float, target_id: str, result: str, reason: str, shot: bool
+    ) -> None:
+        if shot:
+            self.darts = max(0, self.darts - 1)
+            self.shots += 1
+        if target_id:
+            self.last_cycle_end = now
+            self.last_tag = {
+                "target_id": target_id, "result": result, "reason": reason, "stamp": now
+            }
+        if result == "fault":
+            self._notify(now, f"launcher fault: {reason}")
+            # Stop the rack and return the trigger at once, not when the
+            # bridge's watchdog notices the commands have stopped.
+            self._launcher_keepalive(now, force=True)
+        elif result == "fired":
+            if target_id not in self.tagged_ids:
+                self.tagged_ids.append(target_id)
+            self._notify(now, f"fired at {target_id}; {self.darts} darts left")
+            if self.auto_next:
+                self._next(now)
+
+    def _launcher_keepalive(self, now: float, force: bool = False) -> None:
+        """Keep commands carrying the launcher's goals flowing while it is
+        not verified at rest, holding pan and tilt where they are going;
+        force: send one now (a cycle started or stopped)."""
+        cycle = self.fire_cycle
+        measured = self._launcher_position(now)
+        if not force and (
+            cycle.phase == FireCycle.READY
+            or (cycle.phase == FireCycle.FAULT
+                and (measured is None or measured[1] <= cycle.trigger_tolerance))
+            or now - self.last_send_time < LAUNCHER_KEEPALIVE_S
+        ):
+            return
+        if self._command_gate(now) not in COMMANDING:
+            return  # the bridge's STOP or watchdog makes it safe meanwhile
+        if self.controller.continuing(now):
+            position = self.controller.last_command[1:]
+        elif self.controller.has_feedback(now):
+            position = self.controller.measured[-1][1:]
+        else:
+            return
+        self._send(now, position, record=False)
+
+    def _reload(self, command: dict[str, Any], now: float) -> None:
+        darts = command.get("darts")
+        if isinstance(darts, bool) or not isinstance(darts, int) or not 0 <= darts <= 1000:
+            self._notify(now, "reload needs darts: a whole number from 0")
+            return
+        if self.fire_cycle.running:
+            self._notify(now, "reload refused: a fire cycle is running")
+            return
+        self.darts = darts
+        self._notify(now, f"reloaded: {darts} darts")
+
+    def _next(self, now: float) -> None:
+        """Lock (aim at) the untagged detection nearest the image centre.
+        It never tags: that needs another tag command."""
+        frame = self.last_frame
+        if frame is None or not 0.0 <= now - frame["time"] <= 1.0:
+            self._notify(now, "next: no camera images")
+            return
+        cx, cy = frame["center"]
+        candidates = [
+            detection
+            for detection in self.last_detections
+            if detection["id"] not in self.tagged_ids and detection["id"] != self.target_track
+        ]
+        if not candidates:
+            self._notify(now, "next: no untagged detection")
+            return
+        detection = min(
+            candidates, key=lambda d: math.dist(d["centroid_px"], (cx, cy))
+        )
+        self._select(now, detection["id"], detection["class"], detection["centroid_px"])
+
+    def _set_auto_next(self, command: dict[str, Any], now: float) -> None:
+        enabled = command.get("enabled")
+        if not isinstance(enabled, bool):
+            self._notify(now, "auto_next needs enabled: true or false")
+            return
+        self.auto_next = enabled
+        self._notify(now, f"auto next {'on' if enabled else 'off'}")
+
     def _status(self, now: float) -> dict[str, Any]:
         frame = self.last_frame
         recent = frame is not None and 0.0 <= now - frame["time"] <= 1.0
@@ -1609,6 +2212,14 @@ class PanTiltYoloTracker(Node):
                 f"no IMU on {self.base_imu_topic} for {self.imu_timeout_s:g} s"
             )
             messages.append(f"{problem}: fixed-base aiming")
+        launcher = self._launcher_state(now)
+        if launcher == "fault":
+            reason = self.fire_cycle.reason or (
+                "no launcher position in the joint states"
+                if self._launcher_position(now) is None else "returning to rest"
+            )
+            messages.append(f"launcher fault: {reason}")
+        fire_block = self._fire_refusal(now, self.target_track)
         return {
             "mode": "estop" if self.estop_engaged else self.mode,
             "target_id": self.target_track if auto else "",
@@ -1621,6 +2232,14 @@ class PanTiltYoloTracker(Node):
             "message": "; ".join(messages),
             "stamp": now,
             "command_state": self.command_state,
+            # Foam dart launcher
+            "launcher": launcher,
+            "darts": self.darts,
+            "tags": len(self.tagged_ids),
+            "tagged_ids": list(self.tagged_ids),
+            "last_tag": None if self.last_tag is None else dict(self.last_tag),
+            "fire_block": fire_block,
+            "auto_next": self.auto_next,
         }
 
     def _selected_class(self) -> str:
@@ -1658,7 +2277,19 @@ class PanTiltYoloTracker(Node):
         message.status = [status]
         self.diagnostics_pub.publish(message)
 
+    def _safe_for_shutdown(self) -> None:
+        """Shutting down: the trigger to 0 and the rack stopped now (the
+        bridge's watchdog would 0.5 s later)."""
+        try:
+            if self.actuator_fitted and self.fire_cycle.phase != FireCycle.READY:
+                now = self._now()
+                self._abort_tag(now, "shutdown")
+                self._launcher_keepalive(now, force=True)
+        except Exception:  # the ROS context may already be shutting down
+            pass
+
     def destroy_node(self) -> bool:
+        self._safe_for_shutdown()
         try:
             if self.window_initialized:
                 cv2.destroyWindow(self.window_name)

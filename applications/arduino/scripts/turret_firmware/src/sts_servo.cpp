@@ -246,6 +246,14 @@ Result Bus::writeTorque(uint8_t id, bool enable) {
   return transact(packet, len, id, reply);
 }
 
+Result Bus::writeTorqueLimit(uint8_t id, uint16_t limit) {
+  uint8_t packet[kMaxPacket];
+  StatusParser reply;
+  const uint8_t value[2] = {static_cast<uint8_t>(limit & 0xFF), static_cast<uint8_t>(limit >> 8)};
+  const size_t len = buildWrite(packet, sizeof(packet), id, kRegTorqueLimit, value, 2);
+  return transact(packet, len, id, reply);
+}
+
 Result Bus::syncWritePosition(const uint8_t* ids, const int32_t* steps, size_t count,
                               uint16_t speed, uint8_t acceleration) {
   uint8_t packet[kMaxPacket];

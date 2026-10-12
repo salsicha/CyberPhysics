@@ -60,29 +60,44 @@ def substitute(text, properties, args):
     return re.sub(r'\$\{([^}]*)\}', lambda m: str(evaluate(m.group(1), {'pi': math.pi, **properties})), text)
 
 
-def expand(path, properties=None, args=None):
-    """Joints and links of a xacro file and its includes, after if/unless."""
+def expand(path, properties=None, args=None, macros=None):
+    """Joints and links of a xacro file and its includes, after if/unless,
+    with xacro:macro definitions and calls (params with := defaults)."""
     root = ET.parse(path).getroot()
     properties = {} if properties is None else properties
     args = {} if args is None else args
+    macros = {} if macros is None else macros
     for arg in root.iter(XACRO + 'arg'):
         args.setdefault(arg.get('name'), arg.get('default'))
     joints, links = {}, set()
 
-    def visit(element, base):
+    def visit(element, base, props):
         for child in element:
             if child.tag == XACRO + 'include':
                 included = (base.parent / child.get('filename')).resolve()
                 assert included.is_file(), f'{path.name} includes missing {included}'
-                sub_joints, sub_links = expand(included, properties, args)
+                sub_joints, sub_links = expand(included, props, args, macros)
+                for name in sub_joints:
+                    assert name not in joints, f'joint {name} defined twice'
                 joints.update(sub_joints)
                 links.update(sub_links)
             elif child.tag == XACRO + 'property':
-                properties[child.get('name')] = substitute(child.get('value'), properties, args)
+                props[child.get('name')] = substitute(child.get('value'), props, args)
+            elif child.tag == XACRO + 'macro':
+                macros[child.get('name')] = child
             elif child.tag in (XACRO + 'if', XACRO + 'unless'):
-                value = substitute(child.get('value'), properties, args).strip().lower()
+                value = substitute(child.get('value'), props, args).strip().lower()
                 if (value in ('true', '1')) == (child.tag == XACRO + 'if'):
-                    visit(child, base)
+                    visit(child, base, props)
+            elif child.tag.startswith(XACRO) and child.tag[len(XACRO):] in macros:
+                macro = macros[child.tag[len(XACRO):]]
+                scope = dict(props)
+                for param in macro.get('params').split():
+                    name, _, default = param.partition(':=')
+                    value = child.get(name, default if _ else None)
+                    assert value is not None, f'{name} missing in the call of {macro.get("name")}'
+                    scope[name] = substitute(value, props, args)
+                visit(macro, base, scope)
             elif child.tag == 'link':
                 links.add(child.get('name'))
             elif child.tag == 'joint':
@@ -92,20 +107,20 @@ def expand(path, properties=None, args=None):
                 def numbers(tag, attribute, default):
                     found = child.find(tag)
                     text = default if found is None else found.get(attribute, default)
-                    return [float(v) for v in substitute(text, properties, args).split()]
+                    return [float(v) for v in substitute(text, props, args).split()]
                 limit = child.find('limit')
                 joints[name] = {
                     'type': child.get('type'),
-                    'parent': child.find('parent').get('link'),
+                    'parent': substitute(child.find('parent').get('link'), props, args),
                     'child': child.find('child').get('link'),
                     'xyz': numbers('origin', 'xyz', '0 0 0'),
                     'rpy': numbers('origin', 'rpy', '0 0 0'),
                     'axis': numbers('axis', 'xyz', '1 0 0'),
                     'limit': None if limit is None else {
-                        key: float(substitute(limit.get(key), properties, args))
+                        key: float(substitute(limit.get(key), props, args))
                         for key in ('lower', 'upper', 'effort', 'velocity')},
                 }
-    visit(root, path)
+    visit(root, path, properties)
     return joints, links
 
 
@@ -141,6 +156,10 @@ def base_to(frame, joints, positions):
             motion = np.eye(4)
             motion[:3, :3] = axis_angle(joint['axis'], positions.get(name, 0.0))
             step = step @ motion
+        elif joint['type'] == 'prismatic':
+            motion = np.eye(4)
+            motion[:3, 3] = np.asarray(joint['axis']) / np.linalg.norm(joint['axis']) * positions.get(name, 0.0)
+            step = step @ motion
         transform = step @ transform
         frame = joint['parent']
     return transform
@@ -153,7 +172,14 @@ TURRET_JOINTS = {
     'tilt_joint': ('revolute', 'turret/pan_link', 'turret/tilt_link', [0, 0, 0.055]),
     'turret_camera_joint': ('fixed', 'turret/tilt_link', 'turret/camera_link', [0.035, 0, 0]),
     'turret_camera_optical_joint': ('fixed', 'turret/camera_link', 'turret/camera_optical_frame', [0, 0, 0]),
+    # Foam dart launcher: from the printed design (hardware/parts/turret/_launcher.py).
+    'turret_launcher_joint': ('fixed', 'turret/tilt_link', 'turret/launcher_link', [0, 0, 0]),
+    'actuator_joint': ('prismatic', 'turret/tilt_link', 'turret/launcher_rack_link', [-0.1035, 0, 0.058]),
+    'trigger_joint': ('revolute', 'turret/tilt_link', 'turret/launcher_trigger_link', [-0.109, 0.021375, 0.059]),
+    'turret_muzzle_joint': ('fixed', 'turret/tilt_link', 'turret/muzzle', [0.133, 0, 0.048]),
 }
+LAUNCHER_LINKS = {'turret/launcher_link', 'turret/launcher_rack_link', 'turret/launcher_trigger_link', 'turret/muzzle'}
+STANDALONE_FILE = SYSTEM / 'urdf/turret_printed.urdf.xacro'
 
 
 def test_contract_states_the_geometry_tested_here():
@@ -185,7 +211,66 @@ def test_joint_axes_and_limits(urdf):
     assert (params['pan_min_rad'], params['pan_max_rad']) == pytest.approx((-1.5708, 1.5708))
     assert (params['tilt_min_rad'], params['tilt_max_rad']) == pytest.approx((-0.65, 0.75))
     # Only the turret moves: robot_state_publisher needs nothing but /turret/joint_states.
+    assert {name for name, joint in joints.items() if joint['type'] != 'fixed'} == {
+        'pan_joint', 'tilt_joint', 'actuator_joint', 'trigger_joint'}
+
+
+def test_launcher_joints(urdf):
+    joints, links = urdf
+    rack, trigger = joints['actuator_joint'], joints['trigger_joint']
+    # 0 = forward (rest), positive draws the rack back; the stroke primes it.
+    assert rack['type'] == 'prismatic' and rack['axis'] == pytest.approx([-1, 0, 0])
+    assert (rack['limit']['lower'], rack['limit']['upper']) == pytest.approx((0.0, 0.038))
+    tilt = joints['tilt_joint']['limit']
+    assert rack['limit']['effort'] == pytest.approx(tilt['effort'] / 0.0135)
+    assert rack['limit']['velocity'] == pytest.approx(tilt['velocity'] * 0.0135)
+    # 0 = safe (sear engaged), positive lifts the sear.
+    assert trigger['type'] == 'revolute' and trigger['axis'] == pytest.approx([0, -1, 0])
+    assert (trigger['limit']['lower'], trigger['limit']['upper']) == pytest.approx((0.0, 0.6))
+    assert LAUNCHER_LINKS <= links
+    # The bridge drives the rack through the same pinion.
+    bridge = yaml.safe_load((REPO / 'applications/pantiltros/config/arduino_bridge.yaml').read_text())
+    assert bridge['turret_arduino_bridge']['ros__parameters']['actuator_pinion_radius_m'] == pytest.approx(0.0135)
+
+
+def test_the_muzzle_is_parallel_to_the_camera_above_it(urdf):
+    joints, _links = urdf
+    for pan, tilt in ((0.0, 0.0), (0.4, 0.5), (-1.2, -0.6)):
+        positions = {'pan_joint': pan, 'tilt_joint': tilt}
+        camera = base_to('turret/camera_link', joints, positions)
+        muzzle = base_to('turret/muzzle', joints, positions)
+        optical = base_to('turret/camera_optical_frame', joints, positions)[:3, 2]
+        # x along the bore = the camera's optical axis
+        assert muzzle[:3, 0] == pytest.approx(optical, abs=1e-9)
+        # the bore is 48 mm above the camera's axis, on its centre line, ahead of the lens
+        offset = camera[:3, :3].T @ (muzzle[:3, 3] - camera[:3, 3])
+        assert offset == pytest.approx([0.098, 0.0, 0.048], abs=1e-9)
+        # the rack primes backward, along the bore
+        rest = base_to('turret/launcher_rack_link', joints, positions)[:3, 3]
+        primed = base_to('turret/launcher_rack_link', joints, {**positions, 'actuator_joint': 0.038})[:3, 3]
+        assert primed - rest == pytest.approx(-0.038 * optical, abs=1e-9)
+
+
+def test_a_turret_without_the_launcher_drops_it():
+    joints, links = expand(XACRO_FILE, args={'launcher': 'false'})
+    assert not ({'actuator_joint', 'trigger_joint', 'turret_muzzle_joint'} & set(joints))
+    assert not (LAUNCHER_LINKS & links)
     assert {name for name, joint in joints.items() if joint['type'] != 'fixed'} == {'pan_joint', 'tilt_joint'}
+
+
+def test_the_standalone_printed_turret_is_the_same_turret(urdf):
+    car, _ = urdf
+    joints, links = expand(STANDALONE_FILE)
+    turret = {name for name in car if name in TURRET_JOINTS}
+    assert turret <= set(joints)
+    for name in turret - {'turret_mount_joint'}:
+        assert joints[name] == car[name], name
+    # On the 8 mm base plate: turret/base_link (the 5 mm plate convention) 3 mm up.
+    mount = joints['turret_mount_joint']
+    assert mount['parent'] == 'base_link' and mount['xyz'] == pytest.approx([0, 0, 0.003])
+    assert 'base_link' in links
+    without, _ = expand(STANDALONE_FILE, args={'launcher': 'false'})
+    assert 'actuator_joint' not in without and 'pan_joint' in without
 
 
 def test_the_racecar_frames_are_included_unchanged(urdf):

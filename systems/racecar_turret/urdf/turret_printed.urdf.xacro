@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<!--
+  The standalone printed turret (hardware/turret.md, hardware/parts/turret):
+  the turret of turret.urdf.xacro on its 8 mm base plate, on a tripod or a
+  bench. base_link is the base plate's underside on the pan axis, x forward
+  (the camera's view at pan 0), z up; the plate's top is the turret's
+  mounting surface, so turret/base_link (the 5 mm plate convention of
+  turret.urdf.xacro) is 3 mm up.
+
+  This is the model of the printed turret; the upstream pan_tilt_ros URDF
+  (applications/pantiltros/pantiltros/urdf) tilts first and pans on top and
+  has no limits. launcher:=false drops the foam dart launcher.
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="turret_printed">
+  <xacro:arg name="launcher" default="true"/>
+  <xacro:include filename="turret.urdf.xacro"/>
+
+  <!-- Base plate (hardware/parts/turret/base_plate.py: 178 x 112 x 8 mm,
+       x -138..40 mm about the pan axis), with the controller boards -->
+  <link name="base_link">
+    <visual>
+      <origin xyz="-0.049 0 0.004" rpy="0 0 0"/>
+      <geometry><box size="0.178 0.112 0.008"/></geometry>
+      <material name="turret_base_plate"><color rgba="0.2 0.4 0.7 1"/></material>
+    </visual>
+    <inertial>
+      <mass value="0.16"/>
+      <origin xyz="-0.06 0 0.006" rpy="0 0 0"/>
+      <inertia ixx="0.00017" ixy="0" ixz="0" iyy="0.00042" iyz="0" izz="0.00058"/>
+    </inertial>
+  </link>
+  <xacro:pantilt_turret parent="base_link" xyz="0 0 0.003" launcher="$(arg launcher)"/>
+</robot>

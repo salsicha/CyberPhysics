@@ -1,4 +1,5 @@
-"""Decision logic of the RACECAR Neo / RACECAR Turret web UI (main.py).
+"""Decision logic of the RACECAR Neo / RACECAR Turret / PanTiltROS turret
+web UI (main.py).
 
 Plain Python (and NumPy for the map image), no ROS and no NiceGUI, so it
 is unit tested on its own (tests/test_racecar_turret_ui.py). Conventions,
@@ -358,25 +359,34 @@ def lock_command(segments, u: float, v: float) -> dict:
     return {'action': 'lock', 'point': [round(u, 4), round(v, 4)]}
 
 
-def detections_svg(segments, width: int, height: int, target_id: str = '', locked: bool = False) -> str:
+def detections_svg(segments, width: int, height: int, target_id: str = '', locked: bool = False,
+                   tagged_ids=()) -> str:
     """SVG boxes over a width x height rendering of the turret image; the
-    tracked target is drawn thicker, green once locked, amber before."""
+    tracked target is drawn thicker, green once locked, amber before, and
+    tagged detections violet and dashed."""
     if segments is None:
         return ''
     stroke = max(2.0, width / 240.0)
     font = max(12.0, width / 30.0)
+    tagged = set(tagged_ids)
     parts = []
     for detection in segments.detections:
         is_target = bool(target_id) and detection.id == target_id
-        colour = ('#22c55e' if locked else '#f59e0b') if is_target else '#22d3ee'
+        is_tagged = bool(detection.id) and detection.id in tagged
+        if is_target:
+            colour = '#22c55e' if locked else '#f59e0b'
+        else:
+            colour = '#a78bfa' if is_tagged else '#22d3ee'
         x = (detection.u - detection.w / 2.0) * width
         y = (detection.v - detection.h / 2.0) * height
         label = html.escape(f'{detection.cls} {detection.confidence:.2f}'
-                            + (f' #{detection.id}' if detection.id else ''))
+                            + (f' #{detection.id}' if detection.id else '')
+                            + (' tagged' if is_tagged else ''))
+        dash = f' stroke-dasharray="{stroke * 3:.1f} {stroke * 2:.1f}"' if is_tagged else ''
         parts.append(
             f'<rect x="{x:.1f}" y="{y:.1f}" width="{detection.w * width:.1f}" '
             f'height="{detection.h * height:.1f}" fill="{colour}" fill-opacity="0.08" '
-            f'stroke="{colour}" stroke-width="{stroke * (2 if is_target else 1):.1f}"/>'
+            f'stroke="{colour}" stroke-width="{stroke * (2 if is_target else 1):.1f}"{dash}/>'
             f'<text x="{x + 3:.1f}" y="{max(font, y - 4):.1f}" fill="{colour}" font-size="{font:.0f}" '
             f'font-family="sans-serif" font-weight="bold" stroke="#0f172a" stroke-width="3" '
             f'paint-order="stroke">{label}</text>')
@@ -387,6 +397,7 @@ def detections_svg(segments, width: int, height: int, target_id: str = '', locke
 
 CONTROL_SOURCES = ('nav2', 'teleop', 'none')
 TURRET_MODES = ('idle', 'auto', 'manual', 'estop')
+LAUNCHER_STATES = ('none', 'ready', 'priming', 'chambering', 'firing', 'empty', 'fault')
 
 
 def _json_object(text):
@@ -413,13 +424,27 @@ def parse_control_status(text: str):
             'steering_rad': _number(payload.get('steering_rad'))}
 
 
+def _last_tag(value):
+    if not isinstance(value, dict):
+        return None
+    return {'target_id': str(value.get('target_id') or ''),
+            'result': str(value.get('result') or ''),
+            'reason': str(value.get('reason') or ''),
+            'stamp': _number(value.get('stamp'))}
+
+
 def parse_turret_status(text: str):
-    """/turret/status, normalised; None if it is not JSON."""
+    """/turret/status, normalised; None if it is not JSON. A tracker without
+    the launcher's fields reads as launcher "none", never ready to fire."""
     payload = _json_object(text)
     if payload is None:
         return None
     mode = payload.get('mode')
     detections = payload.get('detections')
+    launcher = payload.get('launcher')
+    tagged = payload.get('tagged_ids')
+    tags, darts = payload.get('tags'), payload.get('darts')
+    fire_block = payload.get('fire_block')
     return {'mode': mode if mode in TURRET_MODES else 'unknown',
             'target_id': str(payload.get('target_id') or ''),
             'target_class': str(payload.get('target_class') or ''),
@@ -427,7 +452,98 @@ def parse_turret_status(text: str):
             'aim_error_deg': _number(payload.get('aim_error_deg')),
             'base_compensation': payload.get('base_compensation') is True,
             'detections': int(detections) if finite(detections) else 0,
-            'message': str(payload.get('message') or '')}
+            'message': str(payload.get('message') or ''),
+            # Foam dart launcher (interfaces.md, "Foam dart launcher")
+            'launcher': launcher if launcher in LAUNCHER_STATES else 'none',
+            'darts': int(darts) if finite(darts) and not isinstance(darts, bool) else 0,
+            'tags': int(tags) if finite(tags) and not isinstance(tags, bool) else 0,
+            'tagged_ids': tuple(str(i) for i in tagged) if isinstance(tagged, list) else (),
+            'last_tag': _last_tag(payload.get('last_tag')),
+            # None: the tracker does not say (an older one), so never ready
+            'fire_block': fire_block if isinstance(fire_block, str) else None,
+            'auto_next': payload.get('auto_next') is True,
+            'stamp': _number(payload.get('stamp'))}
+
+
+def newer_status(previous_stamp, stamp, restart_s=2.0) -> bool:
+    """Whether a status stamped `stamp` replaces the one stamped
+    `previous_stamp`. The page reads /turret/status twice (latched and
+    volatile), so each message arrives twice and a copy can come after a
+    newer one: those are dropped. A stamp well before the last one is a
+    restarted tracker and is taken; so is a status without a stamp."""
+    if stamp is None or previous_stamp is None:
+        return True
+    return not previous_stamp - restart_s < stamp <= previous_stamp
+
+
+def fire_button(status, armed, actuator_ready):
+    """(enabled, why not) for the Fire button. Enabled only while the
+    contract's conditions hold according to a fresh /turret/status (the
+    tracker's fire_block is empty: locked on the target within the aim
+    error at its aim point, not too close, the launcher ready with darts,
+    past the minimum interval) and the page's own view agrees (armed,
+    actuator ready, locked, launcher ready). The tracker checks the gates
+    again when the command arrives."""
+    if status is None:
+        return False, 'no status from the tracker'
+    if status['launcher'] == 'none':
+        return False, 'no launcher'
+    if armed is not True:
+        return False, 'turret disarmed'
+    if actuator_ready is not True:
+        return False, 'actuator not ready'
+    if status['mode'] != 'auto' or not status['target_id']:
+        return False, 'no locked target'
+    if status['fire_block'] is None:
+        return False, 'the tracker does not report fire_block'
+    if status['fire_block']:
+        return False, status['fire_block']
+    if not status['locked']:
+        return False, 'target not locked'
+    if status['darts'] <= 0:
+        return False, 'no darts'
+    if status['launcher'] != 'ready':
+        return False, f'launcher {status["launcher"]}'
+    return True, ''
+
+
+def fire_command(status) -> dict:
+    """The fire command ("tag") for the target the status reports locked."""
+    return {'action': 'tag', 'target_id': status['target_id']}
+
+
+def reload_command(darts):
+    """{"action": "reload", "darts": N} for a whole N from 0, else None."""
+    try:
+        count = float(darts)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(count) or count < 0 or count != int(count) or count > 1000:
+        return None
+    return {'action': 'reload', 'darts': int(count)}
+
+
+def auto_next_command(enabled: bool) -> dict:
+    return {'action': 'auto_next', 'enabled': bool(enabled)}
+
+
+def launcher_summary(status) -> str:
+    """The launcher line: its state, the darts left, the tag count and the last shot."""
+    if status is None:
+        return 'Launcher: no status from the tracker'
+    if status['launcher'] == 'none':
+        return 'Launcher: none fitted'
+    darts, count = status['darts'], status['tags']
+    text = (f'Launcher: {status["launcher"]}, {darts} dart{"" if darts == 1 else "s"}, '
+            f'{count} tag{"" if count == 1 else "s"}')
+    last = status['last_tag']
+    if last is not None and last['result']:
+        text += f'; last: {last["result"]}'
+        if last['target_id']:
+            text += f' #{last["target_id"]}'
+        if last['reason'] and last['result'] != 'fired':
+            text += f' ({last["reason"]})'
+    return text
 
 
 def control_summary(status) -> str:

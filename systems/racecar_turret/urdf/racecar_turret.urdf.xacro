@@ -12,8 +12,10 @@
   turns it up (image -v). robot_state_publisher must read the turret joints
   from /turret/joint_states.
 
-  The include is relative to this file, so systems/racecarneo must sit next
-  to systems/racecar_turret (mount ../systems, not one platform folder).
+  The turret itself is the pantilt_turret macro of turret.urdf.xacro (with
+  the foam dart launcher; launcher:=false without). The includes are
+  relative to this file, so systems/racecarneo must sit next to
+  systems/racecar_turret (mount ../systems, not one platform folder).
 
   sim_vehicle:=true adds what a physics simulator needs to drive the car
   (applications/isaac/scripts/racecar_turret_isaac.py): a chassis collision
@@ -28,99 +30,14 @@
   <xacro:arg name="sim_vehicle" default="false"/>
   <xacro:include filename="../../racecarneo/urdf/racecarneo.urdf.xacro"/>
 
-  <!-- Turret geometry (metres, radians); systems/racecar_turret/interfaces.md -->
+  <!-- The turret (turret.urdf.xacro, shared with the standalone turret's
+       turret_printed.urdf.xacro) on the plate behind the lidar;
+       systems/racecar_turret/interfaces.md. launcher:=false drops the foam
+       dart launcher (actuator_joint, trigger_joint, turret/muzzle). -->
+  <xacro:arg name="launcher" default="true"/>
   <xacro:property name="turret_mount_xyz" value="-0.10 0 0.24"/>
-  <xacro:property name="pan_axis_height" value="0.045"/>
-  <xacro:property name="tilt_axis_height" value="0.055"/>
-  <xacro:property name="camera_forward" value="0.035"/>
-  <xacro:property name="pan_limit" value="1.5708"/>
-  <xacro:property name="tilt_min" value="-0.65"/>
-  <xacro:property name="tilt_max" value="0.75"/>
-  <!-- ST3215 at 12 V: about 2.9 N m stall, 0.222 s per 60 degrees -->
-  <xacro:property name="servo_effort" value="2.9"/>
-  <xacro:property name="servo_velocity" value="4.7"/>
-
-  <!-- The plate and the pan servo, whose body is fixed on it (ST3215,
-       45 x 25 x 35 mm, output shaft up at the pan axis) -->
-  <link name="turret/base_link">
-    <visual>
-      <origin xyz="0 0 0.0025" rpy="0 0 0"/>
-      <geometry><box size="0.11 0.11 0.005"/></geometry>
-      <material name="turret_grey"><color rgba="0.35 0.35 0.38 1"/></material>
-    </visual>
-    <visual>
-      <origin xyz="-0.01 0 0.0225" rpy="0 0 0"/>
-      <geometry><box size="0.045 0.025 0.035"/></geometry>
-      <material name="turret_black"><color rgba="0.05 0.05 0.05 1"/></material>
-    </visual>
-    <inertial>
-      <mass value="0.18"/>
-      <origin xyz="-0.0033 0 0.0092" rpy="0 0 0"/>
-      <inertia ixx="0.00014" ixy="0" ixz="0" iyy="0.00015" iyz="0" izz="0.00025"/>
-    </inertial>
-  </link>
-  <joint name="turret_mount_joint" type="fixed">
-    <parent link="base_link"/>
-    <child link="turret/base_link"/>
-    <origin xyz="${turret_mount_xyz}" rpy="0 0 0"/>
-  </joint>
-
-  <!-- Pan stage: the bracket on the pan servo's horn and the tilt servo it
-       carries -->
-  <link name="turret/pan_link">
-    <visual>
-      <origin xyz="0 0 0.02" rpy="0 0 0"/>
-      <geometry><box size="0.045 0.06 0.04"/></geometry>
-      <material name="turret_grey"/>
-    </visual>
-    <inertial>
-      <mass value="0.09"/>
-      <origin xyz="0 0 0.02" rpy="0 0 0"/>
-      <inertia ixx="0.000039" ixy="0" ixz="0" iyy="0.000027" iyz="0" izz="0.000042"/>
-    </inertial>
-  </link>
-  <joint name="pan_joint" type="revolute">
-    <parent link="turret/base_link"/>
-    <child link="turret/pan_link"/>
-    <origin xyz="0 0 ${pan_axis_height}" rpy="0 0 0"/>
-    <axis xyz="0 0 -1"/>
-    <limit lower="${-pan_limit}" upper="${pan_limit}" effort="${servo_effort}" velocity="${servo_velocity}"/>
-  </joint>
-
-  <!-- Tilt stage: the camera on the tilt servo's horn -->
-  <link name="turret/tilt_link">
-    <visual>
-      <origin xyz="0.015 0 0" rpy="0 0 0"/>
-      <geometry><box size="0.05 0.045 0.035"/></geometry>
-      <material name="turret_black"/>
-    </visual>
-    <inertial>
-      <mass value="0.08"/>
-      <origin xyz="0.015 0 0" rpy="0 0 0"/>
-      <inertia ixx="0.00002" ixy="0" ixz="0" iyy="0.00003" iyz="0" izz="0.00003"/>
-    </inertial>
-  </link>
-  <joint name="tilt_joint" type="revolute">
-    <parent link="turret/pan_link"/>
-    <child link="turret/tilt_link"/>
-    <origin xyz="0 0 ${tilt_axis_height}" rpy="0 0 0"/>
-    <axis xyz="0 -1 0"/>
-    <limit lower="${tilt_min}" upper="${tilt_max}" effort="${servo_effort}" velocity="${servo_velocity}"/>
-  </joint>
-
-  <!-- Turret camera body, x forward / y left / z up, and its optical frame -->
-  <link name="turret/camera_link"/>
-  <joint name="turret_camera_joint" type="fixed">
-    <parent link="turret/tilt_link"/>
-    <child link="turret/camera_link"/>
-    <origin xyz="${camera_forward} 0 0" rpy="0 0 0"/>
-  </joint>
-  <link name="turret/camera_optical_frame"/>
-  <joint name="turret_camera_optical_joint" type="fixed">
-    <parent link="turret/camera_link"/>
-    <child link="turret/camera_optical_frame"/>
-    <origin xyz="0 0 0" rpy="-1.57079632679 0 -1.57079632679"/>
-  </joint>
+  <xacro:include filename="turret.urdf.xacro"/>
+  <xacro:pantilt_turret parent="base_link" xyz="${turret_mount_xyz}" launcher="$(arg launcher)"/>
 
   <!--
     Simulation-only running gear (sim_vehicle:=true). The RACECAR URDF's

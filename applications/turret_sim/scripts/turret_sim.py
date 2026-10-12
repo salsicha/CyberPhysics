@@ -61,11 +61,30 @@ def occlusion_fraction(obj, t):
     return 0.0
 
 
+# The foam dart launcher (systems/racecar_turret/interfaces.md; the design in
+# hardware/parts/turret/_launcher.py): an ST3215 turning the pinion of the
+# priming rack, a second servo on the trigger, and the sear between them.
+# Defaults for a scenario without a pantilt.launcher block.
+LAUNCHER_DEFAULTS = {
+    'stroke_m': 0.038,  # the rack at prime
+    'sear_catch_m': 0.03425,  # the sear drops into the rod's groove from here
+    'pinion_radius_m': 0.0135,  # the design's module 1.5, 18-tooth pinion
+    'trigger_fire_rad': 0.6,  # lifts the sear 5.4 mm
+    # 4.45 mm of lift releases it: the trigger arm's pin (14 mm radius, 2.5
+    # mm under the sear's lug at 0) at asin(6.95 / 14)
+    'trigger_release_rad': 0.5194,
+    'speed_steps_s': 2000,  # the bridge's and firmware's goal speed, both servos
+    'watchdog_s': 0.5,  # no command for this long: trigger to 0, rack stopped
+}
+STEPS_PER_TURN = 4096
+
+
 class TurretSim:
     def __init__(
         self,
         scenario,
         variant_name='nominal',
+        launcher=False,
     ):
         self.scenario = scenario
         self.variant_name = variant_name
@@ -114,6 +133,18 @@ class TurretSim:
         self.was_target_detected = False
         self.samples = []
         self.command_queue = deque()
+        # Optional dart launcher: the rack (m, 0 forward) and the trigger (rad,
+        # 0 safe), their goals, and the sear
+        self.launcher_config = dict(LAUNCHER_DEFAULTS, **self.pantilt.get('launcher', {}))
+        self.launcher = launcher
+        self.rack = 0.0
+        self.trigger = 0.0
+        self.rack_cmd = 0.0
+        self.trigger_cmd = 0.0
+        self.launcher_queue = deque()  # (time it takes effect, rack or None: stop, trigger)
+        self.last_launcher_command = -1e9
+        self.primed = False  # the sear holds the plunger
+        self.shots = []  # times the plunger was released
         self.confidence = float(scenario['yolo']['min_confidence'])
         if not 0.0 <= self.confidence <= 1.0:
             raise SystemExit('synthetic confidence must be between 0 and 1')
@@ -450,7 +481,48 @@ class TurretSim:
         command_tilt = clamp(command_tilt, tilt_min, tilt_max)
         self.command_queue.append((t + float(self.pantilt['command_latency_s']), command_pan, command_tilt))
 
+    @property
+    def servo_speed_rad_s(self):
+        return float(self.launcher_config['speed_steps_s']) * 2.0 * math.pi / STEPS_PER_TURN
+
+    @property
+    def rack_speed_m_s(self):
+        return self.servo_speed_rad_s * float(self.launcher_config['pinion_radius_m'])
+
+    def update_launcher(self, t, dt, emergency_stop):
+        """The rack and trigger at the ST3215's goal speed, in whole servo
+        steps, and the sear: it catches the plunger when the rack is driven
+        past sear_catch_m and releases it (a shot) when the trigger is driven
+        past trigger_release_rad. Like the firmware, a command without the
+        rack stops it where it is, and the emergency stop's STOP and commands
+        stopping for watchdog_s return the trigger to 0 and stop the rack."""
+        config = self.launcher_config
+        stroke, fire = float(config['stroke_m']), float(config['trigger_fire_rad'])
+        while self.launcher_queue and self.launcher_queue[0][0] <= t:
+            _, rack, self.trigger_cmd = self.launcher_queue.popleft()
+            self.rack_cmd = self.rack if rack is None else rack
+            self.last_launcher_command = t
+        if emergency_stop or t - self.last_launcher_command >= float(config['watchdog_s']):
+            self.rack_cmd, self.trigger_cmd = self.rack, 0.0
+        rack, trigger = self.rack, self.trigger
+        step = clamp(clamp(self.rack_cmd, 0.0, stroke) - self.rack,
+                     -self.rack_speed_m_s * dt, self.rack_speed_m_s * dt)
+        quantum = 2.0 * math.pi / STEPS_PER_TURN * float(config['pinion_radius_m'])
+        self.rack = clamp(round((self.rack + step) / quantum) * quantum, 0.0, stroke)
+        step = clamp(clamp(self.trigger_cmd, 0.0, fire) - self.trigger,
+                     -self.servo_speed_rad_s * dt, self.servo_speed_rad_s * dt)
+        quantum = 2.0 * math.pi / STEPS_PER_TURN
+        self.trigger = clamp(round((self.trigger + step) / quantum) * quantum, 0.0, fire)
+        catch, release = float(config['sear_catch_m']), float(config['trigger_release_rad'])
+        if rack < catch <= self.rack:
+            self.primed = True
+        if self.primed and trigger < release <= self.trigger:
+            self.primed = False
+            self.shots.append(t)
+
     def update_servo(self, t, dt, emergency_stop):
+        if self.launcher:
+            self.update_launcher(t, dt, emergency_stop)
         while self.command_queue and self.command_queue[0][0] <= t:
             _, self.pan_cmd, self.tilt_cmd = self.command_queue.popleft()
         if emergency_stop:

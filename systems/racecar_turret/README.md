@@ -35,10 +35,13 @@ The car is the RACECAR Neo build of `hardware/racecarneo.md`. On it:
   thin posts from the top deck, above the lidar so that only the posts cross
   its scan plane;
 - the pan servo on the plate, the tilt servo on the pan stage and the USB
-  turret camera on the tilt stage (pan +-90 deg, tilt -37 to +43 deg);
-- the two ST3215 serial bus servos driven by the Jetson itself: its 40-pin
-  header UART goes through a Waveshare Bus Servo Adapter (A) to the servo
-  bus; no microcontroller;
+  turret camera on the tilt stage (pan +-90 deg, tilt -37 to +43 deg), with
+  the printed foam dart launcher above the camera (toy power, foam darts
+  only; [interfaces.md](interfaces.md), "Foam dart launcher");
+- four ST3215 serial bus servos (pan, tilt, and the launcher's priming
+  actuator and trigger) driven by the Jetson itself: its 40-pin header UART
+  goes through a Waveshare Bus Servo Adapter (A) to the servo bus; no
+  microcontroller;
 - a 12 V servo rail from the drive battery through a fuse, a buck-boost
   regulator and a relay opened by the second pole of the emergency stop.
 
@@ -47,10 +50,12 @@ The car is the RACECAR Neo build of `hardware/racecarneo.md`. On it:
 ```text
 drive battery (3S or more) --+-- contactor (coil via e-stop pole 1) -- VESC -- drive motor   (as the RACECAR)
                              +-- 19 V regulator -- Jetson                                 (as the RACECAR)
-                             +-- 10 A fuse -- 12 V buck-boost, >= 6 A -- 7.5 A fuse
-                                   -- relay (coil via e-stop pole 2) -- Bus Servo Adapter (A) DC in
-                                                                  -- servo bus -- pan ST3215 (ID 12)
-                                                                                -- tilt ST3215 (ID 13)
+                             +-- 20 A fuse -- 12 V buck-boost, >= 12 A -- 5 A fuse
+                                   -- relay, >= 20 A contacts (coil via e-stop pole 2) -- Bus Servo Adapter (A) DC in
+                                      -- servo bus (daisy chain) -- pan ST3215 (ID 12)
+                                                                 -- tilt ST3215 (ID 13)
+                                                                 -- launcher actuator ST3215 (ID 14, tilt stage)
+                                                                 -- launcher trigger ST3215 (ID 15, tilt stage)
 Jetson 40-pin header           Bus Servo Adapter (A), jumper on A (UART)
   pin  8  UART1 TX  ---------->  TX    (Waveshare: "RX-RX, TX-TX"; the labels
   pin 10  UART1 RX  <----------  RX     are the host's side)
@@ -67,9 +72,20 @@ Turret camera  -- USB 2 -- Jetson (or the powered hub)
   fallback.
 - Never feed the servo rail from the Jetson or a USB port; the adapter's
   ground is common with the Jetson's through the GND wire.
+- Four servos at locked rotor draw 10.8 A at 12 V (130 W), more than the
+  adapter's servo port (6 A): the 12 V regulator is rated at least 12 A so
+  the rail does not sag when they accelerate together, the 5 A fuse
+  protects the adapter's port against a sustained stall, the 20 A fuse the
+  regulator's input (about 15 A from a sagging 3S pack), and the relay that
+  the e-stop's second pole drops breaks the 12 V line (contacts rated 20 A
+  or more at 14 V DC, flyback diode across its coil). 14 AWG silicone wire
+  before the regulator, 18 AWG after it. The software limits the launcher
+  servos' torque (actuator about 55 %, trigger about 30 %), which brings
+  the rail's worst case near 7.7 A (hardware/racecar_turret.md).
 - Route the camera cable and the servo bus with a half-turn service loop
-  around the pan axis (bill of materials), and check the full pan and tilt
-  range by hand before powering the servos.
+  around the pan axis (bill of materials), and the launcher servos' cable
+  with a loop across the tilt axis, and check the full pan and tilt range by
+  hand, launcher cocked and primed, before powering the servos.
 
 ## Bring-up
 
@@ -170,6 +186,18 @@ Open `http://<car>:8080` (`applications/nicegui/README.md` has the details):
   it, or Release, Center, Arm, Disarm. The aim joystick (bottom right) aims
   by hand. The status line shows the mode, the target, whether it is
   locked, the aim error and whether base compensation is active.
+- **Foam dart launcher** ([interfaces.md](interfaces.md), "Foam dart
+  launcher"): **Fire** shoots one dart at the locked target (prime the rack,
+  chamber, trigger, trigger back). It is enabled only while the tracker's
+  status says every condition holds (armed, actuator ready, launcher ready
+  with darts left, target locked within 2 deg at its aim point, a person
+  aimed at the torso and not too close, the line of fire clear of the car,
+  2 s since the last shot), and the line under it says why not otherwise. **Reload** sets the dart count to
+  the number next to it. **Next** aims at the nearest untagged detection,
+  **Clear tags** empties the tagged set, **Auto next** aims at the next one
+  after each shot. The launcher line shows its state, the darts left, the
+  tag count and the last shot's result; tagged objects are drawn violet and
+  dashed.
 
 ## Safety
 
@@ -185,6 +213,22 @@ Open `http://<car>:8080` (`applications/nicegui/README.md` has the details):
   `cmd_vel_to_ackermann` commands zero speed when `/cmd_vel_teleop` stops
   for 0.5 s; the turret holds when manual commands stop.
 - 30 kg.cm servos: keep fingers out of the turret while it is armed.
+- The dart launcher primes and fires only on a Fire tap, once, at the
+  target the page shows locked, and only while every gate holds: no
+  automatic, timed or on-lock firing, and Auto next only aims. A person is
+  aimed at the torso, never the head, and is not fired at when too close
+  (taller than 0.6 of the image). It does not fire into the car: aimed low
+  ahead (pan -0.17 to 0.26 rad with the tilt below -0.42 rad, plus a 0.05
+  rad margin; `no_fire_zones_rad` in `config/turret_tracker.yaml`) a dart
+  would hit the RealSense or the camera arm, so Fire is refused there, and
+  a shot whose line of fire becomes blocked is stopped before the sear
+  releases. Disarm, Stop all, Release, any other aim command, the target
+  leaving the lock, the bridge's 500 ms watchdog and the tracker shutting
+  down return the trigger to safe and stop the rack. A step not measured in
+  time is a fault: Fire stays disabled until Disarm and Arm. After a fault
+  the launcher may still be primed: put its safety catch on and clear it by
+  hand before arming again. Toy-power darts only, and eye protection for
+  everyone in range.
 - The page has no login: anyone on the car's network can drive it. Keep that
   network private.
 

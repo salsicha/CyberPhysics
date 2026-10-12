@@ -66,7 +66,7 @@ Isaac only:
 | Topic | Type | Content |
 |---|---|---|
 | `/clock` | `rosgraph_msgs/Clock` | Simulation time; every node runs with `use_sim_time` |
-| `/simulation/truth` | `std_msgs/String` (JSON), 10 Hz or more | Ground truth in the `odom` frame at the sim stamp: `{"stamp": s, "vehicle": {"x", "y", "yaw", "speed_mps"}, "turret_camera": {"position": [x, y, z], "forward": [x, y, z]}, "targets": [{"name": "person_1", "class": "person", "position": [x, y, z], "centroid": [x, y, z], "visible": bool}], "collisions": int}` |
+| `/simulation/truth` | `std_msgs/String` (JSON), 10 Hz or more | Ground truth in the `odom` frame at the sim stamp: `{"stamp": s, "vehicle": {"x", "y", "yaw", "speed_mps"}, "turret_camera": {"position": [x, y, z], "forward": [x, y, z], "up": [x, y, z]}, "targets": [{"name": "person_1", "class": "person", "position": [x, y, z], "centroid": [x, y, z], "visible": bool, "in_view": bool}], "collisions": int}`. `visible`: not occluded from the turret camera; `in_view`: inside its image |
 
 ## Turret commands (`/turret/command`)
 
@@ -123,6 +123,90 @@ exactly as the UI does. The scorer reads `/simulation/truth`,
   reports `locked`, and reacquisition times after occlusions;
 - the same with `base_compensation` and `target_lead` off, for comparison.
 
+The evaluator acts as an operator would: when the turret stays more than
+10 deg off its target for 3 s (the tracker followed someone else), it aims
+back with `manual` and locks again, counted as a re-selection. The scorer
+also reports the aim error only while the tracker's box contains the true
+target ("following"), which isolates the aiming loop from target
+association. The course is sent as goals inside the map and does not end on
+its start line (Nav2 checks only the last pose).
+
 Thresholds live in `validation/acceptance_thresholds.json`;
 `tools/racecar_turret_isaac_test.sh` runs the whole evaluation and exits
 non-zero when a threshold is missed.
+
+## Foam dart launcher
+
+Both turrets, the standalone one (`applications/pantiltros`,
+`hardware/turret.md`) and this car-mounted one, carry a 3D-printed
+spring-plunger foam dart launcher on the tilt stage. The operator fires it
+once per target ("tag"). Same interface on both.
+
+Hardware:
+
+- **Ammunition and power**: standard Nerf Elite-size foam darts, toy power
+  only. The purchased plunger spring is sized for at most about 30 m/s
+  (100 fps) muzzle velocity, measured with a chronograph at bring-up. The
+  docs forbid stronger springs and anything other than foam darts.
+  Everyone in range wears eye protection.
+- **Action**: a third ST3215 (ID 14, same bus, rail and controller as pan
+  and tilt) turns the pinion of a printed rack. The rack draws the plunger
+  back until the sear catches it, chambering a dart from a printed
+  spring-fed clip, then returns forward. `actuator_joint`, prismatic,
+  metres, 0 = forward (rest); its stroke is the design's plunger draw.
+- **Trigger**: a fourth servo (ID 15 on the same bus) releases the sear.
+  `trigger_joint`, revolute, radians, 0 = safe (sear engaged).
+- **Mount**: the barrel parallel to the camera's optical axis, close to it.
+  The URDF gives both joints and a `turret/muzzle` frame.
+- **Mechanical safety**: a printed safety catch that blocks the sear, for
+  transport and maintenance, and a muzzle cap.
+
+Joints: `/turret/joint_states` and `/turret/joint_commands` carry
+`actuator_joint` and `trigger_joint` when a launcher is fitted. A turret
+without one omits them, and fire commands are refused ("no launcher").
+Safe state: trigger at 0, rack forward. A STOP, the 500 ms command
+watchdog, an emergency stop, a release or a fault returns the trigger to 0
+and stops the rack. Pan and tilt keep their existing hold behaviour.
+
+Command (`/turret/command`): `{"action": "tag", "target_id": "7"}` fires one
+dart at the locked target: prime (rack back to the sear, verified from the
+measured position), rack forward, trigger, trigger back to 0, then record
+the shot. It runs only when all of these hold:
+
+- the command names the currently locked target (a stale tap for another
+  target is refused);
+- the turret is armed (`/turret/emergency_stop` false) and
+  `/turret/actuator_ready` is true;
+- the target is locked with an aim error under `tag_max_aim_error_deg`,
+  measured at the aim point;
+- for a `person`, the aim point is on the torso, at `person_aim_fraction`
+  (default 0.6) of the box height from its top, never the head; and the
+  box is no taller than `person_max_box_fraction` of the image (default
+  0.6, roughly closer than 2 m with the turret camera), otherwise "too
+  close";
+- the launcher is idle (rack forward, trigger safe), no cycle is running,
+  and darts remain;
+- at least `tag_min_interval_s` has passed since the last shot.
+
+Otherwise the command is refused with the reason in `/turret/status`.
+Nothing else primes or fires the launcher: there is no automatic, timed or
+on-lock firing and no option that enables one. The tests check that no
+sequence of other commands or detections can prime or fire it. The
+launcher is primed only inside a fire cycle, which ends in a shot or, on a
+fault, with the trigger at 0.
+
+After a shot the target's ID joins the tagged set. With `auto_next` the
+tracker then locks the nearest untagged detection, aim only; firing at it
+needs another `tag` command. `{"action": "next"}` does the same on demand,
+`{"action": "clear_tags"}` empties the set, and `{"action": "reload",
+"darts": N}` sets the clip count. `{"action": "auto_next", "enabled": true |
+false}` switches `auto_next` at run time (the UI's toggle); `/turret/status`
+reports it as `"auto_next"`.
+
+`/turret/status` adds `"launcher": "none" | "ready" | "priming" |
+"chambering" | "firing" | "empty" | "fault"`, `"darts": <remaining>`,
+`"tags": <count>`, `"tagged_ids": [...]`, `"last_tag": {"target_id",
+"result", "stamp"}` and `"fire_block": <reason or "">`. The UI shows a Fire
+button that is enabled only while the conditions above hold, plus Next, an
+auto-next toggle, Reload and the dart count. The standalone turret gets the
+same page in a turret-only layout.

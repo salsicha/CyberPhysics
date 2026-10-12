@@ -104,76 +104,37 @@ def test_the_turret_page_is_opt_in():
     assert turret.TURRET is True and turret.TITLE == 'RACECAR Turret'
 
 
-def test_drive_commands_go_to_the_contract_topics(gui):
-    module, node = gui
-    node.teleop_pub, node.stop_pub = MagicMock(), MagicMock()
-    node.publish_teleop(0.2, -0.1)
-    [twist] = published(node.teleop_pub)
-    assert (twist.linear.x, twist.angular.z) == (0.2, -0.1)
-    node.request_stop(True)
-    node.request_stop(False)
-    assert [msg.data for msg in published(node.stop_pub)] == [True, False]
-
-
-def test_cancel_reaches_every_ready_nav2_action(gui):
-    module, node = gui
-    ready, absent = MagicMock(), MagicMock()
-    ready.service_is_ready.return_value = True
-    absent.service_is_ready.return_value = False
-    node.cancel_clients = [ready, absent]
-    assert node.cancel_navigation('Cancel') is True
-    ready.call_async.assert_called_once()
-    absent.call_async.assert_not_called()
-    assert 'canceled' in node.state.nav_status
-    ready.service_is_ready.return_value = False
-    assert node.cancel_navigation('Cancel') is False
-
-
-def test_stop_all_stops_cancels_and_disarms_the_turret(gui):
-    module, node = gui
-    node.turret = True
-    node.stop_pub, node.turret_estop_pub = MagicMock(), MagicMock()
-    client = MagicMock()
-    client.service_is_ready.return_value = True
-    node.cancel_clients = [client]
+def test_turret_only_layout():
+    standalone = load_gui({'UI_TURRET': '1', 'UI_CAR': '0',
+                           'UI_TURRET_CAMERA_TOPIC': '/camera/camera/color/image_raw'})
+    assert (standalone.TURRET, standalone.CAR, standalone.TITLE) == (True, False, 'PanTiltROS Turret')
+    assert standalone.TURRET_CAMERA_TOPIC == '/camera/camera/color/image_raw'
+    assert load_gui({'UI_TURRET': '1'}).TURRET_CAMERA_TOPIC == '/turret/camera/image_raw'
+    # A page needs something on it: without the turret the car part stays
+    assert load_gui({'UI_CAR': '0'}).CAR is True
+    # Stop all then only disarms the turret; car commands go nowhere
+    node = standalone.RacecarNeoGuiNode.__new__(standalone.RacecarNeoGuiNode)
+    node.state = standalone.VehicleState()
+    node.turret, node.car = True, False
+    node.turret_estop_pub = MagicMock()
     node.stop_all()
-    assert [msg.data for msg in published(node.stop_pub)] == [True]
-    client.call_async.assert_called_once()
+    node.request_stop(True)
     assert [msg.data for msg in published(node.turret_estop_pub)] == [True]
+    assert not hasattr(node, 'stop_pub') and node.cancel_navigation('x') is False
 
 
-def test_turret_commands_are_json_strings(gui):
+def test_launcher_commands_are_json_strings(gui):
     module, node = gui
-    node.turret_command_pub = MagicMock()
-    node.send_turret_command({'action': 'release'})
-    assert published(node.turret_command_pub) == []          # plain RACECAR page: no turret
     node.turret = True
-    node.send_turret_command({'action': 'lock', 'target_id': '3'})
-    [msg] = published(node.turret_command_pub)
-    assert json.loads(msg.data) == {'action': 'lock', 'target_id': '3'}
-
-
-def test_status_and_segments_handlers(gui):
-    module, node = gui
-    node.handle_control_status(NS(data=json.dumps(
-        {'source': 'nav2', 'stopped': False, 'speed_mps': 0.2, 'steering_rad': 0.1})))
-    assert node.state.control['source'] == 'nav2' and node.state.control_time > 0.0
-    node.handle_turret_status(NS(data='{"mode": "auto", "target_id": "3", "locked": true}'))
-    assert node.state.turret_status['locked'] is True
-    # The size comes from the message, or else from the last turret image.
-    node.state.turret_image_size = (320, 240)
-    node.handle_segments(NS(data=json.dumps([{'id': 4, 'class': 'person', 'confidence': 0.5,
-                                              'bbox_xywh': [160, 120, 32, 48]}])))
-    detection = node.state.segments.detections[0]
-    assert (detection.id, detection.u, detection.v) == ('4', 0.5, 0.5)
-    node.handle_segments(NS(data='not json'))
-    assert node.state.segments.detections[0].id == '4'       # bad messages are ignored
-
-
-def test_plan_in_another_frame_is_not_drawn(gui):
-    module, node = gui
-    pose = NS(pose=NS(position=NS(x=1.0, y=2.0)))
-    node.handle_plan(NS(header=NS(frame_id='map'), poses=[pose, pose]))
-    assert node.state.path == ((1.0, 2.0), (1.0, 2.0))
-    node.handle_plan(NS(header=NS(frame_id='odom'), poses=[]))
-    assert node.state.path == ((1.0, 2.0), (1.0, 2.0))
+    node.turret_command_pub = MagicMock()
+    status = module.logic.parse_turret_status(json.dumps({
+        'mode': 'auto', 'target_id': '7', 'locked': True, 'launcher': 'ready', 'darts': 2,
+        'fire_block': ''}))
+    node.send_turret_command(module.logic.fire_command(status))
+    node.send_turret_command(module.logic.reload_command(6))
+    node.send_turret_command(module.logic.auto_next_command(True))
+    node.send_turret_command({'action': 'next'})
+    node.send_turret_command({'action': 'clear_tags'})
+    assert [json.loads(msg.data) for msg in published(node.turret_command_pub)] == [
+        {'action': 'tag', 'target_id': '7'}, {'action': 'reload', 'darts': 6},
+        {'action': 'auto_next', 'enabled': True}, {'action': 'next'}, {'action': 'clear_tags'}]

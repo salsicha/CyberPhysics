@@ -9,9 +9,10 @@ time, managed from one web page on the car. Interfaces:
 safety: `systems/racecar_turret/README.md`; software stack:
 `compositions/racecar_turret_hardware.yaml`.
 
-The turret has no microcontroller: the Jetson drives the two ST3215 serial
-bus servos itself, from its 40-pin header UART through a Waveshare Bus Servo
-Adapter (A), with three jumper wires (TX, RX, GND).
+The turret has no microcontroller: the Jetson drives the four ST3215 serial
+bus servos (pan, tilt, and the foam dart launcher's priming actuator and
+trigger) itself, from its 40-pin header UART through a Waveshare Bus Servo Adapter (A), with three jumper
+wires (TX, RX, GND).
 
 ## Compatibility notes
 
@@ -101,6 +102,12 @@ Adapter (A), with three jumper wires (TX, RX, GND).
   nothing), so they return nothing even before the filter; the assembly
   check of `hardware/parts/racecar_turret` verifies both.
 
+- **Line of fire.** The foam dart launcher's bore points at the car's own
+  RealSense and its arm below about -28 deg of tilt within about -6 to +12
+  deg of pan (the RACECAR Turret's assembly check maps it). The fire cycle
+  must refuse a shot there; nothing else of the car is in the line of fire
+  over the turret's range.
+
 ## Purchased parts
 
 ### Car
@@ -108,14 +115,15 @@ Adapter (A), with three jumper wires (TX, RX, GND).
 Everything in `hardware/racecarneo.md`, with these changes:
 
 - **Emergency stop**: a two-pole latching emergency-stop switch (two
-  normally-closed contacts, at least 10 A DC each at 16 V) instead of the
+  normally-closed contacts, at least 15 A DC each at 16 V) instead of the
   car's single-pole one: one pole opens the drive motor's contactor as before
   (`hardware/racecarneo.md`: a 22 mm switch cannot break the motor current
-  itself), the other the turret's 12 V servo rail (5.4 A at most; a contact
-  that is not rated to break that DC current opens a relay in the rail
-  instead). Mount it on top where it can be hit while the car moves (the
-  RACECAR deck's printed e-stop tower). Not printed, not replaced by
-  software: it is the only stop that works when the Jetson does not.
+  itself), the other the turret's 12 V servo rail (10.8 A with the four
+  servos stalled; a contact that is not rated to break that DC current opens
+  a relay in the rail instead, see "Servo power" under Turret). Mount it on
+  top where it can be hit while the car moves (the RACECAR deck's printed
+  e-stop tower). Not printed, not replaced by software: it is the only stop
+  that works when the Jetson does not.
 - **USB**: the turret camera is one more USB device next to the RealSense,
   the lidar and the drive electronics: the developer kit's fourth USB-A port
   takes it (the car uses three); add a powered USB hub only for more devices
@@ -128,17 +136,28 @@ Everything in `hardware/racecarneo.md`, with these changes:
 
 ### Turret
 
-- 2 x **Waveshare ST3215** serial bus servo, 12 V, 30 kg.cm (or Feetech
-  STS3215, 12 V version), with their metal horns. IDs 12 (pan) and 13
-  (tilt), set once before assembly (README).
+- 4 x **Waveshare ST3215** serial bus servo, 12 V, 30 kg.cm (or Feetech
+  STS3215, 12 V version), with their metal horns. IDs 12 (pan), 13 (tilt),
+  14 (the foam dart launcher's priming actuator) and 15 (its trigger), set
+  once before assembly (README). The launcher's two need their output
+  horns only. (No smaller STS servo runs on the 12 V rail: the STS3032 is
+  4.8-6 V.)
+- **Foam dart launcher**, the purchased parts of `hardware/turret.md`
+  ("Foam dart launcher" and its power and safety section): the K&S 8140
+  brass barrel (cut to 45 mm), the 1.5 N/mm plunger spring (**no stiffer
+  spring**), the clip and sear springs, two O-rings, a 3 mm dowel pin,
+  **Elite-size foam darts only**, eye protection for everyone in range and a
+  chronograph for the bring-up (**at most about 30 m/s**).
 - 1 x **Waveshare Bus Servo Adapter (A)**, jumper on A (UART).
 - 3 x female-female jumper wires, about 40 cm (Dupont, or JST to suit the
   adapter): Jetson pins 8, 10 and 6 to the adapter's TX, RX and GND. The
   header is at the front of the car and the adapter under the turret plate:
   the run along the deck and up a post is about 0.38 m.
-- 1 x servo bus cable, about 20 cm, adapter to pan servo, and 1 x
-  about 15 cm, pan servo to tilt servo (the servos' 3-pin daisy-chain
-  cables; one usually comes with each servo).
+- 1 x servo bus cable, about 20 cm, adapter to pan servo, 1 x about
+  15 cm, pan servo to tilt servo, 1 x about 25 cm, tilt servo to the
+  launcher's actuator servo across the tilt joint, and 1 x about 25 cm,
+  actuator to trigger servo (the servos' 3-pin daisy-chain cables; one
+  usually comes with each servo).
 - 1 x **turret camera: Arducam B0385**, 1 MP OV9782 **global shutter colour**
   USB camera board (UVC, USB 2.0, MJPEG 640x480 at up to 100 fps, 5 V
   200 mA), with its low-distortion M12 lens of **70 deg horizontal field of
@@ -158,21 +177,35 @@ Everything in `hardware/racecarneo.md`, with these changes:
   the deck to the Jetson is about 0.8 m), with a right-angle plug at the
   camera (silicone-jacketed "soft" cable; a stiff USB 3 cable fights the pan
   and tilt servos).
-- Servo power, from the drive battery:
-  - 1 x **12 V buck-boost regulator**, at least 6 A continuous (75 W), input
-    range covering at least 9-13 V (3S; wider if the car runs 4S). Sizing: two ST3215 at
-    locked rotor draw 2 x 2.7 A = 5.4 A at 12 V (65 W); tracking a person
-    draws well under 1 A per servo, but a jammed turret or a hard stop must
-    not brown out the rail. At 90 % efficiency the input draws up to about
-    7.5 A from a sagging 3S pack (9.6 V).
-  - 1 x inline blade fuse holder with a **10 A** fuse on the regulator
-    input, at the battery tap, and 1 x **7.5 A** fuse
-    between the regulator output and the adapter.
-  - 16 AWG silicone wire on the input side, 18 AWG on the 12 V side; an
-    XT60 Y-tap or a free output of the car's power distribution board, and a
-    5.5 x 2.1 mm DC plug (or the adapter's screw terminal) for the adapter.
+- Servo power, from the drive battery (four servos):
+  - 1 x **12 V buck-boost regulator**, at least **12 A** continuous
+    (150 W), input range covering at least 9-13 V (3S; wider if the car runs
+    4S). Sizing: four ST3215 at locked rotor draw 4 x 2.7 A = **10.8 A** at
+    12 V (130 W); tracking a person draws well under 1 A per servo, priming
+    about 1 A on the actuator for under a second, but the servos
+    accelerating together, a jammed turret or a hard stop must not brown
+    out the rail. At 90 % efficiency the input draws up to about 15 A from a
+    sagging 3S pack (9.6 V).
+  - 1 x inline blade fuse holder with a **20 A** fuse on the regulator
+    input, at the battery tap, and 1 x **5 A** fuse between the regulator
+    output and the adapter: the adapter's servo port is marked 6 A maximum,
+    less than the servos stalled, so this fuse carries normal operation and
+    short peaks and opens on a sustained stall. Set the launcher servos'
+    torque limits in the software: the actuator about 55 % (priming needs
+    about 0.9 N m: the spring's 65 N on the 13.5 mm pinion; at full torque
+    the pinion could push about 220 N), the trigger about 30 %; that brings
+    the rail's worst case near 7.7 A.
+  - 14 AWG silicone wire on the input side (20 A fuse), 18 AWG on the 12 V
+    side; an XT60 Y-tap or a free output of the car's power distribution
+    board, and a 5.5 x 2.1 mm DC plug (or the adapter's screw terminal) for
+    the adapter.
   - The emergency stop's second pole in the 12 V line, through a relay if
-    its contact is not rated to break 5.4 A DC (see Car).
+    its contact is not rated to break 10.8 A DC (see Car): an automotive 12 V
+    relay with contacts rated 20 A or more at 14 V DC (a 30 A ISO mini relay
+    and socket), normally-open contact in the rail, the stop's
+    normally-closed pole in series with its coil (about 150 mA) and a
+    flyback diode (1N4007) across the coil: pressing the stop, a broken
+    wire or a dead regulator all open the rail.
 - Turret plate supports: 4 x **thin posts**, printed (`plate_post`, 12 mm,
   8 mm where they cross the scan plane; see "3D-printed parts"), or M3
   aluminium hex standoffs (5 mm across flats) stacked to length, or 4 mm
@@ -216,6 +249,14 @@ instructions in [`parts/racecar_turret/`](parts/racecar_turret/README.md).
   parts, `hardware/parts/turret` (pan axis on the plate's centre, tilt axis
   0.055 m above the pan joint origin, B0385 lens on the tilt axis about
   0.035 m in front of it).
+- **Foam dart launcher** (the `launcher_*` parts): the turret's too. A
+  spring-plunger launcher above the camera, its bore 48 mm above the
+  camera's axis and parallel to it: plunger tube, plunger, sear and safety,
+  a sliding breech block under a clip of six darts, the brass barrel in a
+  printed clamp, a muzzle cap; the third servo primes it through an
+  18-tooth, module 1.5 pinion (13.5 mm pitch radius) and a 38 mm rack
+  stroke, the fourth lifts the sear. About 425 g with a full clip and both
+  servos. Toy power only (at most about 30 m/s): `hardware/turret.md`.
 - **Servo adapter mount**: four standoffs under the turret plate hold the Bus
   Servo Adapter (A), components down, its jumper and DC jack reachable from
   the side.

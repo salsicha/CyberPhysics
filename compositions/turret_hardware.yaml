@@ -3,8 +3,17 @@
 # profile; the peers here are a real ROS camera and Arduino.  Nothing moves
 # until the emergency stop is released on /turret/emergency_stop and the
 # Arduino firmware implements the bridge's serial protocol (hardware/turret.md).
-# The PanTiltROS and RealSense images both build on the repository's ROS 2
-# Jazzy base, so every node on this DDS graph runs the same distro.
+# The PanTiltROS, RealSense and NiceGUI images all build on the repository's
+# ROS 2 Jazzy base, so every node on this DDS graph runs the same distro.
+#
+# The foam dart launcher (the priming rack on a third ST3215, ID 14, and the
+# trigger servo, ID 15, on the tilt stage; systems/racecar_turret/
+# interfaces.md, "Foam dart launcher") is fitted: TURRET_ACTUATOR_FITTED
+# (default true, as in config/arduino.env) switches it for the bridge and the
+# tracker together; the firmware's own switch is TURRET_ACTUATOR_FITTED in
+# src/turret_config.h. turret_ui serves the operator page in its turret-only
+# layout on port 8080 (TURRET_UI_PORT): camera, lock, aim, Arm/Disarm, Fire,
+# which shoots one dart per tap and only at the locked target, and Reload.
 
 x-pantiltros-image: &pantiltros-image
   image: salsicha/cyberphysics:pantiltros-${CYBERPHYSICS_TAG:-latest}
@@ -53,6 +62,7 @@ services:
       -p device:="'${TURRET_YOLO_DEVICE:-0}'"
       -p image_size:=${TURRET_YOLO_IMAGE_SIZE:-640}
       -p confidence:=${TURRET_YOLO_CONFIDENCE:-0.25}
+      -p actuator_fitted:=${TURRET_ACTUATOR_FITTED:-true}
     healthcheck:
       test: ["CMD-SHELL", "test -f /tmp/pantilt_yolo_ready"]
       interval: 10s
@@ -75,6 +85,7 @@ services:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
       - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
       - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+      - TURRET_ACTUATOR_FITTED=${TURRET_ACTUATOR_FITTED:-true}
     volumes:
       - /dev:/dev
       - /dev/shm:/dev/shm
@@ -83,6 +94,30 @@ services:
       python3 /scripts/turret_arduino_bridge.py
       --ros-args
       --params-file /workspace/pantiltros/config/arduino_bridge.yaml
+
+  # The operator page (applications/nicegui) in its turret-only layout, from
+  # this checkout's scripts: http://<host>:8080. It shows the camera the
+  # tracker uses (TURRET_CAMERA_TOPIC) with the tracker's boxes.
+  turret_ui:
+    image: salsicha/cyberphysics:nicegui-${CYBERPHYSICS_TAG:-latest}
+    pull_policy: build
+    build:
+      context: ../applications/nicegui
+    container_name: turret_ui
+    ulimits: *ros-ulimits
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+      - UI_CAR=0
+      - UI_TURRET=1
+      - UI_TURRET_CAMERA_TOPIC=${TURRET_CAMERA_TOPIC:-/camera/camera/color/image_raw}
+      - UI_PORT=${TURRET_UI_PORT:-8080}
+    volumes:
+      - ../applications/nicegui/scripts:/workspace/scripts:ro
+    command: python3 /workspace/scripts/main.py
 
   # Enable this profile if the turret uses the repository's RealSense camera:
   # docker compose -f compositions/turret_hardware.yaml --profile realsense up

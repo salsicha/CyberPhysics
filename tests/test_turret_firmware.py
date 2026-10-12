@@ -82,3 +82,25 @@ def test_firmware_pos_lines_parse_in_bridge(host_test, bridge, pan, tilt):
     line = run(host_test, 'format', repr(pan), repr(tilt))
     assert line.endswith('\n')
     assert bridge.parse_position_line(line) == pytest.approx((pan, tilt), abs=1e-6)
+
+
+@pytest.mark.parametrize('actuator,trigger', [(0.0, 0.0), (0.07, 0.6), (0.0123456, 0.3),
+                                              (1e-7, 1e-7)])
+def test_bridge_set_lines_with_the_launcher_parse_in_firmware(host_test, bridge, actuator,
+                                                              trigger):
+    line = bridge.format_command(0.25, -0.5, (actuator, trigger))
+    fields = run(host_test, 'parse', line.rstrip('\n')).split()
+    assert fields[:3] == ['SET', '0.250000', '-0.500000']
+    assert fields[3::2] == ['actuator', 'trigger']
+    assert [float(value) for value in fields[4::2]] == pytest.approx([actuator, trigger],
+                                                                     abs=1e-6)
+
+
+@pytest.mark.parametrize('actuator,trigger', [(0.0, 0.0), (0.07, 0.6), (0.0295, 0.25),
+                                              (0.000001, 0.000001)])
+def test_firmware_pos_lines_with_the_launcher_parse_in_bridge(host_test, bridge, actuator,
+                                                              trigger):
+    line = run(host_test, 'format', '0.1', '-0.2', repr(actuator), repr(trigger))
+    assert ' actuator_joint ' in line and ' trigger_joint ' in line
+    assert bridge.parse_position_line(line) == pytest.approx((0.1, -0.2, actuator, trigger),
+                                                             abs=1e-6)

@@ -6,27 +6,45 @@ the same messages (radians) to it, and a third drives the servos itself:
 
 ``serial`` (default; UNO R4 WiFi on USB): ASCII lines, newline terminated
 
-  host -> firmware  ``SET pan_joint <pan> tilt_joint <tilt>``  move to position
-  host -> firmware  ``STOP``                                    hold / stop motion
-  firmware -> host  ``POS pan_joint <pan> tilt_joint <tilt>``  measured position
-  firmware -> host  ``ERR <text>``                              error report
+  host -> firmware  ``SET pan_joint <pan> tilt_joint <tilt>
+                    [actuator_joint <m> trigger_joint <rad>]``
+  host -> firmware  ``STOP``    hold, trigger to 0, rack stopped
+  firmware -> host  ``POS pan_joint <pan> tilt_joint <tilt>
+                    [actuator_joint <m> trigger_joint <rad>]``
+  firmware -> host  ``ERR <text>``          error report
 
 ``uno_q_bridge`` (run on the Arduino UNO Q's Linux side): msgpack-RPC through
 the arduino-router Unix socket to the board's MCU (Arduino_RouterBridge):
-requests ``turret/set [pan, tilt]`` and ``turret/stop []``, and the
-notifications ``turret/pos [pan, tilt]`` and ``turret/err [text]``, which the
-router forwards here after ``$/register``. ``turret/get_position`` (also used
-as a liveness probe) returns ``[pan, tilt]``, or ``[]`` without a fresh reading.
+requests ``turret/set [pan, tilt]``, ``turret/set_all [pan, tilt, actuator,
+trigger]`` and ``turret/stop []``, and the notifications ``turret/pos [pan,
+tilt]`` (or ``[pan, tilt, actuator, trigger]``) and ``turret/err [text]``,
+which the router forwards here after ``$/register``. ``turret/get_position``
+(also used as a liveness probe) returns the same list, or ``[]`` without a
+fresh reading.
 
 ``sts`` (no Arduino; e.g. a Jetson's header UART or a USB bus servo adapter):
-the Feetech STS protocol straight to the two ST3215 servos on serial_port at
+the Feetech STS protocol straight to the ST3215 servos on serial_port at
 1 Mbps through a half-duplex adapter. StsController is a port of the
 firmware's servo code (src/sts_servo.*, Controller in src/turret_core.*), so
 SET and STOP have the same effect (limits, torque on at the first SET, hold
-after 500 ms without SET, 25 Hz feedback only when both servos answer, servo
+after 500 ms without SET, 25 Hz feedback only when pan and tilt answer, servo
 errors at most once per second) and its POS and ERR reports feed the same
 topics and diagnostics. The watchdog then runs in this process: if the bridge
 dies the servos keep their last goal.
+
+With ``actuator_fitted`` (``TURRET_ACTUATOR_FITTED``) the foam dart launcher
+(systems/racecar_turret/interfaces.md, "Foam dart launcher": its priming
+rack, a third ST3215, ID 14, ``actuator_joint`` in metres, 0 forward; its
+trigger, ID 15, ``trigger_joint`` in radians, 0 safe) travels with the SETs
+of joint commands that carry ``actuator_joint``: both clamped to their
+limits, the trigger at 0 when the command does not carry it. A command
+without ``actuator_joint`` sends pan and tilt only, which returns the
+trigger to 0 and stops the rack where it is. STOP, the emergency stop and
+the 500 ms watchdog do the same; pan and tilt keep their hold behaviour. The rack servo's torque is limited (``actuator_torque_
+limit``, 25 %) at every torque enable. The launcher's measured positions
+join /turret/joint_states when both servos answered. Without a launcher
+fitted, commands' launcher joints are ignored and joint states carry pan and
+tilt only.
 
 /turret/joint_states is published only from measured positions (``POS`` /
 ``turret/pos`` / servo replies); commands are never echoed back as joint
@@ -66,6 +84,8 @@ except ImportError:  # pragma: no cover - depends on container build contents.
     msgpack = None
 
 JOINT_NAMES = ("pan_joint", "tilt_joint")
+ACTUATOR_JOINT = "actuator_joint"  # the launcher's priming rack, metres
+TRIGGER_JOINT = "trigger_joint"  # the launcher's trigger, radians
 STOP_LINE = "STOP\n"
 MAX_LINE_BYTES = 256
 
@@ -77,6 +97,7 @@ class RouterUnreachable(RuntimeError):
     """The arduino-router socket stayed unreachable for router_lost_exit_s."""
 # RouterBridge RPC methods provided by the UNO Q firmware
 RPC_SET = "turret/set"
+RPC_SET_ALL = "turret/set_all"  # pan, tilt and the launcher's rack and trigger
 RPC_STOP = "turret/stop"
 RPC_GET_POSITION = "turret/get_position"
 # Notifications the firmware sends; the router routes them to whoever registered
@@ -97,14 +118,23 @@ def env_bool(name: str, default: bool) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
-def format_command(pan: float, tilt: float) -> str:
-    return f"SET pan_joint {pan:.6f} tilt_joint {tilt:.6f}\n"
+def format_command(
+    pan: float, tilt: float, launcher: tuple[float, float] | None = None
+) -> str:
+    """A SET line; launcher is (rack metres, trigger radians) or None."""
+    line = f"SET pan_joint {pan:.6f} tilt_joint {tilt:.6f}"
+    if launcher is not None:
+        actuator, trigger = launcher
+        line += f" {ACTUATOR_JOINT} {actuator:.6f} {TRIGGER_JOINT} {trigger:.6f}"
+    return line + "\n"
 
 
-def parse_position_line(line: str) -> Optional[tuple[float, float]]:
-    """Parse ``POS pan_joint <rad> tilt_joint <rad>``; None if malformed."""
+def parse_position_line(line: str) -> Optional[tuple[float, ...]]:
+    """Parse ``POS pan_joint <rad> tilt_joint <rad> [actuator_joint <m>
+    trigger_joint <rad>]``: (pan, tilt) or (pan, tilt, actuator, trigger);
+    None if malformed."""
     tokens = line.split()
-    if len(tokens) != 5 or tokens[0] != "POS":
+    if len(tokens) not in (5, 9) or tokens[0] != "POS":
         return None
     values = {}
     for name, raw in zip(tokens[1::2], tokens[2::2]):
@@ -112,17 +142,22 @@ def parse_position_line(line: str) -> Optional[tuple[float, float]]:
             value = float(raw)
         except ValueError:
             return None
-        if not math.isfinite(value):
+        if not math.isfinite(value) or name in values:
             return None
         values[name] = value
-    if set(values) != set(JOINT_NAMES):
+    launcher = {ACTUATOR_JOINT, TRIGGER_JOINT}
+    if set(values) not in (set(JOINT_NAMES), set(JOINT_NAMES) | launcher):
         return None
+    if ACTUATOR_JOINT in values:
+        return (values["pan_joint"], values["tilt_joint"], values[ACTUATOR_JOINT],
+                values[TRIGGER_JOINT])
     return values["pan_joint"], values["tilt_joint"]
 
 
-def parse_position_params(params: object) -> tuple[float, float] | None:
-    """Parse ``turret/pos`` / ``turret/get_position`` ``[pan, tilt]``; None if malformed."""
-    if not isinstance(params, (list, tuple)) or len(params) != 2:
+def parse_position_params(params: object) -> tuple[float, ...] | None:
+    """Parse ``turret/pos`` / ``turret/get_position`` ``[pan, tilt]`` or
+    ``[pan, tilt, actuator, trigger]``; None if malformed."""
+    if not isinstance(params, (list, tuple)) or len(params) not in (2, 4):
         return None
     values = []
     for value in params:
@@ -131,7 +166,7 @@ def parse_position_params(params: object) -> tuple[float, float] | None:
         if not math.isfinite(value):
             return None
         values.append(float(value))
-    return values[0], values[1]
+    return tuple(values)
 
 
 def format_rpc_error(error: object) -> str:
@@ -279,11 +314,12 @@ STS_INST_SYNC_WRITE = 0x83
 # Memory table (SMS_STS.h in Feetech's SCServo library)
 STS_REG_TORQUE_ENABLE = 40  # 0 off, 1 on; 128 recalibrates the midpoint: never written here
 STS_REG_ACCELERATION = 41  # 41 acc, 42-43 goal position, 44-45 goal time, 46-47 goal speed
+STS_REG_TORQUE_LIMIT = 48  # 48-49, 0.1 % units; reset from EEPROM's max torque at power-up
 STS_REG_PRESENT_POSITION = 56
 STS_STEPS_PER_TURN = 4096
 STS_MAX_STEP = STS_STEPS_PER_TURN - 1
 STS_STEPS_PER_RAD = STS_STEPS_PER_TURN / (2.0 * math.pi)
-# Largest packet built or parsed (a two-servo sync write is 26 bytes)
+# Largest packet built or parsed (a four-servo sync write is 40 bytes)
 STS_MAX_PACKET = 64
 STS_MAX_STATUS_PARAMS = STS_MAX_PACKET - 6
 # Status packet error bits, as the firmware names them
@@ -490,6 +526,11 @@ class StsBus:
         packet = sts_write(servo_id, STS_REG_TORQUE_ENABLE, bytes((1 if enable else 0,)))
         return self._transact(packet, servo_id)[0]
 
+    def write_torque_limit(self, servo_id: int, limit: int) -> str:
+        """Torque limit, 0-1000 (0.1 %); RAM, until the next power-up."""
+        packet = sts_write(servo_id, STS_REG_TORQUE_LIMIT, bytes((limit & 0xFF, limit >> 8)))
+        return self._transact(packet, servo_id)[0]
+
     def sync_write_position(
         self, ids: Sequence[int], steps: Sequence[int], speed: int, acceleration: int
     ) -> None:
@@ -498,29 +539,45 @@ class StsBus:
 
 
 class StsJoint(NamedTuple):
-    name: str  # ROS joint name: pan_joint / tilt_joint
+    name: str  # ROS joint name: pan_joint, tilt_joint, actuator_joint, trigger_joint
     servo_id: int  # STS bus ID
-    zero_steps: int  # servo position (0-4095) at 0 rad
-    direction: int  # +1: steps increase with the joint angle, -1: decrease
-    min_rad: float  # joint limits enforced on every command
-    max_rad: float
+    zero_steps: int  # servo position (0-4095) at joint position 0
+    direction: int  # +1: steps increase with the joint position, -1: decrease
+    lower: float  # joint limits enforced on every command (rad, or m for a slide);
+    upper: float  # the lower one is the launcher joints' rest (safe) position
+    # 0: revolute joint, positions in radians; > 0: a rack-and-pinion slide,
+    # positions in metres of rack travel (the pinion's pitch radius)
+    pinion_radius_m: float = 0.0
+    torque_limit: int = 0  # 0: the servo's own; 1-1000 (0.1 %): written at every torque enable
 
-    def clamp(self, rad: float) -> float:
-        return min(max(rad, self.min_rad), self.max_rad)
+    def clamp(self, value: float) -> float:
+        return min(max(value, self.lower), self.upper)
 
-    def to_steps(self, rad: float) -> int:
-        """Joint angle to servo steps, clamped to 0..4095 (not to the joint limits)."""
-        steps = math.floor(self.zero_steps + self.direction * rad * STS_STEPS_PER_RAD + 0.5)
+    @property
+    def rest(self) -> float:
+        """A launcher joint's rest (safe) position: its lower limit."""
+        return self.lower
+
+    def shaft_angle(self, value: float) -> float:
+        return value / self.pinion_radius_m if self.pinion_radius_m > 0 else value
+
+    def to_steps(self, value: float) -> int:
+        """Joint position to servo steps, clamped to 0..4095 (not to the joint limits)."""
+        steps = math.floor(
+            self.zero_steps + self.direction * self.shaft_angle(value) * STS_STEPS_PER_RAD + 0.5
+        )
         return min(max(steps, 0), STS_MAX_STEP)
 
-    def to_rad(self, steps: int) -> float:
-        return self.direction * (steps - self.zero_steps) / STS_STEPS_PER_RAD
+    def from_steps(self, steps: int) -> float:
+        angle = self.direction * (steps - self.zero_steps) / STS_STEPS_PER_RAD
+        return angle * self.pinion_radius_m if self.pinion_radius_m > 0 else angle
 
 
 class StsConfig(NamedTuple):
-    """The firmware's Config (src/turret_config.h); joints are (pan, tilt)."""
+    """The firmware's Config (src/turret_config.h); joints are (pan, tilt),
+    or (pan, tilt, rack, trigger) when the launcher is fitted."""
 
-    joints: tuple[StsJoint, StsJoint]
+    joints: tuple[StsJoint, ...]
     speed: int = 2000  # goal speed, steps/s (0 = servo maximum)
     acceleration: int = 50  # goal acceleration, 100 steps/s^2 units
     watchdog_s: float = 0.5  # hold when no SET arrives for this long
@@ -529,8 +586,14 @@ class StsConfig(NamedTuple):
     torque_retry_s: float = 0.25  # minimum interval between torque re-enables
     stop_disables_torque: bool = False  # STOP/watchdog: torque off instead of holding
 
+    @property
+    def actuator_fitted(self) -> bool:
+        return len(self.joints) == 4
+
     def validate(self) -> None:
         """Raise ValueError if the configuration is unusable."""
+        if len(self.joints) not in (2, 4):
+            raise ValueError("joints must be (pan, tilt) or (pan, tilt, rack, trigger)")
         for joint in self.joints:
             if joint.direction not in (1, -1):
                 raise ValueError(f"{joint.name}: direction must be +1 or -1")
@@ -539,21 +602,33 @@ class StsConfig(NamedTuple):
             if not 0 <= joint.zero_steps <= STS_MAX_STEP:
                 raise ValueError(f"{joint.name}: zero_steps must be 0-4095")
             if not (
-                math.isfinite(joint.min_rad)
-                and math.isfinite(joint.max_rad)
-                and joint.min_rad < joint.max_rad
+                math.isfinite(joint.lower)
+                and math.isfinite(joint.upper)
+                and joint.lower < joint.upper
             ):
-                raise ValueError(f"{joint.name}: joint limits must be finite with min < max")
+                raise ValueError(f"{joint.name}: joint limits must be finite with lower < upper")
+            if not (math.isfinite(joint.pinion_radius_m) and joint.pinion_radius_m >= 0):
+                raise ValueError(f"{joint.name}: pinion_radius_m must be finite and >= 0")
+            if not 0 <= joint.torque_limit <= 1000:
+                raise ValueError(f"{joint.name}: torque_limit must be 0-1000")
             # The limits must map inside one servo turn, or clamping to 0..4095
             # would silently move the joint somewhere else.
-            for rad in (joint.min_rad, joint.max_rad):
-                steps = joint.zero_steps + joint.direction * rad * STS_STEPS_PER_RAD
+            for value in (joint.lower, joint.upper):
+                steps = (joint.zero_steps
+                         + joint.direction * joint.shaft_angle(value) * STS_STEPS_PER_RAD)
                 if not -0.5 <= steps <= STS_MAX_STEP + 0.5:
                     raise ValueError(
                         f"{joint.name}: joint limits reach outside servo steps 0-4095"
                     )
         if self.joints[0].servo_id == self.joints[1].servo_id:
             raise ValueError("pan and tilt servo ids must differ")
+        if self.actuator_fitted:
+            if len({joint.servo_id for joint in self.joints}) != 4:
+                raise ValueError(
+                    "the launcher's servo ids must differ from each other and pan and tilt"
+                )
+            if not self.joints[2].pinion_radius_m > 0:
+                raise ValueError("the rack (a slide) needs pinion_radius_m > 0")
         if not 0 <= self.speed <= 0x7FFF or not 0 <= self.acceleration <= 0xFF:
             raise ValueError("servo speed must be 0-32767 and acceleration 0-255")
         if self.watchdog_s <= 0 or self.feedback_period_s <= 0:
@@ -563,14 +638,19 @@ class StsConfig(NamedTuple):
 class StsController:
     """The firmware's Controller (src/turret_core.cpp) on this host.
 
-    set() clamps to the joint limits and moves both servos in one sync write,
+    set() clamps to the joint limits and moves the servos in one sync write,
     enabling torque first on the first SET (and again, at most every
-    torque_retry_s, after a servo stopped answering). stop(), and update()
-    when no SET arrived for watchdog_s, hold the measured position. update()
-    reads both positions every feedback_period_s and reports them only when
-    both servos answered. Servo errors are reported at once, then at most
-    every error_repeat_s while they persist. Nothing is written to the servos
-    before the first set() or stop(). Times are seconds on one clock.
+    torque_retry_s, after a servo stopped answering), with each joint's
+    torque limit; a fitted launcher's trigger goes to the given angle or 0,
+    its rack to the given position or stops where it is. stop(), and
+    update() when no SET arrived for watchdog_s, hold pan and tilt's measured
+    position, return the trigger to 0 and hold the rack where it is.
+    update() reads the positions every feedback_period_s and reports them
+    only when pan and tilt answered, with the launcher's when both its
+    servos answered too. Servo errors are
+    reported at once, then at most every error_repeat_s while they persist.
+    Nothing is written to the servos before the first set() or stop(). Times
+    are seconds on one clock.
     """
 
     IDLE = "idle"  # no SET yet: servos untouched
@@ -581,12 +661,13 @@ class StsController:
         self,
         config: StsConfig,
         bus: StsBus,
-        on_position: Callable[[float, float], None],
+        on_position: Callable[..., None],
         on_error: Callable[[str], None],
     ) -> None:
         config.validate()
         self.config = config
         self.bus = bus
+        # on_position(pan, tilt), or (pan, tilt, rack, trigger) when the launcher answered
         self.on_position = on_position
         self.on_error = on_error
         self.state = self.IDLE
@@ -595,44 +676,92 @@ class StsController:
         self.last_torque_attempt = float("-inf")
         self.torque_unknown = False  # a servo stopped answering: re-enable torque on the next SET
         self.have_feedback = False
-        self.measured_rad = [0.0, 0.0]
-        self.goal_rad = [0.0, 0.0]  # last commanded goal, after clamping
-        self.joint_failing = [False, False]
-        self.last_error_time = [float("-inf"), float("-inf")]
+        self.have_launcher = False  # both launcher servos answered at the last read
+        count = len(config.joints)
+        self.measured = [0.0] * count
+        # Last commanded goal, after clamping (the launcher starts at rest)
+        self.goal = [joint.rest if index >= 2 else 0.0
+                     for index, joint in enumerate(config.joints)]
+        self.joint_failing = [False] * count
+        self.last_error_time = [float("-inf")] * count
+        self.last_ignored_time = float("-inf")  # last "no launcher fitted" report
 
     @property
     def ids(self) -> list[int]:
         return [joint.servo_id for joint in self.config.joints]
 
-    def set(self, pan: float, tilt: float, now: float) -> bool:
-        """Clamp to the joint limits and command the servos; False for non-finite values."""
-        if not (math.isfinite(pan) and math.isfinite(tilt)):
+    def set(
+        self,
+        pan: float,
+        tilt: float,
+        now: float,
+        actuator: float | None = None,
+        trigger: float | None = None,
+    ) -> bool:
+        """Clamp to the joint limits and command the servos; False for
+        non-finite values. A fitted launcher's trigger goes to ``trigger``
+        (0 when None) and its rack to ``actuator`` (stopped where it is, its
+        present position, when None)."""
+        if not (
+            math.isfinite(pan)
+            and math.isfinite(tilt)
+            and (actuator is None or math.isfinite(actuator))
+            and (trigger is None or math.isfinite(trigger))
+        ):
             self.on_error("rejected non-finite SET")
             return False
         joints = self.config.joints
-        self.goal_rad = [joint.clamp(rad) for joint, rad in zip(joints, (pan, tilt))]
+        if (
+            (actuator is not None or trigger is not None)
+            and not self.config.actuator_fitted
+            and now - self.last_ignored_time >= self.config.error_repeat_s
+        ):
+            self.on_error(
+                "actuator_joint/trigger_joint ignored: no launcher fitted (turret_config.h)"
+            )
+            self.last_ignored_time = now
+        self.goal[0], self.goal[1] = joints[0].clamp(pan), joints[1].clamp(tilt)
         if self.state != self.ACTIVE or (
             self.torque_unknown
             and now - self.last_torque_attempt >= self.config.torque_retry_s
         ):
             self._enable_torque(now)
-        steps = [joint.to_steps(rad) for joint, rad in zip(joints, self.goal_rad)]
-        self.bus.sync_write_position(
-            self.ids, steps, self.config.speed, self.config.acceleration
-        )
+        ids = [joints[0].servo_id, joints[1].servo_id]
+        steps = [joints[0].to_steps(self.goal[0]), joints[1].to_steps(self.goal[1])]
+        if self.config.actuator_fitted:
+            # The trigger leaves 0 only while SETs keep naming it; the rack
+            # moves only while SETs keep naming it and is otherwise stopped
+            # where it is.
+            rack, trigger_joint = joints[2], joints[3]
+            self.goal[3] = trigger_joint.rest if trigger is None else trigger_joint.clamp(trigger)
+            if actuator is not None:
+                self.goal[2] = rack.clamp(actuator)
+                ids.append(rack.servo_id)
+                steps.append(rack.to_steps(self.goal[2]))
+            else:
+                present = self._read_joint(2, now)
+                if present is not None:
+                    self.goal[2] = self.measured[2]
+                    ids.append(rack.servo_id)
+                    steps.append(present)
+            ids.append(trigger_joint.servo_id)
+            steps.append(trigger_joint.to_steps(self.goal[3]))
+        self.bus.sync_write_position(ids, steps, self.config.speed, self.config.acceleration)
         self.state = self.ACTIVE
         self.last_set_time = now
         return True
 
     def stop(self, now: float) -> None:
-        """Stop moving: hold the measured position (or disable torque)."""
+        """Stop moving: hold pan and tilt's measured position (or disable
+        their torque), return the trigger to 0 and hold the rack where it is."""
         self._hold(now)
         self.state = self.HOLDING
 
     def update(self, now: float) -> None:
         """Run the watchdog and the periodic position feedback."""
         if self.state == self.ACTIVE and now - self.last_set_time >= self.config.watchdog_s:
-            # No SET for watchdog_s (tracker or bridge input gone): stop where we are.
+            # No SET for watchdog_s (tracker or bridge input gone): stop where
+            # we are, the trigger back to 0.
             self._hold(now)
             self.state = self.HOLDING
         if now >= self.next_feedback_time:
@@ -657,43 +786,67 @@ class StsController:
             self.joint_failing[index] = True
         else:
             self.joint_failing[index] = False  # recovered: the next failure reports at once
-        self.measured_rad[index] = joint.to_rad(steps)
+        self.measured[index] = joint.from_steps(steps)
         return steps
 
     def _read_feedback(self, now: float) -> None:
         answered = [self._read_joint(index, now) is not None for index in (0, 1)]
+        self.have_launcher = False
+        if self.config.actuator_fitted:
+            launcher = [self._read_joint(index, now) is not None for index in (2, 3)]
+            self.have_launcher = all(launcher)
         self.have_feedback = all(answered)
         if self.have_feedback:
-            # Never report a joint that did not answer: the host treats POS as measured.
-            self.on_position(*self.measured_rad)
+            # Never report a joint that did not answer: the host treats POS as
+            # measured. A silent launcher servo leaves pan and tilt reported
+            # without the launcher.
+            self.on_position(*self.measured[:4 if self.have_launcher else 2])
 
     def _enable_torque(self, now: float) -> None:
         self.last_torque_attempt = now
         ok = True
         for index, joint in enumerate(self.config.joints):
             result = self.bus.write_torque(joint.servo_id, True)
+            what = "torque enable"
+            if result == STS_OK and joint.torque_limit > 0:
+                # RAM register: the servo forgets it when it loses power
+                result = self.bus.write_torque_limit(joint.servo_id, joint.torque_limit)
+                what = "torque limit"
             if result != STS_OK:
-                self._report(index, f"torque enable {result}", now)
+                self._report(index, f"{what} {result}", now)
                 ok = False
         self.torque_unknown = not ok
 
     def _hold(self, now: float) -> None:
-        if self.config.stop_disables_torque:
-            for index, joint in enumerate(self.config.joints):
+        ids: list[int] = []
+        steps: list[int] = []
+        for index, joint in enumerate(self.config.joints[:2]):
+            if self.config.stop_disables_torque:
                 result = self.bus.write_torque(joint.servo_id, False)
                 if result != STS_OK:
                     self._report(index, f"torque disable {result}", now, force=True)
-            return
-        # Hold the measured position: a goal equal to the present position.
-        ids: list[int] = []
-        steps: list[int] = []
-        for index, joint in enumerate(self.config.joints):
+                continue
+            # Hold the measured position: a goal equal to the present position.
             present = self._read_joint(index, now)
             if present is None:
                 self._report(index, "cannot hold: no position reply", now, force=True)
             else:
                 ids.append(joint.servo_id)
                 steps.append(present)
+        if self.config.actuator_fitted:
+            # The launcher's safe state, whatever pan and tilt do: the rack
+            # stopped where it is, the trigger at 0.
+            rack, trigger = self.config.joints[2], self.config.joints[3]
+            present = self._read_joint(2, now)
+            if present is None:
+                self._report(2, "cannot hold: no position reply", now, force=True)
+            else:
+                self.goal[2] = self.measured[2]
+                ids.append(rack.servo_id)
+                steps.append(present)
+            self.goal[3] = trigger.rest
+            ids.append(trigger.servo_id)
+            steps.append(trigger.to_steps(trigger.rest))
         if ids:
             self.bus.sync_write_position(
                 ids, steps, self.config.speed, self.config.acceleration
@@ -712,12 +865,19 @@ class StsController:
 
 
 class TurretArduinoBridge(Node):
-    # Transport state defaults; __init__ sets them from the parameters.
+    # Transport and actuator state defaults; __init__ sets them from the parameters.
     transport = "serial"
     router = None
     mcu_ready = False
     registered: frozenset[str] | set[str] = frozenset()
     servos: StsController | None = None
+    actuator_fitted = False  # the dart launcher: rack (actuator_joint) and trigger
+    actuator_min_m = 0.0
+    actuator_max_m = 0.038
+    trigger_min_rad = 0.0
+    trigger_max_rad = 0.6
+    launcher_position: tuple[float, float] | None = None  # last measured (rack, trigger)
+    ignored_actuator_commands = 0
 
     def __init__(self) -> None:
         super().__init__("turret_arduino_bridge")
@@ -774,6 +934,27 @@ class TurretArduinoBridge(Node):
         self.declare_parameter("servo_acceleration", 50)  # 100 steps/s^2
         self.declare_parameter("servo_reply_timeout_s", 0.01)
         self.declare_parameter("stop_disables_torque", False)
+        # The foam dart launcher (its priming rack, a third ST3215, and its
+        # trigger servo): TURRET_ACTUATOR_FITTED in the env files, false by
+        # default. The rack's limits are metres of travel (0 forward), the
+        # trigger's radians (0 safe); the sts transport also uses the servo
+        # settings (the firmware's turret_config.h).
+        self.declare_parameter(
+            "actuator_fitted", env_bool("TURRET_ACTUATOR_FITTED", False)
+        )
+        self.declare_parameter("actuator_min_m", 0.0)
+        self.declare_parameter("actuator_max_m", 0.038)
+        self.declare_parameter("actuator_servo_id", 14)
+        self.declare_parameter("actuator_zero_steps", 512)
+        self.declare_parameter("actuator_direction", 1)
+        self.declare_parameter("actuator_pinion_radius_m", 0.0135)
+        self.declare_parameter("actuator_torque_limit", 550)  # 0.1 %: 55 %
+        self.declare_parameter("trigger_min_rad", 0.0)
+        self.declare_parameter("trigger_max_rad", 0.6)
+        self.declare_parameter("trigger_servo_id", 15)
+        self.declare_parameter("trigger_zero_steps", 2048)
+        self.declare_parameter("trigger_direction", 1)
+        self.declare_parameter("trigger_torque_limit", 300)  # 0.1 %: 30 %
 
         self.serial_port = str(self.get_parameter("serial_port").value)
         self.baud_rate = int(self.get_parameter("baud_rate").value)
@@ -796,6 +977,19 @@ class TurretArduinoBridge(Node):
         self.pan_max_rad = float(self.get_parameter("pan_max_rad").value)
         self.tilt_min_rad = float(self.get_parameter("tilt_min_rad").value)
         self.tilt_max_rad = float(self.get_parameter("tilt_max_rad").value)
+        self.actuator_fitted = bool(self.get_parameter("actuator_fitted").value)
+        self.actuator_min_m = float(self.get_parameter("actuator_min_m").value)
+        self.actuator_max_m = float(self.get_parameter("actuator_max_m").value)
+        self.trigger_min_rad = float(self.get_parameter("trigger_min_rad").value)
+        self.trigger_max_rad = float(self.get_parameter("trigger_max_rad").value)
+        if self.actuator_fitted and not all(
+            math.isfinite(low) and math.isfinite(high) and low < high
+            for low, high in ((self.actuator_min_m, self.actuator_max_m),
+                              (self.trigger_min_rad, self.trigger_max_rad))
+        ):
+            raise ValueError("the launcher's limits must be finite with min < max")
+        self.launcher_position = None
+        self.ignored_actuator_commands = 0
         self.servos: StsController | None = None
         self.servo_reply_timeout_s = float(self.get_parameter("servo_reply_timeout_s").value)
         self.sts_config = self._sts_config() if self.transport == "sts" else None
@@ -855,10 +1049,13 @@ class TurretArduinoBridge(Node):
                 f"Turret Arduino bridge ready on the UNO Q router socket {self.router_socket}"
             )
         elif self.transport == "sts":
-            pan, tilt = self.sts_config.joints
+            names = ", ".join(
+                f"{joint.servo_id} ({joint.name.split('_')[0]})"
+                for joint in self.sts_config.joints
+            )
             self.get_logger().info(
-                f"Turret bridge driving STS servos {pan.servo_id} (pan) and "
-                f"{tilt.servo_id} (tilt) on {self.serial_port} at {self.baud_rate} baud"
+                f"Turret bridge driving STS servos {names} on {self.serial_port} "
+                f"at {self.baud_rate} baud"
             )
         else:
             self.get_logger().info(
@@ -878,11 +1075,33 @@ class TurretArduinoBridge(Node):
                 servo_id=int(param(f"{side}_servo_id")),
                 zero_steps=int(param(f"{side}_zero_steps")),
                 direction=int(param(f"{side}_direction")),
-                min_rad=getattr(self, f"{side}_min_rad"),
-                max_rad=getattr(self, f"{side}_max_rad"),
+                lower=getattr(self, f"{side}_min_rad"),
+                upper=getattr(self, f"{side}_max_rad"),
             )
             for side in ("pan", "tilt")
         )
+        if self.actuator_fitted:
+            joints += (
+                StsJoint(
+                    name=ACTUATOR_JOINT,
+                    servo_id=int(param("actuator_servo_id")),
+                    zero_steps=int(param("actuator_zero_steps")),
+                    direction=int(param("actuator_direction")),
+                    lower=self.actuator_min_m,
+                    upper=self.actuator_max_m,
+                    pinion_radius_m=float(param("actuator_pinion_radius_m")),
+                    torque_limit=int(param("actuator_torque_limit")),
+                ),
+                StsJoint(
+                    name=TRIGGER_JOINT,
+                    servo_id=int(param("trigger_servo_id")),
+                    zero_steps=int(param("trigger_zero_steps")),
+                    direction=int(param("trigger_direction")),
+                    lower=self.trigger_min_rad,
+                    upper=self.trigger_max_rad,
+                    torque_limit=int(param("trigger_torque_limit")),
+                ),
+            )
         config = StsConfig(
             joints=joints,
             speed=int(param("servo_speed")),
@@ -1022,6 +1241,8 @@ class TurretArduinoBridge(Node):
                 self.last_error = (
                     f"{method} not available: is turret_firmware running on the UNO Q MCU?"
                 )
+                if method == RPC_SET_ALL:
+                    self.last_error += " (a build without the launcher has no turret/set_all)"
             else:
                 self.last_error = f"{method}: {format_rpc_error(error)}"
             return
@@ -1032,7 +1253,7 @@ class TurretArduinoBridge(Node):
             if {RPC_POSITION, RPC_ERROR} <= self.registered:
                 self.last_error = ""  # keep a registration error visible
         self.mcu_ready = True
-        if method == RPC_SET and result is False:
+        if method in (RPC_SET, RPC_SET_ALL) and result is False:
             self.last_error = "firmware rejected SET"
 
     def _probe(self) -> None:
@@ -1079,12 +1300,21 @@ class TurretArduinoBridge(Node):
         self.last_error = ""
         return True
 
-    def _send_set(self, pan: float, tilt: float) -> bool:
+    def _send_set(
+        self, pan: float, tilt: float, launcher: tuple[float, float] | None = None
+    ) -> bool:
+        """SET pan and tilt, and the launcher's (rack, trigger) unless it is
+        None: then the firmware returns the trigger to 0 and stops the rack."""
         if self.transport == "uno_q_bridge":
-            return self._send_rpc(RPC_SET, (pan, tilt))
+            if launcher is None:
+                return self._send_rpc(RPC_SET, (pan, tilt))
+            return self._send_rpc(RPC_SET_ALL, (pan, tilt, *launcher))
         if self.transport == "sts":
-            return self._send_servos(lambda now: self.servos.set(pan, tilt, now))
-        return self._write(format_command(pan, tilt))
+            actuator, trigger = launcher if launcher is not None else (None, None)
+            return self._send_servos(
+                lambda now: self.servos.set(pan, tilt, now, actuator, trigger)
+            )
+        return self._write(format_command(pan, tilt, launcher))
 
     def _send_stop(self) -> bool:
         if self.transport == "uno_q_bridge":
@@ -1123,11 +1353,14 @@ class TurretArduinoBridge(Node):
     def _joint_command(self, msg: JointState) -> None:
         pan = self._joint_position(msg, "pan_joint")
         tilt = self._joint_position(msg, "tilt_joint")
+        actuator = self._joint_position(msg, ACTUATOR_JOINT)
+        trigger = self._joint_position(msg, TRIGGER_JOINT)
         if pan is None or tilt is None:
             self.last_error = "joint command must include pan_joint and tilt_joint"
             return
-        if not (math.isfinite(pan) and math.isfinite(tilt)):
-            self.last_error = f"rejected non-finite joint command ({pan}, {tilt})"
+        values = [value for value in (pan, tilt, actuator, trigger) if value is not None]
+        if not all(math.isfinite(value) for value in values):
+            self.last_error = f"rejected non-finite joint command {tuple(values)}"
             self.get_logger().warning(self.last_error, throttle_duration_sec=5.0)
             return
         if not self.actuator_ready():
@@ -1137,7 +1370,24 @@ class TurretArduinoBridge(Node):
             return
         pan = min(max(pan, self.pan_min_rad), self.pan_max_rad)
         tilt = min(max(tilt, self.tilt_min_rad), self.tilt_max_rad)
-        if self._send_set(pan, tilt):
+        launcher = None
+        if self.actuator_fitted:
+            if actuator is not None:
+                # The command's rack position and trigger angle (0 when it does
+                # not carry one); without actuator_joint the SET carries pan and
+                # tilt only: trigger to 0, rack stopped where it is.
+                launcher = (
+                    min(max(actuator, self.actuator_min_m), self.actuator_max_m),
+                    min(max(self.trigger_min_rad if trigger is None else trigger,
+                            self.trigger_min_rad), self.trigger_max_rad),
+                )
+        elif actuator is not None or trigger is not None:
+            self.ignored_actuator_commands += 1
+            self.get_logger().warning(
+                "ignoring the launcher's joints: actuator_fitted is false",
+                throttle_duration_sec=10.0,
+            )
+        if self._send_set(pan, tilt, launcher):
             self.last_write_time = time.monotonic()
 
     def _joint_position(self, msg: JointState, name: str) -> Optional[float]:
@@ -1250,12 +1500,27 @@ class TurretArduinoBridge(Node):
             elif line.startswith("ERR"):
                 self.last_error = f"firmware: {line[3:].strip()}"
 
-    def _publish_joint_state(self, pan: float, tilt: float) -> None:
+    def _publish_joint_state(
+        self,
+        pan: float,
+        tilt: float,
+        actuator: float | None = None,
+        trigger: float | None = None,
+    ) -> None:
+        """Measured positions; the launcher's only when it is fitted and both
+        its servos answered."""
         self.last_feedback_time = time.monotonic()
         state = JointState()
         state.header.stamp = self.get_clock().now().to_msg()
         state.name = list(JOINT_NAMES)
         state.position = [pan, tilt]
+        if self.actuator_fitted:
+            launcher = None if actuator is None or trigger is None else (actuator, trigger)
+            self.launcher_position = launcher
+            if launcher is not None:
+                # (extend: rclpy keeps position in an array.array)
+                state.name.extend([ACTUATOR_JOINT, TRIGGER_JOINT])
+                state.position.extend(launcher)
         self.joint_state_pub.publish(state)
 
     def _publish_ready(self) -> None:
@@ -1315,10 +1580,10 @@ class TurretArduinoBridge(Node):
                 KeyValue(key="baud_rate", value=str(self.baud_rate)),
             ]
         if sts:
-            pan, tilt = self.sts_config.joints
+            ids = ",".join(str(joint.servo_id) for joint in self.sts_config.joints)
             servos = self.servos
             status.values += [
-                KeyValue(key="servo_ids", value=f"{pan.servo_id},{tilt.servo_id}"),
+                KeyValue(key="servo_ids", value=ids),
                 KeyValue(key="servo_state", value=servos.state if servos else "disconnected"),
                 KeyValue(key="bad_packets", value=str(servos.bus.bad_packets if servos else 0)),
             ]
@@ -1331,7 +1596,20 @@ class TurretArduinoBridge(Node):
             KeyValue(key="last_feedback_age_s", value=self._age(self.last_feedback_time)),
             KeyValue(key="last_write_age_s", value=self._age(self.last_write_time)),
             KeyValue(key="dropped_commands", value=str(self.dropped_commands)),
+            KeyValue(key="actuator_fitted", value=str(self.actuator_fitted).lower()),
         ]
+        if self.actuator_fitted:
+            position = self.launcher_position if feedback else None
+            status.values += [
+                KeyValue(key="actuator_position_m",
+                         value="unknown" if position is None else f"{position[0]:.4f}"),
+                KeyValue(key="trigger_position_rad",
+                         value="unknown" if position is None else f"{position[1]:.3f}"),
+            ]
+        elif self.ignored_actuator_commands:
+            status.values.append(KeyValue(
+                key="ignored_actuator_commands", value=str(self.ignored_actuator_commands)
+            ))
         msg = DiagnosticArray()
         msg.header.stamp = self.get_clock().now().to_msg()
         msg.status = [status]

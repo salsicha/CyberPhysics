@@ -67,6 +67,47 @@ The stock open-vocabulary model exercises actual inference and control, but the
 strict thresholds are intended for a turret checkpoint trained on representative
 camera data.
 
+The plant also carries the foam dart launcher
+(`systems/racecar_turret/interfaces.md`, "Foam dart launcher";
+`TURRET_ACTUATOR_FITTED`, default true): `actuator_joint` (the priming rack)
+and `trigger_joint` in the joint states and commands, moving at the
+ST3215's goal speed (2000 steps/s; the rack on its 13.5 mm pinion,
+`pantilt.launcher` in the scenario: the design's 0.038 m draw and 0.6 rad
+fire angle), a sear that catches the plunger when the rack is driven past
+0.03425 m and releases it (a shot) when the trigger is next driven past
+0.52 rad (`sear_catch_m`, `trigger_release_rad`), the trigger returned to 0
+and the rack stopped where it is by the emergency stop and when commands
+stop for 0.5 s, as the firmware does, and `/turret/actuator_ready`. The
+simulator plays the operator: from `TURRET_TAG_AT` seconds (default 2) on
+it reloads `TURRET_DARTS` darts (default 3) and presses Fire
+(`{"action": "tag", "target_id": <locked id>}`) whenever the tracker's
+`/turret/status` says the button is enabled (`fire_block` empty), up to ten
+times, until the clip is shot; Fire never moves the aim. A cycle stops
+early (a fault) when the tracker loses the lock, and with the stock YOLOE
+checkpoint it often does: the synthetic cart comes as several
+low-confidence boxes, missing from about a third of the frames, and the
+start-up selection jumps between their IDs. The fault latches, so this
+operator stops there. `TURRET_TAG_LOCK=true` makes the operator tap the
+target's box first (`{"action": "lock", "target_id": <id>}`), so the
+tracker follows that one ID, and acknowledge a fault as on the page
+(disarm for 0.5 s, then arm; a primed launcher is cleared by hand first, no
+shot), so it fires again; that changes the tracking (a lock sticks to a
+mis-detected box, the disarms stop the turret), so the tracking metrics of
+such a run are not comparable. Even locked, the cart's ID rarely lasts the
+3.6 s from Fire to the shot with the stock checkpoint (the rack reaches the
+sear, then the box is lost while chambering); the cycle time on this
+launcher model with a steady target is checked in
+`tests/test_turret_launcher.py` (a shot 3.6 s after Fire, ready again
+after 4.0 s). The metrics file's `launcher` section records the presses, the
+acknowledged faults, the status's `last_tag` changes and launcher phases, each shot with its cycle
+time (`press_to_shot_s`, Fire to the sear's release; `press_to_ready_s`,
+Fire to ready again) and the true aim error when it left
+(`true_aim_error_deg`: a shot at a mis-detected box shows here), the
+rack's and trigger's travel, and `unexplained_command_count` (priming or
+firing commands that no accepted Fire explains; it must be 0). The tracking
+summary and its scoring are unchanged. `TURRET_ACTUATOR_FITTED=false` runs
+the plant without it.
+
 `command_saturation_fraction` counts received commands at or beyond a joint
 limit, `emergency_stop_violation_count` counts commands that arrive more than
 `pantilt.emergency_stop_grace_s` (default two frames) after the emergency stop

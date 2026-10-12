@@ -95,3 +95,40 @@ def horn_holes(angle0=45.0):
     r = S.HORN_HOLE_CIRCLE / 2
     return [(r * math.cos(math.radians(angle0 + 90 * k)), r * math.sin(math.radians(angle0 + 90 * k)))
             for k in range(4)]
+
+
+# --------------------------------------------------------------------- foam dart launcher
+# The launcher core (hardware/parts/turret/_launcher.py) is built in its
+# own frame: origin on the bore at the chamber's rear face, x along the
+# bore, z toward the plunger tube's side. On the turret it sits on the
+# camera yoke, above the camera, upright and parallel to the camera's
+# axis: its origin at LAUNCHER_ORIGIN in the yoke frame (origin on the tilt
+# axis), no rotation. The bore is then BORE_Z above the camera's optical
+# axis, on its centre line.
+BORE_Z = 48.0
+LAUNCHER_ORIGIN = (12.0, 0.0, BORE_Z)
+
+# Yoke pad: the breech's pedestal stands on it, two M3 from below into
+# inserts in the pedestal.
+YOKE_PAD = (10.0, CROSSBAR_X[1], 18.0, 16.5, 20.5)   # x0, x1, half width, z0, z1
+PAD_SCREWS = ((14.5, 10.0), (14.5, -10.0))           # (x, y), yoke frame
+
+
+def to_yoke(p):
+    """Launcher-frame point -> yoke frame."""
+    return (p[0] + LAUNCHER_ORIGIN[0], p[1] + LAUNCHER_ORIGIN[1], p[2] + LAUNCHER_ORIGIN[2])
+
+
+def from_yoke(p):
+    return (p[0] - LAUNCHER_ORIGIN[0], p[1] - LAUNCHER_ORIGIN[1], p[2] - LAUNCHER_ORIGIN[2])
+
+# The breech's pedestal on the yoke pad (launcher frame): x0, x1, y0, y1,
+# z0 (the pad's top), the two pad screws (from below, into inserts).
+PEDESTAL = (YOKE_PAD[0] - LAUNCHER_ORIGIN[0], 72.0, -13.6, 13.6, YOKE_PAD[4] - LAUNCHER_ORIGIN[2],
+            tuple((x - LAUNCHER_ORIGIN[0], y) for x, y in PAD_SCREWS))
+
+
+def launcher_to_turret(shape):
+    """Launcher-frame shape -> the turret frame (tilt 0, pan 0)."""
+    from hardware.parts.common import cad
+    return cad.translate(shape, (LAUNCHER_ORIGIN[0], LAUNCHER_ORIGIN[1], LAUNCHER_ORIGIN[2] + TILT_Z))

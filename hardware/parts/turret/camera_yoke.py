@@ -1,6 +1,8 @@
 """Camera yoke: hangs on both of the tilt servo's horns and carries a
 camera plate on its crossbar, in front of the tilt axis. The idler-side
-hub is smaller behind the axis so it clears the servo's bus plugs."""
+hub is smaller behind the axis so it clears the servo's bus plugs. A pad on
+top of the crossbar, behind the camera plates, carries the foam dart
+launcher's pedestal (two M3 from below; unused on a turret without one)."""
 from hardware.parts.common import printing
 from hardware.parts.turret import _frame as F
 from hardware.parts.turret._footprints import ST3215 as S
@@ -25,11 +27,17 @@ PART = {
          "source": S.SOURCE, "verified": False},
         {"part": "camera_plate_b0385, camera_plate_tripod (printed)", "dimensions": "four M3 x 3 inserts in the crossbar",
          "source": "hardware/parts/turret/_frame.py", "verified": True},
+        {"part": "launcher_breech (printed)", "dimensions": "two M3 x 10 from below through the pad into the pedestal's "
+                                                             "inserts",
+         "source": "hardware/parts/turret/_frame.py", "verified": True},
     ],
     "inserts": [{"size": "M3-short", "qty": 4, "where": "crossbar, from the front, through holes pressed flush"}],
     "fasteners": [{"item": "M3 x 5 socket head cap screw", "qty": 8,
                    "use": "camera yoke to the tilt servo's output and idler horns (no longer: the tip must stay "
-                          "inside the horn flange)"}],
+                          "inside the horn flange)"},
+                  {"item": "M3 x 10 socket head cap screw", "qty": 2,
+                   "use": "launcher pedestal to the yoke's pad, from below (a long 2.5 mm key between the crossbar "
+                          "and the tilt servo)"}],
     "fit_test": True,
     "notes": [
         "With the tilt servo at its centre (step 2048), press both horns on so a hole pair lies at 45 deg, then fit "
@@ -60,6 +68,8 @@ def build_local():
         parts.append(cad.box(F.YOKE_ARM_THICK_X, cx1, ta, tb, -F.ARM_HALF_H, F.ARM_HALF_H))
     y_arm = y_in + F.YOKE_ARM_T
     parts.append(cad.box(cx0, cx1, -y_arm, y_arm, cz0, cz1))
+    px0, px1, phw, pz0, pz1 = F.YOKE_PAD
+    parts.append(cad.box(px0, px1, -phw, phw, pz0, pz1))
     yoke = cad.fuse_all(parts)
     cutters = []
     for sign in (1, -1):
@@ -68,6 +78,8 @@ def build_local():
             cutters.append(cad.cyl(3.4, F.YOKE_T + 2, (x, face + sign, z), (0, -sign, 0)))
     for y, z in F.CROSSBAR_INSERTS:
         cutters.append(cad.cyl(4.0, cx1 - cx0 + 2, (cx0 - 1, y, z), (1, 0, 0)))
+    for x, y in F.PAD_SCREWS:
+        cutters.append(cad.cyl(3.4, pz1 - pz0 + 2, (x, y, pz0 - 1)))
     return cad.cut_all(yoke, cutters)
 
 
