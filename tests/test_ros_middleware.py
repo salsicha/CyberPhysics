@@ -13,6 +13,7 @@ from conftest import REPO
     'boat_hardware', 'submarine_hardware', 'racecar_turret_hardware',
     'racecar_turret_isaac', 'turret_hardware', 'turret_sim', 'turret_uno_q',
     'so101_smolvla_isaac', 'so101_groot_isaac', 'so101_gazebo',
+    'spaceros', 'lunar_rover_sim', 'lunar_rover_hardware',
 ])
 @pytest.mark.parametrize('rmw', [None, 'rmw_fastrtps_cpp'])
 def test_connected_graph_selects_one_backend_with_explicit_fallback(stack, rmw):
@@ -57,19 +58,6 @@ def test_micro_ros_agent_and_its_client_remain_on_the_same_dds_backend():
     services = yaml.safe_load((REPO / 'compositions/arduino.yaml').read_text())['services']
     for name in ('uros', 'ros_sub'):
         assert services[name]['environment']['RMW_IMPLEMENTATION'] == 'rmw_fastrtps_cpp'
-
-
-@pytest.mark.parametrize('stack', ['spaceros', 'lunar_rover_sim', 'lunar_rover_hardware'])
-def test_statically_linked_space_ros_graph_is_not_changed_by_global_rmw_override(stack):
-    if not shutil.which('docker'):
-        pytest.skip('Docker Compose not installed')
-    result = subprocess.run([
-        'docker', 'compose', '-f', str(REPO / 'compositions' / f'{stack}.yaml'),
-        'config', '--format', 'json',
-    ], env={**os.environ, 'RMW_IMPLEMENTATION': 'rmw_zenoh_cpp'},
-        text=True, capture_output=True, check=True)
-    for service in json.loads(result.stdout)['services'].values():
-        assert service['environment']['RMW_IMPLEMENTATION'] == 'rmw_cyclonedds_cpp'
 
 
 def test_env_default_checker_understands_self_overrides(tmp_path, monkeypatch):

@@ -36,8 +36,10 @@ def make_sim(module, variant='nominal'):
     node.current_t = 0.0
     node.records = []
     node.frame_index = 0
+    node.discovery_wait_s = 0.0
     node.input_frames = {}
     node.frame_results = {}
+    node.launcher_truth = {}
     node.reacquire_times = []
     node.false_lock_count = 0
     node.command_log = []
@@ -62,6 +64,21 @@ def test_saturated_commands_are_counted(module):
         node._joint_command(command(pan, 0.0))
     assert summary(node)['command_saturation_fraction'] == pytest.approx(0.5)
     assert node.sim.command_queue[1][1] == pytest.approx(1.5708)  # clamped
+
+
+def test_camera_waits_for_tracker_discovery_and_times_out(module):
+    node = make_sim(module)
+    node.finished = False
+    node.discovery_ready = False
+    node.discovery_started = 100.0
+    node.image_pub = NS(get_subscription_count=lambda: 0)
+    with patch.object(module.time, 'monotonic', return_value=103.0):
+        node._tick()
+    assert node.frame_index == 0 and not node.input_frames
+    assert node.discovery_wait_s == 3.0
+    with patch.object(module.time, 'monotonic', return_value=131.0):
+        with pytest.raises(RuntimeError, match='did not connect'):
+            node._tick()
 
 
 def test_frame_accounting_separates_missing_results_empty_masks_and_camera_drops(module):
@@ -212,7 +229,24 @@ def test_ros_sim_carries_the_launcher_in_commands_and_reports(module):
     report = node._launcher_report()
     assert report['unexplained_command_count'] == 0
     assert report['shots'] == [{'t_s': 5.5, 'tag_at_s': 1.9, 'press_to_shot_s': 3.6,
-                                'press_to_ready_s': None, 'true_aim_error_deg': None}]
+                                'press_to_ready_s': None, 'true_aim_error_deg': None,
+                                'target_id': None, 'scene_object_id': None}]
+
+
+def test_shot_truth_follows_selected_object_after_target_change(module):
+    import numpy as np
+    node = make_sim(module)
+    node.status = {'target_id': 'second'}
+    node.latest = {'segments': [{'id': 'second', 'class': 'red cardboard box',
+                                'bbox_xyxy': [2., 2., 8., 8.]}]}
+    mask = np.zeros((10, 10), dtype=np.uint8)
+    mask[2:8, 2:8] = 255
+    node.sim.project = lambda obj, t: [0., 0., 0., 0., .01, .02]
+    node._record_launcher_truth({'box_red_01': mask})
+    truth = node.launcher_truth[0.0]
+    assert truth['target_id'] == 'second'
+    assert truth['scene_object_id'] == 'box_red_01'
+    assert truth['true_aim_error_deg'] == pytest.approx(math.degrees(math.hypot(.01, .02)))
 
 
 def test_operator_reloads_taps_the_box_then_fires_only_when_the_page_would(module):

@@ -13,14 +13,14 @@
 
 services:
   spaceros:
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:spaceros-${CYBERPHYSICS_TAG:-latest}
     container_name: spaceros
     network_mode: host
     ipc: host
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
-      # The pinned Space ROS core is linked directly to Cyclone DDS.
-      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - RMW_IMPLEMENTATION=${RMW_IMPLEMENTATION:-rmw_zenoh_cpp}
       - PYTHONUNBUFFERED=1
       - DISPLAY=${DISPLAY:-:0}
       - XAUTHORITY=/tmp/.XAuthority

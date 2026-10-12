@@ -55,6 +55,45 @@ TRIGGER_TOLERANCE_RAD = 0.05
 LAUNCHER_KEEPALIVE_S = 0.1
 
 
+def configure_model_classes(model: Any, prompts: list[str]) -> None:
+    """Prompt open-vocabulary heads; preserve classes learned by fused heads.
+
+    Checkpoints can be renamed, and a fine-tuned YOLOE head no longer reads
+    text embeddings. A filename test either misses a renamed base model or
+    relabels a trained model's logits without changing what it recognizes.
+    """
+    head = model.model.model[-1]
+    if (hasattr(head, "reprta") and not getattr(head, "is_fused", False)
+            and not hasattr(head, "lrpc")):
+        model.set_classes(prompts)
+
+
+def suppress_duplicate_detections(detections: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Remove near-identical same-class boxes from NMS-free model heads.
+
+    Duplicate boxes otherwise acquire competing track IDs for the same object.
+    Keep ordinary overlapping instances and boxes belonging to different classes.
+    """
+    kept = []
+    for detection in sorted(detections, key=lambda d: d["confidence"], reverse=True):
+        a = detection["bbox_xyxy"]
+        duplicate = False
+        for previous in kept:
+            if previous["class"] != detection["class"]:
+                continue
+            b = previous["bbox_xyxy"]
+            intersection = max(0., min(a[2], b[2]) - max(a[0], b[0])) * max(
+                0., min(a[3], b[3]) - max(a[1], b[1]))
+            union = ((a[2] - a[0]) * (a[3] - a[1])
+                     + (b[2] - b[0]) * (b[3] - b[1]) - intersection)
+            if union > 0. and intersection / union > .9:
+                duplicate = True
+                break
+        if not duplicate:
+            kept.append(detection)
+    return kept
+
+
 def clamp(value: float, low: float, high: float) -> float:
     if not math.isfinite(value):
         raise ValueError(f"cannot clamp non-finite value {value!r}")
@@ -1072,14 +1111,14 @@ class PanTiltYoloTracker(Node):
             f"Loading Ultralytics checkpoint {self.model_path} on {self.device}"
         )
         self.model = YOLO(self.model_path)
-        if "yoloe-" in Path(self.model_path).name.lower():
-            self.model.set_classes(self.class_prompts)
+        configure_model_classes(self.model, self.class_prompts)
         if bool(self.parameter("warmup")):
             self.model.predict(
                 np.zeros((self.image_size, self.image_size, 3), dtype=np.uint8),
                 conf=self.confidence,
                 imgsz=self.image_size,
                 device=self.device,
+                retina_masks=True,
                 verbose=False,
             )
         self.ready_file.parent.mkdir(parents=True, exist_ok=True)
@@ -1357,6 +1396,7 @@ class PanTiltYoloTracker(Node):
             conf=self.confidence,
             imgsz=self.image_size,
             device=self.device,
+            retina_masks=True,
             verbose=False,
         )[0]
         latency_ms = (time.perf_counter() - started) * 1000.0
@@ -1436,7 +1476,7 @@ class PanTiltYoloTracker(Node):
                     "mask": mask,
                 }
             )
-        return detections
+        return suppress_duplicate_detections(detections)
 
     def _associate_target(
         self, detections: list[dict[str, Any]], width: int, height: int
@@ -1444,7 +1484,7 @@ class PanTiltYoloTracker(Node):
         if self.mode != "auto":
             return None
         target = None
-        if self.selection == "track":
+        if self.target_track:
             target = next(
                 (d for d in detections if d["id"] == self.target_track), None
             )

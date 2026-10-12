@@ -1,0 +1,202 @@
+{
+  "simulation_only": true,
+  "middleware": "rmw_zenoh_cpp",
+  "image": "salsicha/cyberphysics:pantiltros-zenoh",
+  "source_bind_mounted": true,
+  "checkpoint": "applications/turret_sim/models/warehouse_yoloe26s.pt",
+  "launcher": {
+    "locks": [],
+    "presses": [
+      {
+        "t_s": 2.05,
+        "target_id": "4",
+        "aim_error_deg": 0.5402785827489016
+      },
+      {
+        "t_s": 6.85,
+        "target_id": "1",
+        "aim_error_deg": 0.2200244390123113
+      },
+      {
+        "t_s": 11.65,
+        "target_id": "6",
+        "aim_error_deg": 0.37688152203884556
+      }
+    ],
+    "acknowledged_faults": [],
+    "last_tag_changes": [
+      {
+        "t_s": 2.05,
+        "tag": {
+          "target_id": "4",
+          "result": "running",
+          "reason": "",
+          "stamp": 1791841866.5922582
+        }
+      },
+      {
+        "t_s": 4.6,
+        "tag": {
+          "target_id": "4",
+          "result": "fired",
+          "reason": "",
+          "stamp": 1791841869.165199
+        }
+      },
+      {
+        "t_s": 6.85,
+        "tag": {
+          "target_id": "1",
+          "result": "running",
+          "reason": "",
+          "stamp": 1791841871.3963342
+        }
+      },
+      {
+        "t_s": 9.4,
+        "tag": {
+          "target_id": "1",
+          "result": "fired",
+          "reason": "",
+          "stamp": 1791841873.9651148
+        }
+      },
+      {
+        "t_s": 11.65,
+        "tag": {
+          "target_id": "6",
+          "result": "running",
+          "reason": "",
+          "stamp": 1791841876.1929805
+        }
+      },
+      {
+        "t_s": 14.2,
+        "tag": {
+          "target_id": "6",
+          "result": "fired",
+          "reason": "",
+          "stamp": 1791841878.76624
+        }
+      }
+    ],
+    "phases": [
+      [
+        0.0,
+        "fault"
+      ],
+      [
+        0.1,
+        "empty"
+      ],
+      [
+        2.05,
+        "ready"
+      ],
+      [
+        2.1,
+        "priming"
+      ],
+      [
+        3.05,
+        "chambering"
+      ],
+      [
+        4.05,
+        "firing"
+      ],
+      [
+        4.65,
+        "ready"
+      ],
+      [
+        6.9,
+        "priming"
+      ],
+      [
+        7.85,
+        "chambering"
+      ],
+      [
+        8.85,
+        "firing"
+      ],
+      [
+        9.45,
+        "ready"
+      ],
+      [
+        11.7,
+        "priming"
+      ],
+      [
+        12.65,
+        "chambering"
+      ],
+      [
+        13.65,
+        "firing"
+      ],
+      [
+        14.25,
+        "empty"
+      ]
+    ],
+    "shots": [
+      {
+        "t_s": 4.15,
+        "tag_at_s": 2.05,
+        "press_to_shot_s": 2.1,
+        "press_to_ready_s": 2.6,
+        "target_id": "4",
+        "scene_object_id": "cart_blue_01",
+        "true_aim_error_deg": 1.3109622383065722
+      },
+      {
+        "t_s": 8.95,
+        "tag_at_s": 6.85,
+        "press_to_shot_s": 2.1,
+        "press_to_ready_s": 2.6,
+        "target_id": "1",
+        "scene_object_id": "box_red_01",
+        "true_aim_error_deg": 0.2590844955812989
+      },
+      {
+        "t_s": 13.75,
+        "tag_at_s": 11.65,
+        "press_to_shot_s": 2.1,
+        "press_to_ready_s": 2.6,
+        "target_id": "6",
+        "scene_object_id": "cart_green_02",
+        "true_aim_error_deg": 0.7149207793785458
+      }
+    ],
+    "max_rack_m": 0.038,
+    "max_trigger_rad": 0.5997864880632857,
+    "priming_command_count": 59,
+    "firing_command_count": 27,
+    "unexplained_command_count": 0,
+    "final_rack_m": 0.0,
+    "final_trigger_rad": 0.0
+  },
+  "frame_delivery": {
+    "startup_discovery_wait_s": 0.05544668901711702,
+    "rendered_frames": 361,
+    "injected_camera_drops": 0,
+    "published_frames": 361,
+    "processed_unique_frames": 361,
+    "frames_without_result": 0,
+    "visible_processed_frames": 341,
+    "visible_frames_without_mask": 1,
+    "visible_frames_wrong_mask": 268,
+    "target_overlap_fraction": 0.21114369501466276,
+    "mean_iou_when_overlapping": 0.8509671282889236,
+    "capture_to_result_p95_ms": 21.622441
+  },
+  "runtime_file_sha256": {
+    "applications/pantiltros/scripts/pantilt_yolo_tracker.py": "6d9455a5f2f259b2169babdc2ade63d59adf69544bbd30ca9227f35981f7e7ee",
+    "applications/turret_sim/scripts/turret_ros_sim.py": "c9108495ba5a53a2af3224a5d6a945d002b760b1a9a7e21270ee7a80a5aec787",
+    "applications/turret_sim/scenarios/warehouse_tracking.json": "dc40bee6fcb6b31e74046a1636b114a0829fee3653d1a89e1b90f0db87627836",
+    "applications/turret_sim/models/warehouse_yoloe26s.pt": "aa8934ae2c9b2d98b4e33eb5515fd9ea53b10e76e6ac445f86e194db2e9df228"
+  }
+}

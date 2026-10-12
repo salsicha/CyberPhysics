@@ -32,8 +32,8 @@ Humble/Jazzy graphs do not interoperate, nor does native Zenoh directly
 exchange ROS messages with DDS or `zenoh-bridge-ros2dds`.
 
 The micro-ROS XRCE agent and its paired subscriber explicitly retain Fast
-DDS. Space ROS and its lunar rover graph retain Cyclone DDS, as explained
-below. MAVLink, USB, ZeroMQ policy RPC, Gazebo Transport and Foxglove WebSocket
+DDS. Space ROS and its lunar rover graph now use native Zenoh after the
+follow-up source rebuild below. MAVLink, USB, ZeroMQ policy RPC, Gazebo Transport and Foxglove WebSocket
 transport are unchanged. Persistent 4 MiB socket limits and Fast DDS profiles
 remain for the explicit DDS fallback. The Zenoh TCP path skips the DDS UDP
 preflight.
@@ -43,23 +43,33 @@ otherwise adds its own Make job count, overriding `CMAKE_BUILD_PARALLEL_LEVEL`.
 This was observed during the Pi build and checked against colcon's actual
 argument-generation helper after correction.
 
-### Space ROS compatibility exception
+### Space ROS source rebuild and validation
 
-A disposable test installed Jazzy Zenoh into the existing Space ROS image.
-Node creation failed with the expected-RMW identifier error: the requested
-Zenoh implementation was actually Cyclone. `ldd` confirmed that the pinned
-Space ROS `librcl.so` links directly to `librmw_cyclonedds_cpp.so`; the runtime
-selection library is absent. The compositions now explicitly preserve
-Cyclone for every node in this graph, including when the host exports Zenoh.
-No core libraries were silently replaced with ordinary ROS binaries. A full
-Space ROS core rebuild and validation is outside this compatibility change.
+The first migration retained Cyclone because the pinned base links its core
+directly to that implementation. The historical measurement remains in
+[`zenoh_spaceros_exception.json`](validation/20261012/zenoh_spaceros_exception.json).
+The follow-up audit completed the source migration: the exact pinned
+`rmw_implementation`, `rcl`, `rclcpp` and `rclpy` sources now support runtime
+selection. Rebuilding only those libraries exposed a second issue: installed
+message dispatchers returned introspection support only. Rebuilding all installed
+interfaces with the available Fast CDR serializers resolved node creation and
+message publication. Source revisions are read from the pinned image's manifest.
 
-The existing two-node lunar rover simulation was then run with the host
-requesting Zenoh. Its composition correctly selected Cyclone: a ten-second
-probe received 201 odometry messages and 200 nonzero velocity commands, with
-continued waypoint progress and changing position. This validates the
-kinematic rover compatibility path, not the full Space ROS Gazebo stack.
-Data: [`zenoh_spaceros_exception.json`](validation/20261012/zenoh_spaceros_exception.json).
+The rebuilt image reported `rmw_zenoh_cpp` and ran the full Gazebo Curiosity
+demo. All six controllers activated. The probe received 3,100 clock messages,
+297 joint states, 62 images, 31 scans and 31 odometry messages; wheel positions
+changed and movement/stop services responded. This was a smoke test with the
+upstream demonstration active, not a complete driving course. The rebuilt
+Python clients and C++ Gazebo/controller processes communicated successfully.
+See [`zenoh_spaceros_gazebo.json`](validation/20261012/zenoh_spaceros_gazebo.json).
+
+The smaller lunar-rover composition delivered 241 odometry messages and 240
+nonzero velocity commands in 12 seconds, with changing position under native
+Zenoh. See [`zenoh_spaceros_lunar.json`](validation/20261012/zenoh_spaceros_lunar.json).
+The final repository image also passed its router-free native message/service
+creation check and an actual Fast DDS fallback node/publisher check.
+Both compositions now default to native Zenoh. Rebuild their image before
+upgrading; installing an RMW package into the old image alone is insufficient.
 
 ## Transport recovery
 
@@ -154,8 +164,9 @@ change during this migration.
 Not every fleet image or GPU subsystem was rebuilt and exercised. The tested
 desktop paths include ROS base, Aerostack2, DemNav, WildNav, Isaac and SO101;
 other image recipes and connected Compose graphs were checked statically.
-There was no physical Jetson GPU acceptance test, full Space ROS Gazebo test,
-or multi-robot field test. Image builds here are local; no container registry
+The follow-up audit added the full Space ROS Gazebo test, PanTiltROS GPU
+image/runtime tests and successful ARM64 image CI. There was no physical
+Jetson GPU acceptance or multi-robot field test. Image builds here are local; no container registry
 publication is implied by pushing the repository.
 
 References: [native RMW](https://github.com/ros2/rmw_zenoh),

@@ -22,3 +22,17 @@ acceptance decisions; per-frame recordings and images are in the ignored
   virtual plant in both modes; they are separate from automatic requests.
 
 Aircraft mass is a CAD/BOM estimate, and no physical Jetson GPU was tested.
+
+Follow-up audit records:
+
+- `stl_mesh_review.json`: all 145 hardware meshes and manifest fit-evidence counts.
+- `image_build_ci.json`: all eight image-build jobs passing for the earlier migration commit.
+- `turret_trained_*`: actual native-Zenoh, GPU-model tracking scores and three-target simulated launcher cycle.
+- `zenoh_spaceros_gazebo.json`, `zenoh_spaceros_lunar.json`: rebuilt native Space ROS runtime checks; the older exception record is historical.
+- `pi_followup_health.json`: ownership, persistent buffers, maintenance timer and preserved BlueOS containers.
+
+See the [complete request ledger](../../task_completion_20261012.md).
+
+Turret `summary.yolo_contract` retains the acceptance scenario's original
+reference-model settings. Each follow-up wrapper records the checkpoint and
+confidence actually used, plus hashes of the bind-mounted runtime source.

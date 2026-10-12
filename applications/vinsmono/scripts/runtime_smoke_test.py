@@ -3,7 +3,9 @@
 estimator output from the container's launch file on synthetic VIO data."""
 import argparse
 import math
+import os
 import signal
+import socket
 import subprocess
 import tempfile
 import time
@@ -18,6 +20,54 @@ from nav_msgs.msg import Odometry, Path as PathMsg
 from rclpy.qos import qos_profile_sensor_data
 from rclpy.time import Time
 from sensor_msgs.msg import Image, Imu, PointCloud
+
+
+@contextmanager
+def local_middleware_router(enabled):
+    """Connect isolated Zenoh test processes without requiring multicast/NICs."""
+    if not enabled or os.environ.get('RMW_IMPLEMENTATION') != 'rmw_zenoh_cpp':
+        yield
+        return
+    with socket.socket() as reservation:
+        reservation.bind(('127.0.0.1', 0))
+        port = reservation.getsockname()[1]
+    endpoint = f'tcp/127.0.0.1:{port}'
+    executable = Path(get_package_prefix('rmw_zenoh_cpp')) / 'lib/rmw_zenoh_cpp/rmw_zenohd'
+    router_env = dict(os.environ, ZENOH_CONFIG_OVERRIDE=(
+        f'listen/endpoints=["{endpoint}"];connect/endpoints=[];scouting/multicast/enabled=false'))
+    client_env = {
+        'ZENOH_CONFIG_OVERRIDE': f'mode="client";listen/endpoints=[];connect/endpoints=["{endpoint}"];scouting/multicast/enabled=false',
+        'ZENOH_ROUTER_CHECK_ATTEMPTS': '0',
+    }
+    previous = {name: os.environ.get(name) for name in client_env}
+    with tempfile.TemporaryFile(mode='w+') as log:
+        router = subprocess.Popen([str(executable)], env=router_env, stdout=log, stderr=log)
+        try:
+            deadline = time.monotonic() + 15
+            while True:
+                if router.poll() is not None or time.monotonic() >= deadline:
+                    log.seek(0)
+                    raise RuntimeError(f'Local Zenoh router did not become ready:\n{log.read()}')
+                try:
+                    with socket.create_connection(('127.0.0.1', port), timeout=.1):
+                        break
+                except OSError:
+                    time.sleep(.05)
+            os.environ.update(client_env)
+            yield
+        finally:
+            for name, value in previous.items():
+                if value is None:
+                    os.environ.pop(name, None)
+                else:
+                    os.environ[name] = value
+            if router.poll() is None:
+                router.send_signal(signal.SIGINT)
+                try:
+                    router.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    router.kill()
+                    router.wait()
 
 
 @contextmanager
@@ -248,7 +298,14 @@ def wait_until(node, predicate, processes, timeout=15):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', required=True)
+    parser.add_argument('--local-router', action='store_true',
+                        help='Use a loopback Zenoh router for an isolated test container')
     args = parser.parse_args()
+    with local_middleware_router(args.local_router):
+        run_smoke(args.config)
+
+
+def run_smoke(config):
     rclpy.init()
     node = rclpy.create_node('vins_runtime_smoke_test')
     image_pub = node.create_publisher(Image, '/camera/image_raw', qos_profile_sensor_data)
@@ -258,7 +315,7 @@ def main():
         PointCloud, '/feature_tracker/feature', lambda msg: features.append(msg), 10)
     try:
         for stop_signal in (signal.SIGINT, signal.SIGTERM):
-            with running_node('vins_estimator', args.config, stop_signal) as estimator:
+            with running_node('vins_estimator', config, stop_signal) as estimator:
                 wait_until(node, lambda: imu_pub.get_subscription_count() > 0, [estimator])
             wait_until(node, lambda: imu_pub.get_subscription_count() == 0, [])
             print(f'PASS idle estimator shutdown on {stop_signal.name}', flush=True)
@@ -269,14 +326,14 @@ def main():
                     f'enable_loop_closure:={str(enabled).lower()}',
                     'support_file:=/workspace/install/share/config_pkg/support_files',
                 )
-                with running_node('pose_graph', args.config, stop_signal, parameters) as graph:
+                with running_node('pose_graph', config, stop_signal, parameters) as graph:
                     wait_until(node, lambda: node.count_publishers('/pose_graph/match_points') > 0,
                                [graph], timeout=30)
                 wait_until(node, lambda: node.count_publishers('/pose_graph/match_points') == 0, [])
                 print(f'PASS pose graph loop_closure={enabled} shutdown on {stop_signal.name}', flush=True)
 
-        with running_node('vins_estimator', args.config) as estimator:
-            with running_node('feature_tracker', args.config) as tracker:
+        with running_node('vins_estimator', config) as estimator:
+            with running_node('feature_tracker', config) as tracker:
                 wait_until(node, lambda: (imu_pub.get_subscription_count() > 0
                                          and image_pub.get_subscription_count() > 0),
                            [estimator, tracker])
@@ -301,7 +358,7 @@ def main():
                 assert estimator.poll() is None and tracker.poll() is None
         print('PASS feature flow and estimator shutdown after sensor processing', flush=True)
 
-        check_estimator_output(node, args.config, image_pub, imu_pub)
+        check_estimator_output(node, config, image_pub, imu_pub)
         print('PASS launch file shutdown after estimator output', flush=True)
     finally:
         node.destroy_subscription(subscription)

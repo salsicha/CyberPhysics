@@ -1,0 +1,48 @@
+{
+  "commit": "e672176c6ee76f1cbc8853988891efd2a3914029",
+  "run_url": "https://github.com/salsicha/CyberPhysics/actions/runs/38307403741",
+  "status": "completed",
+  "conclusion": "success",
+  "jobs": [
+    {
+      "name": "ros2 family",
+      "conclusion": "success",
+      "url": "https://github.com/salsicha/CyberPhysics/actions/runs/38307403741/job/115004672150"
+    },
+    {
+      "name": "standalone images",
+      "conclusion": "success",
+      "url": "https://github.com/salsicha/CyberPhysics/actions/runs/38307403741/job/115004672298"
+    },
+    {
+      "name": "aerostack2 family (arm64)",
+      "conclusion": "success",
+      "url": "https://github.com/salsicha/CyberPhysics/actions/runs/38307403741/job/115004672350"
+    },
+    {
+      "name": "aerostack2 family (amd64)",
+      "conclusion": "success",
+      "url": "https://github.com/salsicha/CyberPhysics/actions/runs/38307403741/job/115004672453"
+    },
+    {
+      "name": "Jetson arm64 (depthanything)",
+      "conclusion": "success",
+      "url": "https://github.com/salsicha/CyberPhysics/actions/runs/38307403741/job/115004672459"
+    },
+    {
+      "name": "arm64 hardware images (ros2, rangefinder, unoq)",
+      "conclusion": "success",
+      "url": "https://github.com/salsicha/CyberPhysics/actions/runs/38307403741/job/115004672468"
+    },
+    {
+      "name": "Jetson arm64 (nvblox)",
+      "conclusion": "success",
+      "url": "https://github.com/salsicha/CyberPhysics/actions/runs/38307403741/job/115004672510"
+    },
+    {
+      "name": "Jetson arm64 (pantiltros)",
+      "conclusion": "success",
+      "url": "https://github.com/salsicha/CyberPhysics/actions/runs/38307403741/job/115004672610"
+    }
+  ]
+}

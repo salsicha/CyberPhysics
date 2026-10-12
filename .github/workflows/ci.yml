@@ -144,6 +144,7 @@ jobs:
           salsicha/cyberphysics:vinsmono-ci
           python3 /repo/applications/vinsmono/scripts/runtime_smoke_test.py
           --config /repo/systems/vinsmono/calibration/vins_mono.yaml
+          --local-router
 
   ardupilot-params:
     runs-on: ubuntu-latest

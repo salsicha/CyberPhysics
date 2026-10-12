@@ -1,0 +1,27 @@
+{
+  "repository": {
+    "output": "e672176c6ee76f1cbc8853988891efd2a3914029",
+    "error": "",
+    "exit": 0
+  },
+  "docker_owner": {
+    "output": "pi:pi 755",
+    "error": "",
+    "exit": 0
+  },
+  "buffers": {
+    "output": "net.core.rmem_max = 4194304\nnet.core.wmem_max = 4194304",
+    "error": "",
+    "exit": 0
+  },
+  "maintenance": {
+    "output": "active",
+    "error": "",
+    "exit": 0
+  },
+  "containers": {
+    "output": "blueos-core Up 15 hours\nextension-publicecrawsblueosbcloudagent20250410 Up 16 hours\nextension-blueroboticscockpitv1160beta1 Up 16 hours\nblueos-bootstrap Up 16 hours",
+    "error": "",
+    "exit": 0
+  }
+}

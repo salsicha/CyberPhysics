@@ -1,0 +1,16 @@
+{
+  "backend": "rmw_zenoh_cpp",
+  "seconds": 12,
+  "odom_messages": 241,
+  "command_messages": 240,
+  "first_pose": [
+    0.0044491990255099735,
+    -4.0000072266819355
+  ],
+  "last_pose": [
+    2.520112759412617,
+    -4.25092683714585
+  ],
+  "nonzero_commands": 240,
+  "passed": true
+}

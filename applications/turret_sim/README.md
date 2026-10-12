@@ -8,12 +8,16 @@ not live here; both are provided by `applications/pantiltros` over ROS 2.
 ## Run the real YOLO path
 
 ```bash
-docker compose -f compositions/turret_sim.yaml up --build
+git lfs pull --include='applications/turret_sim/models/*.pt'
+make -C applications build_pantiltros
+docker compose -f compositions/turret_sim.yaml up --no-build
 ```
 
-The `pantilt_yolo` service first downloads and warms the default
-`yoloe-26s-seg.pt` model if it is not already in `cache/turret/models/`. Once its
-healthcheck is ready, `turret_sim` publishes the synthetic camera and joint state
+The Makefile rebuilds the ROS base dependency as well, so an older local
+image cannot silently leave the tracker without native Zenoh support.
+The `pantilt_yolo` service warms the simulation-only
+`models/warehouse_yoloe26s.pt` checkpoint. Once its healthcheck is ready and
+the camera/state/result graph is discovered, `turret_sim` publishes the synthetic camera and joint state
 and consumes the same commands used by hardware. Metrics and sampled frames are
 written under `generated/turret/`.
 
@@ -63,9 +67,11 @@ docker compose -f compositions/turret_sim.yaml \
   --profile validation run --rm --no-deps turret_score
 ```
 
-The stock open-vocabulary model exercises actual inference and control, but the
-strict thresholds are intended for a turret checkpoint trained on representative
-camera data.
+The simulation checkpoint was trained on separately randomized renderer frames.
+See [its provenance and reproduction instructions](models/README.md). Hardware
+model defaults are unchanged. To compare the stock open-vocabulary model, set
+`TURRET_YOLO_MODEL=yoloe-26s-seg.pt TURRET_YOLO_CONFIDENCE=0.003`.
+The acceptance thresholds are unchanged.
 
 The plant also carries the foam dart launcher
 (`systems/racecar_turret/interfaces.md`, "Foam dart launcher";
@@ -83,22 +89,15 @@ it reloads `TURRET_DARTS` darts (default 3) and presses Fire
 (`{"action": "tag", "target_id": <locked id>}`) whenever the tracker's
 `/turret/status` says the button is enabled (`fire_block` empty), up to ten
 times, until the clip is shot; Fire never moves the aim. A cycle stops
-early (a fault) when the tracker loses the lock, and with the stock YOLOE
-checkpoint it often does: the synthetic cart comes as several
-low-confidence boxes, missing from about a third of the frames, and the
-start-up selection jumps between their IDs. The fault latches, so this
-operator stops there. `TURRET_TAG_LOCK=true` makes the operator tap the
-target's box first (`{"action": "lock", "target_id": <id>}`), so the
-tracker follows that one ID, and acknowledge a fault as on the page
-(disarm for 0.5 s, then arm; a primed launcher is cleared by hand first, no
-shot), so it fires again; that changes the tracking (a lock sticks to a
-mis-detected box, the disarms stop the turret), so the tracking metrics of
-such a run are not comparable. Even locked, the cart's ID often does not
-last the 2 s from Fire to the shot with the stock checkpoint (the box is
-lost while priming or chambering); the cycle time on this launcher model
-with a steady target is checked in `tests/test_turret_launcher.py` (a shot
-2.04 s after Fire, ready again after 2.47 s; one closed-loop run with the
-lock timeout raised to 2 s fired 2.05 s after Fire). The model moves the
+early (a fault) when the tracker loses the selected ID. The stock checkpoint
+can still miss a synthetic target during the cycle. `TURRET_TAG_LOCK=true`
+explicitly taps its box before firing and acknowledges a fault by disarming
+and rearming; such a run changes tracking behavior and is not a comparable
+tracking baseline. The default trained synthetic checkpoint completed three
+shots at three different IDs in the October validation, with automatic
+selection advancement. Near-identical duplicate boxes are suppressed before
+ID assignment, and initial class tracking preserves an existing ID.
+The model moves the
 servos at the commanded speed, with no torque or load. The metrics file's
 `launcher` section records the presses, the acknowledged faults, the
 status's `last_tag` changes and launcher phases, each shot with its cycle
@@ -155,3 +154,17 @@ still returned no target mask for 132/341 visible nominal frames and failed
 strict tracking acceptance. See [the measured report](../../tools/hardware_validation_20261012.md).
 Run `sudo python3 tools/configure_dds_buffers.py` on a new host so the kernel
 permits the requested socket sizes.
+
+### Trained checkpoint validation
+
+The follow-up native Zenoh runs pass all existing tracking checks in nominal,
+low-light, glare/motion blur, camera-dropout and command-dropout scenarios.
+Every published image receives a result; selected-target masks can still be
+missing on individual frames. Startup waits up to 30 seconds for camera,
+calibration, joint-state and mask-result discovery before advancing the scene.
+This wait is reported separately and does not remove any scenario frames.
+
+The launcher report matches each shot to the selected scene object; automatic
+advancement no longer measures every shot against the original blue cart.
+`target_id` and `scene_object_id` identify that match, and missing truth remains
+null. See the [follow-up report](../../tools/task_completion_20261012.md).

@@ -50,11 +50,12 @@ python3 tools/configure_dds_buffers.py --check
 This writes `/etc/sysctl.d/99-cyberphysics-dds.conf`, applies it immediately,
 and verifies both `net.core.rmem_max` and `net.core.wmem_max` are at least
 **4194304 bytes (4 MiB)**. Higher existing values are preserved. Ubuntu's
-`systemd-sysctl` reapplies the file at boot. The Jetson smoke test and
-`./start.sh` for the affected physical vehicle and turret stacks refuse to proceed if a later
-configuration change has lowered the live limits. A direct `docker compose`
-invocation bypasses `start.sh`, so run the `--check` command first in that
-case. These settings belong on the host, not in the host-network containers.
+`systemd-sysctl` reapplies the file at boot. The Jetson GPU smoke test checks
+these limits; `./start.sh` checks them for the affected vehicle and turret
+stacks when a DDS fallback is selected. Native Zenoh uses its TCP transport
+and does not require this DDS UDP buffer preflight. Direct `docker compose`
+invocations bypass `start.sh`; run `--check` before using DDS that way.
+These settings belong on the host, not in the host-network containers.
 
 From this checkout, build the car and turret images natively. Allow ample
 NVMe space for CUDA packages, intermediate layers and model checkpoints

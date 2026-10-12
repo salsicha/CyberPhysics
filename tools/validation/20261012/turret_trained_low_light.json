@@ -1,0 +1,121 @@
+{
+  "checkpoint": "applications/turret_sim/models/warehouse_yoloe26s.pt",
+  "middleware": "rmw_zenoh_cpp",
+  "confidence": 0.25,
+  "image": "salsicha/cyberphysics:pantiltros-zenoh",
+  "source_bind_mounted": true,
+  "actuator_fitted": false,
+  "frame_delivery": {
+    "startup_discovery_wait_s": 0.05466901510953903,
+    "rendered_frames": 361,
+    "injected_camera_drops": 0,
+    "published_frames": 361,
+    "processed_unique_frames": 361,
+    "frames_without_result": 0,
+    "visible_processed_frames": 341,
+    "visible_frames_without_mask": 22,
+    "visible_frames_wrong_mask": 0,
+    "target_overlap_fraction": 0.9354838709677419,
+    "mean_iou_when_overlapping": 0.842185340457106,
+    "capture_to_result_p95_ms": 22.085631
+  },
+  "score": {
+    "run_count": 1,
+    "success": true,
+    "results": [
+      {
+        "scenario": "turret_warehouse_tracking_v1",
+        "target_id": "cart_blue_01",
+        "success": true,
+        "checks": {
+          "topic_contract": true,
+          "lock_fraction": true,
+          "mean_pixel_error": true,
+          "p95_pixel_error": true,
+          "mean_angular_error": true,
+          "p95_angular_error": true,
+          "target_detection_fraction": true,
+          "target_mean_iou": true,
+          "false_lock_count": true,
+          "reacquire_time": true,
+          "command_saturation": true,
+          "joint_limit_violations": true,
+          "emergency_stop_violations": true,
+          "yolo_latency": true
+        },
+        "topic_contract_errors": [],
+        "metrics": {
+          "sample_count": 361,
+          "scored_sample_count": 341,
+          "target_visible_sample_count": 341,
+          "lock_fraction": 0.9325513196480938,
+          "target_detection_fraction": 0.9354838709677419,
+          "mean_pixel_error_px": 7.371011391327796,
+          "p95_pixel_error_px": 13.508336752568868,
+          "mean_angular_error_deg": 0.7915093256250745,
+          "p95_angular_error_deg": 1.45171551238309,
+          "target_mean_iou": 0.8046698274493722,
+          "target_min_iou": 0.3433461404121551,
+          "false_lock_count": 0,
+          "max_reacquire_time_s": 0.75,
+          "command_saturation_fraction": 0.0,
+          "dropped_command_count": 0,
+          "joint_limit_violation_count": 0,
+          "emergency_stop_violation_count": 0,
+          "max_yolo_latency_ms": 17.512,
+          "topic_contract": {
+            "camera_image": "/turret/camera/image_raw",
+            "camera_info": "/turret/camera/camera_info",
+            "segments": "/turret/yolo/segments",
+            "target_mask": "/turret/yolo/target_mask",
+            "target_bbox": "/turret/yolo/target_bbox",
+            "target_confidence": "/turret/yolo/target_confidence",
+            "pixel_error": "/turret/target/pixel_error",
+            "angular_error": "/turret/target/angular_error",
+            "selected_id": "/turret/target/selected_id",
+            "locked": "/turret/target/locked",
+            "joint_commands": "/turret/joint_commands",
+            "joint_states": "/turret/joint_states",
+            "diagnostics": "/turret/diagnostics",
+            "emergency_stop": "/turret/emergency_stop"
+          },
+          "yolo_contract": {
+            "family": "YOLOE-26",
+            "task": "instance_segmentation",
+            "runtime": "ultralytics",
+            "default_checkpoint": "yoloe-26s-seg.pt",
+            "open_vocabulary": true,
+            "cpu_smoke_backend": "simulated_yolo26_seg",
+            "cpu_smoke_checkpoint": "yolo26n-seg.pt",
+            "gpu_validation_checkpoint_pattern": "yoloe-26*-seg.pt",
+            "min_confidence": 0.003,
+            "min_target_iou": 0.6,
+            "max_cpu_smoke_latency_ms": 35.0,
+            "model_check": "Compose pins Ultralytics 8.4.52 and defaults to YOLOE-26s segmentation. Override TURRET_YOLO_MODEL with a compatible custom segmentation checkpoint when validating trained turret classes."
+          }
+        }
+      }
+    ],
+    "thresholds": {
+      "min_lock_fraction": 0.82,
+      "max_mean_pixel_error_px": 34.0,
+      "max_p95_pixel_error_px": 70.0,
+      "max_mean_angular_error_deg": 3.2,
+      "max_p95_angular_error_deg": 6.5,
+      "min_target_detection_fraction": 0.88,
+      "min_target_mean_iou": 0.68,
+      "max_false_lock_count": 0,
+      "max_reacquire_time_s": 1.2,
+      "max_command_saturation_fraction": 0.08,
+      "max_joint_limit_violation_count": 0,
+      "max_emergency_stop_violation_count": 0,
+      "max_yolo_latency_ms": 35.0
+    }
+  },
+  "runtime_file_sha256": {
+    "applications/pantiltros/scripts/pantilt_yolo_tracker.py": "6d9455a5f2f259b2169babdc2ade63d59adf69544bbd30ca9227f35981f7e7ee",
+    "applications/turret_sim/scripts/turret_ros_sim.py": "c9108495ba5a53a2af3224a5d6a945d002b760b1a9a7e21270ee7a80a5aec787",
+    "applications/turret_sim/scenarios/warehouse_tracking.json": "dc40bee6fcb6b31e74046a1636b114a0829fee3653d1a89e1b90f0db87627836",
+    "applications/turret_sim/models/warehouse_yoloe26s.pt": "aa8934ae2c9b2d98b4e33eb5515fd9ea53b10e76e6ac445f86e194db2e9df228"
+  }
+}

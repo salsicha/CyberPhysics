@@ -14,7 +14,7 @@ Hardware (bill of materials, printed parts, printing and assembly):
 ## Expected Space ROS Setup
 
 - `salsicha/cyberphysics:spaceros-latest` built from `applications/spaceros`.
-- ROS 2 Jazzy and Space ROS (Cyclone DDS) sourced by the container entrypoint.
+- ROS 2 Jazzy and Space ROS (native Zenoh; rebuilt core and message support) sourced by the container entrypoint.
 - Optional use of the upstream Space ROS Curiosity rover demo, built into the
   same image, for baseline rover behavior
   (`docker compose -f compositions/spaceros.yaml up`).

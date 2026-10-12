@@ -9,10 +9,10 @@
 # reloads TURRET_DARTS darts and presses Fire whenever the tracker's
 # /turret/status enables it, until the clip is shot, so fire cycles run
 # closed loop. With TURRET_TAG_LOCK=true it first taps the target's box (a
-# lock by ID), which keeps the target's ID through YOLOE's duplicate boxes,
-# and acknowledges a launcher fault (disarm, arm) to fire again, both of
-# which change the tracking. The report's "launcher" section records the shots and their
-# cycle times; the tracking score is unchanged.
+# lock by ID), and acknowledges a launcher fault (disarm, arm) to fire
+# again; these actions change the tracking. The report's "launcher" section
+# records the selected scene objects, shots and cycle times. Tracking-only
+# acceptance runs use TURRET_ACTUATOR_FITTED=false.
 
 x-pantiltros-image: &pantiltros-image
   image: salsicha/cyberphysics:pantiltros-${CYBERPHYSICS_TAG:-latest}
@@ -43,6 +43,7 @@ services:
     volumes:
       - ../applications/pantiltros/scripts/pantilt_yolo_tracker.py:/scripts/pantilt_yolo_tracker.py:ro
       - ../applications/pantiltros/config:/workspace/pantiltros/config:ro
+      - ../applications/turret_sim/models:/workspace/sim_models:ro
       - ../cache/turret:/workspace/cache
       - /dev/shm:/dev/shm
       - /tmp/.X11-unix:/tmp/.X11-unix
@@ -50,10 +51,10 @@ services:
       python3 /scripts/pantilt_yolo_tracker.py
       --ros-args
       --params-file /workspace/pantiltros/config/yolo_tracker.yaml
-      -p model_path:=${TURRET_YOLO_MODEL:-yoloe-26s-seg.pt}
+      -p model_path:=${TURRET_YOLO_MODEL:-/workspace/sim_models/warehouse_yoloe26s.pt}
       -p device:="'${TURRET_YOLO_DEVICE:-0}'"
       -p image_size:=${TURRET_YOLO_IMAGE_SIZE:-640}
-      -p confidence:=${TURRET_YOLO_CONFIDENCE:-0.003}
+      -p confidence:=${TURRET_YOLO_CONFIDENCE:-0.25}
       -p show_window:=${TURRET_SHOW_WINDOW:-false}
       -p actuator_fitted:=${TURRET_ACTUATOR_FITTED:-true}
     healthcheck:

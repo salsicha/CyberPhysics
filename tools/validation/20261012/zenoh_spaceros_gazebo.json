@@ -1,0 +1,89 @@
+{
+  "backend": "rmw_zenoh_cpp",
+  "active_controllers": [
+    "wheel_tree_position_controller",
+    "steer_position_controller",
+    "wheel_velocity_controller",
+    "mast_joint_trajectory_controller",
+    "arm_joint_trajectory_controller",
+    "joint_state_broadcaster"
+  ],
+  "counts": {
+    "clock": 3100,
+    "odom": 31,
+    "images": 62,
+    "scans": 31,
+    "joints": 297
+  },
+  "joint_motion_rad_max": 7.949999990406959,
+  "clock_advance_s": 3.099,
+  "initial_joints": {
+    "arm_01_joint": -2.0627724363321547e-13,
+    "arm_02_joint": 2.3756480759965398e-12,
+    "arm_03_joint": 2.2935512949754675e-13,
+    "arm_04_joint": 2.970596773122122e-12,
+    "arm_tools_joint": 1.490515479947656e-13,
+    "back_wheel_L_joint": -8.626301517630748e-10,
+    "back_wheel_R_joint": 7.731619312903531e-10,
+    "front_wheel_L_joint": 2.805941440781845e-10,
+    "front_wheel_R_joint": -0.0069150648620329765,
+    "mast_02_joint": 1.4801802481619973e-13,
+    "mast_cameras_joint": 1.2572168191427436e-14,
+    "mast_p_joint": 4.352749479417761e-05,
+    "middle_wheel_L_joint": 1.639267878884943e-10,
+    "middle_wheel_R_joint": 2.2807191624221016e-10,
+    "suspension_arm_B2_L_joint": -0.06654839376563655,
+    "suspension_arm_B2_R_joint": -0.02685830525264821,
+    "suspension_arm_B_L_joint": 0.01902799725446963,
+    "suspension_arm_B_R_joint": 0.02518922769894089,
+    "suspension_arm_F_L_joint": -0.008882705348613787,
+    "suspension_arm_F_R_joint": -0.015576331379436053,
+    "suspension_steer_B_L_joint": -8.821575610113366e-11,
+    "suspension_steer_B_R_joint": 6.113150921242105e-11,
+    "suspension_steer_F_L_joint": 2.072176514872936e-11,
+    "suspension_steer_F_R_joint": 1.081325083907664e-10
+  },
+  "final_joints": {
+    "arm_01_joint": -2.867456268702428e-14,
+    "arm_02_joint": 7.238463410200889e-13,
+    "arm_03_joint": 2.5246636667898002e-14,
+    "arm_04_joint": 8.577898250093995e-13,
+    "arm_tools_joint": 2.5209329868544865e-15,
+    "back_wheel_L_joint": 5.300000001767588,
+    "back_wheel_R_joint": -5.29992169050585,
+    "front_wheel_L_joint": 5.300861065494109,
+    "front_wheel_R_joint": -5.30691507322557,
+    "mast_02_joint": 2.4731731837199077e-15,
+    "mast_cameras_joint": 1.0720353520388347e-14,
+    "mast_p_joint": 2.5261747821419184e-08,
+    "middle_wheel_L_joint": 7.949999990570886,
+    "middle_wheel_R_joint": -7.948217346738138,
+    "suspension_arm_B2_L_joint": -0.4001871468869086,
+    "suspension_arm_B2_R_joint": -0.3884758219695992,
+    "suspension_arm_B_L_joint": 0.40000000000015146,
+    "suspension_arm_B_R_joint": 0.3990201445549958,
+    "suspension_arm_F_L_joint": -0.3358000057098615,
+    "suspension_arm_F_R_joint": -0.4000000000001356,
+    "suspension_steer_B_L_joint": 3.1134401235560243e-11,
+    "suspension_steer_B_R_joint": -3.222438274458167e-13,
+    "suspension_steer_F_L_joint": 1.882769734839927e-12,
+    "suspension_steer_F_R_joint": -7.773961310363368e-11
+  },
+  "odom_endpoints": [
+    [
+      -2.4161478218973136e-19,
+      -3.2915211815312397e-19
+    ],
+    [
+      1.2534405870573537,
+      -0.22702003895214606
+    ]
+  ],
+  "passed": true,
+  "image": "salsicha/cyberphysics:spaceros-zenoh",
+  "image_id": "4d34a56ff757be3ae5d0cec437978cae9436539999d95ea0b41a64fc2c31fab9",
+  "base_release": "jazzy-2026.07.0",
+  "native_zenoh_build_smoke": true,
+  "fast_dds_fallback_node_smoke": true,
+  "scope": "Full Gazebo controller/sensor/service smoke test with upstream demonstration active; not a complete driving course"
+}

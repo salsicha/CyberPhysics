@@ -23,7 +23,13 @@ built in, plus the CyberPhysics lunar rover simulator (`scripts/`).
 - `/entrypoint.sh` sources ROS 2 Jazzy (`/opt/ros/jazzy`, apt), then Space ROS
   (`/opt/ros/spaceros`), then the demo workspace. Interactive shells source
   the same environment through `~/.bashrc`.
-- `RMW_IMPLEMENTATION=rmw_cyclonedds_cpp`. Space ROS ships only Cyclone DDS.
+- `RMW_IMPLEMENTATION=rmw_zenoh_cpp`. The base originally hard-wired Cyclone.
+  `enable_zenoh.sh` rebuilds its RMW dispatcher, C/C++/Python client libraries
+  and generated message dispatchers from the image's exact source manifest.
+  Both introspection and Fast CDR serialization support remain available.
+  The Compose graphs use the [shared middleware settings](../../systems/ros2/README.md),
+  with explicit DDS fallback. This is a local source rebuild, not an upstream
+  qualification claim.
 - `/launch/curiosity_sim.launch.py` (from `launch/`) is the default command.
 
 Build:
@@ -85,7 +91,7 @@ Upstream's README lists `/stop`, but the service is actually `/move_stop`.
 Without a display, run the image directly:
 
 ```bash
-docker run --rm --network none salsicha/cyberphysics:spaceros-latest \
+docker run --rm --network host -e ROS_DOMAIN_ID=227 salsicha/cyberphysics:spaceros-latest \
   ros2 launch /launch/curiosity_sim.launch.py gui:=false
 ```
 

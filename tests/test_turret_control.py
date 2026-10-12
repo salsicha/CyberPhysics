@@ -53,6 +53,33 @@ def controller(tracker, **kwargs):
     return tracker.PanTiltController(**options)
 
 
+@pytest.mark.parametrize('head,expected', [
+    (NS(reprta=object(), is_fused=False), True),
+    (NS(reprta=object(), is_fused=True), False),
+    (NS(reprta=object(), is_fused=False, lrpc=object()), False),
+    (NS(), False),
+])
+def test_checkpoint_head_controls_prompting_not_its_filename(tracker, head, expected):
+    model = NS(model=NS(model=[head]), set_classes=MagicMock())
+    tracker.configure_model_classes(model, ['cart', 'person'])
+    assert model.set_classes.called is expected
+    if expected:
+        model.set_classes.assert_called_once_with(['cart', 'person'])
+
+
+def test_near_identical_boxes_do_not_create_competing_tracks(tracker):
+    def box(x, confidence, category='cart'):
+        return {'bbox_xyxy': [x, 0., x + 100., 80.], 'confidence': confidence,
+                'class': category}
+    best = box(0., .9)
+    duplicate = box(.2, .8)
+    overlapping_instance = box(20., .7)
+    different_class = box(0., .6, 'box')
+    assert tracker.suppress_duplicate_detections([
+        duplicate, best, overlapping_instance, different_class,
+    ]) == [best, overlapping_instance, different_class]
+
+
 def test_previous_gain_is_unstable_with_two_frames_of_latency():
     # c[k] = c[k-1] + kp * e[k - n]: characteristic z^(n+1) - z^n + kp.
     def worst_pole(kp, n):

@@ -135,6 +135,9 @@ class TurretRosSimulator(Node):
         self.input_frames = {}
         self.frame_results = {}
         self.drain_started = None
+        self.discovery_started = time.monotonic()
+        self.discovery_ready = False
+        self.discovery_wait_s = 0.0
         self.records: list[dict[str, Any]] = []
         self.reacquire_times: list[float] = []
         self.occlusion_started: float | None = None
@@ -218,6 +221,7 @@ class TurretRosSimulator(Node):
         self.acknowledged: list[dict[str, Any]] = []
         # (t, rack, trigger, the status's launcher state)
         self.launcher_log: list[tuple[float, float, float, str]] = []
+        self.launcher_truth: dict[float, dict[str, Any]] = {}
         # Times of commands that prime (the rack further back than it is) or fire
         self.priming_commands: list[float] = []
         self.firing_commands: list[float] = []
@@ -403,6 +407,22 @@ class TurretRosSimulator(Node):
     def _tick(self) -> None:
         if self.finished:
             return
+        if not self.discovery_ready:
+            # Model warmup does not imply that this newly-created camera and
+            # result subscriber have discovered the tracker yet. Start the
+            # scenario only after both directions of the graph are connected.
+            self.discovery_wait_s = time.monotonic() - self.discovery_started
+            topics = self.scenario["topics"]
+            self.discovery_ready = (
+                self.image_pub.get_subscription_count() > 0
+                and self.camera_info_pub.get_subscription_count() > 0
+                and self.joint_state_pub.get_subscription_count() > 0
+                and self.count_publishers(topics["target_mask"]) > 0
+            )
+            if not self.discovery_ready:
+                if self.discovery_wait_s > 30.0:
+                    raise RuntimeError("Tracker camera/state/result graph did not connect within 30 s")
+                return
         if self.frame_index >= self.steps:
             # Allow the final images to leave the tracker queue before counting
             # input frames with no result. No new image/plant steps are sent.
@@ -420,6 +440,8 @@ class TurretRosSimulator(Node):
             self.emergency_stop_started = self.current_t
         self.sim.update_servo(self.current_t, self.dt, emergency_stop)
         frame, ground_truth_masks = self.sim.render_frame(self.current_t)
+        if self.actuator_fitted:
+            self._record_launcher_truth(ground_truth_masks)
         self._record(ground_truth_masks, emergency_stop)
         stamp = self.get_clock().now().to_msg()
         self._publish_state(stamp, emergency_stop)
@@ -642,6 +664,7 @@ class TurretRosSimulator(Node):
         visible_results = [r for r in aligned if r['target_visible'] and r['t_s'] >= ignore_initial]
         overlaps = [r for r in visible_results if r['iou'] > .05]
         report['frame_delivery'] = {
+            'startup_discovery_wait_s': self.discovery_wait_s,
             'rendered_frames': self.frame_index,
             'injected_camera_drops': self.frame_index - len(self.input_frames),
             'published_frames': len(self.input_frames),
@@ -658,6 +681,37 @@ class TurretRosSimulator(Node):
             report["launcher"] = self._launcher_report()
         return report
 
+    def _record_launcher_truth(self, masks: dict[str, np.ndarray]) -> None:
+        """Match the active track to scene truth after automatic target changes."""
+        track_id = (self.status or {}).get("target_id")
+        detection = next((d for d in self.latest["segments"] if d["id"] == track_id), None)
+        if detection is None:
+            return
+        a = detection["bbox_xyxy"]
+        matches = []
+        for obj in self.scenario["objects"]:
+            if obj["yolo_prompt"] != detection["class"] or obj["id"] not in masks:
+                continue
+            ys, xs = np.nonzero(masks[obj["id"]])
+            if not len(xs):
+                continue
+            b = (xs.min(), ys.min(), xs.max() + 1, ys.max() + 1)
+            intersection = max(0., min(a[2], b[2]) - max(a[0], b[0])) * max(
+                0., min(a[3], b[3]) - max(a[1], b[1]))
+            union = ((a[2] - a[0]) * (a[3] - a[1])
+                     + (b[2] - b[0]) * (b[3] - b[1]) - intersection)
+            if union > 0 and intersection / union > .25:
+                matches.append((intersection / union, obj))
+        if not matches:
+            return
+        _, obj = max(matches, key=lambda item: item[0])
+        projection = self.sim.project(obj, self.current_t)
+        if projection is not None:
+            self.launcher_truth[self.current_t] = {
+                "target_id": track_id, "scene_object_id": obj["id"],
+                "true_aim_error_deg": math.degrees(math.hypot(*projection[4:6])),
+            }
+
     def _launcher_report(self) -> dict[str, Any]:
         """The presses, the shots with their cycle times and the true aim
         error at each, and any priming or firing command that no accepted
@@ -668,10 +722,6 @@ class TurretRosSimulator(Node):
         window = 15.0  # a cycle (prime, chamber, trigger) ends well within this
         unexplained = [t for t in self.priming_commands + self.firing_commands
                        if not any(start - 0.5 <= t <= start + window for start in accepted)]
-        # Ground truth: how far the optical axis was from the true target
-        # when each shot left (a shot at a mis-detected box shows here)
-        truth = {sample["t_s"]: math.degrees(sample["derived"]["angular_error_norm_rad"])
-                 for sample in self.records if sample["derived"]["target_visible"]}
         shots = []
         for shot in self.sim.shots:
             press = max((t for t in accepted if t <= shot), default=None)
@@ -683,7 +733,9 @@ class TurretRosSimulator(Node):
                 "press_to_shot_s": None if press is None else round(shot - press, 3),
                 "press_to_ready_s": (None if press is None or ready is None
                                      else round(ready - press, 3)),
-                "true_aim_error_deg": truth.get(round(shot, 6)),
+                **self.launcher_truth.get(round(shot, 6), {
+                    "target_id": None, "scene_object_id": None, "true_aim_error_deg": None,
+                }),
             })
         phases: list[list[Any]] = []
         for t, _, _, state in log:

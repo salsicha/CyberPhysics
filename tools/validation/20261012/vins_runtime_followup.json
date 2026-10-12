@@ -1,0 +1,22 @@
+{
+  "image": "salsicha/cyberphysics:vinsmono-zenoh",
+  "image_id": "7608a2b64bc5040c3c30332e0f77de35b43232270d33203e7c05d12dc58a0a76",
+  "network": "none",
+  "middleware": "rmw_zenoh_cpp",
+  "local_router": true,
+  "passed_checks": [
+    "PASS idle estimator shutdown on SIGINT",
+    "PASS idle estimator shutdown on SIGTERM",
+    "PASS pose graph loop_closure=False shutdown on SIGINT",
+    "PASS pose graph loop_closure=False shutdown on SIGTERM",
+    "PASS pose graph loop_closure=True shutdown on SIGINT",
+    "PASS pose graph loop_closure=True shutdown on SIGTERM",
+    "PASS best-effort camera and IMU connections",
+    "PASS feature flow and estimator shutdown after sensor processing",
+    "PASS estimator odometry (40 messages)",
+    "PASS pose graph path stamps (21 keyframes)",
+    "PASS trajectory CSV (40 rows, nanosecond stamps)",
+    "PASS launch file shutdown after estimator output"
+  ],
+  "script_sha256": "4e64782fd63bc0c9acb8c773db46553823e00d41502a9874f7f75d2d88d6c384"
+}

@@ -146,8 +146,8 @@ actual Jetson remain to be measured.
 The subsequently requested migration now selects native `rmw_zenoh_cpp` on
 Ubuntu 24.04 / ROS 2 Jazzy throughout connected ROS graphs. Aerostack2 is
 source-pinned, Isaac uses external Jazzy libraries, and DDS remains an explicit
-fallback. The micro-ROS agent/subscriber pair and the statically linked
-Space ROS rover graph remain documented DDS exceptions. Deployment
+fallback. The micro-ROS agent/subscriber pair remains a documented DDS exception.
+The follow-up Space ROS source rebuild also migrates the rover graph to Zenoh. Deployment
 instructions and required image rebuilds are in the
 [ROS middleware guide](../systems/ros2/README.md); measured transport, flight
 and hardware results are in the [Zenoh validation report](zenoh_validation_20261012.md).

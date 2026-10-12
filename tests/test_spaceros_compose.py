@@ -23,8 +23,9 @@ def test_demo_workspace_is_built_inside_the_image():
     assert '--branch "${SPACEROS_RELEASE}"' in DOCKERFILE
     assert 'rosdep install --from-paths' in DOCKERFILE
     assert 'colcon build' in DOCKERFILE
-    # The pinned core links directly to Cyclone; an apt RMW cannot replace it.
-    assert 'RMW_IMPLEMENTATION=rmw_cyclonedds_cpp' in DOCKERFILE
+    # Core and generated message dispatchers must be rebuilt together.
+    assert 'RMW_IMPLEMENTATION=rmw_zenoh_cpp' in DOCKERFILE
+    assert 'RUN bash /tmp/enable_zenoh.sh' in DOCKERFILE
 
 
 def test_compose_and_cmd_run_the_launch_file_shipped_in_the_image():

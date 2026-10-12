@@ -12,7 +12,8 @@ Rebuild the connected stack together, including its derived images. Existing
 The common runtime is Ubuntu 24.04 / ROS 2 Jazzy. Aerostack2 is source-pinned
 in its Dockerfile and installed at `/opt/aerostack2`; its descendant entrypoints
 source that overlay. Isaac Sim 6.0.1 uses external Jazzy Python 3.12 libraries,
-not its bundled ROS distribution. Space ROS is a separate DDS exception below.
+not its bundled ROS distribution. Space ROS rebuilds its pinned client libraries
+and generated message support for the same native backend.
 The SO101, UNO Q and VINS images also install Jazzy Zenoh directly.
 
 For example, rebuild a flight stack with:
@@ -87,13 +88,16 @@ paired ROS subscriber on Fast DDS. The agent's DDS implementation is not an
 RMW selection switch. Native Zenoh integration for microcontrollers requires
 a separate firmware/agent migration.
 
-The pinned `osrf/space-ros:jazzy-2026.07.0` core links `librcl` directly to
-Cyclone DDS. Installing Jazzy's Zenoh package and setting its RMW variable
-fails with an implementation-identifier mismatch. Its Space ROS and lunar
-rover compositions therefore explicitly use `rmw_cyclonedds_cpp`, even if a
-host exports a different RMW. External rover drivers must use Cyclone too.
-Migrating that graph requires rebuilding and validating the Space ROS core;
-it cannot be joined to the native Zenoh graph by an environment change.
+The pinned `osrf/space-ros:jazzy-2026.07.0` base originally hard-wired Cyclone
+DDS and introspection-only message dispatch. `applications/spaceros/enable_zenoh.sh`
+rebuilds the RMW dispatcher, C/C++/Python clients and installed interfaces from
+the exact source revisions in that image's manifest. Both its core and message
+support need rebuilding; an environment override alone is insufficient.
+Rebuild `spaceros` before starting the Space ROS or lunar rover compositions.
+They now load the shared middleware settings, including explicit DDS fallback.
+External rover drivers must select the same backend. Full Gazebo controller,
+sensor/service traffic and the two-node lunar simulation passed native Zenoh
+validation; this local rebuild does not claim upstream flight qualification.
 
 The Navigator SITL image retains its
 existing base; the flight compositions run its ArduPilot executable directly,

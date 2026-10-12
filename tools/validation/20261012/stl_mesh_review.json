@@ -1,0 +1,2239 @@
+{
+  "scope": "Read-only inspection of all committed hardware STL meshes; no strength or physical fit claim",
+  "files": 145,
+  "failures": [],
+  "meshes": [
+    {
+      "path": "hardware/parts/aerodrone/stl/battery_tray.stl",
+      "triangles": 2392,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 29817.471511216627,
+      "extents_mm": [
+        148.0,
+        64.0,
+        13.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/aerodrone/stl/cable_clip.stl",
+      "triangles": 300,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 1575.5411283850553,
+      "extents_mm": [
+        21.920711517333984,
+        20.5989933013916,
+        10.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/aerodrone/stl/gps_mast.stl",
+      "triangles": 1480,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 88615.63656950933,
+      "extents_mm": [
+        75.0,
+        57.83782196044922,
+        212.99000549316406
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/aerodrone/stl/halow_cradle.stl",
+      "triangles": 2164,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 36553.30915534033,
+      "extents_mm": [
+        85.69999694824219,
+        93.4000015258789,
+        37.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/aerodrone/stl/hub_bottom_plate.stl",
+      "triangles": 8600,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 174756.90737255695,
+      "extents_mm": [
+        181.0193328857422,
+        181.0193328857422,
+        18.5
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/aerodrone/stl/hub_top_plate.stl",
+      "triangles": 7112,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 176157.30557082663,
+      "extents_mm": [
+        181.0193328857422,
+        181.0193328857422,
+        18.5
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/aerodrone/stl/landing_leg.stl",
+      "triangles": 392,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 33522.29269244777,
+      "extents_mm": [
+        94.0,
+        181.0,
+        12.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/aerodrone/stl/launcher_breech_down.stl",
+      "triangles": 3020,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 48950.39128904082,
+      "extents_mm": [
+        92.0,
+        74.9000015258789,
+        45.150001525878906
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/aerodrone/stl/launcher_cam_guide.stl",
+      "triangles": 2084,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 59172.78117299024,
+      "extents_mm": [
+        100.0,
+        94.0,
+        13.300000190734863
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/aerodrone/stl/launcher_dart_detent.stl",
+      "triangles": 336,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 55.80464430885812,
+      "extents_mm": [
+        13.84000015258789,
+        13.801301002502441,
+        1.5000000000000007
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/aerodrone/stl/launcher_hanger.stl",
+      "triangles": 2116,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 112504.9453763498,
+      "extents_mm": [
+        122.0,
+        65.0,
+        213.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/aerodrone/stl/leg_foot.stl",
+      "triangles": 204,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 6307.826811511724,
+      "extents_mm": [
+        20.0,
+        22.0,
+        18.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/aerodrone/stl/motor_mount.stl",
+      "triangles": 2244,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 26587.344533392785,
+      "extents_mm": [
+        72.94100952148438,
+        41.999725341796875,
+        31.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/aerodrone/stl/oak1_cradle.stl",
+      "triangles": 1582,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 15803.850724131264,
+      "extents_mm": [
+        54.5,
+        46.400001525878906,
+        23.899999618530273
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/aerodrone/stl/oak1_stage.stl",
+      "triangles": 2744,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 22939.739540271254,
+      "extents_mm": [
+        67.0,
+        80.95246124267578,
+        37.900001525878906
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/aerodrone/stl/sensor_nose.stl",
+      "triangles": 2832,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 54914.304624417106,
+      "extents_mm": [
+        135.0,
+        80.0,
+        15.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/aerodrone/stl/stack_grommet.stl",
+      "triangles": 504,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 182.9998350829916,
+      "extents_mm": [
+        10.5,
+        10.470640182495117,
+        3.4000000953674316
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/aerodrone/stl/stack_tray.stl",
+      "triangles": 3108,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 13044.120569699022,
+      "extents_mm": [
+        111.0,
+        59.0,
+        7.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/aerodrone/stl/tall_leg_foot.stl",
+      "triangles": 548,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 7646.703022544413,
+      "extents_mm": [
+        36.60628890991211,
+        22.0,
+        26.18267240061033
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/aerodrone/stl/tall_leg_socket.stl",
+      "triangles": 1666,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 22414.829812182226,
+      "extents_mm": [
+        68.53766632080078,
+        16.0,
+        54.736732482910156
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/aerodrone/stl/top_deck.stl",
+      "triangles": 3556,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 93404.33459498682,
+      "extents_mm": [
+        180.0,
+        148.0,
+        50.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/airplane/stl/antenna_mount.stl",
+      "triangles": 1918,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 14389.027065830802,
+      "extents_mm": [
+        56.0,
+        63.81980514526367,
+        22.999999900000006
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/airplane/stl/avionics_deck.stl",
+      "triangles": 1976,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 58767.296728687645,
+      "extents_mm": [
+        180.0,
+        104.0,
+        8.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/airplane/stl/battery_tray.stl",
+      "triangles": 520,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 58511.40627297233,
+      "extents_mm": [
+        225.0,
+        66.0,
+        15.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/airplane/stl/cable_clip.stl",
+      "triangles": 224,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 912.0366649282696,
+      "extents_mm": [
+        22.0,
+        16.0,
+        5.599999904632568
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/airplane/stl/camera_deck.stl",
+      "triangles": 2256,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 27815.74979802064,
+      "extents_mm": [
+        88.0,
+        104.0,
+        4.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/airplane/stl/camera_frame.stl",
+      "triangles": 944,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 33034.38791057125,
+      "extents_mm": [
+        88.0,
+        104.0,
+        47.79999923706055
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/airplane/stl/gps_mount.stl",
+      "triangles": 1066,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 43515.90796637594,
+      "extents_mm": [
+        64.0,
+        64.0,
+        22.989999771118164
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/airplane/stl/oak1_cradle.stl",
+      "triangles": 2016,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 21796.299481159305,
+      "extents_mm": [
+        67.0,
+        80.95246124267578,
+        22.799999237060547
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/airplane/stl/pitot_mount.stl",
+      "triangles": 272,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 15480.294213331885,
+      "extents_mm": [
+        60.0,
+        46.0,
+        28.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/airplane/stl/stack_grommet.stl",
+      "triangles": 504,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 182.9998350829916,
+      "extents_mm": [
+        10.5,
+        10.470640182495117,
+        3.4000000953674316
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/airplane/stl/stack_tray.stl",
+      "triangles": 3108,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 13044.12056969902,
+      "extents_mm": [
+        111.0,
+        59.0,
+        7.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/boat/stl/camera_mast.stl",
+      "triangles": 2056,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 127898.27581059968,
+      "extents_mm": [
+        70.0,
+        70.0,
+        199.9999999
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/boat/stl/crossbar_plate.stl",
+      "triangles": 3228,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 263810.0534828648,
+      "extents_mm": [
+        100.0,
+        225.0,
+        12.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/lunar_rover/stl/actuator_mount.stl",
+      "triangles": 3696,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 196484.71443272475,
+      "extents_mm": [
+        99.5773696899414,
+        48.04999923706055,
+        154.8000030517578
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/lunar_rover/stl/actuator_shroud.stl",
+      "triangles": 358,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 27793.15769428478,
+      "extents_mm": [
+        99.5427017211914,
+        99.10557556152344,
+        9.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/lunar_rover/stl/battery_end.stl",
+      "triangles": 600,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 122861.94393670268,
+      "extents_mm": [
+        38.0,
+        194.0,
+        70.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/lunar_rover/stl/cable_clip.stl",
+      "triangles": 440,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 1427.7182176076878,
+      "extents_mm": [
+        24.0,
+        12.645712852478027,
+        12.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/lunar_rover/stl/compute_tray.stl",
+      "triangles": 3564,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 156916.68816032138,
+      "extents_mm": [
+        130.0,
+        250.0,
+        13.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/lunar_rover/stl/diff_clevis.stl",
+      "triangles": 908,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 14260.905845341258,
+      "extents_mm": [
+        50.0,
+        21.5,
+        33.96644592285156
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/lunar_rover/stl/estop_housing.stl",
+      "triangles": 736,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 52482.39184464068,
+      "extents_mm": [
+        56.0,
+        70.0,
+        60.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/lunar_rover/stl/gnss_head.stl",
+      "triangles": 886,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 98735.7312713735,
+      "extents_mm": [
+        138.0,
+        103.76704406738281,
+        36.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/lunar_rover/stl/grouser.stl",
+      "triangles": 348,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 12791.987633994628,
+      "extents_mm": [
+        12.0,
+        120.0,
+        12.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/lunar_rover/stl/hazcam_mount.stl",
+      "triangles": 1160,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 67116.3970131277,
+      "extents_mm": [
+        49.44626235961914,
+        40.0,
+        110.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/lunar_rover/stl/lidar_mount.stl",
+      "triangles": 3396,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 84714.8794268586,
+      "extents_mm": [
+        110.0,
+        110.0,
+        38.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/lunar_rover/stl/mast_foot.stl",
+      "triangles": 1092,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 45535.70506814061,
+      "extents_mm": [
+        74.0,
+        60.0,
+        32.400001525878906
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/lunar_rover/stl/panel_clamp.stl",
+      "triangles": 782,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 92371.30240720976,
+      "extents_mm": [
+        40.0,
+        80.0,
+        75.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/lunar_rover/stl/power_tray.stl",
+      "triangles": 3532,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 181619.92045576122,
+      "extents_mm": [
+        130.0,
+        250.0,
+        13.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/lunar_rover/stl/terrain_cam_mount.stl",
+      "triangles": 568,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 22772.09582237159,
+      "extents_mm": [
+        80.0999984741211,
+        60.0,
+        17.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/lunar_rover/stl/wheel_hub.stl",
+      "triangles": 6436,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 428562.0064936431,
+      "extents_mm": [
+        225.36805725097656,
+        226.0,
+        15.800000190734863
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/lunar_rover/stl/wheel_segment.stl",
+      "triangles": 2192,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 88201.97356073861,
+      "extents_mm": [
+        98.70353698730469,
+        120.0,
+        118.79393758310547
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/racecar_turret/stl/plate_post.stl",
+      "triangles": 1294,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 11712.331082284101,
+      "extents_mm": [
+        30.0,
+        12.0,
+        108.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/racecar_turret/stl/post_clip.stl",
+      "triangles": 476,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 859.5201471090778,
+      "extents_mm": [
+        22.38509750366211,
+        16.08763885498047,
+        8.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/racecar_turret/stl/turret_plate.stl",
+      "triangles": 3300,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 61990.160061577364,
+      "extents_mm": [
+        110.0,
+        116.0,
+        9.000000000000002
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/racecarneo/stl/antenna_mount.stl",
+      "triangles": 568,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 1445.9320790430418,
+      "extents_mm": [
+        19.0,
+        14.0,
+        19.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/racecarneo/stl/camera_arm.stl",
+      "triangles": 836,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 137269.78545023047,
+      "extents_mm": [
+        164.0,
+        101.0,
+        26.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/racecarneo/stl/camera_cradle.stl",
+      "triangles": 1168,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 9152.48443704915,
+      "extents_mm": [
+        29.5,
+        73.5,
+        19.5
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/racecarneo/stl/deck_front.stl",
+      "triangles": 2860,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 103964.95499801979,
+      "extents_mm": [
+        160.0,
+        144.0,
+        11.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/racecarneo/stl/deck_grommet.stl",
+      "triangles": 504,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 202.64770462398954,
+      "extents_mm": [
+        10.5,
+        10.470640182495117,
+        4.400000095367432
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/racecarneo/stl/deck_rear.stl",
+      "triangles": 7200,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 163451.64992205994,
+      "extents_mm": [
+        235.0,
+        144.0,
+        11.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/racecarneo/stl/estop_tower.stl",
+      "triangles": 968,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 30014.5870592735,
+      "extents_mm": [
+        38.0,
+        62.20000076293945,
+        60.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/racecarneo/stl/halow_cradle.stl",
+      "triangles": 1404,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 23548.392281181576,
+      "extents_mm": [
+        74.5999984741211,
+        85.97763061523438,
+        44.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/racecarneo/stl/halow_spacer.stl",
+      "triangles": 336,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 738.5908650329535,
+      "extents_mm": [
+        8.0,
+        7.977630615234375,
+        18.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/racecarneo/stl/imu_mount.stl",
+      "triangles": 1888,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 4511.401314491794,
+      "extents_mm": [
+        30.0,
+        44.0,
+        8.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/racecarneo/stl/jetson_tray.stl",
+      "triangles": 2632,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 18546.512226075087,
+      "extents_mm": [
+        79.0,
+        108.0,
+        9.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/racecarneo/stl/lidar_mast.stl",
+      "triangles": 3092,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 43318.86892118063,
+      "extents_mm": [
+        93.0,
+        64.0,
+        18.200000762939453
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/racecarneo/stl/post_adapter_front.stl",
+      "triangles": 1024,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 6778.976587217147,
+      "extents_mm": [
+        13.987950325012207,
+        49.48144721984863,
+        24.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/racecarneo/stl/post_adapter_rear.stl",
+      "triangles": 1024,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 5338.976613573276,
+      "extents_mm": [
+        13.987950325012207,
+        37.48144721984863,
+        24.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/racecarneo/stl/power_tray.stl",
+      "triangles": 996,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 8014.963139562545,
+      "extents_mm": [
+        61.0,
+        40.0,
+        6.989999771118164
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/racecarneo/stl/rim_clip.stl",
+      "triangles": 296,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 891.5257822358932,
+      "extents_mm": [
+        13.994260787963867,
+        19.98500919342041,
+        10.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/racecarneo/stl/vesc_tray.stl",
+      "triangles": 1544,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 18402.250001359556,
+      "extents_mm": [
+        92.0,
+        93.0,
+        11.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/so101/stl/base_motor_holder_so101.stl",
+      "triangles": 6816,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 23709.033027234404,
+      "extents_mm": [
+        47.641090393066406,
+        80.19999694824219,
+        31.400001525878906
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/so101/stl/base_so101.stl",
+      "triangles": 9558,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 122689.75802304957,
+      "extents_mm": [
+        110.92500305175781,
+        72.0,
+        87.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/so101/stl/block_green.stl",
+      "triangles": 44,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 87735.33333333333,
+      "extents_mm": [
+        40.0,
+        55.0,
+        40.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/so101/stl/block_red.stl",
+      "triangles": 44,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 90860.33333333333,
+      "extents_mm": [
+        45.0,
+        45.0,
+        45.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/so101/stl/cable_clip.stl",
+      "triangles": 440,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 1406.8257893242674,
+      "extents_mm": [
+        24.0,
+        12.256837844848633,
+        12.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/so101/stl/calib_board_foot.stl",
+      "triangles": 220,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 37618.85326236664,
+      "extents_mm": [
+        70.0,
+        50.0,
+        28.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/so101/stl/camera_cradle.stl",
+      "triangles": 1548,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 13279.050709427976,
+      "extents_mm": [
+        32.5,
+        80.0,
+        30.998128890991097
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/so101/stl/camera_head.stl",
+      "triangles": 1112,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 28670.38234058236,
+      "extents_mm": [
+        30.399999618530273,
+        34.394287109375,
+        83.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/so101/stl/cylinder_blue.stl",
+      "triangles": 332,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 136734.356332219,
+      "extents_mm": [
+        54.0,
+        53.84900665283203,
+        60.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/so101/stl/gauge_0.stl",
+      "triangles": 1766,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 6799.9725851714065,
+      "extents_mm": [
+        51.235713958740234,
+        34.69999694824219,
+        10.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/so101/stl/gauge_tight_1.stl",
+      "triangles": 416,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 6792.174208207761,
+      "extents_mm": [
+        51.114288330078125,
+        34.60000228881836,
+        10.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/so101/stl/handle_so101.stl",
+      "triangles": 11220,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 69626.39985306759,
+      "extents_mm": [
+        88.12459564208984,
+        60.064903259277344,
+        25.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/so101/stl/motor_holder_so101_base.stl",
+      "triangles": 5854,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 13307.191402240394,
+      "extents_mm": [
+        55.0804443359375,
+        38.0970573425293,
+        28.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/so101/stl/motor_holder_so101_wrist.stl",
+      "triangles": 8010,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 13871.623463382204,
+      "extents_mm": [
+        56.390968322753906,
+        36.900001525878906,
+        28.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/so101/stl/moving_jaw_so101.stl",
+      "triangles": 11260,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 20692.938852714473,
+      "extents_mm": [
+        22.299165725708008,
+        91.98896026611328,
+        48.0
+      ],
+      "finite": true,
+      "bodies": 2,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/so101/stl/occluder_box.stl",
+      "triangles": 44,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 559445.3333333334,
+      "extents_mm": [
+        50.0,
+        160.0,
+        70.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/so101/stl/post_foot.stl",
+      "triangles": 2052,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 140767.3333494761,
+      "extents_mm": [
+        110.0,
+        110.0,
+        51.665767669677734
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/so101/stl/rotation_pitch_so101.stl",
+      "triangles": 6696,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 68787.18076607681,
+      "extents_mm": [
+        46.0,
+        84.20000457763672,
+        59.79999923706055
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/so101/stl/station_base_plate.stl",
+      "triangles": 5972,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 231649.16234965794,
+      "extents_mm": [
+        220.0,
+        220.0,
+        31.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/so101/stl/task_bin.stl",
+      "triangles": 380,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 81357.73423838418,
+      "extents_mm": [
+        180.0,
+        120.0,
+        35.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/so101/stl/trigger_so101.stl",
+      "triangles": 8960,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 11164.257837073203,
+      "extents_mm": [
+        41.979705810546875,
+        60.99993896484375,
+        32.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/so101/stl/under_arm_so101.stl",
+      "triangles": 10508,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 92895.03034790071,
+      "extents_mm": [
+        130.69981384277344,
+        64.4000015258789,
+        24.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/so101/stl/upper_arm_so101.stl",
+      "triangles": 8038,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 117328.1926035739,
+      "extents_mm": [
+        142.14630126953125,
+        67.30000305175781,
+        24.5
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/so101/stl/waveshare_mounting_plate_so101.stl",
+      "triangles": 752,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 9093.45215924056,
+      "extents_mm": [
+        51.0,
+        42.0,
+        7.599999904632568
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/so101/stl/wrist_roll_follower_so101.stl",
+      "triangles": 12056,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 56618.4374411994,
+      "extents_mm": [
+        105.42529296875,
+        52.0,
+        65.19999694824219
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/so101/stl/wrist_roll_pitch_so101.stl",
+      "triangles": 17036,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 32299.357375326672,
+      "extents_mm": [
+        77.82771301269531,
+        35.65959548950195,
+        62.30000686645508
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/so101/stl/wrist_roll_so101.stl",
+      "triangles": 6158,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 39815.49125247331,
+      "extents_mm": [
+        42.849998474121094,
+        52.0,
+        65.19999694824219
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/so101/upstream/Base_SO101.stl",
+      "triangles": 9558,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 122689.76292945848,
+      "extents_mm": [
+        110.92500305175781,
+        71.9999999999997,
+        87.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/so101/upstream/Base_motor_holder_SO101.stl",
+      "triangles": 6816,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 23709.036375715736,
+      "extents_mm": [
+        47.641090393066406,
+        31.400001525878906,
+        80.20000076293945
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/so101/upstream/Gauge_0.stl",
+      "triangles": 1766,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 6799.972346020342,
+      "extents_mm": [
+        51.235713958740234,
+        34.69999694824219,
+        9.999999649822712
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/so101/upstream/Gauge_tight_1.stl",
+      "triangles": 416,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 6792.174205447358,
+      "extents_mm": [
+        51.114288330078125,
+        34.60000228881836,
+        10.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/so101/upstream/Handle_SO101.stl",
+      "triangles": 11220,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 69626.4008320805,
+      "extents_mm": [
+        88.12459897994995,
+        25.0,
+        60.064903259277344
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/so101/upstream/Motor_holder_SO101_Base.stl",
+      "triangles": 5854,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 13307.191403017132,
+      "extents_mm": [
+        28.0,
+        38.0970573425293,
+        55.0804443359375
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/so101/upstream/Motor_holder_SO101_Wrist.stl",
+      "triangles": 8010,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 13871.623342825786,
+      "extents_mm": [
+        28.0,
+        36.900001525878906,
+        56.39096641540527
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/so101/upstream/Moving_Jaw_SO101.stl",
+      "triangles": 11260,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 20692.939095361915,
+      "extents_mm": [
+        22.299165725708008,
+        91.98895931243896,
+        48.0
+      ],
+      "finite": true,
+      "bodies": 2,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/so101/upstream/Rotation_Pitch_SO101.stl",
+      "triangles": 6696,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 68787.1786680352,
+      "extents_mm": [
+        59.79999923706055,
+        84.20000152289867,
+        46.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/so101/upstream/Trigger_SO101.stl",
+      "triangles": 8960,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 11164.257818076476,
+      "extents_mm": [
+        41.979705810546875,
+        60.99993896484375,
+        32.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/so101/upstream/Under_arm_SO101.stl",
+      "triangles": 10508,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 92895.03045840858,
+      "extents_mm": [
+        130.69981384277344,
+        24.0,
+        64.4000015258789
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/so101/upstream/Upper_arm_SO101.stl",
+      "triangles": 8038,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 117328.19197700791,
+      "extents_mm": [
+        142.14630126953125,
+        24.500000000000167,
+        67.29999923706055
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/so101/upstream/WaveShare_Mounting_Plate_SO101.stl",
+      "triangles": 752,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 9093.45215924056,
+      "extents_mm": [
+        51.0,
+        42.0,
+        7.599999904632568
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/so101/upstream/Wrist_Roll_Follower_SO101.stl",
+      "triangles": 12056,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 56618.43700777999,
+      "extents_mm": [
+        65.20000076293945,
+        52.0,
+        105.42529354617
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/so101/upstream/Wrist_Roll_Pitch_SO101.stl",
+      "triangles": 17036,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 32299.355781760885,
+      "extents_mm": [
+        62.30000686645508,
+        35.65959453582764,
+        77.82771301269531
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/so101/upstream/Wrist_Roll_SO101.stl",
+      "triangles": 6158,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 39815.49121454107,
+      "extents_mm": [
+        65.20000076293945,
+        52.0,
+        42.849998474121094
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/submarine/stl/dvl_mount.stl",
+      "triangles": 1876,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 66612.69555178184,
+      "extents_mm": [
+        100.0,
+        100.0,
+        22.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/submarine/stl/skid.stl",
+      "triangles": 1080,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 115994.8442909587,
+      "extents_mm": [
+        240.0,
+        40.0,
+        16.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/submarine/stl/spool_drum.stl",
+      "triangles": 2200,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 304322.3476009648,
+      "extents_mm": [
+        100.0,
+        99.99304962158203,
+        110.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/submarine/stl/spool_flange.stl",
+      "triangles": 3104,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 211820.67642822504,
+      "extents_mm": [
+        240.0,
+        239.32891845703125,
+        17.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/submarine/stl/spool_handle.stl",
+      "triangles": 336,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 23340.980242566056,
+      "extents_mm": [
+        24.0,
+        23.932891845703125,
+        55.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/submarine/stl/trim_weight_holder.stl",
+      "triangles": 504,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 9004.81972795825,
+      "extents_mm": [
+        36.0,
+        35.89933776855469,
+        31.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/turret/stl/base_plate.stl",
+      "triangles": 4060,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 145594.61569142292,
+      "extents_mm": [
+        178.0,
+        112.0,
+        15.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/turret/stl/camera_plate_b0385.stl",
+      "triangles": 2084,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 5800.118293837123,
+      "extents_mm": [
+        40.400001525878906,
+        44.0,
+        9.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/turret/stl/camera_plate_tripod.stl",
+      "triangles": 1560,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 13226.166516967416,
+      "extents_mm": [
+        32.0,
+        44.0,
+        36.5
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/turret/stl/camera_yoke.stl",
+      "triangles": 2752,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 10742.461169876477,
+      "extents_mm": [
+        30.75,
+        47.25,
+        32.75
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/turret/stl/launcher_barrel_clamp.stl",
+      "triangles": 1548,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 7058.990915471615,
+      "extents_mm": [
+        27.149999618530273,
+        30.0,
+        12.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/turret/stl/launcher_breech.stl",
+      "triangles": 2736,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 73679.27526342237,
+      "extents_mm": [
+        92.0,
+        80.19999694824219,
+        60.5
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/turret/stl/launcher_cam.stl",
+      "triangles": 584,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 5750.046111671225,
+      "extents_mm": [
+        60.0,
+        24.399999618530273,
+        4.5
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/turret/stl/launcher_cap.stl",
+      "triangles": 2262,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 33612.623520546695,
+      "extents_mm": [
+        51.99996566772461,
+        84.19816970825195,
+        62.310001373291016
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/turret/stl/launcher_clip.stl",
+      "triangles": 1920,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 35561.9297961985,
+      "extents_mm": [
+        77.30000305175781,
+        72.4000015258789,
+        97.1500015258789
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/turret/stl/launcher_clip_cap.stl",
+      "triangles": 180,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 3703.1916493377335,
+      "extents_mm": [
+        73.25,
+        14.800000190734863,
+        9.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/turret/stl/launcher_collar.stl",
+      "triangles": 336,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 432.9573470936173,
+      "extents_mm": [
+        14.0,
+        13.960853576660156,
+        3.000000000000001
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/turret/stl/launcher_follower.stl",
+      "triangles": 180,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 4786.54016009654,
+      "extents_mm": [
+        73.25,
+        14.800000190734863,
+        9.989999771118164
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/turret/stl/launcher_muzzle_cap.stl",
+      "triangles": 540,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 1215.0253337279444,
+      "extents_mm": [
+        21.690000534057617,
+        16.64333152770996,
+        11.999999999999973
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/turret/stl/launcher_pinion.stl",
+      "triangles": 3084,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 3641.1702295538475,
+      "extents_mm": [
+        29.397520065307617,
+        29.130250930786133,
+        8.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/turret/stl/launcher_plunger.stl",
+      "triangles": 1214,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 13094.592101830189,
+      "extents_mm": [
+        31.399999618530273,
+        31.312198638916016,
+        105.5
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/turret/stl/launcher_rack.stl",
+      "triangles": 568,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 12062.109289543494,
+      "extents_mm": [
+        119.0,
+        37.07500076293945,
+        36.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/turret/stl/launcher_safety.stl",
+      "triangles": 20,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 679.1999588012695,
+      "extents_mm": [
+        20.299999237060547,
+        8.0,
+        9.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/turret/stl/launcher_sear.stl",
+      "triangles": 212,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 782.7128976994305,
+      "extents_mm": [
+        17.989999771118164,
+        24.0,
+        3.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/turret/stl/launcher_servo_mount.stl",
+      "triangles": 1156,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 29273.80957516081,
+      "extents_mm": [
+        57.310001373291016,
+        47.435001373291016,
+        52.32500076293945
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/turret/stl/launcher_shuttle.stl",
+      "triangles": 312,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 18415.646381210423,
+      "extents_mm": [
+        75.69999694824219,
+        73.0,
+        15.75
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/turret/stl/launcher_trigger_arm.stl",
+      "triangles": 1020,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 1168.6824024214304,
+      "extents_mm": [
+        26.994407653808594,
+        21.95968246459961,
+        8.875000000000002
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/turret/stl/launcher_tube.stl",
+      "triangles": 2792,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 38495.19518155205,
+      "extents_mm": [
+        48.0,
+        48.932891845703125,
+        95.19999694824219
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/turret/stl/pan_base.stl",
+      "triangles": 1704,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 42450.11476727636,
+      "extents_mm": [
+        73.36000061035156,
+        62.0,
+        44.0
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/turret/stl/pan_hub.stl",
+      "triangles": 2050,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 12389.914951725967,
+      "extents_mm": [
+        26.5,
+        35.0,
+        21.815000534057617
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    },
+    {
+      "path": "hardware/parts/turret/stl/tilt_bracket.stl",
+      "triangles": 2820,
+      "watertight": true,
+      "winding_consistent": true,
+      "volume_mm3": 18326.104689094118,
+      "extents_mm": [
+        50.810001373291016,
+        42.400001525878906,
+        32.41999816894531
+      ],
+      "finite": true,
+      "bodies": 1,
+      "zero_area_faces": 0
+    }
+  ],
+  "manifest_summary": [
+    {
+      "platform": "aerodrone",
+      "parts": 21,
+      "fit_test_parts": 10,
+      "unverified_mates": 10
+    },
+    {
+      "platform": "airplane",
+      "parts": 11,
+      "fit_test_parts": 9,
+      "unverified_mates": 14
+    },
+    {
+      "platform": "boat",
+      "parts": 2,
+      "fit_test_parts": 1,
+      "unverified_mates": 1
+    },
+    {
+      "platform": "lunar_rover",
+      "parts": 17,
+      "fit_test_parts": 9,
+      "unverified_mates": 9
+    },
+    {
+      "platform": "racecar_turret",
+      "parts": 3,
+      "fit_test_parts": 0,
+      "unverified_mates": 0
+    },
+    {
+      "platform": "racecarneo",
+      "parts": 17,
+      "fit_test_parts": 8,
+      "unverified_mates": 8
+    },
+    {
+      "platform": "so101",
+      "parts": 27,
+      "fit_test_parts": 4,
+      "unverified_mates": 2
+    },
+    {
+      "platform": "submarine",
+      "parts": 6,
+      "fit_test_parts": 2,
+      "unverified_mates": 3
+    },
+    {
+      "platform": "turret",
+      "parts": 25,
+      "fit_test_parts": 13,
+      "unverified_mates": 12
+    }
+  ],
+  "degenerate_face_area_threshold_mm2": 1e-12
+}

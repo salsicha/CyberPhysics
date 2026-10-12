@@ -47,7 +47,8 @@ RUN . /venv/bin/activate && \
         "torch==${TORCH_VERSION}" "torchvision==${TORCHVISION_VERSION}" ;; \
       *) echo "Unsupported architecture: ${TARGETARCH}" >&2; exit 1 ;; \
     esac && \
-    python3 -c 'import torch, torchvision; print("torch==" + torch.__version__); print("torchvision==" + torchvision.__version__)' \
+    # PyPI metadata omits runtime CUDA suffixes; pin the installed distribution.
+    python3 -c 'from importlib.metadata import version; print("torch==" + version("torch")); print("torchvision==" + version("torchvision"))' \
       > /opt/torch-constraints.txt && \
     pip3 install --no-cache-dir -c /opt/torch-constraints.txt \
       "opencv-python==${OPENCV_VERSION}" \
