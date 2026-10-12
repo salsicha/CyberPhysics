@@ -10,9 +10,10 @@
 # rate limit is retried once.
 #
 # Not built here:
-#   nvblox, isaac, groot          CUDA/Isaac images of 20-40 GB
-#   depthanything                 PyTorch image of about 10 GB
-#   pantiltros, turret_sim        PyTorch/Ultralytics images of about 10 GB
+#   isaac, groot                 CUDA/Isaac images of 20-40 GB
+#   turret_sim                   PyTorch/Ultralytics image of about 10 GB
+#   nvblox, depthanything,
+#     pantiltros                 amd64 skipped; arm64 built in jetson-gpu
 #   smolvla, lerobot (so101)      CUDA PyTorch/LeRobot stacks
 #   matlab                        needs a MathWorks download and license
 #   vinsmono                      built and smoke-tested by ci.yml
@@ -381,3 +382,46 @@ jobs:
         run: |
           docker system df
           df -h
+
+  # Native arm64 builds catch missing wheels and x86-only apt sources.
+  # These runners have no Jetson GPU: runtime acceptance is the separate
+  # tools/jetson_gpu_smoke.sh check on the robot. Images are not published.
+  jetson-gpu:
+    name: Jetson arm64 (${{ matrix.app }})
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 330
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [nvblox, pantiltros, depthanything]
+    env:
+      PLATFORM: arm64
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Google's Docker Hub mirror
+        run: .github/workflows/scripts/use_docker_hub_mirror.sh
+      - name: Free runner disk
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+            /usr/local/.ghcup /opt/hostedtoolcache/CodeQL /usr/share/swift
+          docker system prune --all --force
+          df -h /
+      - name: Build ROS 2 arm64 base
+        run: .github/workflows/scripts/ci_build_image.sh ros2 --keep
+      - name: Build GPU application
+        run: .github/workflows/scripts/ci_build_image.sh "${{ matrix.app }}" --keep
+      - name: Check architecture and installed packages without a GPU
+        env:
+          APP: ${{ matrix.app }}
+        run: |
+          image="$REPOSITORY:${APP}-arm64"
+          test "$(docker image inspect -f '{{.Architecture}}' "$image")" = arm64
+          if [ "$APP" = nvblox ]; then
+            docker run --rm --network none "$image" ros2 pkg prefix nvblox_ros
+            docker run --rm --network none "$image" ros2 pkg prefix nvblox_nav2
+            docker run --rm --network none "$image" \
+              ros2 launch /workspace/racecarneo_nvblox.launch.py --show-args
+          else
+            docker run --rm --network none "$image" python3 -c \
+              'import torch, torchvision; assert torch.version.cuda == "13.0"; assert torchvision.extension._has_ops(); print(torch.__version__, torchvision.__version__)'
+          fi

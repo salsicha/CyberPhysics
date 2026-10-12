@@ -213,7 +213,7 @@ def run_main(module, tree_xml, servers_up_after_s, timeout_s=60.0, extra_args=()
         for client in list(node.action_clients.values()) + list(node.service_clients.values()):
             client.ready = clock.t >= servers_up_after_s
 
-    module.rclpy = NS(init=lambda: None, ok=lambda: True, spin_once=spin_once,
+    module.rclpy = NS(init=lambda **kwargs: None, ok=lambda: True, spin_once=spin_once,
                       shutdown=lambda: None)
     module.time = NS(monotonic=lambda: clock.t)
     real = module.NavigationReadiness
@@ -248,6 +248,19 @@ def test_zero_timeout_waits_as_long_as_it_takes(ready_module):
 def test_flight_ready_times_out_naming_the_missing_servers(ready_module):
     with pytest.raises(RuntimeError, match='/aerodrone/TakeoffBehavior'):
         run_main(ready_module, generated_tree(), servers_up_after_s=1e9, timeout_s=10.0)
+
+
+def test_readiness_executes_only_after_servers_are_settled(ready_module):
+    with patch.object(ready_module.os, 'execvp') as execute:
+        elapsed, _ = run_main(ready_module, generated_tree(), 20,
+                             extra_args=['--exec', 'python3', 'tree.py'])
+        assert elapsed >= 23
+        execute.assert_called_once_with('python3', ['python3', 'tree.py'])
+    with patch.object(ready_module.os, 'execvp') as execute:
+        with pytest.raises(RuntimeError):
+            run_main(ready_module, generated_tree(), 1e9, timeout_s=1,
+                     extra_args=['--exec', 'python3', 'tree.py'])
+        execute.assert_not_called()
 
 
 # --- run_behavior_tree.py ----------------------------------------------------------
@@ -461,25 +474,26 @@ def test_drone_tree_waits_for_flight_ready_without_gps_or_timeout(ready_module):
     """The BlueOS drone (blueos_aerostack.yaml) gates its map-goal tree the
     same way, but may start GPS-denied and must not give up on a slow start."""
     stack = services('blueos_aerostack.yaml')
-    tree, ready = stack['behavior_tree'], stack['flight_ready']
-    assert tree['depends_on']['flight_ready'] == {'condition': 'service_completed_successfully'}
+    tree = stack['behavior_tree']
+    assert 'flight_ready' not in stack
+    assert all(v['condition'] == 'service_started' for v in tree['depends_on'].values())
     assert tree['restart'] == 'always'  # the tree ends after each map goal
     assert tree['stop_signal'] == 'SIGINT'
 
-    wrapper = runner_module.parse_args(shlex.split(tree['command'])[2:])
-    assert shlex.split(tree['command'])[1].endswith('/run_behavior_tree.py')
+    args = ready_module.parse_args(shlex.split(tree['command'])[2:])
+    wrapper = runner_module.parse_args(args.command[2:])
+    assert args.command[1].endswith('/run_behavior_tree.py')
     assert wrapper.command[:4] == ['ros2', 'launch', 'as2_behavior_tree',
                                    'behavior_trees.launch.py']
     tree_args = launch_args(wrapper.command)
 
-    args = ready_module.parse_args(shlex.split(ready['command'])[2:])
     assert args.behavior_tree == tree_args['tree']
     assert args.behavior_namespace.strip('/') == tree_args['drone_id']
     assert not args.require_gps
     assert args.timeout <= 0
-    assert set(ready['depends_on']) >= {'mavros', 'aerostack'}
+    assert set(tree['depends_on']) >= {'mavros', 'aerostack'}
     scripts = '../applications/aerostack2/scripts:/workspace/applications/aerostack2/scripts:ro'
-    assert scripts in tree['volumes'] and scripts in ready['volumes']
+    assert scripts in tree['volumes']
 
     # The tree ships in the image: the servers it needs are the GoTo behaviour.
     source = REPO / 'applications/aerostack2/src/as2_platform_blueos/resource/map_goal.xml'

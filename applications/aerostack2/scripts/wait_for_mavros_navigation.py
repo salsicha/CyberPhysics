@@ -16,6 +16,8 @@ from __future__ import annotations
 import argparse
 import importlib
 import math
+import os
+import sys
 import time
 from xml.etree import ElementTree
 
@@ -204,7 +206,18 @@ def parse_args(argv=None):
         "--behavior-namespace", default="/",
         help="namespace the tree runs in (behavior_trees.launch.py drone_id)")
     parser.add_argument("--report-seconds", type=float, default=30.0)
-    return parser.parse_args(argv)
+    parser.add_argument("--exec", dest="command", nargs=argparse.REMAINDER,
+                        help="after readiness, replace this process with this command")
+    tokens = list(sys.argv[1:] if argv is None else argv)
+    # argparse otherwise interprets a child's `--` as its own separator.
+    if '--exec' in tokens:
+        index = tokens.index('--exec')
+        args = parser.parse_args(tokens[:index])
+        args.command = tokens[index + 1:]
+        if not args.command:
+            parser.error('--exec requires a command')
+        return args
+    return parser.parse_args(tokens)
 
 
 def main(argv=None):
@@ -215,7 +228,8 @@ def main(argv=None):
         with open(args.behavior_tree, encoding="utf-8") as tree:
             actions, services = behavior_tree_servers(tree.read(), args.behavior_namespace)
 
-    rclpy.init()
+    # Our CLI (including the future child's launch arguments) is not ROS argv.
+    rclpy.init(args=[])
     node = NavigationReadiness(
         args.namespace.rstrip("/"), actions, services, require_gps=args.require_gps)
     if actions or services:
@@ -239,20 +253,23 @@ def main(argv=None):
                         + (f"; {len(actions) + len(services)} mission servers available"
                            f" after {time.monotonic() - start:.0f} s"
                            if actions or services else ""))
-                    return
+                    break
             else:
                 ready_since = None
                 if time.monotonic() >= next_report:
                     next_report = time.monotonic() + args.report_seconds
                     node.get_logger().info(
                         "Waiting for " + ", ".join(node.waiting_for()))
-        raise RuntimeError(
-            "Navigator not ready before timeout; still waiting for "
-            + ", ".join(node.waiting_for()))
+        else:
+            raise RuntimeError(
+                "Navigator not ready before timeout; still waiting for "
+                + ", ".join(node.waiting_for()))
     finally:
         node.destroy_node()
         if rclpy.ok():
             rclpy.shutdown()
+    if args.command:
+        os.execvp(args.command[0], args.command)
 
 
 if __name__ == "__main__":

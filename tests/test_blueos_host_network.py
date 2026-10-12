@@ -153,3 +153,26 @@ def test_the_vehicle_env_files_use_the_router_link():
     for name in ('airplane', 'boat', 'submarine'):
         text = (REPO / f'systems/{name}/config/blueos.env').read_text()
         assert f'BLUEOS_FCU_URL={BLUEOS_ROUTER}\n' in text, name
+
+
+@pytest.mark.parametrize('name', ['blueos_nav_core.yaml', 'boat_hardware.yaml', 'submarine_hardware.yaml'])
+def test_hardware_mavros_uses_required_plugin_allowlist(name):
+    nodes = [s for s in services(name).values() if 'blueos_mavros.launch.xml' in command(s)]
+    assert len(nodes) == 1
+    assert '../applications/aerostack2/config:/workspace/mavros_config:ro' in nodes[0]['volumes']
+    config = yaml.safe_load((REPO / 'applications/aerostack2/config/mavros_plugins.yaml').read_text())
+    plugins = set(config['/**']['ros__parameters']['plugin_allowlist'])
+    assert {'command', 'sys_status', 'sys_time', 'param', 'imu', 'global_position',
+            'local_position', 'gps_status', 'gps_input', 'setpoint_velocity',
+            'setpoint_position', 'setpoint_raw', 'vfr_hud', 'rc_io', 'waypoint'} <= plugins
+    assert len(plugins) < 25
+
+
+@pytest.mark.parametrize('name', ['blueos_nav_core.yaml', 'blueos_aerostack.yaml',
+                                  'boat_hardware.yaml', 'submarine_hardware.yaml'])
+def test_blueos_ros_nodes_load_camera_sized_dds_transport(name):
+    for key, service in services(name).items():
+        if service.get('ipc') != 'host':
+            continue
+        assert 'FASTRTPS_DEFAULT_PROFILES_FILE=/workspace/fastdds.xml' in service['environment'], key
+        assert '../systems/aerodrone/config/fastdds.xml:/workspace/fastdds.xml:ro' in service['volumes']

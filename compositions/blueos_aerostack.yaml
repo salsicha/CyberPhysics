@@ -26,7 +26,9 @@ services:
       - mavros
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - FASTRTPS_DEFAULT_PROFILES_FILE=/workspace/fastdds.xml
     volumes:
+      - ../systems/aerodrone/config/fastdds.xml:/workspace/fastdds.xml:ro
       - /dev/shm:/dev/shm
     command: >
       ros2 launch as2_platform_blueos blueos_autonomy.launch.py
@@ -35,33 +37,8 @@ services:
         navigation_odom_topic:=/navigation/odometry
         takeoff_altitude:=${TAKEOFF_ALTITUDE:-2.0}
 
-  flight_ready:
-    # Ready to fly: MAVROS has local odometry and every Aerostack2 server the
-    # tree calls can be discovered; the tree gives each action server only
-    # 1 s while it is being built (applications/aerostack2/README.md,
-    # "Mission start"). No GPS fix is required (the drone may start
-    # GPS-denied) and there is no timeout: the tree just starts later.
-    image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-arm64}
-    container_name: aerostack_flight_ready
-    network_mode: host
-    ipc: host
-    depends_on:
-      - mavros
-      - aerostack
-    environment:
-      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
-    volumes:
-      - /dev/shm:/dev/shm
-      - ../applications/aerostack2/scripts:/workspace/applications/aerostack2/scripts:ro
-    command: >
-      python3 /workspace/applications/aerostack2/scripts/wait_for_mavros_navigation.py
-        --namespace /mavros --timeout 0 --no-require-gps --settle-seconds 3
-        --behavior-tree /workspace/install/share/as2_platform_blueos/resource/map_goal.xml
-        --behavior-namespace /${DRONE_NAMESPACE:-drone0}
-    restart: "no"
-
   aerodrone_message_rates:
-    # flight_ready asks ArduCopter for its telemetry rates once and exits;
+    # The readiness gate asks ArduCopter for its telemetry rates once and exits;
     # an autopilot reboot mid-session forgets them. This keeps the same
     # rates (systems/aerodrone/config/message_rates.yaml): at start, after
     # every MAVROS reconnect, and when the attitude stream drops while
@@ -77,7 +54,9 @@ services:
       - mavros
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - FASTRTPS_DEFAULT_PROFILES_FILE=/workspace/fastdds.xml
     volumes:
+      - ../systems/aerodrone/config/fastdds.xml:/workspace/fastdds.xml:ro
       - ../applications/aerostack2/scripts:/workspace/applications/aerostack2/scripts:ro
       - ../systems/aerodrone/config:/workspace/systems/aerodrone/config:ro
       - /dev/shm:/dev/shm
@@ -98,16 +77,24 @@ services:
     ipc: host
     restart: always
     depends_on:
-      flight_ready: {condition: service_completed_successfully}
+      mavros: {condition: service_started}
       aerostack: {condition: service_started}
       demnav: {condition: service_started}
       wildnav: {condition: service_started}
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - FASTRTPS_DEFAULT_PROFILES_FILE=/workspace/fastdds.xml
     volumes:
+      - ../systems/aerodrone/config/fastdds.xml:/workspace/fastdds.xml:ro
       - ../applications/aerostack2/scripts:/workspace/applications/aerostack2/scripts:ro
+    # Wait inside the container so compose up -d returns while the FC is down.
+    # The mission still cannot start before odometry and all servers are ready.
     command: >
-      python3 /workspace/applications/aerostack2/scripts/run_behavior_tree.py
+      python3 /workspace/applications/aerostack2/scripts/wait_for_mavros_navigation.py
+        --namespace /mavros --timeout 0 --no-require-gps --settle-seconds 3
+        --behavior-tree /workspace/install/share/as2_platform_blueos/resource/map_goal.xml
+        --behavior-namespace /${DRONE_NAMESPACE:-drone0}
+        --exec python3 /workspace/applications/aerostack2/scripts/run_behavior_tree.py
         --attempts 5 --retry-delay 5 --
         ros2 launch as2_behavior_tree behavior_trees.launch.py
           drone_id:=${DRONE_NAMESPACE:-drone0}

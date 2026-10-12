@@ -37,8 +37,8 @@
 #
 # cmd_vel_to_ackermann and the web UI run this checkout's scripts (mounted),
 # so the teleop/stop mux and the turret page are there without rebuilding
-# the racecarneo and nicegui images. arm64/Jetson: not supported as is (see
-# racecarneo_hardware.yaml; the pantiltros image installs x86_64 PyTorch).
+# the racecarneo and nicegui images. Jetson Orin uses JetPack 7.2 and the
+# arm64 GPU images; see applications/jetson.md before starting the stack.
 #
 # The turret camera's 640x480 frames go to the tracker and the UI over UDP:
 # every service uses 4 MiB socket buffers, which the 208 KiB default drops
@@ -51,6 +51,8 @@ x-pantiltros-image: &pantiltros-image
   pull_policy: build
   build:
     context: ../applications/pantiltros
+    args:
+      TAG: ${CYBERPHYSICS_TAG:-latest}
 
 # Docker on some hosts gives containers an open-file limit of about 2^30,
 # and LTTng-UST in every ROS 2 Jazzy process then zeroes a 128 MiB

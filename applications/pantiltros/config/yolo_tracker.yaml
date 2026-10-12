@@ -61,7 +61,7 @@ pantilt_yolo_tracker:
     tag_min_interval_s: 2.0
     tag_stroke_timeout_s: 3.0
     tag_lock_timeout_s: 0.5
-    auto_next: false
+    auto_next: true
     darts: 0
     person_aim_fraction: 0.6
     person_max_box_fraction: 0.6

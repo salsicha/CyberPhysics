@@ -63,32 +63,25 @@ def test_every_bind_mount_over_the_package_exists_in_repo_and_image():
         assert target in text, f'Dockerfile does not assert {target}'
 
 
-def camera_mount_heights():
-    """z (m, relative to base_link) of every downward camera payload in the
-    generated world and the development fixture."""
-    heights = []
+def test_the_downward_cameras_use_the_cad_lens_without_a_generic_landing_box():
+    """The old centred landing visual occluded depth. The real legs are
+    allowed below the lens: CAD assembly tests check their field-of-view
+    clearance. No generic quadrotor geometry may be layered over that model.
+    """
+    import json
+    data = json.loads((REPO / 'applications/aerostack2/models/aerodrone/airframe.json').read_text())
     generated = (REPO / 'applications/demnav/scripts/build_georeferenced_terrain.py').read_text()
     fixture = (REPO / 'applications/gazebo/config/world_gazebo.yaml').read_text()
-    for text in (generated, fixture):
-        for match in re.finditer(r'model_type: (?:hd|rgbd)_camera\n.*\n\s*xyz: \[([^\]]+)\]', text):
-            heights.append(float(match.group(1).split(',')[2]))
-    assert len(heights) == 4
-    return heights
-
-
-def test_nothing_rendered_hangs_below_the_downward_cameras():
-    """Gazebo's depth camera reports geometry inside its near clip as -inf:
-    a visual under the lenses blanks every depth frame DemNav matches."""
+    assert "CAMERA_POSITION = AIRFRAME['camera_position_flu_m']" in generated
+    assert generated.count('xyz: {CAMERA_POSITION}') == 2
+    mounts = re.findall(r'model_type: (?:hd|rgbd)_camera\n.*\n\s*xyz: \[([^\]]+)\]', fixture)
+    assert len(mounts) == 2
+    for mount in mounts:
+        assert [float(v) for v in mount.split(',')] == data['camera_position_flu_m']
     template = (REPO / 'applications/gazebo/models/quadrotor_ardupilot.sdf.jinja').read_text()
-    lowest_camera = min(camera_mount_heights())
-    links = re.findall(r'<link name="([^"]+)">(.*?)</link>', template, re.DOTALL)
-    assert links
-    for name, body in links:
-        pose = re.search(r'<pose relative_to="base_link">([^<]+)</pose>', body)
-        z = float(pose.group(1).split()[2]) if pose else 0.0
-        if z < lowest_camera:
-            assert '<visual' not in body, name
-            assert '<collision' in body, name
+    assert 'model://aerodrone' in template
+    assert 'model://quadrotor_base' not in template
+    assert '<visual' not in template
 
 
 def test_launch_files_the_stack_runs_are_checked_at_build_time():

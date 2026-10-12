@@ -189,6 +189,68 @@ def test_stl_comparison_detects_changes(tmp_path):
     assert bpp.compare_stl(tmp_path / "a.stl", tmp_path / "c.stl")
 
 
+def test_stl_comparison_detects_moved_hole_with_same_summary(tmp_path):
+    plate = cad.box(-20, 20, -15, 15, 0, 4)
+    a = plate.cut(cad.cyl(3.4, 6, (0, 0, -1)))
+    b = plate.cut(cad.cyl(3.4, 6, (5, 0, -1)))
+    bpp.export_stl(a, tmp_path / 'a.stl')
+    bpp.export_stl(b, tmp_path / 'b.stl')
+    problems = bpp.compare_stl(tmp_path / 'a.stl', tmp_path / 'b.stl')
+    assert any('surface differs' in problem for problem in problems)
+
+
+def test_stl_comparison_ignores_face_order(tmp_path):
+    bpp.export_stl(plate_with_hole()(), tmp_path / 'a.stl')
+    mesh = bpp.load_mesh(tmp_path / 'a.stl')
+    mesh.faces = mesh.faces[::-1]
+    mesh.export(tmp_path / 'b.stl')
+    assert not bpp.compare_stl(tmp_path / 'a.stl', tmp_path / 'b.stl')
+
+
+def test_partial_check_rejects_stale_part_and_cleans_scratch(tmp_path, monkeypatch):
+    monkeypatch.setattr(bpp, 'REPO', tmp_path)
+    monkeypatch.setattr(bpp, 'PARTS', tmp_path / 'parts')
+    monkeypatch.setattr(bpp, 'platforms', lambda: ['fixture'])
+    monkeypatch.setattr(bpp, 'load_parts', lambda *a: {'fixture': fixture_module(plate_with_hole())})
+    destination = tmp_path / 'parts/fixture/stl/fixture.stl'
+    destination.parent.mkdir(parents=True)
+    bpp.export_stl(plate_with_hole(t=5)(), destination)
+    assert bpp.main(['fixture', '--check', '--part', 'fixture']) == 1
+
+
+def test_invalid_metadata_reports_failure_without_packing(tmp_path, monkeypatch):
+    monkeypatch.setattr(bpp, 'platforms', lambda: ['fixture'])
+    monkeypatch.setattr(bpp, 'load_parts', lambda *a: {'fixture': fixture_module(plate_with_hole(), material='invalid')})
+    assert bpp.main(['fixture', '--out', str(tmp_path)]) == 1
+
+
+@pytest.mark.parametrize('no_step', [False, True])
+def test_download_manifest_paths_resolve_inside_the_artifact(tmp_path, monkeypatch, no_step):
+    import json
+    monkeypatch.setattr(bpp, 'platforms', lambda: ['fixture'])
+    monkeypatch.setattr(bpp, 'load_parts', lambda *a: {'fixture': fixture_module(plate_with_hole())})
+    output = tmp_path / 'download'
+    options = ['--no-step'] if no_step else []
+    assert bpp.main(['fixture', '--out', str(output)] + options) == 0
+    directory = output / 'fixture/stl'
+    manifest = json.loads((directory / 'manifest.json').read_text())
+    assert manifest['path_base'] == 'manifest_directory'
+    part = manifest['parts'][0]
+    assert (directory / part['stl']).is_file()
+    if no_step:
+        assert part['step'] is None
+    else:
+        assert (directory / part['step']).is_file()
+    assert 'see ../README.md' not in (directory / 'manifest.md').read_text()
+
+
+@pytest.mark.parametrize('option', [['--figures'], ['--previews', 'previews'], ['--out', 'output']])
+def test_check_rejects_output_options(option):
+    with pytest.raises(SystemExit) as error:
+        bpp.main(['--check'] + option)
+    assert error.value.code == 2
+
+
 def test_plate_packing():
     def entry(stem, size, qty, material="PETG"):
         return {"id": stem, "name": stem, "quantity": qty, "material": material,

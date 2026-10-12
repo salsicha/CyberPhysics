@@ -93,6 +93,8 @@ services:
         -p use_sim_time:=${TRACKING_USE_SIM_TIME:-true}
         -p topic_prefix:=/aerodrone/launcher
         -p shots_topic:=/simulation/launcher/shots
+        -p auto_fire:=${SIM_AUTO_FIRE:-true}
+        -p tracking_topic_prefix:=${TRACKING_TOPIC_PREFIX:-/tracking}
 
   tracking_rosbridge:
     # The web page's link to ROS, as blueos_nav_core.yaml's rosbridge on

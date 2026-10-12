@@ -155,8 +155,10 @@ are obstacles): the share of floor pixels whose point lands in that band
 - GPU time: `infer_image` per 640x480 frame on an RTX 4000 Ada Laptop GPU
   (the network alone 42 ms), 0.29 GB of PyTorch memory; the same for both
   checkpoints. Alignment adds 0.1 ms (the median) plus 0.3 ms (scaling and
-  masking) on the CPU. On the car's Jetson the image's arm64 PyTorch is
-  CPU-only (`compositions/racecarneo_hardware.yaml`); not measured.
+  masking) on the CPU. Jetson timings have not been measured. The ARM64
+  build now uses CUDA 13.0 PyTorch on JetPack 7.2; see
+  [Jetson GPU images](../jetson.md) for building and testing it. These
+  desktop timings do not predict its performance on the Orin Nano.
 
 So the simulator compositions map the camera's own depth with nvblox
 (`racecarneo.yaml`, `racecar_turret_isaac.yaml`; Depth Anything still runs

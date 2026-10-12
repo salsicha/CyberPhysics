@@ -30,9 +30,21 @@ make target_arm64 build_ros2
 
 Builds do not modify the working tree: `.gitattributes` keeps scripts and Dockerfiles at LF line endings in every checkout. `make -C applications cleanup` strips Windows line endings from sources under `applications/` if a copy bypassed git.
 
+For the Orin Nano car, see [Jetson GPU images](jetson.md): nvblox,
+PanTiltROS and Depth Anything have ARM64 CUDA builds for **JetPack 7.2**,
+with a hardware smoke test before deployment.
+
 ## CI
 
-`.github/workflows/images.yml` builds the images that fit on a GitHub-hosted runner with `_build_it.sh`, the same script the Makefile targets run. It runs on pushes to `main` and pull requests that touch `applications/`, weekly, and on demand. There is one job per base image (`ros2`, `aerostack2`, and the standalone images), with one step per image, so a failing step names the broken Dockerfile. Nothing is pushed. The CUDA/PyTorch images (nvblox, isaac, groot, depthanything, pantiltros, turret_sim, smolvla, lerobot) and matlab are not built there; vinsmono is built and smoke-tested by `ci.yml`. The arm64 images the hardware compositions run (`CYBERPHYSICS_TAG=arm64`: the aerostack2 family, rangefinder and unoq) are also built, natively on GitHub's `ubuntu-24.04-arm` runners. A new app needs its own step in `images.yml`.
+`.github/workflows/images.yml` builds images with `_build_it.sh`, the same
+script the Makefile targets run, on relevant pushes/PRs, weekly, and on
+demand. Nothing is pushed. Native `ubuntu-24.04-arm` jobs cover the
+hardware images and, in separate jobs, nvblox, pantiltros and depthanything.
+The latter verify ARM64 dependencies and CUDA-enabled binaries without
+a GPU; run `tools/jetson_gpu_smoke.sh` on the Jetson for GPU acceptance.
+The amd64 versions of those three GPU images, isaac, groot, turret_sim,
+smolvla, lerobot and matlab remain outside this build workflow. vinsmono
+is built and smoke-tested by `ci.yml`. A new app needs its own build step.
 
 ## CAD Toolchain
 

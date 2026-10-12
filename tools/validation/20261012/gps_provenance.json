@@ -1,0 +1,23 @@
+{
+  "base_commit": "eb00efab9f76a06e7c2b73ddd9d6adc51fd5d23b",
+  "middleware": "rmw_fastrtps_cpp",
+  "note": "Measurements made with the staged CAD-airframe changes before native Zenoh migration. Gazebo runs 2/3/control used isolated ROS/SITL ports concurrently with Isaac; Gazebo run 1 ran alone.",
+  "image_ids": {
+    "salsicha/cyberphysics:aerostack2-latest": "sha256:e51e11e5a3affae22032cc96940ab36b6673dd4834ae0a76002c8ed60a073974",
+    "salsicha/cyberphysics:wildnav-latest": "sha256:d2277648a41b752b1417e2f4cae10d4c613d7657905566b639546603ff349c30",
+    "salsicha/cyberphysics:demnav-latest": "sha256:e8d4b0e715590161907313d425f9e9d5196119f4f1925714ee67a3589dcb73ab",
+    "salsicha/cyberphysics:navigator-latest": "sha256:968ee95f268c647c59e692467fdff24b0f9be9a1716d788c336ea5723c63efd0",
+    "salsicha/cyberphysics:isaac-latest": "sha256:8c1e47b38d84ac2bdc99474dc9d37190fcc96a9fdea74b43715092e6d0f33738"
+  },
+  "isaac_loaded_sources": {
+    "applications/isaac/scripts/aerodrone_navsim.py": "afb3cdb894c672e9ad102fff424eac6ed11dcf109f2ebde1ef2bb49bfc483c19",
+    "applications/aerostack2/models/aerodrone/airframe.json": "cb652cd618ccfc52c17db2716bebf3897bf07202f414aa5d4c66936781f7a38d",
+    "note": "Runtime hashes verified inside the container after startup. A subsequent STL input-validation guard was tested to yield identical coordinates for all 176702 triangles; no physics or camera changes followed startup."
+  },
+  "assets": {
+    "applications/aerostack2/models/aerodrone/model.sdf": "393d23400b45e965bf96dbd4b9ec780cfd20a54e65ff862f08438f79fd80132a",
+    "applications/aerostack2/models/aerodrone/airframe.stl": "aba9aea9d8d158117c7751adfb742755391e01b5436914ae1c960c6694b3fc0f",
+    "applications/aerostack2/models/aerodrone/airframe.json": "cb652cd618ccfc52c17db2716bebf3897bf07202f414aa5d4c66936781f7a38d",
+    "applications/aerostack2/models/aerodrone/model.config": "8323fe0d14ba408dd6b44ce497c028a4d93a77d57f81d5875aac99de69f49956"
+  }
+}

@@ -483,13 +483,13 @@ Before the HaLow link and the top deck: 2.09 kg.)
   the two configurations hover at about 0.31 and 0.38. The hardware overlay
   `systems/aerodrone/config/arducopter_hardware.params` starts from 0.31
   (see "ArduPilot parameters" below); the `MOT_THST_HOVER 0.67` in
-  `arducopter.params` is Gazebo's model's and stays for the simulators.
+  `arducopter.params` is a legacy simulation starting value; the simulated
+  controller relearns it for the CAD-derived airframe.
   The launcher hangs about 290 mm under the hub and raises the pitch and
   roll inertia: re-run AutoTune.
-- The simulations' vehicle masses do not match the real airframe anyway,
-  with or without the launcher: Isaac flies a 1.5 kg body with a rectangular
-  rotor layout, Gazebo Aerostack2's generic quadrotor; neither models the
-  launcher.
+- Both simulators now load the same launcher-equipped CAD assembly and mass
+  budget: **3.1647 kg**, including five clip darts plus one chambered dart.
+  This verifies the documented estimate, not the weight of a built aircraft.
 
 **Operating rules.**
 
@@ -696,32 +696,29 @@ the part their head bears on). Buy 10-20 % spares.
 
 ### Simulator geometry
 
-The simulators model a different airframe (not changed here):
+Both Gazebo and Isaac use the generated assets in
+`applications/aerostack2/models/aerodrone/`. Rebuild them in the CAD image with
+`python3 tools/build_aerodrone_sim_assets.py` after changing the airframe CAD
+or printable STLs. Printed geometry comes from the committed STLs, transformed
+back from print orientation into the assembly; purchased hardware uses its CAD
+envelope. No printable part is changed by this export.
 
-- Gazebo (`applications/gazebo`) flies Aerostack2's `quadrotor_base` model
-  (its geometry lives in the `as2_gazebo_assets` package, not in this
-  repository) with the downward cameras on the body centre, 0.05-0.06 m
-  below it, and a 0.34 x 0.34 m landing-gear collision box 0.13 m down
-  (`models/quadrotor_ardupilot.sdf.jinja`); in flight it learns
-  `MOT_THST_HOVER 0.67`.
-- Isaac (`applications/isaac/scripts/aerodrone_navsim.py`): a 1.5 kg,
-  0.47 x 0.47 x 0.11 m body with rotors at (+-0.13, +-0.20-0.22) m, a
-  rectangle wider than it is long rather than a square X, and the camera
-  0.08 m below the centre.
-- The printed aircraft: about 2.5 kg, square quad X with 12 in rotors at
-  (+-177, +-177) mm, 47 mm above the arm-tube plane, OAK-1 lens about
-  142 mm ahead of and 80 mm below the arm-tube plane, rangefinder 177 mm
-  ahead, GPS 85 mm behind and about 240 mm above, feet at (+-106, +-106) mm,
-  206 mm below. With the foam dart launcher: about 3.2 kg, its muzzle
-  307 mm below the arm-tube plane on the centre line, feet at
-  (+-230, +-230) mm, 357 mm below.
-  Its hover thrust (about 0.31 without the launcher, 0.38 with it) differs
-  from the `MOT_THST_HOVER 0.67` in `arducopter.params`, which the Gazebo
-  model learned; the hardware overlay `arducopter_hardware.params` starts the
-  aircraft at 0.31 and ArduPilot relearns it in the first hovers
-  (`MOT_HOVER_LEARN`). Measured camera and
-  rangefinder extrinsics belong in `systems/aerodrone/config/sensors.yaml`
-  once calibrated.
+The full launcher configuration has an estimated mass of **3.164661 kg**,
+a 500 mm square-X wheelbase, rotor centres at (+/-176.8, +/-176.8, 47) mm,
+and the OAK-1 lens at (142.15, 0, -79.8) mm in body FLU coordinates. The feet
+extend 356.5 mm below the body origin. Both cameras look down with image top
+toward the nose. The two backends share the centre of mass, full inertia
+tensor, propulsion constants and CAD-derived contact envelopes in
+`airframe.json`; Isaac diagonalizes the tensor into principal axes.
+
+Masses are BOM and shell/infill estimates. Inertia assumes uniform density
+inside each item's CAD envelope, with wiring represented as point allowances.
+The motor model uses the documented 1.6 kg-per-motor, 8300 rpm test point at
+14.8 V; aerodynamic drag and yaw torque remain simulation estimates. Collision
+boxes approximate contact rather than reproducing every printed recess. A
+scale measurement, measured propulsion curves and flight identification are
+still needed to calibrate the completed physical aircraft. Measured camera
+and rangefinder extrinsics belong in `systems/aerodrone/config/sensors.yaml`.
 
 ## Recommended assembly order
 

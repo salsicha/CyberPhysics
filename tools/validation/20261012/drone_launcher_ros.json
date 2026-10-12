@@ -1,0 +1,37 @@
+{
+  "result": "pass",
+  "runs": [
+    {
+      "use_sim_time": true,
+      "requests": [
+        {
+          "action": "fire",
+          "target_id": "7"
+        },
+        {
+          "action": "fire",
+          "target_id": "8"
+        }
+      ],
+      "shots": [
+        {
+          "stamp": 3.78,
+          "shot": 1
+        }
+      ],
+      "feedback_samples": 114
+    },
+    {
+      "use_sim_time": false,
+      "requests": [],
+      "shots": [
+        {
+          "stamp": 1791830804.6934,
+          "shot": 1
+        }
+      ],
+      "feedback_samples": 210
+    }
+  ],
+  "scope": "ROS stand-in wiring; explicit joint commands exercise the plant in both runs. Only automatic fire requests must be absent without simulation time."
+}

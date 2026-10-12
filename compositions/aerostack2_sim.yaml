@@ -76,6 +76,7 @@ services:
     env_file: [../systems/aerodrone/config/topics.env, ../applications/aerostack2/config/mount_tamalpais.env]
     volumes:
       - ../applications/ardupilot_sitl/scripts:/workspace/applications/ardupilot_sitl/scripts:ro
+      - ../applications/aerostack2/models:/workspace/applications/aerostack2/models:ro
       - ../applications/demnav/scripts:/workspace/applications/demnav/scripts:ro
       - ../applications/aerostack2/missions:/workspace/missions:ro
       - demnav_gazebo_cache:/data/demnav_cache:ro
@@ -107,11 +108,12 @@ services:
       MESA_LOADER_DRIVER_OVERRIDE: swrast
       IGN_RENDERING_ENGINE: ogre
       EGL_PLATFORM: surfaceless
-      GZ_SIM_RESOURCE_PATH: /data/navsim_assets:/data/navsim_assets/models
+      GZ_SIM_RESOURCE_PATH: /data/navsim_assets:/data/navsim_assets/models:/workspace/applications/aerostack2/models
     volumes:
       - /dev/shm:/dev/shm
       - *fastdds-mount
       - navsim_gazebo_assets:/data/navsim_assets:ro
+      - ../applications/aerostack2/models:/workspace/applications/aerostack2/models:ro
       - ../applications/gazebo/config:/workspace/config:ro
       - ../applications/gazebo/scripts:/workspace/scripts:ro
       - ../applications/gazebo/models/rgbd_camera.sdf.jinja:/opt/ros/humble/share/as2_gazebo_assets/models/rgbd_camera/rgbd_camera.sdf.jinja:ro
@@ -129,7 +131,7 @@ services:
     environment:
       ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
       FASTRTPS_DEFAULT_PROFILES_FILE: *fastdds-profile
-      GZ_SIM_RESOURCE_PATH: /data/navsim_assets:/data/navsim_assets/models
+      GZ_SIM_RESOURCE_PATH: /data/navsim_assets:/data/navsim_assets/models:/workspace/applications/aerostack2/models
     volumes:
       - /dev/shm:/dev/shm
       - *fastdds-mount
@@ -169,6 +171,7 @@ services:
       GPS_INPUT_CORRECTIONS: ${GPS_INPUT_CORRECTIONS:-true}
     volumes:
       - ../applications/ardupilot_sitl/scripts:/workspace/applications/ardupilot_sitl/scripts:ro
+      - ../applications/aerostack2/models:/workspace/applications/aerostack2/models:ro
       - ../systems/aerodrone:/workspace/systems/aerodrone:ro
       - navsim_gazebo_assets:/data/navsim_assets:ro
     command: /workspace/applications/ardupilot_sitl/scripts/run_arducopter_sitl.sh
@@ -186,6 +189,7 @@ services:
       - *fastdds-mount
       - navsim_gazebo_assets:/data/navsim_assets:ro
       - ../applications/ardupilot_sitl/scripts:/workspace/applications/ardupilot_sitl/scripts:ro
+      - ../applications/aerostack2/models:/workspace/applications/aerostack2/models:ro
       - ../applications/gazebo/scripts:/workspace/scripts:ro
     command: python3 /workspace/scripts/gazebo_ardupilot_backend.py
 

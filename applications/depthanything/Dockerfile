@@ -28,22 +28,29 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN python3 -m venv --system-site-packages /venv
 
-# arm64 gets PyPI's CPU-only wheels; Jetson GPUs need NVIDIA's JetPack builds.
+# JetPack 7.2 (Orin, Ubuntu 24.04) supports the upstream CUDA 13 arm64
+# wheels. Never let this branch resolve PyPI's CPU-only arm64 wheels.
 ARG TARGETARCH
 ARG TORCH_VERSION=2.5.1
 ARG TORCHVISION_VERSION=0.20.1
 RUN . /venv/bin/activate && \
-    TORCH_PKGS="torch==${TORCH_VERSION} torchvision==${TORCHVISION_VERSION} torchaudio==${TORCH_VERSION}" && \
-    if [ "$TARGETARCH" = "arm64" ]; then \
-        pip install --no-cache-dir ${TORCH_PKGS}; \
-    else \
-        pip install --no-cache-dir ${TORCH_PKGS} \
-            --index-url https://download.pytorch.org/whl/cu121; \
-    fi && \
+    case "${TARGETARCH}" in \
+      arm64) pip install --no-cache-dir --only-binary=:all: \
+        torch==2.10.0+cu130 torchvision==0.25.0+cu130 \
+        --index-url https://download.pytorch.org/whl/cu130 ;; \
+      amd64) pip install --no-cache-dir \
+        "torch==${TORCH_VERSION}" "torchvision==${TORCHVISION_VERSION}" "torchaudio==${TORCH_VERSION}" \
+        --index-url https://download.pytorch.org/whl/cu121 ;; \
+      *) echo "Unsupported architecture: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac && \
     pip install --no-cache-dir \
         numpy==1.26.4 \
         opencv-python-headless==4.11.0.86 \
         matplotlib==3.11.0
+
+# These assertions do not need a GPU at build time, and catch CPU wheels
+# and mismatched torchvision native extensions on native arm64 CI runners.
+RUN python3 -c 'import torch, torchvision; assert torch.version.cuda; assert torchvision.extension._has_ops()'
 
 # Depth-Anything-V2 main as of 2026-03-24 and the model repo revision of the
 # metric VKITTI (outdoor driving) small checkpoint, checked by hash.

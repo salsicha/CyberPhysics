@@ -20,6 +20,8 @@ x-pantiltros-image: &pantiltros-image
   pull_policy: build
   build:
     context: ../applications/pantiltros
+    args:
+      TAG: ${CYBERPHYSICS_TAG:-latest}
 
 # Docker on some hosts (the UNO Q's Debian 13 Docker 26, or any host
 # whose containerd runs with LimitNOFILE=infinity) gives containers an
@@ -44,7 +46,7 @@ services:
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
       - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
-      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4?sockets_size=4194304
       - YOLO_CONFIG_DIR=/workspace/cache/ultralytics
       - TORCH_HOME=/workspace/cache/torch
       - PANTILT_MODEL_DIR=/workspace/cache/models
@@ -84,7 +86,7 @@ services:
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
       - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
-      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4?sockets_size=4194304
       - TURRET_ACTUATOR_FITTED=${TURRET_ACTUATOR_FITTED:-true}
     volumes:
       - /dev:/dev
@@ -103,6 +105,8 @@ services:
     pull_policy: build
     build:
       context: ../applications/nicegui
+      args:
+        TAG: ${CYBERPHYSICS_TAG:-latest}
     container_name: turret_ui
     ulimits: *ros-ulimits
     network_mode: host
@@ -110,7 +114,7 @@ services:
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
       - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
-      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4?sockets_size=4194304
       - UI_CAR=0
       - UI_TURRET=1
       - UI_TURRET_CAMERA_TOPIC=${TURRET_CAMERA_TOPIC:-/camera/camera/color/image_raw}
@@ -127,6 +131,8 @@ services:
     pull_policy: build
     build:
       context: ../applications/realsense
+      args:
+        TAG: ${CYBERPHYSICS_TAG:-latest}
     container_name: turret_realsense
     ulimits: *ros-ulimits
     network_mode: host
@@ -135,7 +141,7 @@ services:
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
       - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
-      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4?sockets_size=4194304
     volumes:
       - /dev:/dev
       - /dev/shm:/dev/shm

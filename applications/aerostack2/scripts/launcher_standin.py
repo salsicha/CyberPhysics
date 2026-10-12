@@ -155,7 +155,8 @@ def run():
     for name, default in (('topic_prefix', '/aerodrone/launcher'),
                           ('shots_topic', '/simulation/launcher/shots'),
                           ('rate_hz', 50.0), ('feedback_rate_hz', 25.0),
-                          ('ready_rate_hz', 5.0)):
+                          ('ready_rate_hz', 5.0), ('auto_fire', True),
+                          ('tracking_topic_prefix', '/tracking')):
         node.declare_parameter(name, default)
     param = lambda name: node.get_parameter(name).value  # noqa: E731
     prefix = '/' + str(param('topic_prefix')).strip('/')
@@ -166,6 +167,10 @@ def run():
     ready_pub = node.create_publisher(Bool, f'{prefix}/actuator_ready', latched)
     shots_pub = node.create_publisher(String, str(param('shots_topic')), 10)
     clock = {'last': None}
+    from simulation_trigger import SimulationTrigger
+    simulated_operator = SimulationTrigger()
+    tracking_prefix = str(param('tracking_topic_prefix')).rstrip('/')
+    operator_pub = node.create_publisher(String, f'{tracking_prefix}/command', 10)
 
     def now():
         return node.get_clock().now().nanoseconds * 1e-9
@@ -183,6 +188,19 @@ def run():
             node.get_logger().info(f'emergency stop {"engaged" if msg.data else "released"}')
         plant.emergency_stop(msg.data)
         publish_ready()
+
+    def on_status(msg):
+        # This plant is only launched in the simulator composition. Requiring
+        # simulation time also prevents accidental operation on a live clock.
+        if not param('auto_fire') or not node.get_parameter('use_sim_time').value:
+            return
+        try:
+            status = json.loads(msg.data)
+        except (ValueError, TypeError):
+            return
+        command = simulated_operator.command(status, now())
+        if command is not None:
+            operator_pub.publish(String(data=json.dumps(command)))
 
     def step():
         t = now()
@@ -211,6 +229,7 @@ def run():
         ready_pub.publish(Bool(data=not plant.estop))
 
     node.create_subscription(JointState, f'{prefix}/joint_commands', on_command, 10)
+    node.create_subscription(String, f'{tracking_prefix}/status', on_status, 10)
     for qos in (latched, 10):
         node.create_subscription(Bool, f'{prefix}/emergency_stop', on_estop, qos)
     node.create_timer(1.0 / float(param('rate_hz')), step)

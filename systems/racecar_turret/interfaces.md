@@ -192,12 +192,14 @@ the shot. It runs only when all of these hold:
 
 Otherwise the command is refused with the reason in `/turret/status`.
 Nothing else primes or fires the launcher: there is no automatic, timed or
-on-lock firing and no option that enables one. The tests check that no
+on-lock firing in the hardware tracker. Simulation-only operator adapters
+issue `tag` when centered and ready; hardware compositions do not load them.
+The tests check that no
 sequence of other commands or detections can prime or fire it. The
 launcher is primed only inside a fire cycle, which ends in a shot or, on a
 fault, with the trigger at 0.
 
-After a shot the target's ID joins the tagged set. With `auto_next` the
+After a shot the target's ID joins the tagged set. With `auto_next` (default true) the
 tracker then locks the nearest untagged detection, aim only; firing at it
 needs another `tag` command. `{"action": "next"}` does the same on demand,
 `{"action": "clear_tags"}` empties the set, and `{"action": "reload",

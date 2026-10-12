@@ -27,6 +27,12 @@ the upstream ST3215 package `pan_tilt_ros` (`pantiltros/`, with the
 `ros2 launch pan_tilt_ros pan_tilt_launch.py` and `description_launch.py` are
 available in the container.
 
+The ARM64 build (`make -C applications PLATFORM=arm64 build_pantiltros`)
+instead pins Torch 2.10.0 and torchvision 0.25.0 from the CUDA 13.0 wheel
+index, for Jetson Orin on JetPack 7.2. A constraint prevents the subsequent
+Ultralytics/CLIP install from replacing this pair. See
+[Jetson GPU images](../jetson.md) for host requirements and GPU validation.
+
 ### Control loop
 
 Each detection's angular error is added to the turret position *when that
@@ -205,7 +211,8 @@ Commands on `/turret/command`:
   below), and `tag_min_interval_s` has passed since the last shot.
 - `{"action": "reload", "darts": N}`: the clip count (`darts`, 0 at start-up).
 - `{"action": "next"}`: lock the untagged detection nearest the image centre
-  (aim only). With `auto_next` the tracker does that after each shot; it
+  (aim only). With `auto_next` (enabled by default), the tracker does that
+  after each completed shot; it
   never fires by itself.
 - `{"action": "clear_tags"}`: empty the tagged set.
 - `{"action": "auto_next", "enabled": true}`: switch `auto_next` (the UI's
@@ -290,7 +297,7 @@ After a shot the target's ID joins the tagged set. `/turret/status` adds:
 ```json
 {"launcher": "ready", "darts": 5, "tags": 1, "tagged_ids": ["7"],
  "last_tag": {"target_id": "7", "result": "fired", "reason": "", "stamp": 1240.2},
- "fire_block": "", "auto_next": false}
+ "fire_block": "", "auto_next": true}
 ```
 
 `launcher` is `none` (not fitted), `ready`, `priming`, `chambering`,
@@ -301,7 +308,7 @@ refused now (`""` when it would not; the UI's Fire button follows it).
 Parameters, with their defaults: `launcher_stroke_m` 0.038,
 `trigger_fire_rad` 0.6, `tag_dwell_s` 0.2 (the trigger's hold),
 `tag_max_aim_error_deg` 2.0, `tag_min_interval_s` 2.0,
-`tag_stroke_timeout_s` 3.0, `tag_lock_timeout_s` 0.5, `auto_next` false,
+`tag_stroke_timeout_s` 3.0, `tag_lock_timeout_s` 0.5, `auto_next` true,
 `darts` 0, `person_aim_fraction` 0.6, `person_max_box_fraction` 0.6,
 `person_height_m` 1.7, `aim_offset_range_m` [1, 10], `aim_offset_pitch_deg`
 [0, 0] (the profiles set the drop table), `no_fire_zones_rad` [0, 0, 0, 0]
@@ -310,7 +317,9 @@ command is refused ("no launcher").
 
 Safety: nothing but a `tag` command naming the locked target, with every
 gate holding, primes or fires the launcher; there is no automatic, timed or
-on-lock firing and no option for one. `tests/test_turret_launcher.py`
+on-lock firing in the hardware tracker. Simulation-only operator adapters
+can issue that command when centered; they are absent from hardware compositions.
+`tests/test_turret_launcher.py`
 checks it: random sessions of every other command, detections, joint states
 (also with the launcher found away from rest), e-stop and readiness toggles,
 IMU messages and timer ticks never produce a command that moves the trigger

@@ -1,0 +1,7 @@
+{
+  "result": "pass",
+  "exit_code": 0,
+  "duration_sim_s": 10.0,
+  "collisions": [],
+  "scope": "Rendered scene and virtual-launcher integration smoke; no trained-policy or navigation-course acceptance claim."
+}

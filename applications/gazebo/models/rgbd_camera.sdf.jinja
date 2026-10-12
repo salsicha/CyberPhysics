@@ -5,9 +5,9 @@
   <pose relative_to="base_link">{{ sensor.pose }}</pose>
 {% endif -%}
   <link name="rgbd_camera">
-    <inertial><mass>0.005</mass><inertia>
-      <ixx>8.33e-06</ixx><ixy>0</ixy><ixz>0</ixz>
-      <iyy>8.33e-06</iyy><iyz>0</iyz><izz>8.33e-06</izz>
+    <inertial><mass>0.000001</mass><inertia>
+      <ixx>1e-10</ixx><ixy>0</ixy><ixz>0</ixz>
+      <iyy>1e-10</iyy><iyz>0</iyz><izz>1e-10</izz>
     </inertia></inertial>
     <sensor name="rgbd_camera" type="rgbd_camera">
       <always_on>true</always_on><update_rate>5</update_rate>

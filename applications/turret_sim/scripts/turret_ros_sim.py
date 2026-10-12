@@ -26,6 +26,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import time
 from pathlib import Path
 from typing import Any
 
@@ -130,6 +131,10 @@ class TurretRosSimulator(Node):
         self.frame_index = 0
         self.current_t = 0.0
         self.finished = False
+        self.operator_disarms = []
+        self.input_frames = {}
+        self.frame_results = {}
+        self.drain_started = None
         self.records: list[dict[str, Any]] = []
         self.reacquire_times: list[float] = []
         self.occlusion_started: float | None = None
@@ -165,7 +170,7 @@ class TurretRosSimulator(Node):
         self.joint_state_pub = self.create_publisher(
             JointState, topics["joint_states"], qos_profile_sensor_data
         )
-        self.estop_pub = self.create_publisher(Bool, topics["emergency_stop"], 10)
+        self.estop_pub = self.create_publisher(Bool, topics["emergency_stop"], LATCHED_QOS)
         self.create_subscription(
             JointState, topics["joint_commands"], self._joint_command, 10
         )
@@ -271,6 +276,8 @@ class TurretRosSimulator(Node):
         target_id = status.get("target_id")
         if not (status.get("locked") and target_id):
             return
+        if target_id in status.get("tagged_ids", []):
+            return
         last_lock = self.locks[-1] if self.locks else None
         if not self.tag_lock:
             pass  # press Tag on whatever the tracker follows
@@ -351,6 +358,19 @@ class TurretRosSimulator(Node):
 
     def _mask(self, msg: Image) -> None:
         self.latest["mask"] = mono_image(msg)
+        stamp = msg.header.stamp.sec * 1_000_000_000 + msg.header.stamp.nanosec
+        source = self.input_frames.get(stamp)
+        if source is not None and stamp not in self.frame_results:
+            target, scenario_time = source
+            predicted = self.latest['mask']
+            visible = target is not None and bool(np.any(target))
+            nonempty = predicted is not None and bool(np.any(predicted))
+            self.frame_results[stamp] = {
+                't_s': scenario_time, 'target_visible': visible,
+                'mask_present': nonempty,
+                'iou': self.sim._mask_iou(predicted, target) if nonempty and visible else 0.0,
+                'capture_to_result_ms': (self.get_clock().now().nanoseconds - stamp) / 1e6,
+            }
 
     def _bbox(self, msg: Float32MultiArray) -> None:
         self.latest["bbox"] = [float(value) for value in msg.data]
@@ -384,7 +404,11 @@ class TurretRosSimulator(Node):
         if self.finished:
             return
         if self.frame_index >= self.steps:
-            self._finish()
+            # Allow the final images to leave the tracker queue before counting
+            # input frames with no result. No new image/plant steps are sent.
+            self.drain_started = self.drain_started or time.monotonic()
+            if time.monotonic() - self.drain_started >= 2.0:
+                self._finish()
             return
         self.current_t = round(self.frame_index * self.dt, 6)
         emergency_stop = self.sim.in_emergency_stop(self.current_t) or any(
@@ -406,6 +430,8 @@ class TurretRosSimulator(Node):
             ))
             self._operate()
         if not self.sim.camera_frame_dropped(self.current_t):
+            key = stamp.sec * 1_000_000_000 + stamp.nanosec
+            self.input_frames[key] = (ground_truth_masks.get(self.sim.target_id), self.current_t)
             self.image_pub.publish(
                 image_message(frame, stamp, self.scenario["camera"]["frame_id"])
             )
@@ -611,6 +637,22 @@ class TurretRosSimulator(Node):
             "detector": {"backend": "pantiltros:ultralytics"},
             "summary": summary,
             "samples": self.records,
+        }
+        aligned = list(self.frame_results.values())
+        visible_results = [r for r in aligned if r['target_visible'] and r['t_s'] >= ignore_initial]
+        overlaps = [r for r in visible_results if r['iou'] > .05]
+        report['frame_delivery'] = {
+            'rendered_frames': self.frame_index,
+            'injected_camera_drops': self.frame_index - len(self.input_frames),
+            'published_frames': len(self.input_frames),
+            'processed_unique_frames': len(self.frame_results),
+            'frames_without_result': len(self.input_frames) - len(self.frame_results),
+            'visible_processed_frames': len(visible_results),
+            'visible_frames_without_mask': sum(not r['mask_present'] for r in visible_results),
+            'visible_frames_wrong_mask': sum(r['mask_present'] and r['iou'] <= .05 for r in visible_results),
+            'target_overlap_fraction': len(overlaps) / max(1, len(visible_results)),
+            'mean_iou_when_overlapping': sum(r['iou'] for r in overlaps) / max(1, len(overlaps)),
+            'capture_to_result_p95_ms': percentile([r['capture_to_result_ms'] for r in aligned], 95),
         }
         if self.actuator_fitted:
             report["launcher"] = self._launcher_report()

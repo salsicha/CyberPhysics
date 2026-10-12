@@ -22,6 +22,7 @@ from ardupilot_json import (  # noqa: E402
     pwm_to_rotor_speed,
     state_from_enu,
 )
+from airframe_model import load_airframe
 
 
 class GazeboArduPilotBackend(Node):
@@ -34,17 +35,16 @@ class GazeboArduPilotBackend(Node):
             "TERRAIN_MANIFEST", "/data/navsim_assets/manifest.json"))
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         self.home_enu = manifest["home_enu_m"]
+        self.maximum_rotor_speed = load_airframe()['max_rotor_speed_rad_s']
         self.pose = None
         self.twist = None
         self.imu = None
         # The ground-truth twist (as2 ground_truth_bridge, from Gazebo's
-        # OdometryPublisher) is the body-frame velocity, not ENU: true
-        # rotates it before it reaches ArduPilot, whose GPS velocity is
-        # otherwise turned by the vehicle's yaw (GPS glitch and EKF yaw
-        # reset once the vehicle has yawed away from east). Off by default
-        # until the Gazebo GPS-denied baselines are measured again with it.
+        # OdometryPublisher) is body-frame FLU. Rotate it to world ENU
+        # before state_from_enu converts it to ArduPilot's NED frame.
+        # Set false only for a replacement twist source already in ENU.
         self.twist_in_body_frame = os.environ.get(
-            "GAZEBO_TWIST_IN_BODY_FRAME", "false").strip().lower() in ("1", "true", "yes")
+            "GAZEBO_TWIST_IN_BODY_FRAME", "true").strip().lower() in ("1", "true", "yes")
         self.transport = ArduPilotJSON(
             port=int(os.environ.get("ARDUPILOT_JSON_PORT", "9002")))
         self.actuator_pub = self.create_publisher(
@@ -81,7 +81,7 @@ class GazeboArduPilotBackend(Node):
         frame = self.transport.receive()
         if frame is None:
             return
-        speeds = pwm_to_rotor_speed(frame.pwm[:4], maximum_speed=800.0)
+        speeds = pwm_to_rotor_speed(frame.pwm[:4], maximum_speed=self.maximum_rotor_speed)
         command = Actuators()
         command.header.stamp = self.get_clock().now().to_msg()
         command.velocity = speeds.tolist()

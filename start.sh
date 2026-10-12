@@ -70,5 +70,14 @@ while [ $# -gt 0 ]; do
     esac
 done
 
+# Catch a missing install step or a later sysctl override after reboot.
+# This check is read-only: starting a stack never asks for sudo or changes
+# host networking settings behind the operator's back.
+case "$stack" in
+    racecarneo_hardware|racecar_turret_hardware|turret_hardware|aerodrone_hardware|airplane_hardware|boat_hardware|submarine_hardware|blueos_nav_core|blueos_aerostack|blueos_drone)
+        python3 "$repo_dir/tools/configure_dds_buffers.py" --check
+        ;;
+esac
+
 set -x
 exec docker compose -f "$compose_file" "${global_args[@]}" up "${up_args[@]}"

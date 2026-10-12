@@ -37,13 +37,27 @@ ARG TORCH_VERSION=2.14.1
 ARG TORCHVISION_VERSION=0.29.1
 ARG OPENCV_VERSION=5.0.0.93
 ARG CLIP_COMMIT=488e81a6711eea7346872b46ea928b367da8889d
+ARG TARGETARCH
 RUN . /venv/bin/activate && \
-    pip3 install --no-cache-dir \
-      "torch==${TORCH_VERSION}" \
-      "torchvision==${TORCHVISION_VERSION}" \
+    case "${TARGETARCH}" in \
+      arm64) pip3 install --no-cache-dir --only-binary=:all: \
+        torch==2.10.0+cu130 torchvision==0.25.0+cu130 \
+        --index-url https://download.pytorch.org/whl/cu130 ;; \
+      amd64) pip3 install --no-cache-dir \
+        "torch==${TORCH_VERSION}" "torchvision==${TORCHVISION_VERSION}" ;; \
+      *) echo "Unsupported architecture: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac && \
+    python3 -c 'import torch, torchvision; print("torch==" + torch.__version__); print("torchvision==" + torchvision.__version__)' \
+      > /opt/torch-constraints.txt && \
+    pip3 install --no-cache-dir -c /opt/torch-constraints.txt \
       "opencv-python==${OPENCV_VERSION}" \
       "ultralytics==${ULTRALYTICS_VERSION}" \
       "clip @ git+https://github.com/ultralytics/CLIP.git@${CLIP_COMMIT}"
+
+# Check the binary stack after Ultralytics/CLIP dependency resolution.
+# A build runner need not have a GPU; tools/jetson_gpu_smoke.sh tests CUDA
+# kernels (including torchvision NMS) on the deployment Jetson itself.
+RUN python3 -c 'import torch, torchvision; assert torch.version.cuda; assert torchvision.extension._has_ops()'
 
 # pan_tilt_ros: upstream ST3215 pan/tilt nodes (adityakamath/pan_tilt_ros, which
 # supports Humble and Jazzy). Its SCServo_Linux submodule is not vendored here;

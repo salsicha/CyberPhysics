@@ -30,8 +30,8 @@ def test_hardware_commands_use_consistent_vehicle_identity(namespace):
     services = json.loads(rendered.stdout)['services']
     vehicle = namespace or 'aerodrone'
     # Object tracking is opt-in (compositions/aerodrone_tracking.yaml): the
-    # `tracking` profile adds the tracker and nothing else to these 12.
-    assert len(services) == 12
+    # `tracking` profile adds the tracker and nothing else to these 11.
+    assert len(services) == 11
     # flight_ready's telemetry rates, kept after it exits (an autopilot
     # reboot mid-session forgets them): tests/test_mavros_message_rates.py.
     assert 'mavros_message_rates.py' in ' '.join(services['aerodrone_message_rates']['command'])
@@ -45,7 +45,9 @@ def test_hardware_commands_use_consistent_vehicle_identity(namespace):
     assert f'namespace:={vehicle}' in services['aerostack']['command']
     assert f'drone_id:={vehicle}' in services['behavior_tree']['command']
     # flight_ready waits for the tree's servers in the same namespace
-    ready = services['flight_ready']['command']
+    ready = services['behavior_tree']['command']
+    assert '--exec' in ready
+    assert 'flight_ready' not in services
     assert ready[ready.index('--behavior-namespace') + 1] == f'/{vehicle}'
     for name, odom_arg in [('demnav', 'odom_topic'), ('wildnav', 'raw_odom_topic')]:
         assert f'gps_topic:=/{vehicle}/sensor_measurements/gps' in services[name]['command']

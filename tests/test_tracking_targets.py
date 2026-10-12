@@ -185,8 +185,8 @@ def test_truth_origin_is_the_home_the_simulators_fly_from():
     source = (SCRIPTS / 'build_georeferenced_terrain.py').read_text()
     main = source[source.index('def main():'):]
     assert ('origin_up = terrain_collision_height(\n            np.load(find_dem(args)), '
-            'args.origin_alt, args.area_km, *home) + 0.2') in main
-    assert '"home_enu_m": [home[0], home[1], home_ground + 0.2]' in main
+            'args.origin_alt, args.area_km, *home) + SPAWN_HEIGHT_M') in main
+    assert '"home_enu_m": [home[0], home[1], home_ground + SPAWN_HEIGHT_M]' in main
     gazebo = source[source.index('def write_gazebo_assets('):source.index('def main():')]
     assert ('ground = terrain_collision_height(dem, args.origin_alt, args.area_km, east, north)'
             in gazebo and 'return ground' in gazebo)

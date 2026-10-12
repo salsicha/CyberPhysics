@@ -50,8 +50,7 @@ jobs:
         run: pip install -r applications/cad/requirements.txt
       - name: Part tests
         run: python -m pytest tests/test_printable_parts_build.py tests/test_printable_parts_metadata.py tests/test_printable_parts_docs.py -v
-      - name: Committed STLs and generated docs are up to date
-        run: python tools/build_printable_parts.py --check
+      # The part tests above already rebuild every platform with --check.
       - name: Build STL, STEP and manifests for download
         if: ${{ !cancelled() }}
         run: python tools/build_printable_parts.py --out printable-parts

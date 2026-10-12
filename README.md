@@ -24,6 +24,14 @@ Keep large generated assets out of git. Docker images may download model weights
 ./install.sh            # add --with-k3s to also install k3s
 ```
 
+Installation persists host DDS receive/send socket limits of at least
+4 MiB in `/etc/sysctl.d/99-cyberphysics-dds.conf`, preserving higher
+existing limits. For an existing host, apply just that setup with
+`sudo python3 tools/configure_dds_buffers.py`; check it without changing
+anything using `python3 tools/configure_dds_buffers.py --check`.
+For the Orin Nano's JetPack 7.2 GPU builds and acceptance checks, see
+[Jetson deployment](applications/jetson.md).
+
 ## Build Images
 
 Build from the `applications/` directory with `make build_<app_name>`. Images are tags of the Docker Hub repository `salsicha/cyberphysics`, named `<app>-latest` (amd64) or `<app>-arm64`, e.g. `salsicha/cyberphysics:ros2-latest`; compose stacks select the variant with `CYBERPHYSICS_TAG` (default `latest`).

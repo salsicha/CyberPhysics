@@ -99,7 +99,7 @@ services:
         -p attitude_sigma_deg:=${TRACKING_ATTITUDE_SIGMA_DEG:-1.0}
         -p terrain_sigma_m:=${TRACKING_TERRAIN_SIGMA_M:-3.0}
         -p process_accel_mps2:=${TRACKING_PROCESS_ACCEL_MPS2:-1.5}
-        -p camera_offset_m:=${TRACKING_CAMERA_OFFSET_M:-[0.137,0.0,-0.080]}
+        -p camera_offset_m:=${TRACKING_CAMERA_OFFSET_M:-[0.14215,0.0,-0.0798]}
         -p launcher_fitted:=${TRACKING_LAUNCHER_FITTED:-false}
         -p launcher_topic_prefix:=/aerodrone/launcher
         -p fire_min_agl_m:=${TRACKING_FIRE_MIN_AGL_M:-8.0}

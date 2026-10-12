@@ -291,9 +291,8 @@ HaLow is not a safety link.
   lidar mask were checked on a desktop host with a mock graph and synthetic
   scans; the turret camera driver was checked to start in the image, not
   with a camera.
-- arm64/Jetson images: not supported as is. The RACECAR's nvblox image and
-  the PanTiltROS image install x86_64 GPU packages
-  (`compositions/racecarneo_hardware.yaml`; the optional Depth Anything
-  image gets CPU-only PyTorch on arm64); running the GPU parts on the Orin
-  Nano needs JetPack builds of them, and the compute budget of the bill of
-  materials.
+- ARM64 GPU builds target Orin on JetPack 7.2, using Isaac ROS 4.6 and
+  CUDA-enabled PyTorch. Build locally, run the hardware acceptance checks,
+  and set `CYBERPHYSICS_TAG=arm64` as described in
+  [Jetson GPU images](../../applications/jetson.md). The combined memory
+  and throughput budget on the physical Orin Nano remains unmeasured.

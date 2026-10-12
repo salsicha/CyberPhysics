@@ -920,7 +920,7 @@ DEFAULT_PARAMETERS: dict[str, Any] = {
     # A cycle stops when its target has not been seen locked this long.
     "tag_lock_timeout_s": 0.5,
     # After a shot, aim at (lock) the nearest untagged detection; it never fires.
-    "auto_next": False,
+    "auto_next": True,
     # Darts in the clip at start-up; {"action": "reload", "darts": N} sets it.
     "darts": 0,
     # With the launcher, a person is aimed at (and its aim error measured at)
@@ -1213,6 +1213,7 @@ class PanTiltYoloTracker(Node):
         self.shots = 0
         self.tagged_ids: list[str] = []
         self.last_tag: dict[str, Any] | None = None
+        self.auto_next_pending = False
         self.last_cycle_end = -math.inf
         self.tag_seen_time = -math.inf  # last frame with the cycle's target locked
         self.last_send_time = -math.inf
@@ -2062,12 +2063,16 @@ class PanTiltYoloTracker(Node):
             return
         target_id = self.target_track
         self.fire_cycle.start(now, target_id)
+        self.auto_next_pending = True
         self.tag_seen_time = now
         self.last_tag = {"target_id": target_id, "result": "running", "reason": "", "stamp": now}
         self._notify(now, f"firing at {target_id}")
         self._launcher_keepalive(now, force=True)
 
     def _abort_tag(self, now: float, reason: str) -> None:
+        # Even after the dart released, an operator's stop/selection wins
+        # over advancing when the trigger finishes returning to rest.
+        self.auto_next_pending = False
         cycle = self.fire_cycle
         target_id = cycle.target_id
         if not cycle.running:
@@ -2103,6 +2108,8 @@ class PanTiltYoloTracker(Node):
     def _tag_ended(
         self, now: float, target_id: str, result: str, reason: str, shot: bool
     ) -> None:
+        advance = self.auto_next_pending
+        self.auto_next_pending = False
         if shot:
             self.darts = max(0, self.darts - 1)
             self.shots += 1
@@ -2120,7 +2127,8 @@ class PanTiltYoloTracker(Node):
             if target_id not in self.tagged_ids:
                 self.tagged_ids.append(target_id)
             self._notify(now, f"fired at {target_id}; {self.darts} darts left")
-            if self.auto_next:
+            if (self.auto_next and advance and self.mode == "auto"
+                    and self.target_track == target_id and self._command_gate(now) in COMMANDING):
                 self._next(now)
 
     def _launcher_keepalive(self, now: float, force: bool = False) -> None:

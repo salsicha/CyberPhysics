@@ -290,8 +290,8 @@ and at most 8 deg shallower, p95), tracking 90 % of the time, recall 0.8, at
 most 3 re-selections in 150 s.
 
 Measured 2026-10-11 and 12 with the YOLO detector (`ROS_DOMAIN_ID=92`;
-median / p95 against truth; the limit in brackets). Gazebo runs with the test
-layer's `GAZEBO_TWIST_IN_BODY_FRAME=true`. Isaac runs at 0.2x real time, so its
+median / p95 against truth; the limit in brackets). Gazebo ran with
+`GAZEBO_TWIST_IN_BODY_FRAME=true`, now the backend's default. Isaac runs at 0.2x real time, so its
 follow steps were 120 s (`TRACKING_TEST_CENTERED_S=TRACKING_TEST_SLANT_S=120`)
 to keep a run within 40 minutes of the shared machine (38 min; 150 s steps
 take about 50). Every check passed in each run:
@@ -349,11 +349,13 @@ height against the 0.43 the 60-degree camera sees to either side); the
 followable scenario now passes them by a wide margin (p95 3.6-5.7 m against
 17.5 m), so they could be tightened to grade the control.
 
-Gazebo's ground-truth twist is the body-frame velocity, which
-`gazebo_ardupilot_backend.py` hands ArduPilot as ENU unless
-`GAZEBO_TWIST_IN_BODY_FRAME=true` (the test's `tools/tracking_sim_test_gazebo.yaml`
-sets it): without it ArduPilot's GPS velocity turns with the yaw, and the slant
-mode's yaw ended in a GPS glitch, EKF failsafe and emergency yaw reset.
+Gazebo's ground-truth twist is the body-frame velocity.
+`gazebo_ardupilot_backend.py` now rotates it to ENU by default
+(`GAZEBO_TWIST_IN_BODY_FRAME=true`), including outside tracking tests.
+Without this conversion ArduPilot's GPS velocity turns with the yaw, and the
+slant mode's yaw ended in a GPS glitch, EKF failsafe and emergency yaw reset.
+The [GPS-denied baselines](../../tools/gps_denied_sim_test.md) also exercise
+this default.
 
 
 ## Aerodrone simulation
@@ -371,11 +373,24 @@ Genesis support (`applications/genesis/`, `compositions/aerostack2_genesis.yaml`
 
 Both use Navigator/ArduCopter through the same MAVROS and `as2_platform_blueos` boundary, build the same georeferenced terrain, and execute the generated behavior-tree mission. Topic names are defined in `systems/aerodrone/config/topics.env`; deployment values are in `applications/aerostack2/config/mount_tamalpais.env`.
 
+The two simulated airframes now share the printable assembly's geometry and
+loaded-launcher mass budget (3.1647 kg), centre of mass, inertia and square-X
+rotor positions. See [simulator geometry](../../hardware/aerodrone.md#simulator-geometry)
+for the generator, assumptions and calibration limits.
+
+Hardware startup waits for MAVROS and behavior servers inside the
+`behavior_tree` container, then replaces the waiter with the mission runner.
+`docker compose up -d` therefore returns while an offline autopilot is awaited.
+The separate `flight_ready` completion dependency below applies to simulations.
+
 ### DDS transport
+
+The BlueOS drone, boat and submarine hardware compositions also load this
+profile; it prevents large OAK-1 images from exhausting the default segment.
 
 Every ROS container of the two compositions and of the lite SITL stack (`tools/gps_denied_sitl.yaml`) loads `systems/aerodrone/config/fastdds.xml` through `FASTRTPS_DEFAULT_PROFILES_FILE`. The containers share the host network and `/dev/shm` and run as root, so FastDDS (Humble, Fast DDS 2.6) sends between them through shared memory. Its default 512 KiB segment holds less than one camera frame (640x480 RGB is 0.9 MB, 32FC1 depth 1.2 MB): the sender reused buffers before the subscribers had read them, and DemNav, WildNav and the validator received 1-3 % of the camera frames, all of them with the profile. The profile gives every sender an 8 MiB segment and keeps UDP, with 4 MiB socket buffers, for peers that cannot use the shared memory. Isaac Sim runs as user 1234; FastDDS creates its shared-memory files mode 0644, so shared memory between it and the root containers delivers nothing, and it loads `fastdds_udp.xml` (UDP only, same buffers) instead. A ROS container added to these stacks needs the same profile, mount, host `/dev/shm` (`ipc: host` or a `/dev/shm` volume) and user; `tests/test_aerial_dds_transport.py` checks them.
 
-The kernel caps the socket buffers at `net.core.rmem_max` and `net.core.wmem_max`. Shared memory does not depend on them, but Isaac Sim's camera does: on a host where they are below 4 MiB (208 KiB was the long-standing default; check with `sysctl net.core.rmem_max`), its UDP frames can still be dropped. Raising them is optional and not done by the stacks: `sudo sysctl -w net.core.rmem_max=4194304 net.core.wmem_max=4194304`. A killed process leaves its segment in `/dev/shm`; `docker run --rm --ipc host salsicha/cyberphysics:aerostack2-latest fastdds shm clean` removes the stale ones.
+The kernel caps the socket buffers at `net.core.rmem_max` and `net.core.wmem_max`. Shared memory does not depend on them, but Isaac Sim's camera does: below 4 MiB, UDP frames can still be dropped. `./install.sh` now applies persistent limits of at least 4 MiB, preserving higher existing values. For an existing installation, run `sudo python3 tools/configure_dds_buffers.py`; verify without privileges using `python3 tools/configure_dds_buffers.py --check`. The configuration in `/etc/sysctl.d/99-cyberphysics-dds.conf` is reapplied at boot; containers do not change host sysctls. A killed process leaves its segment in `/dev/shm`; `docker run --rm --ipc host salsicha/cyberphysics:aerostack2-latest fastdds shm clean` removes the stale ones.
 
 ### Mission start
 

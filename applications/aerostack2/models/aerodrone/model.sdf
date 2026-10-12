@@ -1,0 +1,446 @@
+<?xml version='1.0' encoding='utf-8'?>
+<sdf version="1.6">
+  <model name="aerodrone_airframe">
+    <link name="base_link">
+      <inertial>
+        <pose>7.64547137927e-20 9.50041294489e-19 -0.00356990524304 0 0 0</pose>
+        <mass>3.16465415786</mass>
+        <inertia>
+          <ixx>0.059343989716</ixx>
+          <iyy>0.0625953875642</iyy>
+          <izz>0.0566762339066</izz>
+          <ixy>-0.000215724777132</ixy>
+          <ixz>0.00342576603085</ixz>
+          <iyz>-0.000215485860259</iyz>
+        </inertia>
+      </inertial>
+      <visual name="assembled_prints_and_hardware">
+        <geometry>
+          <mesh>
+            <uri>model://aerodrone/airframe.stl</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <ambient>.18 .22 .3 1</ambient>
+          <diffuse>.18 .22 .3 1</diffuse>
+        </material>
+      </visual>
+      <collision name="hub_bottom_plate">
+        <pose>7.1054273576e-18 0 -0.00975 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.181019335984 0.181019335984 0.0185</size>
+          </box>
+        </geometry>
+      </collision>
+      <collision name="hub_top_plate">
+        <pose>7.1054273576e-18 0 0.00975 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.181019335984 0.181019335984 0.0185</size>
+          </box>
+        </geometry>
+      </collision>
+      <collision name="motor_mount_0">
+        <pose>0.164295724908 0.164295724908 -0.0015 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.0669619407771 0.0669619407771 0.031</size>
+          </box>
+        </geometry>
+      </collision>
+      <collision name="motor_mount_1">
+        <pose>-0.164295724908 0.164295724908 -0.0015 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.0669619407771 0.0669619407771 0.031</size>
+          </box>
+        </geometry>
+      </collision>
+      <collision name="motor_mount_2">
+        <pose>-0.164295724908 -0.164295724908 -0.0015 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.0669619407771 0.0669619407771 0.031</size>
+          </box>
+        </geometry>
+      </collision>
+      <collision name="motor_mount_3">
+        <pose>0.164295724908 -0.164295724908 -0.0015 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.0669619407771 0.0669619407771 0.031</size>
+          </box>
+        </geometry>
+      </collision>
+      <collision name="arm_tube_0">
+        <pose>0.101823376491 0.101823376491 4.97231512431e-06 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.138609302069 0.138609302069 0.0160099448302</size>
+          </box>
+        </geometry>
+      </collision>
+      <collision name="motor_screw_0_45">
+        <pose>0.17677754998 0.18927754998 0.0124992168604 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.00550470037579 0.00550470037579 0.011005270854</size>
+          </box>
+        </geometry>
+      </collision>
+      <collision name="motor_screw_0_135">
+        <pose>0.16427754998 0.17677754998 0.0124992168604 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.00550470037579 0.00550470037579 0.011005270854</size>
+          </box>
+        </geometry>
+      </collision>
+      <collision name="motor_screw_0_225">
+        <pose>0.17677754998 0.16427754998 0.0124992168604 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.00550470037579 0.00550470037579 0.011005270854</size>
+          </box>
+        </geometry>
+      </collision>
+      <collision name="motor_screw_0_315">
+        <pose>0.18927754998 0.17677754998 0.0124992168604 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.00550470037579 0.00550470037579 0.011005270854</size>
+          </box>
+        </geometry>
+      </collision>
+      <collision name="motor_0">
+        <pose>0.176783190888 0.176783190888 0.02825 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.041835721536 0.041835721536 0.028551960893</size>
+          </box>
+        </geometry>
+      </collision>
+      <collision name="arm_tube_1">
+        <pose>-0.101823376491 0.101823376491 4.97231512431e-06 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.138609302069 0.138609302069 0.0160099448302</size>
+          </box>
+        </geometry>
+      </collision>
+      <collision name="motor_screw_1_45">
+        <pose>-0.18927754998 0.17677754998 0.0124992168604 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.00550470037579 0.00550470037579 0.011005270854</size>
+          </box>
+        </geometry>
+      </collision>
+      <collision name="motor_screw_1_135">
+        <pose>-0.17677754998 0.16427754998 0.0124992168604 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.00550470037579 0.00550470037579 0.011005270854</size>
+          </box>
+        </geometry>
+      </collision>
+      <collision name="motor_screw_1_225">
+        <pose>-0.16427754998 0.17677754998 0.0124992168604 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.00550470037579 0.00550470037579 0.011005270854</size>
+          </box>
+        </geometry>
+      </collision>
+      <collision name="motor_screw_1_315">
+        <pose>-0.17677754998 0.18927754998 0.0124992168604 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.00550470037579 0.00550470037579 0.011005270854</size>
+          </box>
+        </geometry>
+      </collision>
+      <collision name="motor_1">
+        <pose>-0.176783190888 0.176783190888 0.02825 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.041835721536 0.041835721536 0.028551960893</size>
+          </box>
+        </geometry>
+      </collision>
+      <collision name="arm_tube_2">
+        <pose>-0.101823376491 -0.101823376491 4.97231512431e-06 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.138609302069 0.138609302069 0.0160099448302</size>
+          </box>
+        </geometry>
+      </collision>
+      <collision name="motor_screw_2_45">
+        <pose>-0.17677754998 -0.18927754998 0.0124992168604 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.00550470037579 0.00550470037579 0.011005270854</size>
+          </box>
+        </geometry>
+      </collision>
+      <collision name="motor_screw_2_135">
+        <pose>-0.16427754998 -0.17677754998 0.0124992168604 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.00550470037579 0.00550470037579 0.011005270854</size>
+          </box>
+        </geometry>
+      </collision>
+      <collision name="motor_screw_2_225">
+        <pose>-0.17677754998 -0.16427754998 0.0124992168604 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.00550470037579 0.00550470037579 0.011005270854</size>
+          </box>
+        </geometry>
+      </collision>
+      <collision name="motor_screw_2_315">
+        <pose>-0.18927754998 -0.17677754998 0.0124992168604 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.00550470037579 0.00550470037579 0.011005270854</size>
+          </box>
+        </geometry>
+      </collision>
+      <collision name="motor_2">
+        <pose>-0.176783190888 -0.176783190888 0.02825 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.041835721536 0.041835721536 0.028551960893</size>
+          </box>
+        </geometry>
+      </collision>
+      <collision name="arm_tube_3">
+        <pose>0.101823376491 -0.101823376491 4.97231512431e-06 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.138609302069 0.138609302069 0.0160099448302</size>
+          </box>
+        </geometry>
+      </collision>
+      <collision name="motor_screw_3_45">
+        <pose>0.18927754998 -0.17677754998 0.0124992168604 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.00550470037579 0.00550470037579 0.011005270854</size>
+          </box>
+        </geometry>
+      </collision>
+      <collision name="motor_screw_3_135">
+        <pose>0.17677754998 -0.16427754998 0.0124992168604 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.00550470037579 0.00550470037579 0.011005270854</size>
+          </box>
+        </geometry>
+      </collision>
+      <collision name="motor_screw_3_225">
+        <pose>0.16427754998 -0.17677754998 0.0124992168604 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.00550470037579 0.00550470037579 0.011005270854</size>
+          </box>
+        </geometry>
+      </collision>
+      <collision name="motor_screw_3_315">
+        <pose>0.17677754998 -0.18927754998 0.0124992168604 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.00550470037579 0.00550470037579 0.011005270854</size>
+          </box>
+        </geometry>
+      </collision>
+      <collision name="motor_3">
+        <pose>0.176783190888 -0.176783190888 0.02825 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.041835721536 0.041835721536 0.028551960893</size>
+          </box>
+        </geometry>
+      </collision>
+      <collision name="launcher_breech_down">
+        <pose>-0.010425 -0.01545 -0.222 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.04515 0.0749 0.092</size>
+          </box>
+        </geometry>
+      </collision>
+      <collision name="tall_leg_foot_0">
+        <pose>0.227942483707 0.227942483707 -0.343408663562 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.034947643792 0.034947643792 0.0261826730766</size>
+          </box>
+        </geometry>
+      </collision>
+      <collision name="tall_leg_foot_1">
+        <pose>-0.227942483707 0.227942483707 -0.343408663562 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.034947643792 0.034947643792 0.0261826730766</size>
+          </box>
+        </geometry>
+      </collision>
+      <collision name="tall_leg_foot_2">
+        <pose>-0.227942483707 -0.227942483707 -0.343408663562 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.034947643792 0.034947643792 0.0261826730766</size>
+          </box>
+        </geometry>
+      </collision>
+      <collision name="tall_leg_foot_3">
+        <pose>0.227942483707 -0.227942483707 -0.343408663562 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.034947643792 0.034947643792 0.0261826730766</size>
+          </box>
+        </geometry>
+      </collision>
+      <collision name="launcher_barrel_clamp">
+        <pose>-0.001425 0 -0.274 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.02715 0.03 0.012</size>
+          </box>
+        </geometry>
+      </collision>
+      <collision name="launcher_barrel">
+        <pose>-4.19228318919e-06 0 -0.284 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.0134983847664 0.0135025763979 0.0450167693328</size>
+          </box>
+        </geometry>
+      </collision>
+      <collision name="battery">
+        <pose>-0.035802888979 0.000129512270105 0.0865 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.0480000002 0.1550000002 0.0350000002</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="rotor_0">
+      <pose relative_to="base_link">0.176776695297 -0.176776695297 0.0465 0 0 0</pose>
+      <inertial>
+        <pose>0 0 0 0 0 0</pose>
+        <mass>1e-06</mass>
+        <inertia>
+          <ixx>1e-10</ixx>
+          <iyy>1e-10</iyy>
+          <izz>1e-10</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+    </link>
+    <joint name="rotor_0_joint" type="revolute">
+      <parent>base_link</parent>
+      <child>rotor_0</child>
+      <axis>
+        <xyz>0 0 1</xyz>
+      </axis>
+    </joint>
+    <link name="rotor_1">
+      <pose relative_to="base_link">-0.176776695297 0.176776695297 0.0465 0 0 0</pose>
+      <inertial>
+        <pose>0 0 0 0 0 0</pose>
+        <mass>1e-06</mass>
+        <inertia>
+          <ixx>1e-10</ixx>
+          <iyy>1e-10</iyy>
+          <izz>1e-10</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+    </link>
+    <joint name="rotor_1_joint" type="revolute">
+      <parent>base_link</parent>
+      <child>rotor_1</child>
+      <axis>
+        <xyz>0 0 1</xyz>
+      </axis>
+    </joint>
+    <link name="rotor_2">
+      <pose relative_to="base_link">0.176776695297 0.176776695297 0.0465 0 0 0</pose>
+      <inertial>
+        <pose>0 0 0 0 0 0</pose>
+        <mass>1e-06</mass>
+        <inertia>
+          <ixx>1e-10</ixx>
+          <iyy>1e-10</iyy>
+          <izz>1e-10</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+    </link>
+    <joint name="rotor_2_joint" type="revolute">
+      <parent>base_link</parent>
+      <child>rotor_2</child>
+      <axis>
+        <xyz>0 0 1</xyz>
+      </axis>
+    </joint>
+    <link name="rotor_3">
+      <pose relative_to="base_link">-0.176776695297 -0.176776695297 0.0465 0 0 0</pose>
+      <inertial>
+        <pose>0 0 0 0 0 0</pose>
+        <mass>1e-06</mass>
+        <inertia>
+          <ixx>1e-10</ixx>
+          <iyy>1e-10</iyy>
+          <izz>1e-10</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+      </inertial>
+    </link>
+    <joint name="rotor_3_joint" type="revolute">
+      <parent>base_link</parent>
+      <child>rotor_3</child>
+      <axis>
+        <xyz>0 0 1</xyz>
+      </axis>
+    </joint>
+    <model name="imu">
+      <link name="internal">
+        <inertial>
+          <pose>0 0 0 0 0 0</pose>
+          <mass>1e-06</mass>
+          <inertia>
+            <ixx>1e-10</ixx>
+            <iyy>1e-10</iyy>
+            <izz>1e-10</izz>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyz>0</iyz>
+          </inertia>
+        </inertial>
+        <sensor name="imu" type="imu">
+          <always_on>1</always_on>
+          <update_rate>250</update_rate>
+        </sensor>
+      </link>
+    </model>
+    <joint name="imu_joint" type="fixed">
+      <parent>base_link</parent>
+      <child>imu::internal</child>
+    </joint>
+  </model>
+</sdf>

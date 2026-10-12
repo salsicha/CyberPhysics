@@ -15,6 +15,13 @@ make -C applications build_nvblox
 
 The nvblox image is large because NVIDIA's Debian packages pull CUDA, TensorRT, and Isaac ROS dependencies. The RACECAR Neo composition bind-mounts `applications/nvblox/racecarneo_nvblox.launch.py`, so local launch changes do not require rebuilding the image every time.
 
+For Jetson Orin, use `make -C applications PLATFORM=arm64 build_nvblox`.
+This selects Isaac ROS 4.6's `noble-jetpack` ARM64 repository, the SBSA
+CUDA repository and Jetson Linux 39.2's VPI packages. It requires JetPack
+7.2; desktop builds retain Isaac ROS 4.4. See [Jetson GPU images](../jetson.md)
+for the complete build and runtime checks. ARM64 builds omit the recorded
+quickstart bags by default (`DOWNLOAD_EXAMPLE_ASSETS=1` includes them).
+
 ## RACECAR Neo Launch
 
 `racecarneo_nvblox.launch.py` starts `nvblox::NvbloxNode` in a component container and remaps RACECAR topics into the camera names expected by nvblox (the launch file's defaults):

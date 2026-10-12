@@ -74,6 +74,7 @@ services:
     env_file: [../systems/aerodrone/config/topics.env, ../applications/aerostack2/config/mount_tamalpais.env]
     volumes:
       - ../applications/ardupilot_sitl/scripts:/workspace/applications/ardupilot_sitl/scripts:ro
+      - ../applications/aerostack2/models:/workspace/applications/aerostack2/models:ro
       - ../applications/demnav/scripts:/workspace/applications/demnav/scripts:ro
       - ../applications/aerostack2/missions:/workspace/missions:ro
       - demnav_isaac_cache:/data/demnav_cache:ro
@@ -134,10 +135,11 @@ services:
       OMNI_KIT_ALLOW_ROOT: "1"
       ISAAC_PHYSICS_HZ: "${ISAAC_PHYSICS_HZ:-1200.0}"
       ISAAC_CAMERA_HZ: "${ISAAC_CAMERA_HZ:-10.0}"
-      ISAAC_MAX_ROTOR_SPEED: "${ISAAC_MAX_ROTOR_SPEED:-1000.0}"
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix
+      - ../applications/isaac/scripts:/workspace/applications/isaac/scripts:ro
       - ../applications/ardupilot_sitl/scripts:/workspace/applications/ardupilot_sitl/scripts:ro
+      - ../applications/aerostack2/models:/workspace/applications/aerostack2/models:ro
       - ../systems/aerodrone:/workspace/systems/aerodrone:ro
       - navsim_isaac_assets:/data/navsim_assets:ro
       # Moves the tracking targets with the simulation clock and publishes
@@ -180,6 +182,7 @@ services:
       ARDUCOPTER_PARAM_FILE: /workspace/applications/isaac/config/aerodrone_sitl.params
     volumes:
       - ../applications/ardupilot_sitl/scripts:/workspace/applications/ardupilot_sitl/scripts:ro
+      - ../applications/aerostack2/models:/workspace/applications/aerostack2/models:ro
       - ../applications/isaac/config/aerodrone_sitl.params:/workspace/applications/isaac/config/aerodrone_sitl.params:ro
       - ../systems/aerodrone:/workspace/systems/aerodrone:ro
       - navsim_isaac_assets:/data/navsim_assets:ro
@@ -243,7 +246,7 @@ services:
         origin_topic:=/navigation/origin prior_fix_topic:=/navigation/fix
         prior_timeout_s:=2.0 search_radius_sigma_scale:=3.0
         max_search_radius_m:=${MAX_SEARCH_RADIUS_M:-2700.0}
-        camera_mount_yaw_deg:=90.0 depth_is_metric:=true
+        camera_mount_yaw_deg:=0.0 depth_is_metric:=true
         attitude_sigma_deg:=0.5
         gps_altitude_datum:=ellipsoid geoid_file:=/usr/share/GeographicLib/geoids/egm96-5.pgm
         rangefinder_topic:=${RANGEFINDER_TOPIC:-/aerodrone/rangefinder} rangefinder_timeout_s:=0.5
@@ -280,7 +283,7 @@ services:
         origin_topic:=/navigation/origin prior_fix_topic:=/navigation/fix
         prior_timeout_s:=2.0 search_radius_sigma_scale:=3.0
         max_search_radius_m:=${WILDNAV_MAX_SEARCH_RADIUS_M:-3300.0}
-        camera_mount_yaw_deg:=90.0
+        camera_mount_yaw_deg:=0.0
         attitude_sigma_deg:=0.5 match_sigma_floor_m:=1.0
 
   aerostack2_autonomy:

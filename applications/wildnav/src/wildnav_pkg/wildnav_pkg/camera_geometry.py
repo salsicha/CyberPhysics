@@ -13,8 +13,8 @@ Camera optical frame: x image right, y image down, z along the view.
 
 The camera looks down the body -z axis with the image top ``mount_yaw``
 counter-clockwise from the nose, seen from above: ``camera_mount_yaw_deg``
-of systems/aerodrone/config/topics.env (0 = image top toward the nose; the
-Isaac camera is mounted at 90). A body-fixed camera (the OAK-1 on the
+of systems/aerodrone/config/topics.env (0 = image top toward the nose, as
+in both flight simulators). A body-fixed camera (the OAK-1 on the
 aircraft, Isaac, Gazebo) tilts with the vehicle, so the image centre is
 not the point below the vehicle. A roll/pitch-stabilised camera
 (``camera_stabilized``: the airplane's satellite_camera_sim camera)

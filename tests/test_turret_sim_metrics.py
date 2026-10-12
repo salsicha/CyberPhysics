@@ -35,6 +35,9 @@ def make_sim(module, variant='nominal'):
     node.dt = float(SCENARIO['dt_s'])
     node.current_t = 0.0
     node.records = []
+    node.frame_index = 0
+    node.input_frames = {}
+    node.frame_results = {}
     node.reacquire_times = []
     node.false_lock_count = 0
     node.command_log = []
@@ -59,6 +62,28 @@ def test_saturated_commands_are_counted(module):
         node._joint_command(command(pan, 0.0))
     assert summary(node)['command_saturation_fraction'] == pytest.approx(0.5)
     assert node.sim.command_queue[1][1] == pytest.approx(1.5708)  # clamped
+
+
+def test_frame_accounting_separates_missing_results_empty_masks_and_camera_drops(module):
+    import numpy as np
+    node = make_sim(module)
+    node.latest = {}
+    node.get_clock = lambda: NS(now=lambda: NS(nanoseconds=4_050_000_000))
+    mask = np.ones((3, 3), dtype=np.uint8) * 255
+    node.frame_index = 5
+    node.input_frames = {k * 1_000_000_000: (mask, float(k)) for k in (1, 2, 3, 4)}
+    for second, data in ((1, mask), (2, mask * 0), (2, mask * 0), (4, mask)):
+        msg = NS(header=NS(stamp=NS(sec=second, nanosec=0)), encoding='mono8',
+                 width=3, height=3, step=3, data=data.tobytes())
+        node._mask(msg)
+    report = node._report()['frame_delivery']
+    assert report['injected_camera_drops'] == 1
+    assert report['published_frames'] == 4
+    assert report['processed_unique_frames'] == 3  # duplicate result is not a frame
+    assert report['frames_without_result'] == 1
+    assert report['visible_frames_without_mask'] == 1
+    assert report['visible_frames_wrong_mask'] == 0
+    assert report['target_overlap_fraction'] == pytest.approx(2 / 3)
 
 
 def test_non_finite_commands_are_ignored(module):

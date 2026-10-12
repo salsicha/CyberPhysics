@@ -400,3 +400,52 @@ denial. One more Gazebo run never started (a tile, as above).
 - The limits rest on few runs (five Gazebo and two Isaac on the committed
   code, and the runs of "Mission progress and the GoTo threshold"); revisit
   them as runs accumulate, Gazebo's error limits first.
+
+## CAD airframe baseline — 12 October 2026
+
+The body-FLU to world-ENU velocity conversion is now the Gazebo backend's
+normal default; the tracking-only override has been removed. A velocity-fix
+reference run with the previous airframe passed: fused median / p95 / maximum
+**10.9 / 17.6 / 21.8 m**, maximum route distance **20.9 m** during the default
+150-second denial. That run is a reference, not a measurement of the new
+3.164661 kg aircraft.
+
+Both simulators now use the loaded-launcher CAD geometry, mass budget, inertia,
+rotor layout and nose-mounted camera described in
+[hardware/aerodrone.md](../hardware/aerodrone.md#simulator-geometry). The new
+baselines below keep the navigation algorithms and acceptance thresholds.
+Comparing them with the older tables does not isolate the velocity fix:
+airframe dynamics and camera geometry changed too.
+
+Measurements are retained in [tools/validation/20261012](validation/20261012/)
+and the full recordings in `generated/gps_denied_sim/airframe_20261012/`.
+Gazebo run 1 used the workstation alone. Repeats 2/3 and the negative control
+use software rendering while Isaac uses the GPU, with distinct ROS domains
+(95 and 94) and SITL instances (Gazebo instance 1, TCP 5770 / JSON UDP 9012).
+These port overrides do not change physics, navigation or scoring settings.
+
+| Run (DDS baseline) | Fused median / p95 / max (m) | Max route deviation (m) | Coverage | Result |
+|---|---:|---:|---:|---|
+| gazebo 1 | 6.67 / 9.91 / 11.71 | 7.50 | 100% | Pass |
+| gazebo 2 | 6.25 / 9.22 / 11.22 | 7.67 | 100% | Pass |
+| gazebo 3 | 6.23 / 9.85 / 11.40 | 7.00 | 100% | Pass |
+| isaac 1 | 3.71 / 5.23 / 6.13 | 3.94 | 100% | Pass |
+
+Each passing run completed 150 simulated seconds without GPS and 60 seconds
+of recovery, stayed in GUIDED, and reported no failsafe. Gazebo ran at
+0.94–0.98× real time; Isaac ran at 0.15× during denial.
+
+The Gazebo negative control, with both fix generators disabled, failed:
+autopilot position error was **57.6 / 142.5 / 144.2 m**, maximum route
+deviation **142.7 m**, and the EKF failsafe changed the mode to LAND.
+Correction coverage was zero. Its apparently small fused error covers only
+76 samples before the fused stream stopped; it must not be interpreted as
+successful navigation. Its graph validator also remained unfinished because
+the deliberately disabled generators did not publish their status topics.
+
+These measurements precede the separately requested native-Zenoh migration.
+They preserve the DDS reference for comparison with that migration.
+
+The aircraft mass remains a BOM/print estimate, and the propulsion constants
+are based on the documented motor/propeller table. These navigation tests do
+not validate physical aircraft mass, thrust or tuning.

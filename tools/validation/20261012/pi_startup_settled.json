@@ -1,0 +1,51 @@
+[
+  {
+    "command": "docker compose -p cp_startup -f /tmp/cp_startup/compose.json up -d --pull never",
+    "stdout": "",
+    "stderr": " Network cp_startup_default Creating \n Network cp_startup_default Created \n Container cp_startup_mavros Creating \n Container cp_startup_wildnav Creating \n Container cp_startup_demnav Creating \n Container cp_startup_mavros Created \n Container cp_startup_aerostack Creating \n Container cp_startup_demnav Created \n Container cp_startup_wildnav Created \n Container cp_startup_aerostack Created \n Container cp_startup_behavior_tree Creating \n Container cp_startup_behavior_tree Created \n Container cp_startup_mavros Starting \n Container cp_startup_demnav Starting \n Container cp_startup_wildnav Starting \n Container cp_startup_demnav Started \n Container cp_startup_mavros Started \n Container cp_startup_aerostack Starting \n Container cp_startup_wildnav Started \n Container cp_startup_aerostack Started \n Container cp_startup_behavior_tree Starting \n Container cp_startup_behavior_tree Started \n",
+    "elapsed_s": 3.236089410027489,
+    "exit_code": 0
+  },
+  {
+    "command": "sleep 35",
+    "stdout": "",
+    "stderr": "",
+    "elapsed_s": 35.07397098792717,
+    "exit_code": 0
+  },
+  {
+    "command": "docker logs cp_startup_behavior_tree",
+    "stdout": "",
+    "stderr": "[WARN] [1791827607.413538673] [rcl]: Found remap rule 'drone_id:=drone0'. This syntax is deprecated. Use '--ros-args --remap drone_id:=drone0' instead.\n[WARN] [1791827607.413715450] [rcl]: Found remap rule 'use_sim_time:=false'. This syntax is deprecated. Use '--ros-args --remap use_sim_time:=false' instead.\n[INFO] [1791827608.373969613] [navigator_navigation_readiness]: Mission tree needs /drone0/GoToBehavior\n[INFO] [1791827638.470383744] [navigator_navigation_readiness]: Waiting for MAVROS connection, local odometry\n",
+    "elapsed_s": 0.08321266900748014,
+    "exit_code": 0
+  },
+  {
+    "command": "docker top cp_startup_behavior_tree -o pid,args",
+    "stdout": "PID                 COMMAND\n106430              python3 /workspace/applications/aerostack2/scripts/wait_for_mavros_navigation.py --namespace /mavros --timeout 0 --no-require-gps --settle-seconds 3 --behavior-tree /workspace/install/share/as2_platform_blueos/resource/map_goal.xml --behavior-namespace /drone0 --exec python3 /workspace/applications/aerostack2/scripts/run_behavior_tree.py --attempts 5 --retry-delay 5 -- ros2 launch as2_behavior_tree behavior_trees.launch.py drone_id:=drone0 tree:=/workspace/install/share/as2_platform_blueos/resource/map_goal.xml use_sim_time:=false\n",
+    "stderr": "",
+    "elapsed_s": 0.10351790790446103,
+    "exit_code": 0
+  },
+  {
+    "command": "docker stats --no-stream cp_mavros_configured",
+    "stdout": "CONTAINER ID   NAME                   CPU %     MEM USAGE / LIMIT     MEM %     NET I/O   BLOCK I/O     PIDS\n8865914210b0   cp_mavros_configured   4.62%     85.75MiB / 7.864GiB   1.06%     0B / 0B   0B / 94.2kB   20\n",
+    "stderr": "",
+    "elapsed_s": 1.0853394051082432,
+    "exit_code": 0
+  },
+  {
+    "command": "docker exec cp_mavros_configured /entrypoint.sh ros2 topic list",
+    "stdout": "/diagnostics\n/mavros/battery\n/mavros/estimator_status\n/mavros/extended_state\n/mavros/global_position/compass_hdg\n/mavros/global_position/global\n/mavros/global_position/gp_lp_offset\n/mavros/global_position/gp_origin\n/mavros/global_position/local\n/mavros/global_position/raw/fix\n/mavros/global_position/raw/gps_vel\n/mavros/global_position/raw/satellites\n/mavros/global_position/rel_alt\n/mavros/global_position/set_gp_origin\n/mavros/gps_input/gps_input\n/mavros/gpsstatus/gps1/raw\n/mavros/gpsstatus/gps1/rtk\n/mavros/gpsstatus/gps2/raw\n/mavros/gpsstatus/gps2/rtk\n/mavros/home_position/home\n/mavros/home_position/set\n/mavros/imu/data\n/mavros/imu/data_raw\n/mavros/imu/diff_pressure\n/mavros/imu/mag\n/mavros/imu/static_pressure\n/mavros/imu/temperature_baro\n/mavros/imu/temperature_imu\n/mavros/local_position/accel\n/mavros/local_position/odom\n/mavros/local_position/pose\n/mavros/local_position/pose_cov\n/mavros/local_position/velocity_body\n/mavros/local_position/velocity_body_cov\n/mavros/local_position/velocity_local\n/mavros/mission/reached\n/mavros/mission/waypoints\n/mavros/nav_controller_output/output\n/mavros/param/event\n/mavros/rangefinder/rangefinder\n/mavros/rangefinder_pub\n/mavros/rangefinder_sub\n/mavros/rc/in\n/mavros/rc/out\n/mavros/rc/override\n/mavros/setpoint_position/global\n/mavros/setpoint_position/global_to_local\n/mavros/setpoint_position/local\n/mavros/setpoint_raw/attitude\n/mavros/setpoint_raw/global\n/mavros/setpoint_raw/local\n/mavros/setpoint_raw/target_attitude\n/mavros/setpoint_raw/target_global\n/mavros/setpoint_raw/target_local\n/mavros/setpoint_velocity/cmd_vel\n/mavros/setpoint_velocity/cmd_vel_unstamped\n/mavros/state\n/mavros/status_event\n/mavros/statustext/recv\n/mavros/statustext/send\n/mavros/sys_status\n/mavros/time_reference\n/mavros/timesync_status\n/mavros/vfr_hud\n/oak1/camera_info\n/oak1/image_highres\n/oak1/image_highres/camera_info\n/oak1/image_raw\n/oak1/relative_depth\n/parameter_events\n/rosout\n/tf\n/tf_static\n/tracking/camera_info\n/tracking/detections\n/tracking/image/compressed\n/uas1/mavlink_sink\n/uas1/mavlink_source\n",
+    "stderr": "",
+    "elapsed_s": 1.8898361078463495,
+    "exit_code": 0
+  },
+  {
+    "command": "docker compose -p cp_startup -f /tmp/cp_startup/compose.json down --timeout 5",
+    "stdout": "",
+    "stderr": " Container cp_startup_behavior_tree Stopping \n Container cp_startup_behavior_tree Stopped \n Container cp_startup_behavior_tree Removing \n Container cp_startup_behavior_tree Removed \n Container cp_startup_aerostack Stopping \n Container cp_startup_demnav Stopping \n Container cp_startup_wildnav Stopping \n Container cp_startup_aerostack Stopped \n Container cp_startup_aerostack Removing \n Container cp_startup_aerostack Removed \n Container cp_startup_mavros Stopping \n Container cp_startup_mavros Stopped \n Container cp_startup_mavros Removing \n Container cp_startup_mavros Removed \n Container cp_startup_demnav Stopped \n Container cp_startup_demnav Removing \n Container cp_startup_demnav Removed \n Container cp_startup_wildnav Stopped \n Container cp_startup_wildnav Removing \n Container cp_startup_wildnav Removed \n Network cp_startup_default Removing \n Network cp_startup_default Removed \n",
+    "elapsed_s": 6.807736020069569,
+    "exit_code": 0
+  }
+]

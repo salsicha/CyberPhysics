@@ -43,10 +43,12 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 stack="${1:-}"
+# This harness sends explicit fire requests, including rejected requests.
+# Interactive simulation uses the simulated operator by default.
+export SIM_AUTO_FIRE=false
 layers=(-f tools/tracking_sim_test.yaml)
 case "$stack" in
-    gazebo) composition=compositions/aerostack2_sim.yaml; default_timeout=2400
-            layers+=(-f tools/tracking_sim_test_gazebo.yaml) ;;
+    gazebo) composition=compositions/aerostack2_sim.yaml; default_timeout=2400 ;;
     isaac) composition=compositions/aerostack2_isaac.yaml; default_timeout=7200 ;;
     *) echo "usage: $0 <gazebo|isaac>" >&2; exit 2 ;;
 esac

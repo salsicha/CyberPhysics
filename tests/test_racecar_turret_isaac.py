@@ -437,7 +437,7 @@ def test_simulator_publishes_the_racecar_and_turret_topics(sim_app):
     # The actuator is reported ready once (latched).
     node.ready_pub.publish.assert_called_once()
     node._joint_command(NS(name=['tilt_joint', 'pan_joint'], position=[0.1, -0.2]))
-    assert node.turret_commands == [(-0.2, 0.1)]
+    assert node.turret_commands == [(-0.2, 0.1, None, None)]
     assert node.front_info['k'][0] == sim_app.FRONT_FX
 
 

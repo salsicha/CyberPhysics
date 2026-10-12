@@ -28,9 +28,8 @@
 # before (Depth Anything stamps the colour frame's time, which the aligned
 # depth's camera_info carries too).
 #
-# arm64/Jetson: not supported as is. The nvblox image installs x86_64 Isaac
-# ROS packages, and the depthanything image installs CPU-only PyTorch on
-# arm64.
+# Jetson Orin: JetPack 7.2 and locally built arm64 images. Build, GPU
+# smoke check and launch instructions: applications/jetson.md.
 
 # Docker on some hosts (the UNO Q's Debian 13 Docker 26, or any host
 # whose containerd runs with LimitNOFILE=infinity) gives containers an

@@ -11,11 +11,18 @@ import os
 from pathlib import Path
 import re
 import shutil
+import sys
 
 import cv2
 import numpy as np
 
 from terrain_collisions import terrain_collision_height, write_terrain_collision_model
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'ardupilot_sitl/scripts'))
+from airframe_model import load_airframe
+
+AIRFRAME = load_airframe()
+SPAWN_HEIGHT_M = AIRFRAME['ground_clearance_m'] + .01
+CAMERA_POSITION = AIRFRAME['camera_position_flu_m']
 
 
 METERS_PER_DEG_LAT = 111_320.0
@@ -428,17 +435,17 @@ origin:
 drones:
   - model_type: quadrotor_base
     model_name: aerodrone
-    xyz: [{east:.3f}, {north:.3f}, {ground + 0.2:.3f}]
+    xyz: [{east:.3f}, {north:.3f}, {ground + SPAWN_HEIGHT_M:.3f}]
     rpy: [0.0, 0.0, 0.0]
     enable_velocity_control: false
     payload:
       - model_type: hd_camera
         model_name: downward_rgb
-        xyz: [0.0, 0.0, -0.05]
+        xyz: {CAMERA_POSITION}
         rpy: [0.0, 1.57079632679, 0.0]
       - model_type: rgbd_camera
         model_name: downward_rgbd
-        xyz: [0.0, 0.0, -0.06]
+        xyz: {CAMERA_POSITION}
         rpy: [0.0, 1.57079632679, 0.0]
 objects: []
 """
@@ -473,7 +480,7 @@ def main():
     if args.targets:
         # The navigation origin is the home the manifest records below.
         origin_up = terrain_collision_height(
-            np.load(find_dem(args)), args.origin_alt, args.area_km, *home) + 0.2
+            np.load(find_dem(args)), args.origin_alt, args.area_km, *home) + SPAWN_HEIGHT_M
         tracking, height, includes = write_tracking_targets(
             args, output_dir, (home[0], home[1], origin_up))
     home_ground = write_gazebo_assets(args, output_dir, home, includes)
@@ -482,7 +489,7 @@ def main():
     home_lat = args.lat + home[1] / METERS_PER_DEG_LAT
     home_lon = args.lon + home[0] / (
         METERS_PER_DEG_LAT * math.cos(math.radians(args.lat)))
-    home_alt = args.origin_alt + home_ground + 0.2
+    home_alt = args.origin_alt + home_ground + SPAWN_HEIGHT_M
     manifest = {
         "schema_version": 1,
         "source": {"dem": "SRTM", "imagery": "ArcGIS World Imagery"},
@@ -495,7 +502,7 @@ def main():
                     "max_up_m": float(grid.max() - args.origin_alt)},
         "imagery": {"zoom": args.zoom, "tile_count": len(tiles),
                     "bounds": list(bounds[:4])},
-        "home_enu_m": [home[0], home[1], home_ground + 0.2],
+        "home_enu_m": [home[0], home[1], home_ground + SPAWN_HEIGHT_M],
         "home_geodetic": {"latitude": home_lat, "longitude": home_lon,
                             "altitude_m": home_alt},
         "mission_waypoints": waypoint_count,
@@ -512,4 +519,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

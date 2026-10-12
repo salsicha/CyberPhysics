@@ -1,0 +1,16 @@
+{
+  "seconds": 30,
+  "hz": {
+    "/mavros/imu/data": 10.033333333333333,
+    "/mavros/imu/data_raw": 10.0,
+    "/mavros/imu/static_pressure": 10.0,
+    "/mavros/global_position/raw/fix": 5.0
+  },
+  "states": [
+    [
+      true,
+      false,
+      "MANUAL"
+    ]
+  ]
+}

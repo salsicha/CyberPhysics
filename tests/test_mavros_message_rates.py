@@ -298,9 +298,10 @@ def test_the_aerodrone_keeps_the_rates_flight_ready_asks_for(modules):
     rates = platform_rates(keeper, 'aerodrone')
     assert rates == ready.MESSAGE_RATES_HZ
     stack = yaml.safe_load((REPO / 'compositions/blueos_aerostack.yaml').read_text())
-    flight_ready = stack['services']['flight_ready']
+    flight_ready = stack['services']['behavior_tree']
     assert 'wait_for_mavros_navigation.py' in flight_ready['command']
-    assert flight_ready['restart'] == 'no'
+    assert '--exec python3' in flight_ready['command']
+    assert all(d['condition'] == 'service_started' for d in flight_ready['depends_on'].values())
     # The keeper watches imu/data at the 20 Hz both ask for.
     assert keeper_with(keeper, rates, Autopilot()).attitude_rate_hz() == 20.0
 
@@ -328,7 +329,7 @@ def test_every_blueos_mavros_has_one_rate_keeper(composition):
     keepers = {name for name, service in services.items()
                if KEEPER.name in ' '.join(service.get('command') or [])}
     assert keepers == expected
-    assert sum('apm.launch' in ' '.join(service.get('command') or [])
+    assert sum('blueos_mavros.launch.xml' in ' '.join(service.get('command') or [])
                for service in services.values()) == 1
 
 

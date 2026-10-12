@@ -55,15 +55,14 @@ shared with the aerodrone): see ["Long-range link"](#long-range-link). The
   coarse there. A sensored 540-size brushless motor (hall cable to the
   VESC) gives smooth low-speed torque and better wheel odometry; keep the
   stock motor for first tests.
-- **Jetson software.** `compositions/racecarneo_hardware.yaml` states that
-  arm64 is not supported as is: the nvblox image installs x86_64 Isaac ROS
-  packages. The Jetson in this list cannot run nvblox until that image has
-  a Jetson build; until then run nvblox and Nav2 on an x86 GPU computer on
-  the same network.
+- **Jetson software.** Use JetPack 7.2 / Jetson Linux 39.2.x and build the
+  ARM64 images as described in [Jetson GPU images](../applications/jetson.md).
+  nvblox uses Isaac ROS 4.6 for Orin. Run the GPU smoke checks on the Jetson
+  before bring-up; physical performance is not yet measured.
 - **Compute: no Depth Anything.** nvblox maps the RealSense's own depth
   (aligned to its colour camera, 16UC1 millimetres), so Depth Anything, the
   heaviest GPU load of the earlier pipeline (48 ms per frame on a laptop
-  RTX 4000 Ada; its arm64 image has CPU-only PyTorch), is not needed on the
+  RTX 4000 Ada), is not needed on the
   Jetson. From the camera's 0.22 m its monocular depth read about 9 times
   the true depth in simulation (`applications/depthanything/README.md`,
   "Accuracy"); it runs only under the composition's `depthanything`

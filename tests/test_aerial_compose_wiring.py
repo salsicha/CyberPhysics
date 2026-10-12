@@ -8,11 +8,19 @@ import yaml
 from conftest import REPO
 
 COMPOSITIONS = REPO / 'compositions'
-SIM_MOUNTS = {'aerostack2_sim.yaml': '0.0', 'aerostack2_isaac.yaml': '90.0'}
+SIM_MOUNTS = {'aerostack2_sim.yaml': '0.0', 'aerostack2_isaac.yaml': '0.0'}
 
 
 def services(name):
     return yaml.safe_load((COMPOSITIONS / name).read_text())['services']
+
+
+def test_isaac_camera_configuration_uses_the_current_simulator_source():
+    # Baked scripts can otherwise keep the old camera rotation and cuboid
+    # while the mounted tracking/navigation configuration uses the CAD camera.
+    mounts = services('aerostack2_isaac.yaml')['isaacsim']['volumes']
+    assert '../applications/isaac/scripts:/workspace/applications/isaac/scripts:ro' in mounts
+    assert '../applications/aerostack2/models:/workspace/applications/aerostack2/models:ro' in mounts
 
 
 @pytest.mark.parametrize('name', sorted(SIM_MOUNTS))

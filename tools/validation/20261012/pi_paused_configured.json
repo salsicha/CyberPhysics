@@ -1,0 +1,61 @@
+{
+  "tracking_subscribed": false,
+  "seconds": 60.0,
+  "topics": {
+    "/oak1/image_raw": {
+      "count": 270,
+      "hz": 4.5,
+      "unique_stamps": 270,
+      "gap_p95_s": 0.3299840386011056,
+      "gap_max_s": 0.3429991919983877,
+      "age_p95_s": 0.005051231384277309,
+      "width": 256,
+      "height": 192,
+      "encoding": "bgr8",
+      "bytes": 147456,
+      "pixel_mean": 24.73434109157986,
+      "pixel_std": 44.884055966207235
+    },
+    "/oak1/relative_depth": {
+      "count": 270,
+      "hz": 4.5,
+      "unique_stamps": 270,
+      "gap_p95_s": 0.33003200060047677,
+      "gap_max_s": 0.34222709800087614,
+      "age_p95_s": 0.007861578464508018,
+      "width": 256,
+      "height": 192,
+      "encoding": "32FC1",
+      "bytes": 196608,
+      "finite_fraction": 1.0
+    },
+    "/oak1/camera_info": {
+      "count": 270,
+      "hz": 4.5,
+      "unique_stamps": 270,
+      "gap_p95_s": 0.3300708887953078,
+      "gap_max_s": 0.34210046899534063,
+      "age_p95_s": 0.009412515163421621,
+      "width": 256,
+      "height": 192,
+      "fx": 197.45787048339844,
+      "fy": 197.45787048339844,
+      "calibration_valid": true
+    },
+    "/oak1/image_highres": {
+      "count": 30,
+      "hz": 0.5,
+      "unique_stamps": 30,
+      "gap_p95_s": 2.0122163460007867,
+      "gap_max_s": 2.015237812003761,
+      "age_p95_s": 0.0100213885307312,
+      "width": 1280,
+      "height": 720,
+      "encoding": "bgr8",
+      "bytes": 2764800,
+      "pixel_mean": 1.9406004050925927,
+      "pixel_std": 8.241435494773574
+    }
+  },
+  "passed": true
+}

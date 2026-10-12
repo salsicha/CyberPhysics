@@ -16,10 +16,14 @@ helpers. It loads the same real SRTM/orthophoto terrain and detailed behavior
 tree as the Gazebo backend. ArduCopter SITL supplies motor commands through the
 JSON external-physics protocol; MAVROS and `as2_platform_blueos` provide the
 Navigator-compatible control boundary. The custom Isaac vehicle model includes
-Gazebo-matched quad-X motor placement and spool constants, passive rigid-body
-damping, and body-frame IMU conversion.
+the same CAD-derived STL airframe, 3.1647 kg loaded-launcher mass budget, full
+inertia tensor, rotor positions and camera extrinsics as Gazebo, with passive
+rigid-body damping and body-frame IMU conversion. The shared assets and their
+calibration limits are documented in
+[simulator geometry](../../hardware/aerodrone.md#simulator-geometry).
 
 ```bash
+git lfs pull --include="applications/aerostack2/models/aerodrone/*.stl"
 docker compose -f compositions/aerostack2_isaac.yaml up
 ```
 

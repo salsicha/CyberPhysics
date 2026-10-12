@@ -1,0 +1,304 @@
+{
+  "stack": "gazebo",
+  "denial": {
+    "configured": {
+      "start_s": 60.0,
+      "duration_s": 150.0,
+      "recovery_s": 60.0,
+      "cruise_height_m": 140.0
+    },
+    "denied_sim_s": 150.0,
+    "denied_wall_s": 152.6,
+    "real_time_factor": 0.98,
+    "start_after_cruise_sim_s": 60.0,
+    "restored": true,
+    "completed": true
+  },
+  "phases": {
+    "before": {
+      "duration_sim_s": 60.0,
+      "duration_wall_s": 62.0,
+      "fused": {
+        "n": 300,
+        "median_m": 0.05,
+        "p95_m": 0.06,
+        "max_m": 0.07,
+        "rms_m": 0.05,
+        "unscored": 0,
+        "consistency": {
+          "n": 300,
+          "beyond_2sigma": 0.0,
+          "beyond_3sigma": 0.0,
+          "sigma_median_m": 3.48
+        }
+      },
+      "autopilot": {
+        "n": 299,
+        "median_m": 0.06,
+        "p95_m": 0.07,
+        "max_m": 0.08,
+        "rms_m": 0.05,
+        "unscored": 0
+      },
+      "fixes": {
+        "demnav": {
+          "n": 176,
+          "median_m": 2.3,
+          "p95_m": 5.85,
+          "max_m": 8.45,
+          "rms_m": 3.41,
+          "consistency": {
+            "n": 176,
+            "beyond_2sigma": 0.0,
+            "beyond_3sigma": 0.0,
+            "sigma_median_m": 5.14
+          }
+        },
+        "wildnav": {
+          "n": 13,
+          "median_m": 1.36,
+          "p95_m": 1.61,
+          "max_m": 1.64,
+          "rms_m": 1.37,
+          "consistency": {
+            "n": 13,
+            "beyond_2sigma": 0.0,
+            "beyond_3sigma": 0.0,
+            "sigma_median_m": 2.2
+          }
+        },
+        "correction": {
+          "n": 189,
+          "median_m": 1.23,
+          "p95_m": 1.77,
+          "max_m": 2.67,
+          "rms_m": 1.27,
+          "consistency": {
+            "n": 189,
+            "beyond_2sigma": 0.0,
+            "beyond_3sigma": 0.0,
+            "sigma_median_m": 22.81
+          }
+        }
+      },
+      "route": {
+        "n": 640,
+        "median_m": 0.03,
+        "p95_m": 0.04,
+        "max_m": 0.08,
+        "rms_m": 0.03,
+        "waypoints_reached": 1,
+        "flown_m": 102.1
+      },
+      "correction_coverage": 1.0,
+      "max_correction_gap_s": 4.9
+    },
+    "during": {
+      "duration_sim_s": 150.0,
+      "duration_wall_s": 152.6,
+      "fused": {
+        "n": 750,
+        "median_m": 6.67,
+        "p95_m": 9.91,
+        "max_m": 11.71,
+        "rms_m": 6.71,
+        "unscored": 0,
+        "consistency": {
+          "n": 750,
+          "beyond_2sigma": 0.047,
+          "beyond_3sigma": 0.0,
+          "sigma_median_m": 5.4
+        }
+      },
+      "autopilot": {
+        "n": 750,
+        "median_m": 6.67,
+        "p95_m": 9.91,
+        "max_m": 11.78,
+        "rms_m": 6.71,
+        "unscored": 0
+      },
+      "fixes": {
+        "demnav": {
+          "n": 446,
+          "median_m": 6.89,
+          "p95_m": 10.08,
+          "max_m": 11.85,
+          "rms_m": 7.04,
+          "consistency": {
+            "n": 446,
+            "beyond_2sigma": 0.011,
+            "beyond_3sigma": 0.0,
+            "sigma_median_m": 5.86
+          }
+        },
+        "wildnav": {
+          "n": 30,
+          "median_m": 2.26,
+          "p95_m": 3.41,
+          "max_m": 3.57,
+          "rms_m": 2.44,
+          "consistency": {
+            "n": 30,
+            "beyond_2sigma": 0.0,
+            "beyond_3sigma": 0.0,
+            "sigma_median_m": 2.73
+          }
+        },
+        "correction": {
+          "n": 476,
+          "median_m": 4.26,
+          "p95_m": 6.26,
+          "max_m": 8.09,
+          "rms_m": 4.35,
+          "consistency": {
+            "n": 476,
+            "beyond_2sigma": 0.0,
+            "beyond_3sigma": 0.0,
+            "sigma_median_m": 38.23
+          }
+        }
+      },
+      "route": {
+        "n": 1581,
+        "median_m": 3.88,
+        "p95_m": 6.73,
+        "max_m": 7.5,
+        "rms_m": 4.16,
+        "waypoints_reached": 2,
+        "flown_m": 687.5
+      },
+      "correction_coverage": 1.0,
+      "max_correction_gap_s": 4.8
+    },
+    "after": {
+      "duration_sim_s": 60.0,
+      "duration_wall_s": 60.7,
+      "fused": {
+        "n": 300,
+        "median_m": 0.16,
+        "p95_m": 0.65,
+        "max_m": 5.97,
+        "rms_m": 0.55,
+        "unscored": 0,
+        "consistency": {
+          "n": 300,
+          "beyond_2sigma": 0.0,
+          "beyond_3sigma": 0.0,
+          "sigma_median_m": 4.27
+        }
+      },
+      "autopilot": {
+        "n": 300,
+        "median_m": 0.14,
+        "p95_m": 0.65,
+        "max_m": 5.96,
+        "rms_m": 0.55,
+        "unscored": 0
+      },
+      "fixes": {
+        "demnav": {
+          "n": 184,
+          "median_m": 2.91,
+          "p95_m": 10.04,
+          "max_m": 13.02,
+          "rms_m": 4.6,
+          "consistency": {
+            "n": 184,
+            "beyond_2sigma": 0.011,
+            "beyond_3sigma": 0.0,
+            "sigma_median_m": 5.6
+          }
+        },
+        "wildnav": {
+          "n": 12,
+          "median_m": 0.98,
+          "p95_m": 3.72,
+          "max_m": 5.48,
+          "rms_m": 1.96,
+          "consistency": {
+            "n": 12,
+            "beyond_2sigma": 0.0,
+            "beyond_3sigma": 0.0,
+            "sigma_median_m": 2.59
+          }
+        },
+        "correction": {
+          "n": 191,
+          "median_m": 1.42,
+          "p95_m": 2.67,
+          "max_m": 5.23,
+          "rms_m": 1.7,
+          "consistency": {
+            "n": 191,
+            "beyond_2sigma": 0.0,
+            "beyond_3sigma": 0.0,
+            "sigma_median_m": 30.91
+          }
+        }
+      },
+      "route": {
+        "n": 629,
+        "median_m": 0.52,
+        "p95_m": 1.46,
+        "max_m": 6.21,
+        "rms_m": 1.17,
+        "waypoints_reached": 1,
+        "flown_m": 267.3
+      },
+      "correction_coverage": 1.0,
+      "max_correction_gap_s": 5.0
+    }
+  },
+  "flight": {
+    "states": [
+      {
+        "mode": "GUIDED",
+        "armed": true
+      }
+    ],
+    "left_guided": [],
+    "failsafe_texts": [],
+    "gps1_fix_types": [
+      6,
+      1
+    ],
+    "gps1_lost": true,
+    "gps1_fix_type_at_end": 6
+  },
+  "thresholds": {
+    "min_denied_fraction": 0.95,
+    "max_before_median_m": 1.0,
+    "max_after_median_m": 2.0,
+    "min_correction_coverage": 0.8,
+    "min_fused_rate_hz": 1.0,
+    "max_fused_median_m": 20.0,
+    "max_fused_p95_m": 35.0,
+    "max_fused_max_m": 45.0,
+    "max_autopilot_median_m": 20.0,
+    "max_autopilot_p95_m": 35.0,
+    "max_autopilot_max_m": 45.0,
+    "max_route_m": 45.0,
+    "max_fused_beyond_3sigma": 0.15
+  },
+  "checks": {
+    "gps_denied_and_restored": true,
+    "denied_duration": true,
+    "gps1_lost": true,
+    "stayed_guided": true,
+    "no_failsafe": true,
+    "fused_samples": true,
+    "before_on_gps": true,
+    "fused_median": true,
+    "fused_p95": true,
+    "fused_max": true,
+    "autopilot_median": true,
+    "autopilot_p95": true,
+    "autopilot_max": true,
+    "fused_consistency": true,
+    "correction_coverage": true,
+    "route_keeping": true,
+    "recovered": true
+  },
+  "passed": true
+}

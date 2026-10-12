@@ -43,6 +43,9 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "demnav" / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "aerostack2" / "scripts"))
+from launcher_standin import LauncherPlant
+from simulation_trigger import SimulationTrigger
 import racecar_turret_sim as rts  # noqa: E402
 from tracking_targets import Tracks  # noqa: E402
 
@@ -445,6 +448,10 @@ def make_ros_node(turret_hfov_deg):
             self.lock = threading.Lock()
             self.commands = []
             self.turret_commands = []
+            self.launcher = LauncherPlant()
+            self.simulated_operator = SimulationTrigger(action='tag')
+            self.auto_fire = os.environ.get('SIM_AUTO_FIRE', 'true').lower() in ('true', '1', 'yes')
+            self.simulation_time = 0.0
             self.emergency_stop = False
             pub = self.create_publisher
             self.clock_pub = pub(Clock, "/clock", 10)
@@ -461,11 +468,14 @@ def make_ros_node(turret_hfov_deg):
             self.battery_pub = pub(Float32, "/racecarneo/battery_voltage", 5)
             self.joint_pub = pub(JointState, "/turret/joint_states", 20)
             self.ready_pub = pub(Bool, "/turret/actuator_ready", latched)
+            self.shots_pub = pub(String, '/simulation/launcher/shots', 10)
+            self.operator_pub = pub(String, '/turret/command', 10)
             self.turret_image_pub = pub(Image, "/turret/camera/image_raw", 5)
             self.turret_info_pub = pub(CameraInfo, "/turret/camera/camera_info", 5)
             self.truth_pub = pub(String, rts.TRUTH_TOPIC, 10)
             self.create_subscription(AckermannDriveStamped, "/ackermann_cmd", self._ackermann, 10)
             self.create_subscription(JointState, "/turret/joint_commands", self._joint_command, 10)
+            self.create_subscription(String, '/turret/status', self._status, 10)
             for qos in (latched, 10):
                 self.create_subscription(Bool, "/turret/emergency_stop", self._estop, qos)
             self.front_info = rts.camera_info_values(
@@ -488,7 +498,20 @@ def make_ros_node(turret_hfov_deg):
             if "pan_joint" in positions and "tilt_joint" in positions:
                 with self.lock:
                     self.turret_commands.append((float(positions["pan_joint"]),
-                                                 float(positions["tilt_joint"])))
+                                                 float(positions["tilt_joint"]),
+                                                 positions.get('actuator_joint'),
+                                                 positions.get('trigger_joint')))
+
+        def _status(self, msg):
+            if not self.auto_fire:
+                return
+            try:
+                status = json.loads(msg.data)
+            except (TypeError, ValueError):
+                return
+            command = self.simulated_operator.command(status, self.simulation_time)
+            if command is not None:
+                self.operator_pub.publish(String(data=json.dumps(command)))
 
         def _estop(self, msg):
             self.emergency_stop = bool(msg.data)
@@ -508,6 +531,7 @@ def make_ros_node(turret_hfov_deg):
             return Time(sec=nanoseconds // 1_000_000_000, nanosec=nanoseconds % 1_000_000_000)
 
         def publish_clock(self, seconds):
+            self.simulation_time = seconds
             msg = Clock()
             msg.clock = self.stamp(seconds)
             self.clock_pub.publish(msg)
@@ -615,7 +639,10 @@ def make_ros_node(turret_hfov_deg):
             msg.header.stamp = self.stamp(seconds)
             msg.name = list(TURRET_JOINTS)
             msg.position = [float(pan), float(tilt)]
+            msg.name.extend(['actuator_joint', 'trigger_joint'])
+            msg.position.extend([float(self.launcher.rack), float(self.launcher.trigger)])
             self.joint_pub.publish(msg)
+            self.ready_pub.publish(Bool(data=not self.launcher.estop))
 
         def publish_truth(self, message):
             msg = String()
@@ -857,8 +884,14 @@ def main():
                 if not drive.command(t, speed, steering):
                     node.get_logger().warn("Ignoring non-finite ackermann_cmd",
                                            throttle_duration_sec=1.0)
-            for pan, tilt in turret_commands:
+            node.launcher.emergency_stop(node.emergency_stop)
+            for pan, tilt, rack, trigger in turret_commands:
                 turret.command(t, pan, tilt)
+                node.launcher.command(t, rack, trigger)
+            shot = node.launcher.update(t, dt)
+            if shot is not None:
+                from std_msgs.msg import String
+                node.shots_pub.publish(String(data=json.dumps({'stamp': shot, 'shot': len(node.launcher.shots)})))
             turret.emergency_stop = node.emergency_stop
             speed_cmd, steering_cmd = drive.update(t, dt)
             pan_goal, tilt_goal = turret.update(t, dt)

@@ -607,6 +607,9 @@ def test_the_defaults_and_the_deployed_values_are_the_documented_ones():
     assert env == {name: getattr(config, name) for name in env} and len(env) == 9
     # No option fires on its own: nothing automatic, timed or on-lock.
     for name in list(vars(config)) + list(tracker_node.PARAMETERS):
+        if name == 'auto_next':  # selection only; no autonomous fire in the tracker
+            assert tracker_node.PARAMETERS[name] is True
+            continue
         assert not any(word in name for word in ('auto', 'timer', 'on_lock', 'periodic')), name
     with pytest.raises(ValueError):
         lc.LauncherConfig(fire_min_agl_m=20.0, fire_max_agl_m=8.0)
@@ -864,6 +867,10 @@ def node_rig(**config):
     node.core = tc.TrackerCore(node.config)
     node.launcher = lc.FireControl(lc.LauncherConfig(**dict({'launcher_fitted': True}, **config)))
     node.launcher_fitted = True
+    node.auto_next = tracker_node.PARAMETERS['auto_next']
+    node.auto_next_command = None
+    node.tagged_ids = set()
+    node.last_detections = None
     node.lock = threading.RLock()
     node.poses = tc.PoseHistory()
     node.terrain = tracker_node.Terrain()
@@ -970,6 +977,58 @@ def tracking_node(**config):
     assert node.launcher.refusal(t, '7', situation) == '', node.launcher.gates(t, '7', situation)
     return node, t
 
+
+
+def test_drone_auto_next_selects_nearest_untagged_vehicle_without_firing():
+    node, t = tracking_node()
+    node.auto_next_command = node.core.command
+    node.tagged_ids = {'7', 'done'}
+    node.last_detections = detections(t, CAR_BELOW,
+        ('person', 'person', (320.5, 240.5)),
+        ('done', 'car', (320.5, 241)),
+        ('far', 'car', (400, 240.5)),
+        ('near', 'car', (340, 240.5)))
+    node._next_after_shot(t, '7')
+    assert node.core.command.target_id == 'near'
+    assert node.core.command.mode == 'centered'
+    assert not node.launcher.cycle.running and not node.out.shots
+
+
+def test_simulated_drone_operator_fires_once_per_centered_target_and_advances():
+    from simulation_trigger import SimulationTrigger
+    node, start = tracking_node()
+    operator = SimulationTrigger()
+    second = ('8', 'car', (340.5, 244.99))
+    for step in range(301):
+        now = round(start + step * .05, 6)
+        node_step(node, now, [CAR_BELOW, second])
+        node._publish_status()
+        command = operator.command(node.out.status[-1], now)
+        if command is not None:
+            node._on_command(NS(data=json.dumps(command)))
+    fired = [shot['target_id'] for shot in node.out.shots if shot['result'] == 'fired']
+    assert fired == ['7', '8']
+    assert node.tagged_ids == {'7', '8'}
+
+
+@pytest.mark.parametrize('change', ['stale', 'stopped', 'reselected', 'disarmed'])
+def test_drone_auto_next_does_not_override_operator_or_use_old_frame(change):
+    node, t = tracking_node()
+    node.auto_next_command = node.core.command
+    node.tagged_ids = {'7'}
+    node.last_detections = detections(t, ('next', 'car', (340, 240.5)))
+    if change == 'stale':
+        node.last_detections.header.stamp = stamp(t - 2)
+    elif change == 'stopped':
+        node._on_command(NS(data='{"action":"stop"}'))
+    elif change == 'reselected':
+        node._on_command(NS(data='{"action":"track","target_id":"chosen","mode":"centered","altitude_agl_m":17}'))
+    else:
+        node._on_command(NS(data='{"action":"launcher_disarm"}'))
+    expected = node.core.command
+    node._next_after_shot(t, '7')
+    assert node.core.command is expected
+    assert not node.launcher.cycle.running and not node.out.shots
 
 def test_the_node_routes_the_launchers_commands_to_the_fire_control_alone():
     node = node_rig()
@@ -1642,7 +1701,7 @@ def test_the_aircraft_runs_the_launcher_bridge_only_with_its_profile():
     assert 'launcher_bridge' not in plain
     tracker = ros_args(plain['tracker'])
     assert tracker['launcher_fitted'] == 'false'  # the aircraft without the launcher
-    assert tracker['camera_offset_m'] == '[0.137,0.0,-0.080]'
+    assert tracker['camera_offset_m'] == '[0.14215,0.0,-0.0798]'
     services = render('aerodrone_hardware.yaml', 'tracking', 'launcher',
                       TRACKING_LAUNCHER_FITTED='true',
                       TURRET_ARDUINO_PORT='/dev/serial/by-id/usb-1a86_USB_Single_Serial_X-if00')
@@ -1667,8 +1726,8 @@ def test_the_aircraft_runs_the_launcher_bridge_only_with_its_profile():
 
 
 @pytest.mark.skipif(not docker_compose_available(), reason='Docker Compose is not installed')
-@pytest.mark.parametrize('name,offset', [('aerostack2_sim.yaml', '[0.0,0.0,-0.05]'),
-                                         ('aerostack2_isaac.yaml', '[0.0,0.0,-0.08]')])
+@pytest.mark.parametrize('name,offset', [('aerostack2_sim.yaml', '[0.14215,0.0,-0.0798]'),
+                                         ('aerostack2_isaac.yaml', '[0.14215,0.0,-0.0798]')])
 def test_the_simulators_run_the_stand_in_launcher(name, offset):
     for profile in ('tracking', 'tracking_truth'):
         services = render(name, profile)
@@ -1689,8 +1748,8 @@ def test_the_simulator_cameras_are_where_the_env_files_say():
     world = yaml.safe_load((REPO / 'applications/gazebo/config/world_gazebo.yaml').read_text())
     camera = next(item for item in world['drones'][0]['payload']
                   if item['model_name'] == 'downward_rgb')
-    assert camera['xyz'] == [0.0, 0.0, -0.05]
+    assert camera['xyz'] == [0.14215, 0.0, -0.0798]
     isaac = (REPO / 'applications/isaac/scripts/aerodrone_navsim.py').read_text()
-    assert 'CAMERA_OFFSET_M = 0.08' in isaac
+    assert "CAMERA_POSITION_M = AIRFRAME['camera_position_flu_m']" in isaac
     hardware = (REPO / 'hardware/parts/aerodrone/_frame.py').read_text()
     assert 'CAMERA_X = 112.0 + NOSE_SHIFT' in hardware and 'NOSE_SHIFT = 25.0' in hardware

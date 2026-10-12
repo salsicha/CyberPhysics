@@ -16,8 +16,12 @@ services:
     restart: unless-stopped
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - FASTRTPS_DEFAULT_PROFILES_FILE=/workspace/fastdds.xml
+    volumes:
+      - ../systems/aerodrone/config/fastdds.xml:/workspace/fastdds.xml:ro
+      - ../applications/aerostack2/config:/workspace/mavros_config:ro
     command: >
-      ros2 launch mavros apm.launch
+      ros2 launch /workspace/mavros_config/blueos_mavros.launch.xml
         fcu_url:=${BLUEOS_FCU_URL:-tcp://127.0.0.1:5777}
 
   boat_bridge:
@@ -30,7 +34,9 @@ services:
       - boat_mavros
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - FASTRTPS_DEFAULT_PROFILES_FILE=/workspace/fastdds.xml
     volumes:
+      - ../systems/aerodrone/config/fastdds.xml:/workspace/fastdds.xml:ro
       - ../systems/boat/config:/workspace/config:ro
       - /dev/shm:/dev/shm
     command: >
@@ -55,7 +61,9 @@ services:
       - boat_mavros
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - FASTRTPS_DEFAULT_PROFILES_FILE=/workspace/fastdds.xml
     volumes:
+      - ../systems/aerodrone/config/fastdds.xml:/workspace/fastdds.xml:ro
       - ../applications/aerostack2/scripts:/workspace/applications/aerostack2/scripts:ro
       - ../systems/boat/config:/workspace/config:ro
       - /dev/shm:/dev/shm
@@ -75,6 +83,8 @@ services:
     restart: unless-stopped
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - FASTRTPS_DEFAULT_PROFILES_FILE=/workspace/fastdds.xml
     volumes:
+      - ../systems/aerodrone/config/fastdds.xml:/workspace/fastdds.xml:ro
       - /dev/shm:/dev/shm
     command: ros2 launch rosbridge_server rosbridge_websocket_launch.xml port:=9092

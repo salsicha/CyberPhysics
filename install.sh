@@ -29,7 +29,10 @@ repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo "Setting up git"
 sudo apt-get update
-sudo apt-get install -y git-lfs curl
+sudo apt-get install -y git-lfs curl python3 procps
+# Persist and apply camera DDS socket limits before any containers start.
+# Idempotent; existing limits above 4 MiB are preserved.
+sudo python3 "$repo_dir/tools/configure_dds_buffers.py"
 # Repository-local preferences (do not override the user's global git config)
 git -C "$repo_dir" config pull.rebase true
 git -C "$repo_dir" config fetch.prune true
@@ -58,6 +61,11 @@ if ! getent group docker > /dev/null; then
   sudo groupadd docker || true
 fi
 sudo usermod -aG docker "$USER"
+# Recover config created by an earlier sudo docker command. Do not follow
+# symlinks or change files deliberately owned by another non-root account.
+if [ -d "$HOME/.docker" ] && [ ! -L "$HOME/.docker" ]; then
+  sudo find "$HOME/.docker" -xdev -user root -exec chown -h "$(id -u):$(id -g)" {} +
+fi
 
 # Install Foxglove
 sudo snap install foxglove-studio
@@ -73,7 +81,13 @@ curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dear
     sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
 
 sudo apt-get update && sudo apt-get install -y make nvidia-container-toolkit
-sudo nvidia-ctk runtime configure --runtime=docker
+nvidia_runtime_args=(--runtime=docker)
+# Jetson's GPU containers need the NVIDIA runtime, including Compose
+# services that request a GPU without an explicit runtime setting.
+if [ -f /etc/nv_tegra_release ]; then
+  nvidia_runtime_args+=(--set-as-default)
+fi
+sudo nvidia-ctk runtime configure "${nvidia_runtime_args[@]}"
 sudo systemctl daemon-reload
 sudo systemctl restart docker
 

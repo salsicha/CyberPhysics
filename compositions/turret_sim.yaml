@@ -19,6 +19,8 @@ x-pantiltros-image: &pantiltros-image
   pull_policy: build
   build:
     context: ../applications/pantiltros
+    args:
+      TAG: ${CYBERPHYSICS_TAG:-latest}
 
 services:
   pantilt_yolo:
@@ -32,12 +34,13 @@ services:
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
       - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
-      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4?sockets_size=4194304
       - YOLO_CONFIG_DIR=/workspace/cache/ultralytics
       - TORCH_HOME=/workspace/cache/torch
       - PANTILT_MODEL_DIR=/workspace/cache/models
       - DISPLAY=${DISPLAY:-:0}
     volumes:
+      - ../applications/pantiltros/scripts/pantilt_yolo_tracker.py:/scripts/pantilt_yolo_tracker.py:ro
       - ../applications/pantiltros/config:/workspace/pantiltros/config:ro
       - ../cache/turret:/workspace/cache
       - /dev/shm:/dev/shm
@@ -71,7 +74,7 @@ services:
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
       - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
-      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4?sockets_size=4194304
     volumes:
       - ../applications/turret_sim:/workspace/turret_sim:ro
       - ../generated/turret:/workspace/generated/turret

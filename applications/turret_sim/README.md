@@ -138,3 +138,20 @@ python3 applications/turret_sim/scripts/score_tracking_task.py \
 - `scripts/score_tracking_task.py`: telemetry acceptance scorer
 - `scenarios/warehouse_tracking.json`: scene, target, dynamics, and topic contract
 - `validation/acceptance_thresholds.json`: strict tracking thresholds
+
+### Frame delivery versus segmentation misses
+
+The `frame_delivery` report matches each output mask to the input image stamp
+and that frame's ground truth. Empty masks count as processed results. It
+reports published/processed frames, deliberate camera drops, missing results,
+visible targets without a mask, wrong masks, aligned overlap and result latency.
+A two-second drain at the end allows queued results to arrive. These counts
+are separate from the older sampled closed-loop summary.
+
+The 12 October 2026 desktop run processed 361/361 nominal frames after the
+4 MiB DDS UDP socket fix, versus 206/361 before it. The dropout run processed
+349/349 published frames; 12 were deliberately suppressed. The stock model
+still returned no target mask for 132/341 visible nominal frames and failed
+strict tracking acceptance. See [the measured report](../../tools/hardware_validation_20261012.md).
+Run `sudo python3 tools/configure_dds_buffers.py` on a new host so the kernel
+permits the requested socket sizes.

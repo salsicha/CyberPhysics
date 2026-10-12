@@ -62,8 +62,9 @@ pantilt_yolo_tracker:
     manual_timeout_s: 0.5
     status_rate_hz: 5.0
     lock_tolerance_px: 36.0
-    # The Isaac turret has no dart launcher: fire commands are refused ("no launcher").
-    actuator_fitted: false
+    # The Isaac node supplies virtual rack/trigger feedback. Darts are loaded
+    # explicitly with reload; the simulated operator never reloads or arms it.
+    actuator_fitted: true
     launcher_stroke_m: 0.038
     trigger_fire_rad: 0.6
     tag_dwell_s: 0.2
@@ -71,7 +72,7 @@ pantilt_yolo_tracker:
     tag_min_interval_s: 2.0
     tag_stroke_timeout_s: 3.0
     tag_lock_timeout_s: 0.5
-    auto_next: false
+    auto_next: true
     darts: 0
     person_aim_fraction: 0.6
     person_max_box_fraction: 0.6

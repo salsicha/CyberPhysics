@@ -37,16 +37,18 @@ from ardupilot_json import (  # noqa: E402
     ArduPilotJSON,
     pwm_to_rotor_speed,
     quaternion_to_matrix,
+    matrix_to_quaternion,
     state_from_enu,
 )
+from airframe_model import load_airframe, load_visual_triangles
 from tracking_targets import HALT_TOPIC, HIDE_TOPIC, TRUTH_TOPIC, Tracks, truth_json  # noqa: E402
 
 
-DRONE_SIZE_M = (0.47, 0.47, 0.11)
+AIRFRAME = load_airframe()
 CAMERA_PATH = "/World/NavDrone/downward_camera"
 CAMERA_FRAME = "downward_camera_optical_frame"
 # Optical centre below the body origin.
-CAMERA_OFFSET_M = 0.08
+CAMERA_POSITION_M = AIRFRAME['camera_position_flu_m']
 IMAGE_WIDTH = 640
 IMAGE_HEIGHT = 480
 # 60 degrees across the width; RTX derives the vertical extent from the
@@ -260,9 +262,7 @@ def add_sky(stage):
 def add_camera(stage):
     from pxr import Gf, UsdGeom
 
-    # A child of the drone, looking down its -z axis: the image top points
-    # along the body +y axis (left of the nose), camera_mount_yaw_deg 90.
-    # The drone prim is scaled to its box size; undo that for the camera.
+    # Downward OAK lens, image top toward the nose as in the real assembly.
     camera = UsdGeom.Camera.Define(stage, CAMERA_PATH)
     camera.GetHorizontalApertureAttr().Set(HORIZONTAL_APERTURE_MM)
     camera.GetVerticalApertureAttr().Set(
@@ -271,8 +271,40 @@ def add_camera(stage):
     # Far enough for the CRUISE_AGL_M cruise over the terrain's relief.
     camera.GetClippingRangeAttr().Set(Gf.Vec2f(0.3, 1000.0))
     xform = UsdGeom.Xformable(camera)
-    xform.AddTranslateOp().Set(Gf.Vec3d(0.0, 0.0, -CAMERA_OFFSET_M / DRONE_SIZE_M[2]))
-    xform.AddScaleOp().Set(Gf.Vec3f(*(1.0 / size for size in DRONE_SIZE_M)))
+    xform.AddTranslateOp().Set(Gf.Vec3d(*CAMERA_POSITION_M))
+    xform.AddRotateZOp().Set(-90.0)
+
+
+def add_airframe(stage, home):
+    """STL visual with CAD contact boxes and the shared full inertia tensor."""
+    from pxr import Gf, UsdGeom, UsdPhysics
+    body = UsdGeom.Xform.Define(stage, '/World/NavDrone')
+    body.AddTranslateOp().Set(Gf.Vec3d(*home))
+    UsdPhysics.RigidBodyAPI.Apply(body.GetPrim())
+    mass = UsdPhysics.MassAPI.Apply(body.GetPrim())
+    mass.CreateMassAttr(AIRFRAME['mass_kg'])
+    mass.CreateCenterOfMassAttr(Gf.Vec3f(*AIRFRAME['center_of_mass_m']))
+    values, axes = np.linalg.eigh(AIRFRAME['inertia_kg_m2'])
+    if np.linalg.det(axes) < 0:
+        axes[:, 0] *= -1
+    q = matrix_to_quaternion(axes)
+    mass.CreateDiagonalInertiaAttr(Gf.Vec3f(*values))
+    mass.CreatePrincipalAxesAttr(Gf.Quatf(q[0], Gf.Vec3f(*q[1:])))
+    # Binary STL in metres, generated from the committed printable meshes.
+    triangles = load_visual_triangles()
+    visual = UsdGeom.Mesh.Define(stage, '/World/NavDrone/airframe')
+    visual.CreatePointsAttr(triangles.reshape(-1, 3).tolist())
+    visual.CreateFaceVertexCountsAttr([3] * len(triangles))
+    visual.CreateFaceVertexIndicesAttr(np.arange(len(triangles) * 3).tolist())
+    visual.CreateSubdivisionSchemeAttr('none')
+    visual.CreateDisplayColorAttr([Gf.Vec3f(.18, .22, .3)])
+    for box in AIRFRAME['collision_boxes']:
+        collision = UsdGeom.Cube.Define(stage, '/World/NavDrone/contact_' + box['name'])
+        collision.CreateSizeAttr(1.0)
+        collision.AddTranslateOp().Set(Gf.Vec3d(*box['center_m']))
+        collision.AddScaleOp().Set(Gf.Vec3f(*box['size_m']))
+        collision.CreateVisibilityAttr('invisible')
+        UsdPhysics.CollisionAPI.Apply(collision.GetPrim())
 
 
 class DownwardCamera:
@@ -323,7 +355,7 @@ def build_world(asset_dir, physics_rate, camera_rate):
     import carb
     import omni.usd
     from isaacsim.core.api import World
-    from isaacsim.core.api.objects import DynamicCuboid, FixedCuboid
+    from isaacsim.core.api.objects import FixedCuboid
     from isaacsim.core.experimental.prims import RigidPrim
     from pxr import PhysxSchema
 
@@ -340,13 +372,10 @@ def build_world(asset_dir, physics_rate, camera_rate):
     # while ArduPilot initializes, without replacing the surrounding terrain.
     world.scene.add(FixedCuboid(
         prim_path="/World/LaunchPad", name="launch_pad",
-        position=home + np.array([0.0, 0.0, -0.12]),
+        position=home + np.array([0.0, 0.0, -AIRFRAME['ground_clearance_m'] - .11]),
         scale=np.array([3.0, 3.0, 0.2]),
         color=np.array([0.20, 0.22, 0.24])))
-    world.scene.add(DynamicCuboid(
-        prim_path="/World/NavDrone", name="nav_drone", position=home,
-        scale=np.array(DRONE_SIZE_M), mass=1.5,
-        color=np.array([0.04, 0.18, 0.72])))
+    add_airframe(stage, home)
     # Match the passive rigid-body losses present in the Gazebo rotor model.
     # A perfectly lossless cuboid is not a credible airframe and makes the
     # stock ArduCopter rate loop unrealistically underdamped.
@@ -355,7 +384,7 @@ def build_world(asset_dir, physics_rate, camera_rate):
     physx_body.CreateLinearDampingAttr().Set(0.15)
     physx_body.CreateAngularDampingAttr().Set(0.20)
     add_camera(stage)
-    rigid = RigidPrim("/World/NavDrone", masses=[1.5])
+    rigid = RigidPrim("/World/NavDrone")
     world.reset()
     settings = carb.settings.get_settings()
     for key, value in RENDER_SETTINGS.items():
@@ -515,14 +544,13 @@ def main():
     rotor_speed = np.zeros(4)
     # Pinned ArduPilot quad-X output order: front-right, rear-left,
     # front-left, rear-right. Reaction torque is opposite propeller spin.
-    rotor_positions = np.array([[0.13, -0.22], [-0.13, 0.20],
-                                [0.13, 0.22], [-0.13, -0.20]])
-    yaw_sign = np.array([-1.0, -1.0, 1.0, 1.0])
-    thrust_coefficient = 8.54858e-6
-    moment_coefficient = 0.016
+    rotor_positions = np.array(AIRFRAME['rotor_positions_flu_m']) - AIRFRAME['center_of_mass_m']
+    yaw_sign = np.array(AIRFRAME['rotor_yaw_sign'])
+    thrust_coefficient = AIRFRAME['motor_constant']
+    moment_coefficient = AIRFRAME['moment_constant']
     dt = 1.0 / physics_rate
     stride = render_stride(physics_rate, camera_rate)
-    maximum_rotor_speed = env_float("ISAAC_MAX_ROTOR_SPEED", 1000.0)
+    maximum_rotor_speed = env_float("ISAAC_MAX_ROTOR_SPEED", AIRFRAME['max_rotor_speed_rad_s'])
     tick = 0
     last_frame_count = None
     state = None

@@ -61,13 +61,11 @@ emergency stop stay the stops.
   and torque with it) and is at the 12.6 V ceiling when full. So the servo
   rail is a regulated 12 V from the drive battery. The URDF's servo speed and the tracker's rate limits
   assume 12 V.
-- **Jetson software.** `compositions/racecarneo_hardware.yaml` is not
-  supported on arm64 as is (the nvblox image installs x86_64 Isaac ROS
-  packages), and the PanTiltROS image installs x86_64 PyTorch wheels. The
-  turret camera driver, the servo bridge, the web UI and
-  `cmd_vel_to_ackermann` have no GPU dependencies; the YOLO tracker and
-  nvblox need Jetson builds (JetPack PyTorch or TensorRT) that this
-  repository does not provide yet.
+- **Jetson software.** Native ARM64 builds for nvblox and PanTiltROS target
+  JetPack 7.2 on Orin, with Isaac ROS 4.6 and CUDA-enabled PyTorch. Build
+  and run the acceptance checks in [Jetson GPU images](../applications/jetson.md)
+  before bring-up. An x86 GPU host is not required by the build design;
+  performance on the physical Orin Nano still needs measurement.
 - **Compute budget (Orin Nano 8 GB).** YOLO and nvblox share one small GPU
   and 8 GB of memory with the CPU. As configured for a desktop GPU they
   may not both keep up; reduce, roughly in this order:

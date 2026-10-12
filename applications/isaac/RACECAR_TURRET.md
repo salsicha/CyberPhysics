@@ -379,8 +379,21 @@ stereo camera's error.
   or are chosen, not identified on the car.
 - **Turret**: the servos' motion profile is modelled and the joints follow
   it stiffly: no backlash, compliance or load-dependent speed. The foam
-  dart launcher is not simulated (the assets expand the URDF with
-  `launcher:=false`; any further joint would be held at zero).
+  launcher rack and trigger use a separate virtual servo plant. Its moving
+  CAD geometry and a ballistic dart are not rendered (the vehicle assets
+  expand the URDF with `launcher:=false`). Shot events measure release only.
 - **Truth**: collisions are counted from the footprint (0.50 × 0.34 m)
   against the scenario's obstacle and people shapes, not from contact
   forces; visibility uses the same shapes.
+
+### Simulated launcher operator
+
+The Isaac car now supplies a virtual rack/sear/trigger plant and launcher
+feedback on the existing turret topics. `SIM_AUTO_FIRE=true` enables a
+simulation-only operator that sends one `tag` request per centered, ready target
+ID; it never arms or reloads the launcher. Supply the virtual darts and release
+the simulated emergency stop through the normal UI before testing. Completed
+shots advance to the nearest untagged target (`auto_next=true`), while faults
+and operator overrides cancel pending selection. Shot events appear on
+`/simulation/launcher/shots`. Set `SIM_AUTO_FIRE=false` for explicit-command
+regressions. Hardware compositions never load the simulated operator.

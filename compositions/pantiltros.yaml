@@ -8,6 +8,8 @@ services:
     pull_policy: build
     build:
       context: ../applications/pantiltros
+      args:
+        TAG: ${CYBERPHYSICS_TAG:-latest}
     container_name: pantilt_yolo
     network_mode: host
     ipc: host
@@ -17,7 +19,7 @@ services:
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
       - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
-      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4?sockets_size=4194304
       - YOLO_CONFIG_DIR=/workspace/cache/ultralytics
       - TORCH_HOME=/workspace/cache/torch
       - PANTILT_MODEL_DIR=/workspace/cache/models

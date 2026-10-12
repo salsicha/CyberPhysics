@@ -163,7 +163,7 @@ stand-in (`aerodrone_tracking_sim.yaml`, `tracking_launcher`:
 and safety behaviour, the joints at the ST3215's speed on the simulation
 clock, and no dart physics.
 
-**Objects only, never people; the operator fires every shot.** The fire
+**Objects only, never people; on hardware, the operator fires every shot.** The fire
 control runs in the tracker (`applications/aerostack2/scripts/launcher_core.py`,
 which gives the reasons for every value below).
 
@@ -188,8 +188,17 @@ Commands (`/tracking/command`):
   prime (the rack back to the sear, verified from the measured position),
   rack forward, trigger, trigger back to 0, then record the shot. One
   command, one cycle, at most one dart. Nothing else primes or fires the
-  launcher: there is no automatic, timed or on-lock firing, and no option
-  that enables it.
+  hardware launcher. The simulator stand-in can issue this command when
+  centered and ready (`SIM_AUTO_FIRE=true`, simulation time required). It
+  neither arms nor reloads the launcher, and attempts each target ID once.
+
+After a successfully completed shot, `auto_next` (default true) selects the
+nearest fresh, untagged vehicle detection and preserves the previous tracking
+mode and altitude. A fault, disarm, stop or operator target change cancels
+pending selection. Previously fired IDs are excluded for this tracker session;
+detector IDs are not persistent identities across restarts or reacquisition.
+Automatic selection only changes aim. Hardware still requires a new explicit
+fire command. The simulated launcher alone can generate the next fire command.
 
 A fire command runs only when every gate holds, otherwise it is refused
 with the reason in the status's `fire_block` (the first gate that does not

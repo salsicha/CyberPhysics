@@ -6,6 +6,13 @@ behind the production-style MAVROS/`as2_platform_blueos` boundary; PWM output
 drives Gazebo's native rotor model and Gazebo state is returned over ArduPilot's
 JSON external-physics protocol.
 
+The backend rotates [Gazebo OdometryPublisher's body-frame FLU linear velocity](https://github.com/gazebosim/gz-sim/blob/ign-gazebo6/src/systems/odometry_publisher/OdometryPublisher.cc#L347-L365)
+into world ENU using the ground-truth attitude, then converts ENU to ArduPilot's
+NED frame. This is the default for every Gazebo mission, including tracking
+and the [GPS-denied baseline test](../../tools/gps_denied_sim_test.md).
+`GAZEBO_TWIST_IN_BODY_FRAME=false` is only for a replacement twist source
+already expressed in world ENU; set it in the backend container's environment.
+
 The asset stage builds an 8 km Mount Tamalpais world from cached real SRTM
 elevations and ArcGIS World Imagery. The textured render mesh and conservative
 native collision cells use the same DEM. Native Gazebo RGB, RGB-D, IMU, pose,
@@ -13,6 +20,7 @@ and velocity outputs feed ArduPilot, DemNav, and WildNav—no synthetic sensor
 publisher is started.
 
 ```bash
+git lfs pull --include="applications/aerostack2/models/aerodrone/*.stl"
 docker compose -f compositions/aerostack2_sim.yaml up
 ```
 
@@ -33,18 +41,20 @@ aerostack2 image, which installs Gazebo Fortress (`ros_gz`) and Aerostack2's
 `hd_camera` and `rgbd_camera` templates and `launch/drone_bridges.py`; the image
 build fails if any of those files is missing.
 
-Nothing rendered may hang below the downward cameras: Gazebo's depth camera
-reports geometry inside its near clip as `-inf`, so a visual under the lenses
-blanks every depth frame (the landing gear is collision only).
+The full CAD airframe, including landing gear and launcher, is rendered from
+the shared mesh. Both downward cameras use the nose-mounted OAK lens position
+from its manifest. Camera placement and self-occlusion are part of the depth
+stream validation when changing the assembly.
 
 Rendering is software (Mesa llvmpipe, EGL surfaceless), so no GPU is needed.
 On a 20-core workstation, with the whole stack running, Gazebo keeps a real-time
 factor of about 0.98 and renders both cameras at about 4.9 of their 5 Hz, more than
 DemNav (every depth frame) and WildNav (`WILDNAV_RATE_HZ`, 0.2 Hz) use.
 
-SITL loads only the shared ArduCopter parameters (`systems/aerodrone/config`):
-in flight Gazebo's quadrotor learns a hover throttle of 0.67, the hardware
-`MOT_THST_HOVER`, so unlike Isaac it needs no backend compensation.
+SITL loads the shared ArduCopter parameters (`systems/aerodrone/config`).
+Rotor layout, maximum speed and thrust constant now come from the loaded
+airframe model; the earlier generic quadrotor's measured hover throttle of
+0.67 is not a calibration of this 3.165 kg assembly.
 
 The tracking targets (a car and two people, `applications/aerostack2/README.md`,
 "Tracking targets and scenario") are visual-only, gravity-free models the

@@ -103,6 +103,7 @@ class Rig:
         parameters.update(profile())
         parameters.update(actuator_fitted=True, publish_annotated_image=False,
                           show_window=False, base_compensation=False, target_lead=False,
+                          auto_next=False,  # cycle fixtures keep their selected target
                           # the rig's detections stay where they are drawn,
                           # whatever the aim: no drop offset unless a test sets one
                           aim_offset_range_m=[1.0, 10.0], aim_offset_pitch_deg=[0.0, 0.0])
@@ -245,6 +246,9 @@ def two_people(dx=0.0):
 
 def locked_rig(tracker, darts=3, rig_class=None, **overrides):
     """Armed, ready, loaded, locked on the person at the centre."""
+    # Most cycle tests deliberately keep their original target after a shot.
+    # Advancement has its own end-to-end test below.
+    overrides.setdefault('auto_next', False)
     rig = (rig_class or Rig)(tracker, **overrides)
     rig.set_estop(0.0, False)
     rig.run(0.0, 0.3, lambda t: two_people())
@@ -975,6 +979,35 @@ def test_the_sweeps_shoot_on_both_sides_of_the_zone_and_meet_it(tracker):
 
 # --- next, auto_next, clear_tags, status --------------------------------------------
 
+def test_simulated_operator_completes_two_targets_once_each(tracker):
+    """The car's simulation adapter uses the shared tracker and servo plant;
+    completing a cycle advances aim before the adapter requests another shot.
+    """
+    operator = load_script(
+        REPO / 'applications/aerostack2/scripts/simulation_trigger.py',
+        'turret_simulated_operator_test').SimulationTrigger('tag')
+    rig = Rig(tracker, auto_next=True)
+    seen = lambda: [detection(CX - 8, CY, w=6, h=6, cls='cart'),
+                    detection(CX + 8, CY, w=6, h=6, cls='cart')]
+    rig.set_estop(0.0, False)
+    rig.run(0.0, 0.3, lambda t: seen())
+    first, second = [item['id'] for item in rig.segments[-1]]
+    rig.command(.31, action='lock', target_id=first)
+    rig.command(.32, action='reload', darts=2)
+    for step in range(1, 751):
+        t = .32 + step * .02
+        rig.advance(t)
+        if step % 3 == 0:
+            rig.frame(t, seen())
+        rig.tick(t)
+        command = operator.command(rig.status(t), T0 + t)
+        if command:
+            rig.command(t, **command)
+    assert rig.node.tagged_ids == [first, second]
+    assert len(rig.shots) == 2
+    assert rig.node.darts == 0
+
+
 def test_auto_next_aims_at_the_nearest_untagged_and_never_fires(tracker):
     rig, centre = locked_rig(tracker, darts=5, auto_next=True)
     people = lambda t: [person_at_torso(CX + 4.0, CY + 2.0), person_at_torso(120.0, CY),
@@ -1020,15 +1053,16 @@ def test_status_fields_and_the_contract(tracker):
 def test_the_profiles_leave_the_launcher_to_the_compositions(tracker):
     for name in ('turret_tracker.yaml', 'turret_tracker_isaac.yaml'):
         params = profile(name)
-        assert params['actuator_fitted'] is False and params['auto_next'] is False
+        assert params['actuator_fitted'] is (name == 'turret_tracker_isaac.yaml')
+        assert params['auto_next'] is True
         assert params['darts'] == 0
         # the car's no-fire zone on both (test_the_car_s_no_fire_zone)
         assert params['no_fire_zones_rad'] == [-0.17, 0.26, -1.5708, -0.42]
-    # The drop table where a launcher is fitted; none in Isaac (no launcher)
+    # Isaac models trigger cycles, without a ballistic projectile/drop model.
     assert profile('turret_tracker_isaac.yaml')['aim_offset_pitch_deg'] == [0.0, 0.0]
     assert profile('turret_tracker.yaml')['aim_offset_pitch_deg'] != [0.0, 0.0]
-    for name in ('actuator_fitted', 'auto_next'):
-        assert tracker.DEFAULT_PARAMETERS[name] is False
+    assert tracker.DEFAULT_PARAMETERS['actuator_fitted'] is False
+    assert tracker.DEFAULT_PARAMETERS['auto_next'] is True
     compose = yaml.safe_load((REPO / 'compositions/racecar_turret_hardware.yaml').read_text())
     tracker_command = compose['services']['turret_tracker']['command']
     assert 'actuator_fitted:=${TURRET_ACTUATOR_FITTED:-true}' in tracker_command

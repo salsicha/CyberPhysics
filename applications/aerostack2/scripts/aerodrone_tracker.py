@@ -97,6 +97,9 @@ PARAMETERS = {
     # often its fire cycle steps.
     'launcher_topic_prefix': '/aerodrone/launcher',
     'launcher_rate_hz': 20.0,
+    # After a completed operator-commanded shot, follow the nearest visible
+    # untagged object. Selecting the next target never fires the launcher.
+    'auto_next': True,
 }
 CONFIG_FIELDS = {name: value for name, value in
                  vars(tc.TrackerConfig()).items()}
@@ -234,6 +237,10 @@ class Tracker:
             name: parameter_value(param(name), default)
             for name, default in LAUNCHER_FIELDS.items()}))
         self.launcher_fitted = self.launcher.config.launcher_fitted
+        self.auto_next = flag(param('auto_next'))
+        self.auto_next_command = None
+        self.tagged_ids = set()
+        self.last_detections = None
         self.camera_offset = tuple(float(value) for value in param('camera_offset_m'))
         if len(self.camera_offset) != 3 or not all(math.isfinite(v) for v in self.camera_offset):
             raise ValueError('camera_offset_m must be three finite numbers')
@@ -417,6 +424,7 @@ class Tracker:
 
     def _preempt(self, reason):
         with self.lock:
+            self.auto_next_command = None
             if not self.core.active:
                 return
             self.node.get_logger().info(f'tracking pre-empted by {reason}')
@@ -433,7 +441,12 @@ class Tracker:
             if launcher_command is not None:
                 # fire, launcher_arm, launcher_disarm, reload
                 situation = self._situation(now)
+                was_running = self.launcher.cycle.running
                 result = self.launcher.handle(launcher_command, now, situation)
+                if launcher_command['action'] == 'fire' and not was_running and self.launcher.cycle.running:
+                    self.auto_next_command = self.core.command
+                elif launcher_command['action'] == 'launcher_disarm':
+                    self.auto_next_command = None
                 self.node.get_logger().info(f'launcher command {msg.data!r}: {result}')
                 self._launcher_outputs(now, situation)
             else:
@@ -445,6 +458,8 @@ class Tracker:
                     f'({self.core.message})')
                 self._execute(actions)
                 action = tc.parse_command(msg.data, self.config)[0]
+                if action is not None:
+                    self.auto_next_command = None
                 if action is not None and self.launcher.abort(now, f'{action.action} command'):
                     # A stop or track command ends a fire cycle in progress.
                     self._launcher_outputs(now, self._situation(now))
@@ -452,6 +467,7 @@ class Tracker:
 
     def _on_detections(self, msg):
         with self.lock:
+            self.last_detections = msg
             core = self.core
             if self.launcher_fitted:
                 self._launcher_detections(msg)
@@ -785,6 +801,7 @@ class Tracker:
                                       self._notes(now))
             situation = self._situation(now)
             status.update(self.launcher.status(now, situation))
+            status.update(stamp=now, auto_next=self.auto_next, tagged_ids=sorted(self.tagged_ids))
             self.status_block = status['fire_block']
             self.status_block_time = now
         self.status_pub.publish(self.String(data=tc.status_json(status)))
@@ -885,6 +902,49 @@ class Tracker:
             record = self.launcher.records.pop(0)
             self.shots_pub.publish(self.String(data=json.dumps(record)))
             self.node.get_logger().info(f'shot {record["shot"]}: {json.dumps(record)}')
+            if record['result'] == 'fired':
+                self.tagged_ids.add(record['target_id'])
+                self._next_after_shot(now, record['target_id'])
+            self.auto_next_command = None
+
+    def _next_after_shot(self, now, target_id):
+        """Aim only, after a completed cycle; never override a later command.
+
+        Use a fresh, geolocatable detection, excluding people/unknown classes
+        and IDs already tagged in this session. No candidate: keep the current
+        selection. A subsequent shot still requires a fresh fire command.
+        """
+        core = self.core
+        if (not self.auto_next or not self.launcher.armed or core.state != 'tracking'
+                or core.command is None or core.command is not self.auto_next_command
+                or core.command.target_id != target_id or self.intrinsics is None):
+            return
+        frame = self.last_detections
+        if frame is None:
+            return
+        image_time = self._image_time(frame.header.stamp, now)
+        if image_time is None or not 0 <= now - image_time <= self.launcher.config.fire_detection_timeout_s:
+            return
+        pose = self.poses.at(stamp_ns(frame.header.stamp))
+        drone = self._drone(now)
+        if pose is None or drone is None or drone.busy or not drone.flying:
+            return
+        candidates = []
+        for item in frame.detections:
+            if not item.id or item.id in self.tagged_ids or lc.person_like(detection_class(item)):
+                continue
+            geo = self._geolocate(item, pose, now)
+            if geo is not None:
+                distance = math.hypot(geo.position[0] - pose.position[0],
+                                      geo.position[1] - pose.position[1])
+                candidates.append((distance, item.id, item))
+        if not candidates:
+            self.node.get_logger().info('auto next: no untagged object in the current frame')
+            return
+        _, next_id, _ = min(candidates, key=lambda candidate: candidate[:2])
+        command = dict(vars(core.command), target_id=next_id)
+        self._execute(core.handle_command(json.dumps(command), now, drone))
+        self.node.get_logger().info(f'auto next: following {next_id} after shot at {target_id}')
 
     def _send_launcher(self, goals):
         """A joint command: the rack's goal (none: stopped where it is) and
@@ -918,6 +978,7 @@ class Tracker:
             return
         try:
             with self.lock:
+                self.auto_next_command = None
                 self.launcher.disarm(self.now(), 'shutdown')
                 self._send_launcher((None, 0.0))
                 self._publish_estop()

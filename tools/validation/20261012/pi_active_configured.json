@@ -1,0 +1,95 @@
+{
+  "tracking_subscribed": true,
+  "seconds": 60.0,
+  "topics": {
+    "/oak1/image_raw": {
+      "count": 171,
+      "hz": 2.85,
+      "unique_stamps": 171,
+      "gap_p95_s": 0.40043740889923357,
+      "gap_max_s": 0.40657684599864297,
+      "age_p95_s": 0.002856612205505371,
+      "width": 256,
+      "height": 192,
+      "encoding": "bgr8",
+      "bytes": 147456,
+      "pixel_mean": 22.503621419270832,
+      "pixel_std": 43.86851739553714
+    },
+    "/oak1/relative_depth": {
+      "count": 171,
+      "hz": 2.85,
+      "unique_stamps": 171,
+      "gap_p95_s": 0.40044874745144626,
+      "gap_max_s": 0.40729349500179524,
+      "age_p95_s": 0.006058216094970703,
+      "width": 256,
+      "height": 192,
+      "encoding": "32FC1",
+      "bytes": 196608,
+      "finite_fraction": 1.0
+    },
+    "/oak1/camera_info": {
+      "count": 171,
+      "hz": 2.85,
+      "unique_stamps": 171,
+      "gap_p95_s": 0.4005750135525886,
+      "gap_max_s": 0.4073774940043222,
+      "age_p95_s": 0.006708502769470215,
+      "width": 256,
+      "height": 192,
+      "fx": 197.45787048339844,
+      "fy": 197.45787048339844,
+      "calibration_valid": true
+    },
+    "/oak1/image_highres": {
+      "count": 29,
+      "hz": 0.48333333333333334,
+      "unique_stamps": 29,
+      "gap_p95_s": 2.0107353265499115,
+      "gap_max_s": 2.0119808000017656,
+      "age_p95_s": 0.011670351028442383,
+      "width": 1280,
+      "height": 720,
+      "encoding": "bgr8",
+      "bytes": 2764800,
+      "pixel_mean": 7.784573206018519,
+      "pixel_std": 20.53008804297297
+    },
+    "/tracking/detections": {
+      "count": 300,
+      "hz": 5.0,
+      "unique_stamps": 300,
+      "gap_p95_s": 0.35000712289474906,
+      "gap_max_s": 0.4236018890005653,
+      "age_p95_s": 0.307244336605072,
+      "last_detection_count": 1
+    },
+    "/tracking/image/compressed": {
+      "count": 300,
+      "hz": 5.0,
+      "unique_stamps": 300,
+      "gap_p95_s": 0.35002097159886036,
+      "gap_max_s": 0.42132216499885544,
+      "age_p95_s": 0.3095672011375427,
+      "format": "jpeg",
+      "bytes": 14824
+    },
+    "/tracking/camera_info": {
+      "count": 300,
+      "hz": 5.0,
+      "unique_stamps": 300,
+      "gap_p95_s": 0.3499269895990437,
+      "gap_max_s": 0.4210456660002819,
+      "age_p95_s": 0.3100738048553467,
+      "width": 640,
+      "height": 352,
+      "fx": 493.6446533203125,
+      "fy": 493.6446533203125,
+      "calibration_valid": true
+    }
+  },
+  "tracking_paired_stamps": 300,
+  "tracking_unpaired_stamps": 0,
+  "passed": true
+}

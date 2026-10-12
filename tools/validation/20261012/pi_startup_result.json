@@ -1,0 +1,44 @@
+[
+  {
+    "command": "docker restart -t 5 cp_mavros_configured",
+    "stdout": "cp_mavros_configured\n",
+    "stderr": "",
+    "elapsed_s": 5.433665330056101,
+    "exit_code": 0
+  },
+  {
+    "command": "docker compose -p cp_startup -f /tmp/cp_startup/compose.json up -d --pull never",
+    "stdout": "",
+    "stderr": " Network cp_startup_default Creating \n Network cp_startup_default Created \n Container cp_startup_mavros Creating \n Container cp_startup_wildnav Creating \n Container cp_startup_demnav Creating \n Container cp_startup_wildnav Created \n Container cp_startup_demnav Created \n Container cp_startup_mavros Created \n Container cp_startup_aerostack Creating \n Container cp_startup_aerostack Created \n Container cp_startup_behavior_tree Creating \n Container cp_startup_behavior_tree Created \n Container cp_startup_mavros Starting \n Container cp_startup_demnav Starting \n Container cp_startup_wildnav Starting \n Container cp_startup_mavros Started \n Container cp_startup_aerostack Starting \n Container cp_startup_wildnav Started \n Container cp_startup_demnav Started \n Container cp_startup_aerostack Started \n Container cp_startup_behavior_tree Starting \n Container cp_startup_behavior_tree Started \n",
+    "elapsed_s": 2.644172698026523,
+    "exit_code": 0
+  },
+  {
+    "command": "docker compose -p cp_startup -f /tmp/cp_startup/compose.json ps -a",
+    "stdout": "NAME                       IMAGE                                    COMMAND                  SERVICE         CREATED         STATUS                  PORTS\ncp_startup_aerostack       salsicha/cyberphysics:aerostack2-arm64   \"/entrypoint.sh ros2\u2026\"   aerostack       2 seconds ago   Up 1 second             \ncp_startup_behavior_tree   salsicha/cyberphysics:aerostack2-arm64   \"/entrypoint.sh pyth\u2026\"   behavior_tree   2 seconds ago   Up Less than a second   \ncp_startup_demnav          salsicha/cyberphysics:aerostack2-arm64   \"/entrypoint.sh pyth\u2026\"   demnav          3 seconds ago   Up 1 second             \ncp_startup_mavros          salsicha/cyberphysics:aerostack2-arm64   \"/entrypoint.sh ros2\u2026\"   mavros          3 seconds ago   Up 1 second             \ncp_startup_wildnav         salsicha/cyberphysics:aerostack2-arm64   \"/entrypoint.sh pyth\u2026\"   wildnav         3 seconds ago   Up 1 second             \n",
+    "stderr": "",
+    "elapsed_s": 0.2555343231651932,
+    "exit_code": 0
+  },
+  {
+    "command": "docker logs cp_startup_behavior_tree",
+    "stdout": "",
+    "stderr": "",
+    "elapsed_s": 0.09952958300709724,
+    "exit_code": 0
+  },
+  {
+    "command": "docker top cp_startup_behavior_tree -o args",
+    "stdout": "",
+    "stderr": "Error response from daemon: Couldn't find PID field in ps output\n",
+    "elapsed_s": 0.14062405098229647,
+    "exit_code": 1
+  },
+  {
+    "command": "docker compose -p cp_startup -f /tmp/cp_startup/compose.json down --timeout 5",
+    "stdout": "",
+    "stderr": " Container cp_startup_behavior_tree Stopping \n Container cp_startup_behavior_tree Stopped \n Container cp_startup_behavior_tree Removing \n Container cp_startup_behavior_tree Removed \n Container cp_startup_demnav Stopping \n Container cp_startup_aerostack Stopping \n Container cp_startup_wildnav Stopping \n Container cp_startup_aerostack Stopped \n Container cp_startup_aerostack Removing \n Container cp_startup_aerostack Removed \n Container cp_startup_mavros Stopping \n Container cp_startup_mavros Stopped \n Container cp_startup_mavros Removing \n Container cp_startup_mavros Removed \n Container cp_startup_wildnav Stopped \n Container cp_startup_wildnav Removing \n Container cp_startup_wildnav Removed \n Container cp_startup_demnav Stopped \n Container cp_startup_demnav Removing \n Container cp_startup_demnav Removed \n Network cp_startup_default Removing \n Network cp_startup_default Removed \n",
+    "elapsed_s": 11.795514351921156,
+    "exit_code": 0
+  }
+]

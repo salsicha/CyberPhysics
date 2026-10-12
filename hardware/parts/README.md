@@ -54,10 +54,18 @@ Run from the repository root. Variants:
 | `aerodrone` | one platform |
 | `aerodrone --part motor_mount` | one part (no docs, no assembly check) |
 | `--out DIR` | write STL/STEP/manifest to `DIR/<platform>/`; the repository is not touched |
-| `--check` | rebuild in a temporary directory and fail if a committed STL or generated doc block is stale (CI runs this) |
+| `--check` | rebuild temporarily and check STL surfaces, manifests and generated doc blocks; `--part` checks the selected STL only |
 | `--previews DIR` | also render a PNG of each part in its print orientation |
 | `--figures` | regenerate the assembly figures in `hardware/parts/<platform>/images/` |
 | `--list` | list the platforms and parts |
+
+`--check` is read-only and rejects `--out`, `--figures` and `--previews`.
+With `--out`, figures are written under that output directory, JSON manifest
+paths resolve relative to the manifest directory, and omitted STEP files are
+reported as null. Temporary build
+directories are cleaned on success and failure. Mesh freshness compares the
+actual surface (0.05 mm tolerance), so a moved hole cannot pass merely because
+volume, bounds and triangle count happen to match.
 
 Exit status 1 if any part fails validation, the assembly check fails, or
 (with `--check`) anything is stale. A source change without regenerated

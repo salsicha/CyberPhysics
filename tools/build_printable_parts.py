@@ -44,7 +44,6 @@ import hashlib
 import importlib
 import json
 import re
-import shutil
 import struct
 import sys
 import tempfile
@@ -771,18 +770,44 @@ def compare_stl(committed, rebuilt):
         problems.append(f"bounding box {a.extents.round(2).tolist()} vs rebuilt {b.extents.round(2).tolist()}")
     if abs(len(a.faces) - len(b.faces)) > FRESH_TRIANGLES_REL * len(b.faces):
         problems.append(f"{len(a.faces)} triangles vs rebuilt {len(b.faces)}")
+    # Equal bounds, volume and triangle count do not detect a moved hole.
+    # Compare both surfaces, without relying on STL vertex/face ordering.
+    def triangles(mesh):
+        points = np.round(mesh.triangles, 5)
+        points = np.sort(points.view([('x', 'f8'), ('y', 'f8'), ('z', 'f8')]), axis=1)
+        data = points.tobytes()
+        return sorted(data[i:i + 72] for i in range(0, len(data), 72))
+
+    if triangles(a) != triangles(b):
+        import trimesh
+        for source, target in ((a, b), (b, a)):
+            points = np.vstack((source.vertices, source.triangles_center))
+            maximum = 0.0
+            for offset in range(0, len(points), 512):
+                _, distances, _ = trimesh.proximity.closest_point(target, points[offset:offset + 512])
+                maximum = max(maximum, float(distances.max()))
+                if maximum > FRESH_BBOX_MM:
+                    break
+            if maximum > FRESH_BBOX_MM:
+                problems.append(f"surface differs by at least {maximum:.3f} mm")
+                break
     return problems
 
 
 # --------------------------------------------------------------------- main
 
 def run_platform(platform, args, report):
+    # Clean up also on partial checks, validation failure and exceptions.
+    with tempfile.TemporaryDirectory(prefix=f"parts-{platform}-") as work:
+        return _run_platform(platform, args, report, Path(work))
+
+
+def _run_platform(platform, args, report, work):
     only = set(args.part) if args.part else None
     mods = load_parts(platform, only)
     if not mods:
         return True
     if args.check:
-        work = Path(tempfile.mkdtemp(prefix=f"parts-{platform}-"))
         stl_dir, step_dir = work / "stl", None
     elif args.out:
         stl_dir, step_dir = Path(args.out) / platform / "stl", Path(args.out) / platform / "step"
@@ -806,6 +831,11 @@ def run_platform(platform, args, report):
         entry, mesh = build_part(platform, stem, mod, stl_path, step_path)
         entry["stl"] = str((PARTS / platform / "stl" / f"{stem}.stl").relative_to(REPO))
         entry["step"] = None if vendored else str((REPO / "generated" / "parts" / platform / f"{stem}.step").relative_to(REPO))
+        if args.out:
+            # Downloaded artifacts must resolve without a repository checkout.
+            # Paths in this manifest are relative to its own stl/ directory.
+            entry["stl"] = stl_path.name
+            entry["step"] = f"../step/{step_path.name}" if step_path is not None else None
         entries.append(entry)
         meshes[stem] = mesh
         v = entry["validation"]
@@ -827,6 +857,25 @@ def run_platform(platform, args, report):
                           Path(args.previews) / f"{platform}_{stem}.png",
                           title=f"{entry['name']} (print orientation)", width_px=640, height_px=480)
 
+    if any(mesh is None for mesh in meshes.values()):
+        report[platform] = False
+        return False  # incomplete entries cannot be packed or assembled
+
+    stale = []
+    if args.check:
+        for stem in mods:
+            committed = PARTS / platform / "stl" / f"{stem}.stl"
+            if not committed.exists():
+                stale.append(f"{committed.relative_to(REPO)} is missing")
+                continue
+            for problem in compare_stl(committed, stl_dir / f"{stem}.stl"):
+                stale.append(f"{committed.relative_to(REPO)}: {problem}")
+    if only:
+        for problem in stale:
+            print(f"    - {problem}")
+        report[platform] = ok and not stale
+        return report[platform]
+
     plates = pack_plates(entries)
     assembly_report = {}
     asm_path = PARTS / platform / "assembly.py"
@@ -839,13 +888,9 @@ def run_platform(platform, args, report):
         if not assembly_report.get("passed", True):
             ok = False
         if args.figures:
-            images = PARTS / platform / "images"
+            images = Path(args.out) / platform / "images" if args.out else PARTS / platform / "images"
             asm.figures(images, {e["id"]: e for e in entries})
-            print(f"  {platform}: figures written to {images.relative_to(REPO)}")
-
-    if only:
-        report[platform] = ok
-        return ok
+            print(f"  {platform}: figures written to {images}")
 
     manifest = {
         "platform": platform,
@@ -860,17 +905,11 @@ def run_platform(platform, args, report):
                     "time_min": p["time_min"], "mass_g": p["mass_g"]} for p in plates],
         "assembly": assembly_report,
     }
+    if args.out:
+        manifest['path_base'] = 'manifest_directory'
     docs = generated_docs(platform, entries, plates, assembly_report if asm_path.exists() and not args.no_assembly else None)
 
     if args.check:
-        stale = []
-        for stem in mods:
-            committed = PARTS / platform / "stl" / f"{stem}.stl"
-            if not committed.exists():
-                stale.append(f"{committed.relative_to(REPO)} is missing")
-                continue
-            for p in compare_stl(committed, stl_dir / f"{stem}.stl"):
-                stale.append(f"{committed.relative_to(REPO)}: {p}")
         committed_dir = PARTS / platform / "stl"
         for extra in sorted({p.stem for p in committed_dir.glob("*.stl")} - set(mods)):
             stale.append(f"{(committed_dir / extra).relative_to(REPO)}.stl has no source module")
@@ -881,7 +920,18 @@ def run_platform(platform, args, report):
         for path, text in docs.items():
             if path.read_text() != text:
                 stale.append(f"{path.relative_to(REPO)}: generated blocks are out of date")
-        shutil.rmtree(work, ignore_errors=True)
+        if not args.no_assembly:
+            manifest_dir = PARTS / platform / "stl"
+            manifest_path = manifest_dir / "manifest.json"
+            try:
+                fresh_manifest = json.loads(manifest_path.read_text()) == json.loads(json.dumps(manifest))
+            except (OSError, ValueError):
+                fresh_manifest = False
+            if not fresh_manifest:
+                stale.append(f"{manifest_path.relative_to(REPO)}: manifest is missing or out of date")
+            markdown = manifest_dir / "manifest.md"
+            if not markdown.exists() or markdown.read_text() != manifest_markdown(platform, entries, plates, assembly_report):
+                stale.append(f"{markdown.relative_to(REPO)}: manifest is missing or out of date")
         if stale:
             ok = False
             print(f"  {platform}: STALE, run tools/build_printable_parts.py {platform}")
@@ -893,7 +943,11 @@ def run_platform(platform, args, report):
         mdir = stl_dir
         mdir.mkdir(parents=True, exist_ok=True)
         (mdir / "manifest.json").write_text(json.dumps(manifest, indent=1, sort_keys=False) + "\n")
-        (mdir / "manifest.md").write_text(manifest_markdown(platform, entries, plates, assembly_report))
+        markdown = manifest_markdown(platform, entries, plates, assembly_report)
+        if args.out:
+            markdown = markdown.replace('see ../README.md.',
+                f'assembly instructions are in hardware/parts/{platform}/README.md in the source repository.')
+        (mdir / "manifest.md").write_text(markdown)
         if not args.out and not args.no_docs:
             for path, text in docs.items():
                 if path.read_text() != text:
@@ -918,6 +972,8 @@ def main(argv=None):
     ap.add_argument("--figures", action="store_true", help="regenerate the assembly figures (images/)")
     ap.add_argument("--list", action="store_true", help="list platforms and parts, then exit")
     args = ap.parse_args(argv)
+    if args.check and (args.figures or args.previews or args.out):
+        ap.error("--check cannot be combined with --figures, --previews or --out (check writes nothing)")
 
     names = args.platforms or platforms()
     unknown = [p for p in names if p not in platforms()]

@@ -1,0 +1,26 @@
+# Interfaces used by the BlueOS drone, airplane, boat and submarine stacks.
+# Loading every upstream plugin creates dozens of unused ROS nodes and
+# substantially increases executor work on the Raspberry Pi. Keep the
+# command, navigation, diagnostic and operator interfaces these stacks use.
+/**:
+  ros__parameters:
+    plugin_allowlist:
+      - command
+      - sys_status
+      - sys_time
+      - param
+      - imu
+      - local_position
+      - global_position
+      - gps_status
+      - gps_input
+      - setpoint_position
+      - setpoint_velocity
+      - setpoint_raw
+      - vfr_hud
+      - rc_io
+      - home_position
+      - waypoint
+      - rangefinder
+      - distance_sensor
+      - nav_controller_output

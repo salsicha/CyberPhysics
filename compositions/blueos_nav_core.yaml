@@ -24,8 +24,12 @@ services:
     restart: unless-stopped
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - FASTRTPS_DEFAULT_PROFILES_FILE=/workspace/fastdds.xml
+    volumes:
+      - ../systems/aerodrone/config/fastdds.xml:/workspace/fastdds.xml:ro
+      - ../applications/aerostack2/config:/workspace/mavros_config:ro
     command: >
-      ros2 launch mavros apm.launch
+      ros2 launch /workspace/mavros_config/blueos_mavros.launch.xml
         fcu_url:=${BLUEOS_FCU_URL:-tcp://127.0.0.1:5777}
 
   navigation_bridge:
@@ -45,7 +49,9 @@ services:
       - mavros
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - FASTRTPS_DEFAULT_PROFILES_FILE=/workspace/fastdds.xml
     volumes:
+      - ../systems/aerodrone/config/fastdds.xml:/workspace/fastdds.xml:ro
       - /dev/shm:/dev/shm
       - ../applications/aerostack2/scripts:/workspace/applications/aerostack2/scripts:ro
     command: >
@@ -73,7 +79,9 @@ services:
     restart: unless-stopped
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - FASTRTPS_DEFAULT_PROFILES_FILE=/workspace/fastdds.xml
     volumes:
+      - ../systems/aerodrone/config/fastdds.xml:/workspace/fastdds.xml:ro
       - /dev/bus/usb:/dev/bus/usb
       - /dev/shm:/dev/shm
     command: >
@@ -105,7 +113,9 @@ services:
       - oak1
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - FASTRTPS_DEFAULT_PROFILES_FILE=/workspace/fastdds.xml
     volumes:
+      - ../systems/aerodrone/config/fastdds.xml:/workspace/fastdds.xml:ro
       - /dev/shm:/dev/shm
       - ${DEMNAV_CACHE_HOST:-/data/demnav_cache}:/data/demnav_cache
     command: >
@@ -143,8 +153,10 @@ services:
       - oak1
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - FASTRTPS_DEFAULT_PROFILES_FILE=/workspace/fastdds.xml
       - WILDNAV_TILE_URL
     volumes:
+      - ../systems/aerodrone/config/fastdds.xml:/workspace/fastdds.xml:ro
       - /dev/shm:/dev/shm
       - ${WILDNAV_CACHE_HOST:-/data/wildnav_cache}:/data/wildnav_cache
     command: >
@@ -192,6 +204,8 @@ services:
     restart: unless-stopped
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - FASTRTPS_DEFAULT_PROFILES_FILE=/workspace/fastdds.xml
     volumes:
+      - ../systems/aerodrone/config/fastdds.xml:/workspace/fastdds.xml:ro
       - /dev/shm:/dev/shm
     command: ros2 launch rosbridge_server rosbridge_websocket_launch.xml port:=9092

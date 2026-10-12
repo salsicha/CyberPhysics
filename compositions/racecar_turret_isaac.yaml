@@ -119,8 +119,10 @@ services:
       ISAAC_CAMERA_HZ: ${ISAAC_CAMERA_HZ:-15.0}
       ISAAC_TURRET_HFOV_DEG: ${ISAAC_TURRET_HFOV_DEG:-70.0}
       ISAAC_MAX_REAL_TIME_FACTOR: ${ISAAC_MAX_REAL_TIME_FACTOR:-1.0}
+      SIM_AUTO_FIRE: ${SIM_AUTO_FIRE:-true}
     volumes:
       - ../applications/isaac/scripts:/workspace/applications/isaac/scripts:ro
+      - ../applications/aerostack2/scripts:/workspace/applications/aerostack2/scripts:ro
       - ../applications/demnav/scripts/tracking_targets.py:/workspace/applications/demnav/scripts/tracking_targets.py:ro
       - ../systems:/workspace/systems:ro
       - racecar_turret_assets:/data/racecar_turret_assets:ro
@@ -351,6 +353,7 @@ services:
         --params-file /workspace/racecar_turret/config/turret_tracker_isaac.yaml
         -p base_compensation:=${RACECAR_TURRET_COMPENSATION:-true}
         -p target_lead:=${RACECAR_TURRET_COMPENSATION:-true}
+        -p actuator_fitted:=true
     healthcheck:
       test: ["CMD-SHELL", "test -f /tmp/pantilt_yolo_ready"]
       interval: 5s
