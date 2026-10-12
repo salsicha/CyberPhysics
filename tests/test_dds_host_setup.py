@@ -68,7 +68,8 @@ def test_configuration_does_not_report_success_when_sysctl_fails(setup, monkeypa
                                   'turret_hardware', 'aerodrone_hardware',
                                   'boat_hardware', 'submarine_hardware'])
 @pytest.mark.parametrize('ready', [False, True])
-def test_start_refuses_to_launch_a_car_with_small_buffers(tmp_path, stack, ready):
+@pytest.mark.parametrize('rmw', ['rmw_fastrtps_cpp', 'rmw_zenoh_cpp'])
+def test_start_checks_socket_limits_only_for_the_dds_fallback(tmp_path, stack, ready, rmw):
     # No real sysctl or Docker commands: exercise start.sh's enforcement.
     python = tmp_path / 'python3'
     python.write_text('#!/bin/sh\n'
@@ -81,6 +82,8 @@ def test_start_refuses_to_launch_a_car_with_small_buffers(tmp_path, stack, ready
     docker.chmod(0o755)
     result = subprocess.run(['bash', str(REPO / 'start.sh'), stack, '-d'], capture_output=True,
                             env={**os.environ, 'PATH': f'{tmp_path}:{os.environ["PATH"]}',
+                                 'RMW_IMPLEMENTATION': rmw,
                                  'DOCKER_MARKER': str(marker)})
-    assert (result.returncode == 0) == ready
-    assert marker.exists() == ready
+    expected = ready or rmw == 'rmw_zenoh_cpp'
+    assert (result.returncode == 0) == expected
+    assert marker.exists() == expected

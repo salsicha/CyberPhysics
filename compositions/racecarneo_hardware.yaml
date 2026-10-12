@@ -51,6 +51,7 @@ services:
   # nvblox. Over USB the camera sends 12 MB/s of depth and 9 MB/s of colour
   # (YUYV), about 170 Mbit/s (hardware/racecarneo.md, "USB").
   racecarneo_camera:
+    env_file: [../systems/ros2/middleware.env]
     network_mode: host
     pull_policy: if_not_present
     privileged: true
@@ -82,6 +83,7 @@ services:
         unite_imu_method:=2
 
   racecarneo_robot_state_publisher:
+    env_file: [../systems/ros2/middleware.env]
     network_mode: host
     pull_policy: if_not_present
     image: salsicha/cyberphysics:racecarneo-${CYBERPHYSICS_TAG:-latest}
@@ -100,6 +102,7 @@ services:
         camera_optical_frames:=false
 
   racecarneo_cmd_vel_to_ackermann:
+    env_file: [../systems/ros2/middleware.env]
     network_mode: host
     pull_policy: if_not_present
     image: salsicha/cyberphysics:racecarneo-${CYBERPHYSICS_TAG:-latest}
@@ -121,6 +124,7 @@ services:
   # --depth-topic /camera/aligned_depth_to_color/image_raw
   # (applications/depthanything/README.md).
   racecarneo_depthanything:
+    env_file: [../systems/ros2/middleware.env]
     profiles: ["depthanything"]
     network_mode: host
     pull_policy: if_not_present
@@ -156,6 +160,7 @@ services:
               capabilities: [gpu, compute, utility]
 
   racecarneo_nvblox:
+    env_file: [../systems/ros2/middleware.env]
     network_mode: host
     pull_policy: if_not_present
     image: salsicha/cyberphysics:nvblox-${CYBERPHYSICS_TAG:-latest}
@@ -193,6 +198,7 @@ services:
               capabilities: [gpu, compute, utility]
 
   racecarneo_slam:
+    env_file: [../systems/ros2/middleware.env]
     network_mode: host
     pull_policy: if_not_present
     image: salsicha/cyberphysics:racecarneo-${CYBERPHYSICS_TAG:-latest}
@@ -211,6 +217,7 @@ services:
         slam_params_file:=/workspace/config/slam_toolbox.yaml
 
   racecarneo_nav2:
+    env_file: [../systems/ros2/middleware.env]
     network_mode: host
     pull_policy: if_not_present
     # The nvblox image ships nvblox_nav2 (NvbloxCostmapLayer) alongside Nav2.
@@ -240,6 +247,7 @@ services:
   # and only while its panel is open. Over a local link set the page's
   # defaults (5 Hz, 480 px, 75) or more (applications/nicegui/README.md).
   racecarneo_nicegui:
+    env_file: [../systems/ros2/middleware.env]
     network_mode: host
     pull_policy: if_not_present
     image: salsicha/cyberphysics:nicegui-${CYBERPHYSICS_TAG:-latest}
@@ -263,6 +271,7 @@ services:
   # tool, over Ethernet or the Jetson's Wi-Fi: camera topics through it
   # saturate the HaLow link.
   racecarneo_foxglove_bridge:
+    env_file: [../systems/ros2/middleware.env]
     network_mode: host
     image: salsicha/cyberphysics:ros2-${CYBERPHYSICS_TAG:-latest}
     container_name: racecarneo_foxglove_bridge

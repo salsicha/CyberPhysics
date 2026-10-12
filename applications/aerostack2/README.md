@@ -1,7 +1,7 @@
 
 # Aerostack2
 
-This image provides the ROS 2 Humble Aerostack2 autonomy layer used by
+This image provides the ROS 2 Jazzy Aerostack2 autonomy layer used by
 CyberPhysics. It includes the runtime state estimator, motion controller,
 motion behaviors, behavior-tree executor, and the `as2_platform_blueos` package
 for controlling an ArduPilot vehicle through a BlueOS MAVLink endpoint and
@@ -75,7 +75,7 @@ RC override, and vehicle failsafes.
 
 ## Map mission
 
-`compositions/blueos_aerostack.yaml` runs the complete Humble stack. Open
+`compositions/blueos_aerostack.yaml` runs the complete Jazzy stack. Open
 `http://<blueos-host>:8080`, click a map location, choose an altitude, and send
 the goal. The page converts the click to the DemNav local ENU frame and
 publishes it to `/aerostack/map_goal`. An Aerostack2 behavior tree consumes the
@@ -383,20 +383,31 @@ Hardware startup waits for MAVROS and behavior servers inside the
 `docker compose up -d` therefore returns while an offline autopilot is awaited.
 The separate `flight_ready` completion dependency below applies to simulations.
 
-### DDS transport
+### ROS middleware
 
-The BlueOS drone, boat and submarine hardware compositions also load this
-profile; it prevents large OAK-1 images from exhausting the default segment.
+ROS 2 Jazzy uses native `rmw_zenoh_cpp` by default. The image builds Aerostack2
+from upstream commit `97ade9f1d43ac760da8f69312e8ef9d2b4bf2328` into
+`/opt/aerostack2`, because Jazzy binaries are not published. This revision
+includes Jazzy and BehaviorTree.CPP 4 support. Rebuild this image and its
+DemNav, WildNav, OAK-1, boat and submarine descendants together.
 
-Every ROS container of the two compositions and of the lite SITL stack (`tools/gps_denied_sitl.yaml`) loads `systems/aerodrone/config/fastdds.xml` through `FASTRTPS_DEFAULT_PROFILES_FILE`. The containers share the host network and `/dev/shm` and run as root, so FastDDS (Humble, Fast DDS 2.6) sends between them through shared memory. Its default 512 KiB segment holds less than one camera frame (640x480 RGB is 0.9 MB, 32FC1 depth 1.2 MB): the sender reused buffers before the subscribers had read them, and DemNav, WildNav and the validator received 1-3 % of the camera frames, all of them with the profile. The profile gives every sender an 8 MiB segment and keeps UDP, with 4 MiB socket buffers, for peers that cannot use the shared memory. Isaac Sim runs as user 1234; FastDDS creates its shared-memory files mode 0644, so shared memory between it and the root containers delivers nothing, and it loads `fastdds_udp.xml` (UDP only, same buffers) instead. A ROS container added to these stacks needs the same profile, mount, host `/dev/shm` (`ipc: host` or a `/dev/shm` volume) and user; `tests/test_aerial_dds_transport.py` checks them.
+Every ROS service loads `systems/ros2/middleware.env`. Local/LAN peer discovery
+works without a separate router; see the [middleware guide](../../systems/ros2/README.md)
+for routed networks, migration and the micro-ROS exception. ROS domain IDs
+still isolate vehicles. MAVLink between MAVROS and the autopilot is unchanged.
 
-The kernel caps the socket buffers at `net.core.rmem_max` and `net.core.wmem_max`. Shared memory does not depend on them, but Isaac Sim's camera does: below 4 MiB, UDP frames can still be dropped. `./install.sh` now applies persistent limits of at least 4 MiB, preserving higher existing values. For an existing installation, run `sudo python3 tools/configure_dds_buffers.py`; verify without privileges using `python3 tools/configure_dds_buffers.py --check`. The configuration in `/etc/sysctl.d/99-cyberphysics-dds.conf` is reapplied at boot; containers do not change host sysctls. A killed process leaves its segment in `/dev/shm`; `docker run --rm --ipc host salsicha/cyberphysics:aerostack2-latest fastdds shm clean` removes the stale ones.
+The existing Fast DDS profiles remain for an explicit DDS fallback. Their
+8 MiB shared-memory segments and UDP-only Isaac profile address large-image
+loss and different container UIDs. `./install.sh` still persists at least
+4 MiB for both host socket-buffer limits; `start.sh` checks these only when
+DDS is selected. Native Zenoh's default TCP transport does not depend on the
+DDS UDP tuning. Do not mix DDS and native Zenoh nodes in one graph.
 
 ### Mission start
 
 `flight_ready` (`scripts/wait_for_mavros_navigation.py`) completes once MAVROS has a GPS fix and local odometry and every server the mission tree calls can be discovered: it reads the mission tree (`wilderness_mission.xml`, or `tracking_mission.xml` with `AERODRONE_MISSION=tracking`, "Tracking targets and scenario") and waits for the action servers of its TakeOff, GoTo and Land nodes (`/aerodrone/TakeoffBehavior`, `GoToBehavior`, `LandBehavior`) and the services of its Arm, Offboard and Disarm nodes, with the availability checks the tree itself makes. `wilderness_mission` starts after it, through `scripts/run_behavior_tree.py`.
 
-as2_behavior_tree (1.1.3) creates every node of the tree before the first tick, and each action node then gives its action server a hard-coded 1 s (`BtActionNode::createActionClient`; `server_timeout`, in milliseconds, only bounds the goal acknowledgement and the cancel). The exception it throws when that second runs out is built as `std::string("Action server %s not available", name)`, which C++ reads as a range between two unrelated pointers, so the process dies of `std::length_error` (`basic_string::_M_create`) instead, and `ros2 launch` still exits 0. In one Isaac run the tree's new process had not discovered `TakeoffBehavior`, up for 3.5 minutes by then, within that second. Nothing is commanded before the first tick, so `run_behavior_tree.py` starts the tree again (5 attempts, 5 s apart) when it aborted while being built and no node had left IDLE; a tree that ticked is never started again. The service exits non-zero when the tree process died or the tree ended in FAILURE (as2_behavior_tree itself exits 0 then; the wrapper reads the root's last status transition from the tree's log), so scripts and CI can tell a failed mission from a finished one.
+as2_behavior_tree (the pinned Jazzy source retains this 1.1.3 behavior) creates every node of the tree before the first tick, and each action node then gives its action server a hard-coded 1 s (`BtActionNode::createActionClient`; `server_timeout`, in milliseconds, only bounds the goal acknowledgement and the cancel). The exception it throws when that second runs out is built as `std::string("Action server %s not available", name)`, which C++ reads as a range between two unrelated pointers, so the process dies of `std::length_error` (`basic_string::_M_create`) instead, and `ros2 launch` still exits 0. In one Isaac run the tree's new process had not discovered `TakeoffBehavior`, up for 3.5 minutes by then, within that second. Nothing is commanded before the first tick, so `run_behavior_tree.py` starts the tree again (5 attempts, 5 s apart) when it aborted while being built and no node had left IDLE; a tree that ticked is never started again. The service exits non-zero when the tree process died or the tree ended in FAILURE (as2_behavior_tree itself exits 0 then; the wrapper reads the root's last status transition from the tree's log), so scripts and CI can tell a failed mission from a finished one.
 
 The BlueOS drone (`compositions/blueos_aerostack.yaml`) gates its map-goal tree (`map_goal.xml`, a GoTo inside a WaitForEvent) the same way, with `--no-require-gps` (the drone may start GPS-denied; local odometry is still required) and `--timeout 0` (wait as long as it takes rather than leave the drone without a tree after a slow start). Its tree also runs through `run_behavior_tree.py`, and `restart: always` starts it again after each map goal.
 

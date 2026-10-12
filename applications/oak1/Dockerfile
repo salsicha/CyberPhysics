@@ -6,11 +6,11 @@ ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US.UTF-8 \
     TERM=xterm \
     PYTHONIOENCODING=UTF-8 \
-    ROS2_DISTRO=humble \
+    ROS2_DISTRO=jazzy \
     DEBIAN_FRONTEND=noninteractive \
     PATH="/venv/bin:$PATH" \
     QT_QPA_PLATFORM=xcb \
-    ROS_DISTRO=humble
+    ROS_DISTRO=jazzy
 
 SHELL ["/bin/bash", "-c"]
 

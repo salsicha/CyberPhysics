@@ -3,6 +3,7 @@
 
 services:
   roboticstoolbox:
+    env_file: [../systems/ros2/middleware.env]
     network_mode: "host"
     image: salsicha/cyberphysics:roboticstoolbox-latest
     container_name: roboticstoolbox

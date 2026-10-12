@@ -1,0 +1,21 @@
+{
+  "rmw": "rmw_cyclonedds_cpp",
+  "host_requested_rmw": "rmw_zenoh_cpp",
+  "composition": "compositions/lunar_rover_sim.yaml",
+  "image": "salsicha/cyberphysics:spaceros-latest",
+  "image_id_prefix": "083f3fa2a0c6",
+  "ros_domain_id": 225,
+  "seconds": 10,
+  "odom_messages": 201,
+  "command_messages": 200,
+  "first_pose": {
+    "x": 46.842775751590324,
+    "y": 13.67374793232129
+  },
+  "last_pose": {
+    "x": 47.669912254553964,
+    "y": 14.425825944999476
+  },
+  "nonzero_commands": 200,
+  "scope": "Kinematic closed-loop rover; not full Gazebo or Space ROS core rebuild"
+}

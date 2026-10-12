@@ -41,10 +41,11 @@ services:
         soft: 1024
         hard: 524288
     env_file:
+      - ../systems/ros2/middleware.env
       - ../applications/pantiltros/config/arduino_uno_q.env
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
-      - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+      - RMW_IMPLEMENTATION=${RMW_IMPLEMENTATION:-rmw_zenoh_cpp}
       - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
       - TURRET_ACTUATOR_FITTED=${TURRET_ACTUATOR_FITTED:-true}
     volumes:

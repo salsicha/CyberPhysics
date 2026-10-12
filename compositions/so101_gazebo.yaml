@@ -1,5 +1,6 @@
 services:
   gazebo:
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:so101-latest
     container_name: so101_gazebo
     stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
@@ -14,6 +15,7 @@ services:
     command: ros2 launch so101_description gazebo.launch.py
 
   controller:
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:so101-latest
     container_name: so101_controller
     network_mode: host

@@ -8,6 +8,7 @@
 services:
   foxglove_bridge:
     network_mode: "host"
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:ros2-latest
     container_name: foxglove_bridge
     stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM

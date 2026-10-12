@@ -1,15 +1,15 @@
-#!/usr/bin/env python3
 """Isaac Sim scene and deterministic grasp semantics for the SO-101 demo."""
 
 import json
 import math
-from pathlib import Path
+import os
 import re
+import tempfile
 import time
+from pathlib import Path
 
 import numpy as np
 from pxr import Gf, UsdGeom, UsdPhysics
-
 from score_picking_task import score
 from so101_common import (
     JOINT_LIMIT_VIOLATION_TOLERANCE,
@@ -21,9 +21,28 @@ from so101_common import (
     scene_support_errors,
 )
 
-
 # The palette every simulator renders the scene with (so101_common).
 COLORS = SCENE_COLORS
+
+
+def write_json_atomic(path, payload):
+    """Replace complete reports, including files created by another container UID."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", dir=path.parent, prefix=f".{path.name}.", delete=False
+        ) as stream:
+            temporary = Path(stream.name)
+            json.dump(payload, stream, indent=2)
+            stream.write("\n")
+            stream.flush()
+            os.fchmod(stream.fileno(), 0o644)
+        temporary.replace(path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
 
 
 def load_scenario(path):
@@ -300,8 +319,7 @@ class SO101TaskScene:
             return
         payload = self.telemetry(now)
         try:
-            self.telemetry_path.parent.mkdir(parents=True, exist_ok=True)
-            self.telemetry_path.write_text(json.dumps(payload, indent=2) + "\n")
+            write_json_atomic(self.telemetry_path, payload)
         except OSError as exc:
             self._disable_telemetry(exc)
             return
@@ -322,7 +340,7 @@ class SO101TaskScene:
     def _write_metrics(self, payload):
         metrics = score(self.scenario, payload, self.task_id)
         try:
-            self.metrics_path.write_text(json.dumps(metrics, indent=2) + "\n")
+            write_json_atomic(self.metrics_path, metrics)
         except OSError as exc:
             self._disable_telemetry(exc)
             return None

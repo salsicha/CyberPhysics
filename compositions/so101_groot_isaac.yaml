@@ -37,7 +37,7 @@ services:
       - ${CYBERPHYSICS_ISAAC_CACHE:-/tmp/cyberphysics/isaac-sim/6.0.1/so101}/pip:/isaac-sim/.cache/pip:rw
       - ${CYBERPHYSICS_ISAAC_CACHE:-/tmp/cyberphysics/isaac-sim/6.0.1/so101}/glcache:/isaac-sim/.cache/nvidia/GLCache:rw
       - ${CYBERPHYSICS_ISAAC_CACHE:-/tmp/cyberphysics/isaac-sim/6.0.1/so101}/computecache:/isaac-sim/.nv/ComputeCache:rw
-      - ../data/groot/telemetry:/workspace/telemetry:rw
+      - ${SO101_TELEMETRY_DIR:-../data/groot/telemetry}:/workspace/telemetry:rw
     entrypoint: ["/bin/chown"]
     command:
       - "1234:1234"
@@ -52,6 +52,7 @@ services:
 
   isaacsim:
     profiles: [sim]
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:isaac-${CYBERPHYSICS_TAG:-latest}
     container_name: so101_groot_isaacsim
     depends_on:
@@ -68,8 +69,8 @@ services:
       - XAUTHORITY=/isaac-sim/.xauth/Xauthority
       - ROS_DISTRO=jazzy
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
-      - RMW_IMPLEMENTATION=${RMW_IMPLEMENTATION:-rmw_fastrtps_cpp}
-      - LD_LIBRARY_PATH=/isaac-sim/exts/isaacsim.ros2.core/jazzy/lib
+      - RMW_IMPLEMENTATION=${RMW_IMPLEMENTATION:-rmw_zenoh_cpp}
+
       - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
       - NVIDIA_DRIVER_CAPABILITIES=${NVIDIA_DRIVER_CAPABILITIES:-graphics,utility,compute}
       - SO101_HEADLESS=${SO101_HEADLESS:-false}
@@ -91,7 +92,7 @@ services:
       - ../systems:/workspace/systems:ro
       - ../applications/so101:/workspace/so101:ro
       - ../data/groot:/workspace/data
-      - ../data/groot/telemetry:/workspace/telemetry:rw
+      - ${SO101_TELEMETRY_DIR:-../data/groot/telemetry}:/workspace/telemetry:rw
       - ${CYBERPHYSICS_ISAAC_CACHE:-/tmp/cyberphysics/isaac-sim/6.0.1/so101}/kit:/isaac-sim/kit/cache:rw
       - ${CYBERPHYSICS_ISAAC_CACHE:-/tmp/cyberphysics/isaac-sim/6.0.1/so101}/user:/isaac-sim/.cache:rw
       - ${CYBERPHYSICS_ISAAC_CACHE:-/tmp/cyberphysics/isaac-sim/6.0.1/so101}/ov:/isaac-sim/.cache/ov:rw
@@ -104,7 +105,7 @@ services:
       timeout: 2s
       start_period: 180s
       retries: 3
-    entrypoint: []
+    entrypoint: ["/workspace/applications/isaac/scripts/with_ros.sh"]
     # The launcher forwards SIGTERM so `down` flushes telemetry and metrics.
     command: >
       bash /workspace/so101/scripts/run_isaacsim_so101.sh
@@ -167,6 +168,7 @@ services:
 
   so101_groot_bridge:
     profiles: [sim]
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:so101-${CYBERPHYSICS_TAG:-latest}
     container_name: so101_groot_bridge
     network_mode: host
@@ -192,6 +194,7 @@ services:
 
   so101_depth_camera:
     profiles: [hil]
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:realsense-${CYBERPHYSICS_TAG:-latest}
     container_name: so101_groot_hil_camera
     stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
@@ -215,6 +218,7 @@ services:
 
   so101_groot_hil_bridge:
     profiles: [hil]
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:so101-${CYBERPHYSICS_TAG:-latest}
     container_name: so101_groot_hil_bridge
     network_mode: host
@@ -242,6 +246,7 @@ services:
 
   so101_hil_guard:
     profiles: [hil]
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:so101-${CYBERPHYSICS_TAG:-latest}
     container_name: so101_groot_hil_guard
     network_mode: host
@@ -266,6 +271,7 @@ services:
 
   foxglove_bridge:
     profiles: [observe]
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:ros2-${CYBERPHYSICS_TAG:-latest}
     container_name: so101_groot_foxglove_bridge
     stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM

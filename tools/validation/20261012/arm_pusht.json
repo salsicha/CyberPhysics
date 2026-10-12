@@ -1,0 +1,40 @@
+{
+  "model": "lerobot/diffusion_pusht",
+  "revision": "84a7c23178445c6bbf7e1a884ff497017910f653",
+  "device": "cuda",
+  "legacy_statistics_restored": true,
+  "arm_simulation": false,
+  "vla": false,
+  "episodes": [
+    {
+      "seed": 42,
+      "success": true,
+      "steps": 182,
+      "max_reward": 1.0,
+      "final_reward": 1.0,
+      "wall_s": 34.39523369492963,
+      "action_latency_p95_ms": 1451.4349632663652
+    },
+    {
+      "seed": 43,
+      "success": true,
+      "steps": 208,
+      "max_reward": 1.0,
+      "final_reward": 1.0,
+      "wall_s": 37.80572579614818,
+      "action_latency_p95_ms": 1400.2185326069591
+    },
+    {
+      "seed": 44,
+      "success": true,
+      "steps": 129,
+      "max_reward": 1.0,
+      "final_reward": 1.0,
+      "wall_s": 24.720997975906357,
+      "action_latency_p95_ms": 1393.0864760186523
+    }
+  ],
+  "success_rate": 1.0,
+  "peak_allocated_mib": 1098.74658203125,
+  "peak_reserved_mib": 1180.0
+}

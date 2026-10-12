@@ -124,9 +124,8 @@ docker compose -f compositions/so101_groot_demo.yaml up
 ```
 
 It publishes `/joint_states`, `/so101/camera/image_raw`, `/so101/camera/camera_info`, `/so101/camera/depth/image_rect_raw`, `/so101/camera/depth/camera_info`, `/so101/camera/imu`, and calibration TF, consumes `/so101/joint_commands`, and drives those
-commands from the GR00T policy server through the bridge. The compose file sets
-`FASTDDS_BUILTIN_TRANSPORTS=UDPv4` so ROS samples flow reliably between Docker
-host-network containers.
+commands from the GR00T policy server through the bridge. ROS containers use
+the shared [native Zenoh configuration](../../systems/ros2/README.md).
 
 ## SO-101 + GR00T Inference
 
@@ -466,3 +465,50 @@ ros2 topic echo /joint_states
 
 The optional controller service in each composition returns the arm toward its
 configured `goal` while keeping commands inside a margin from the URDF limits.
+
+## Policy evaluation scope
+
+The repository contains several different kinds of policy examples:
+
+| Workflow | What it actually demonstrates |
+| --- | --- |
+| `so101_smolvla_isaac.yaml` | A SmolVLA adapter for rendered RGB, joint state and language. It needs a fine-tuned checkpoint with valid normalization; the public base is rejected for joint control. |
+| `so101_groot_isaac.yaml`, real mode | GR00T wiring for a fine-tuned SO101 checkpoint; requires its trained embodiment contract, gated backbone access and sufficient GPU memory. |
+| GR00T demo mode | A scripted, ground-truth-assisted placement baseline. It is not neural policy inference. |
+| `pi0_example.py` | Pretrained pi0 inference on placeholder observations. It has no connected arm simulation. |
+| `evaluate_pretrained_policy.py` | PushT: image-conditioned diffusion controlling a 2D end effector. It is neither a language-conditioned policy nor a 3D arm. |
+
+The Isaac tabletop scene attaches the target kinematically when the jaws close
+near it and snaps a released target to its support. It does not measure
+collisions. Its scorer keeps geometric task completion separate from policy
+acceptance; a scripted placement or a missing collision measurement cannot
+prove a complete VLA manipulation system. Generalization, distractors,
+failed-grasp recovery and physically simulated grasps need separate evaluation.
+
+Build the standalone examples with `make -C applications build_lerobot`.
+PushT now restores normalization tensors from its legacy checkpoint, uses the
+LeRobot 0.6 processor API and reports three seeded episodes plus videos:
+
+```bash
+docker compose -f compositions/lerobot.yaml run --rm lerobot
+```
+
+Results persist under `generated/lerobot/pusht`; `LEROBOT_OUTPUT_DIR` selects a
+different host directory. A named volume preserves the Hugging Face cache.
+A JSON report records success per seed, peak Torch memory and inference latency.
+
+The pi0 example loads weights strictly (upstream's compatibility loader can
+return an untrained model after a loading error), tokenizes the instruction,
+and applies the checkpoint processors. Its default BF16 reduces parameter
+memory, but fit still needs measurement on the actual GPU. The public checkpoint
+uses the gated PaliGemma tokenizer; obtain access and authenticate in the cache
+if required. This command sends no robot commands:
+
+```bash
+docker compose -f compositions/lerobot.yaml run --rm lerobot \
+  /opt/lerobot_venv/bin/python3 pi0_example.py --output /workspace/outputs/pi0.json
+```
+
+Use `SO101_TELEMETRY_DIR` to keep separate rendered arm evaluations. Reports are
+written atomically, so readable files from a previous UID do not prevent a new
+run from writing into a writable telemetry directory.

@@ -8,8 +8,9 @@ ARG SPACEROS_RELEASE
 # need root, and the container runs as root
 USER root
 
-# Space ROS ships only rmw_cyclonedds_cpp, so every process in the image (and
-# the upstream demo) uses Cyclone DDS
+# This pinned Space ROS core links directly to Cyclone DDS (runtime RMW
+# selection is absent). Adding an apt RMW cannot switch it; keep this graph
+# on Cyclone until the Space ROS core itself is rebuilt and validated.
 ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US.UTF-8 \
     TERM=xterm \

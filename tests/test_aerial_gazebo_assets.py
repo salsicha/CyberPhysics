@@ -8,7 +8,7 @@ from conftest import REPO
 
 DOCKERFILE = REPO / 'applications/aerostack2/Dockerfile'
 COMPOSE = REPO / 'compositions/aerostack2_sim.yaml'
-SHARE = '/opt/ros/humble/share/as2_gazebo_assets/'
+SHARE = '/opt/aerostack2/share/as2_gazebo_assets/'
 GAZEBO_SERVICES = ('gazebo', 'gazebo_bridges')
 
 
@@ -32,21 +32,14 @@ def bind_mounts():
     return mounts
 
 
-def test_gazebo_assets_are_pinned_like_mavros_on_every_architecture():
+def test_aerostack_source_is_pinned_on_jazzy_for_every_architecture():
     text = dockerfile()
-    version = re.search(r'^ARG AS2_GAZEBO_ASSETS_VERSION=(\S+)$', text, re.MULTILINE)
-    assert version, 'as2-gazebo-assets needs a pinned version'
-    # The Aerostack2 release of the other as2 packages. Upstream version only:
-    # the build date in the Debian version differs between amd64 and arm64.
-    assert version.group(1) == '1.1.3'
-    assert '"Package: ros-${ROS_DISTRO}-as2-gazebo-assets"' in text
-    assert '"Pin: version ${AS2_GAZEBO_ASSETS_VERSION}-1jammy.*"' in text
-    assert 'http://snapshots.ros.org/humble/${ROS_SNAPSHOT}/ubuntu' in text
-    # No architecture-specific Debian version is pinned anywhere
-    assert not re.search(r'=\d[\w.~+-]*-1jammy\.\d{8}', text)
-    # The build checks each pin landed
-    assert 'as2-gazebo-assets:${AS2_GAZEBO_ASSETS_VERSION}' in text
-    assert 'mavros:${MAVROS_VERSION}' in text
+    revision = re.search(r'^ARG AS2_REVISION=([0-9a-f]{40})$', text, re.MULTILINE)
+    assert revision, 'Jazzy source builds must use an immutable upstream commit'
+    assert 'FROM ros:jazzy-ros-base' in text
+    assert 'rev-parse HEAD)' in text and '= "$AS2_REVISION"' in text
+    assert '--install-base /opt/aerostack2' in text
+    assert 'snapshots.ros.org/humble' not in text
 
 
 def test_every_bind_mount_over_the_package_exists_in_repo_and_image():

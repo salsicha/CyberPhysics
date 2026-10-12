@@ -21,8 +21,8 @@ SmolVLA.
 
 ## Hardware and software
 
-SmolVLA is a 450M-parameter model and is a substantially better fit for the
-available 32 GB V100 than GR00T N1.7. This image uses a CUDA 12.8 runtime base
+SmolVLA is a 450M-parameter model. GPU fit depends on the selected precision,
+camera count and concurrent simulator; use the benchmark below on your host. This image uses a CUDA 12.8 runtime base
 and pins PyTorch's CUDA 12.6 wheel because PyTorch 2.11 CUDA 12.8 wheels omit
 Volta (`sm_70`) kernels. Inference uses FP32 by default; the V100 does not need
 FlashAttention or native BF16 support for this workflow.
@@ -83,8 +83,8 @@ docker compose \
     --local-dir /workspace/data/models/smolvla_base
 ```
 
-The server can also use `lerobot/smolvla_base` directly and let Hugging Face
-cache the files on first start.
+The base checkpoint is for fine-tuning and the model-only benchmark below.
+It does not supply the SO101 normalization contract required for joint commands.
 
 ## Run the SO101 simulation
 
@@ -94,11 +94,12 @@ Build the reusable simulation images if needed:
 make -C applications build_isaac build_so101 build_smolvla
 ```
 
-Run a headless integration smoke test with the local base checkpoint:
+Run a headless evaluation after installing a fine-tuned checkpoint with its
+matching processor JSON files and normalization tensors:
 
 ```bash
 SO101_HEADLESS=true \
-SMOLVLA_MODEL_PATH=/workspace/data/models/smolvla_base \
+SMOLVLA_MODEL_PATH=/workspace/data/models/so101-checkpoint \
 docker compose \
   -f compositions/so101_smolvla_isaac.yaml \
   --profile sim up
@@ -107,11 +108,12 @@ docker compose \
 To render the Isaac window, omit `SO101_HEADLESS=true`. Add
 `--profile observe` to also start the rosbridge/Foxglove service.
 
-> **Base-model warning:** `lerobot/smolvla_base` verifies model loading,
-> observation preprocessing, and closed-loop transport, but it is not trained
-> for this simulated red-block task. Its actions should not be expected to
-> succeed. The ROS bridge still clamps joint limits and per-command motion, but
-> the base model must only be exercised in simulation.
+The server rejects missing normalization statistics before loading the model
+or accepting policy requests. LeRobot 0.6 otherwise treats absent statistics
+as identity, which would misinterpret normalized actions as joint angles.
+The public `lerobot/smolvla_base` checkpoint fails this check. There is no
+fallback to arbitrary statistics or a scripted policy. A valid checkpoint also
+needs the camera views and joint units used in its training data.
 
 Stop the stack with:
 
@@ -140,7 +142,9 @@ those values look like plausible degrees but are not, so the server refuses a
 checkpoint whose state statistics saturate at exactly ±100
 (`SMOLVLA_SKIP_UNIT_CHECK=true` overrides a false positive) and
 `--checkpoint-units so101_range100` is rejected outright: converting it needs
-the arm's calibration file.
+the arm's calibration file. The override does not bypass missing normalization
+statistics. Loaded tensor statistics are checked, including checkpoints whose
+processor constructor has an empty `stats` field.
 
 LeRobot's 0° is the middle of each joint's calibrated range, while this
 repository's URDF zero is the arm pointing straight up. The server maps
@@ -174,8 +178,8 @@ docker compose \
     --wandb.enable=false
 ```
 
-Start at batch size 8 on the V100, then increase it only after observing peak
-VRAM. The official SmolVLA guidance recommends roughly 50 varied, successful
+Choose a training batch size from measured peak VRAM; the example batch size
+is not a promise that training and simulation fit together on a 12 GB GPU. The official SmolVLA guidance recommends roughly 50 varied, successful
 episodes as a starting point.
 
 LeRobot v0.6.0 also supports a smaller LoRA fine-tune:
@@ -238,8 +242,9 @@ The simulator publishes one rendered front camera. The server reads the image
 feature names from the selected checkpoint:
 
 - A one-camera fine-tuned checkpoint receives the front image on its camera key.
-- The base checkpoint declares three cameras, so the server duplicates the front
-  image across those three keys.
+- For multiple camera keys the adapter duplicates the front image. This is
+  transport compatibility only; meaningful task evaluation needs the views
+  used during training. The base-model benchmark similarly fills three slots.
 - For best task performance, fine-tune on images rendered from the same camera
   pose used during evaluation.
 
@@ -247,7 +252,7 @@ feature names from the selected checkpoint:
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `SMOLVLA_MODEL_PATH` | `lerobot/smolvla_base` | Hub ID or path below `/workspace/data` |
+| `SMOLVLA_MODEL_PATH` | `lerobot/smolvla_base` | Override with a trained SO101 checkpoint for joint control; the public base fails the statistics check |
 | `SMOLVLA_DEVICE` | `cuda` | Torch inference device |
 | `SMOLVLA_CHECKPOINT_UNITS` | `so101` | `so101` (use_degrees=True degrees/0–100) or `isaac` radians/metres |
 | `SMOLVLA_JOINT_MAPPING` | `/workspace/systems/so101/config/lerobot_joint_mapping.json` | LeRobot degrees to URDF sign/offset and gripper range |
@@ -295,3 +300,27 @@ docker run --rm \
 - [Official SmolVLA guide](https://github.com/huggingface/lerobot/blob/v0.6.0/docs/source/smolvla.mdx)
 - [Official LeRobot SO101 rollout example](https://github.com/huggingface/lerobot/blob/v0.6.0/docs/source/smolvla.mdx#evaluate-the-finetuned-model-and-run-it-in-real-time)
 - [Official PEFT guide](https://github.com/huggingface/lerobot/blob/v0.6.0/docs/source/peft_training.mdx)
+
+## Measure inference before running a scene
+
+For the public base, explicitly select normalized model inputs and outputs.
+This measures fresh action-chunk inference on synthetic RGB/state/language
+without pretending to decode calibrated joint commands:
+
+```bash
+docker compose -f compositions/so101_smolvla_isaac.yaml --profile sim \
+  run --rm --no-deps smolvla_policy \
+  python /workspace/smolvla_scripts/benchmark_so101.py \
+  --normalized-inputs-only \
+  --output /workspace/data/telemetry/inference_benchmark.json
+```
+
+For a trained SO101 checkpoint, omit `--normalized-inputs-only` and pass
+`--model /workspace/data/models/so101-checkpoint` to exercise its actual
+preprocessing and joint adapter. `--revision` pins a Hub checkpoint version.
+Invalid/missing statistics produce a failed JSON report and a nonzero exit.
+
+Its PyTorch peak excludes the simulator, CUDA context and graphics allocations.
+Measure total GPU usage while the complete scene runs too. A passing benchmark
+proves model execution, not task success. `SO101_TELEMETRY_DIR` selects a
+separate host output directory for each simulated run.

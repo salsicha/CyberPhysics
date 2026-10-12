@@ -1,4 +1,4 @@
-# FastDDS transport of every ROS container: shared memory sized for the
+# Optional Fast DDS fallback for ROS containers: shared memory sized for the
 # camera frames, UDP with larger socket buffers (applications/aerostack2/README.md).
 # Isaac Sim runs as another user and uses UDP only (fastdds_udp.xml).
 x-fastdds-profile: &fastdds-profile /workspace/systems/aerodrone/config/fastdds.xml
@@ -22,7 +22,7 @@ services:
   demnav_assets:
     image: salsicha/cyberphysics:demnav-${CYBERPHYSICS_TAG:-latest}
     network_mode: host
-    env_file: [../systems/aerodrone/config/topics.env, ../applications/aerostack2/config/mount_tamalpais.env]
+    env_file: [../systems/ros2/middleware.env, ../systems/aerodrone/config/topics.env, ../applications/aerostack2/config/mount_tamalpais.env]
     volumes: [demnav_isaac_cache:/data/demnav_cache]
     command: >
       /venv/bin/python3 -m demnav_pkg.seed_cache
@@ -34,7 +34,7 @@ services:
   wildnav_assets:
     image: salsicha/cyberphysics:wildnav-${CYBERPHYSICS_TAG:-latest}
     network_mode: host
-    env_file: [../systems/aerodrone/config/topics.env, ../applications/aerostack2/config/mount_tamalpais.env]
+    env_file: [../systems/ros2/middleware.env, ../systems/aerodrone/config/topics.env, ../applications/aerostack2/config/mount_tamalpais.env]
     environment:
       WILDNAV_TILE_URL: ${WILDNAV_TILE_URL:-https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}}
     volumes: [wildnav_isaac_cache:/data/wildnav_cache]
@@ -53,6 +53,7 @@ services:
     # pinned Gazebo Fuel models of applications/aerostack2/missions/
     # tracking_targets.json, downloaded once into the cache, their licence
     # and SHA-256 checked (applications/demnav/scripts/target_models.py).
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:demnav-${CYBERPHYSICS_TAG:-latest}
     network_mode: host
     volumes:
@@ -120,17 +121,17 @@ services:
     depends_on:
       terrain_assets: {condition: service_completed_successfully}
       isaacsim_cache_init: {condition: service_completed_successfully}
-    env_file: [../systems/aerodrone/config/topics.env, ../applications/aerostack2/config/mount_tamalpais.env]
+    env_file: [../systems/ros2/middleware.env, ../systems/aerodrone/config/topics.env, ../applications/aerostack2/config/mount_tamalpais.env]
     environment:
       ACCEPT_EULA: Y
       PRIVACY_CONSENT: Y
       DISPLAY: ${DISPLAY}
       ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
-      ROS_DISTRO: ${ISAAC_ROS_DISTRO:-humble}
-      RMW_IMPLEMENTATION: ${RMW_IMPLEMENTATION:-rmw_fastrtps_cpp}
+      ROS_DISTRO: jazzy
+      RMW_IMPLEMENTATION: ${RMW_IMPLEMENTATION:-rmw_zenoh_cpp}
       FASTDDS_DEFAULT_PROFILES_FILE: /workspace/systems/aerodrone/config/fastdds_udp.xml
       FASTRTPS_DEFAULT_PROFILES_FILE: /workspace/systems/aerodrone/config/fastdds_udp.xml
-      LD_LIBRARY_PATH: /isaac-sim/exts/isaacsim.ros2.core/${ISAAC_ROS_DISTRO:-humble}/lib
+
       NVIDIA_DRIVER_CAPABILITIES: all
       OMNI_KIT_ALLOW_ROOT: "1"
       ISAAC_PHYSICS_HZ: "${ISAAC_PHYSICS_HZ:-1200.0}"
@@ -154,7 +155,7 @@ services:
       - ~/docker/isaac-sim/6.0.1/logs:/isaac-sim/.nvidia-omniverse/logs:rw
       - ~/docker/isaac-sim/6.0.1/config:/isaac-sim/.nvidia-omniverse/config:rw
       - ~/docker/isaac-sim/6.0.1/data:/isaac-sim/.local/share/ov/data:rw
-    entrypoint: []
+    entrypoint: ["/workspace/applications/isaac/scripts/with_ros.sh"]
     command: >
       ./python.sh /workspace/applications/isaac/scripts/aerodrone_navsim.py
         --headless --lat ${INITIAL_LAT:-37.9234} --lon ${INITIAL_LON:--122.5967}
@@ -189,6 +190,7 @@ services:
     command: /workspace/applications/ardupilot_sitl/scripts/run_arducopter_sitl.sh
 
   mavros:
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
     stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     network_mode: host
@@ -204,6 +206,7 @@ services:
     # false turns it off), sends accepted DemNav/WildNav fixes to ArduPilot
     # as GPS 2 once SITL reports arducopter_gps_input.params, which
     # navigator_sitl loads with the same flag (tools/gps_denied_sitl_test.md).
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
     network_mode: host
     ipc: host
@@ -224,7 +227,7 @@ services:
     network_mode: host
     ipc: host
     depends_on: [isaacsim, mavros]
-    env_file: [../systems/aerodrone/config/topics.env, ../applications/aerostack2/config/mount_tamalpais.env]
+    env_file: [../systems/ros2/middleware.env, ../systems/aerodrone/config/topics.env, ../applications/aerostack2/config/mount_tamalpais.env]
     environment:
       ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
       FASTRTPS_DEFAULT_PROFILES_FILE: *fastdds-profile
@@ -257,7 +260,7 @@ services:
     network_mode: host
     ipc: host
     depends_on: [isaacsim, demnav]
-    env_file: [../systems/aerodrone/config/topics.env, ../applications/aerostack2/config/mount_tamalpais.env]
+    env_file: [../systems/ros2/middleware.env, ../systems/aerodrone/config/topics.env, ../applications/aerostack2/config/mount_tamalpais.env]
     environment:
       ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
       FASTRTPS_DEFAULT_PROFILES_FILE: *fastdds-profile
@@ -287,6 +290,7 @@ services:
         attitude_sigma_deg:=0.5 match_sigma_floor_m:=1.0
 
   aerostack2_autonomy:
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
     stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     network_mode: host
@@ -314,6 +318,7 @@ services:
     # Aerostack2 server the mission tree calls can be discovered; the tree
     # gives each action server only 1 s while it is being built
     # (applications/aerostack2/README.md, "Mission start").
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
     network_mode: host
     ipc: host
@@ -345,6 +350,7 @@ services:
     # take more than the tree's 1 s to discover a behaviour server. Stopping
     # the stack mid-mission logs "Failed to cancel action server for
     # GoToBehavior" although the goal is cancelled (README, "Mission start").
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
     stop_signal: SIGINT  # passed on to ros2 launch (which ignores SIGTERM)
     network_mode: host
@@ -384,7 +390,7 @@ services:
     ipc: host
     depends_on:
       flight_ready: {condition: service_completed_successfully}
-    env_file: [../systems/aerodrone/config/topics.env, ../applications/aerostack2/config/mount_tamalpais.env]
+    env_file: [../systems/ros2/middleware.env, ../systems/aerodrone/config/topics.env, ../applications/aerostack2/config/mount_tamalpais.env]
     environment:
       ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
       FASTRTPS_DEFAULT_PROFILES_FILE: *fastdds-profile
@@ -413,6 +419,7 @@ services:
   # of simulation time during the cruise (denial_events.jsonl).
   gps_denial_recorder:
     profiles: ["denial"]
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
     network_mode: host
     ipc: host
@@ -438,6 +445,7 @@ services:
     # restores GPS 1 and exits GPS_DENIAL_RECOVERY_S later: all simulation
     # time (/clock), not wall time, as Isaac runs at about 0.2x real time.
     profiles: ["denial"]
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
     network_mode: host
     ipc: host

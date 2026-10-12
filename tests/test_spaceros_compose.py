@@ -23,7 +23,7 @@ def test_demo_workspace_is_built_inside_the_image():
     assert '--branch "${SPACEROS_RELEASE}"' in DOCKERFILE
     assert 'rosdep install --from-paths' in DOCKERFILE
     assert 'colcon build' in DOCKERFILE
-    # Space ROS ships only Cyclone DDS
+    # The pinned core links directly to Cyclone; an apt RMW cannot replace it.
     assert 'RMW_IMPLEMENTATION=rmw_cyclonedds_cpp' in DOCKERFILE
 
 

@@ -141,6 +141,7 @@ def test_follow_reference_behaviour_runs_with_the_other_behaviours():
     launch = (REPO / 'applications/aerostack2/src/as2_platform_blueos/launch/'
               'blueos_autonomy.launch.py').read_text()
     assert "'follow_reference_behavior_launch.py'" in launch
+    assert "'plugin_name': 'follow_reference_plugin_position'" in launch
     assert "'as2_behaviors_motion', 'motion_behaviors_launch.py'" in launch
 
 

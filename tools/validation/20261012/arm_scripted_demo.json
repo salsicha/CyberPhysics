@@ -1,0 +1,34 @@
+{
+  "task_id": "pick_red_block_left_bin",
+  "target_object": "red_block_target",
+  "destination": "left_bin",
+  "min_approach_distance_m": 0.015083385027830798,
+  "max_lift_height_m": 0.1872746597409669,
+  "final_place_error_m": 0.002501369973892403,
+  "collision_count": null,
+  "joint_limit_violations": 0,
+  "policy_used_ground_truth": true,
+  "policy_command_count": 94,
+  "command_saturation_fraction": 0.4148936170212766,
+  "policy_latency_ms": 46.9431858509779,
+  "observation_age_ms": 65.93581894412637,
+  "duration_s": 18.69064510706812,
+  "task_completed": true,
+  "success": false,
+  "checks": {
+    "reachable_target": true,
+    "grasp_approach": true,
+    "grasp_closure": true,
+    "lift_stability": true,
+    "place_accuracy": true,
+    "duration": true,
+    "failed_grasp_recovery": true,
+    "object_inside_destination": true,
+    "object_released": true,
+    "placement_settled": true,
+    "no_policy_ground_truth": false
+  },
+  "unmeasured_checks": [
+    "collision_free"
+  ]
+}

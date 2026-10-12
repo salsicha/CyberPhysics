@@ -460,8 +460,8 @@ def test_turret_servos_use_the_jetson_uart_without_privileges(stack):
     service = stack['turret_servos']
     assert not service.get('privileged')
     assert not any(volume.startswith('/dev') for volume in service['volumes'])
-    [env_file] = service['env_file']
-    env = dict(line.split('=', 1) for line in (COMPOSITION.parent / env_file).read_text().splitlines()
+    env = dict(line.split('=', 1) for env_file in service['env_file']
+               for line in (COMPOSITION.parent / env_file).read_text().splitlines()
                if line and not line.startswith('#'))
     assert env['TURRET_ARDUINO_TRANSPORT'] == 'sts'
     port = env['TURRET_ARDUINO_PORT']

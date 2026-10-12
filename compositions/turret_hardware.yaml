@@ -35,6 +35,7 @@ x-ros-ulimits: &ros-ulimits
 
 services:
   pantilt_yolo:
+    env_file: [../systems/ros2/middleware.env]
     <<: *pantiltros-image
     container_name: turret_pantilt_yolo
     ulimits: *ros-ulimits
@@ -45,7 +46,7 @@ services:
     working_dir: /workspace/cache/models
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
-      - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+      - RMW_IMPLEMENTATION=${RMW_IMPLEMENTATION:-rmw_zenoh_cpp}
       - FASTDDS_BUILTIN_TRANSPORTS=UDPv4?sockets_size=4194304
       - YOLO_CONFIG_DIR=/workspace/cache/ultralytics
       - TORCH_HOME=/workspace/cache/torch
@@ -82,10 +83,11 @@ services:
     privileged: true
     restart: unless-stopped
     env_file:
+      - ../systems/ros2/middleware.env
       - ../applications/pantiltros/config/arduino.env
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
-      - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+      - RMW_IMPLEMENTATION=${RMW_IMPLEMENTATION:-rmw_zenoh_cpp}
       - FASTDDS_BUILTIN_TRANSPORTS=UDPv4?sockets_size=4194304
       - TURRET_ACTUATOR_FITTED=${TURRET_ACTUATOR_FITTED:-true}
     volumes:
@@ -101,6 +103,7 @@ services:
   # this checkout's scripts: http://<host>:8080. It shows the camera the
   # tracker uses (TURRET_CAMERA_TOPIC) with the tracker's boxes.
   turret_ui:
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:nicegui-${CYBERPHYSICS_TAG:-latest}
     pull_policy: build
     build:
@@ -113,7 +116,7 @@ services:
     restart: unless-stopped
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
-      - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+      - RMW_IMPLEMENTATION=${RMW_IMPLEMENTATION:-rmw_zenoh_cpp}
       - FASTDDS_BUILTIN_TRANSPORTS=UDPv4?sockets_size=4194304
       - UI_CAR=0
       - UI_TURRET=1
@@ -126,6 +129,7 @@ services:
   # Enable this profile if the turret uses the repository's RealSense camera:
   # docker compose -f compositions/turret_hardware.yaml --profile realsense up
   turret_realsense:
+    env_file: [../systems/ros2/middleware.env]
     profiles: ["realsense"]
     image: salsicha/cyberphysics:realsense-${CYBERPHYSICS_TAG:-latest}
     pull_policy: build
@@ -140,7 +144,7 @@ services:
     privileged: true
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
-      - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+      - RMW_IMPLEMENTATION=${RMW_IMPLEMENTATION:-rmw_zenoh_cpp}
       - FASTDDS_BUILTIN_TRANSPORTS=UDPv4?sockets_size=4194304
     volumes:
       - /dev:/dev

@@ -6,11 +6,11 @@ ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US.UTF-8 \
     TERM=xterm \
     PYTHONIOENCODING=UTF-8 \
-    ROS2_DISTRO=humble \
+    ROS2_DISTRO=jazzy \
     DEBIAN_FRONTEND=noninteractive \
     PATH="/venv/bin:$PATH" \
     QT_QPA_PLATFORM=xcb \
-    ROS_DISTRO=humble
+    ROS_DISTRO=jazzy
 
 SHELL ["/bin/bash", "-c"]
 
@@ -35,7 +35,7 @@ COPY src /workspace/src
 # colcon writes its own interpreter into the console scripts' shebangs: run
 # it with the venv's, so the nodes see the packages installed there
 # (synthetic_world, srtm.py), not the bare /usr/bin/python3.
-RUN . /venv/bin/activate && . /opt/ros/$ROS2_DISTRO/setup.bash && \
+RUN . /venv/bin/activate && . /opt/ros/$ROS2_DISTRO/setup.bash && . /opt/aerostack2/setup.bash && \
     /venv/bin/python3 /usr/bin/colcon build --merge-install --install-base /workspace/install
 # Each console script must import its module with its own interpreter
 # (the plain ROS environment, as ros2 launch runs it).

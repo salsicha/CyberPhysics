@@ -12,130 +12,146 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-This script demonstrates how to evaluate a pretrained policy from the HuggingFace Hub or from your local
-training outputs directory. In the latter case, you might want to run examples/3_train_policy.py first.
+"""Evaluate the PushT diffusion policy (2D end-effector control, not a VLA arm)."""
 
-It requires the installation of the 'gym_pusht' simulation environment. Install it by running:
-```bash
-pip install -e ".[pusht]"
-```
-"""
-
+import argparse
+import json
+import time
 from pathlib import Path
 
-import gym_pusht  # noqa: F401
-import gymnasium as gym
-import imageio
-import numpy
-import torch
 
-from lerobot.policies.diffusion.modeling_diffusion import DiffusionPolicy
+def legacy_statistics(weights, config):
+    """Recover the old checkpoint's training statistics, without inventing defaults."""
+    import torch
 
-# Create a directory to store the video of the evaluation
-output_directory = Path("outputs/eval/example_pusht_diffusion")
-output_directory.mkdir(parents=True, exist_ok=True)
+    stats = {}
+    for prefix, features in [('normalize_inputs', config.input_features),
+                             ('normalize_targets', config.output_features)]:
+        for key, feature in features.items():
+            mode = config.normalization_mapping[feature.type].value
+            required = {'MEAN_STD': ('mean', 'std'), 'MIN_MAX': ('min', 'max'),
+                        'IDENTITY': ()}[mode]
+            for name in required:
+                tensor_key = f'{prefix}.buffer_{key.replace(".", "_")}.{name}'
+                value = weights[tensor_key]  # missing statistics must fail
+                if not torch.isfinite(value).all():
+                    raise ValueError(f'Invalid checkpoint statistic: {tensor_key}')
+                stats.setdefault(key, {})[name] = value
+                if prefix == 'normalize_targets':
+                    output = weights[f'unnormalize_outputs.buffer_{key.replace(".", "_")}.{name}']
+                    if not torch.equal(value, output):
+                        raise ValueError('Checkpoint input/output action statistics disagree')
+    return stats
 
-# Select your device
-device = "cuda" if torch.cuda.is_available() else "cpu"
 
-# Provide the [hugging face repo id](https://huggingface.co/lerobot/diffusion_pusht):
-pretrained_policy_path = "lerobot/diffusion_pusht"
-# OR a path to a local outputs/train folder.
-# pretrained_policy_path = Path("outputs/train/example_pusht_diffusion")
+def load_policy(model, revision, device):
+    from huggingface_hub import hf_hub_download
+    from lerobot.configs import PreTrainedConfig
+    from lerobot.policies import make_pre_post_processors
+    from lerobot.policies.diffusion.modeling_diffusion import DiffusionPolicy
+    from safetensors.torch import load_file
 
-policy = DiffusionPolicy.from_pretrained(pretrained_policy_path)
-policy.to(device)
-policy.eval()
+    config = PreTrainedConfig.from_pretrained(model, revision=revision)
+    if config.type != 'diffusion':
+        raise ValueError(f'Expected a diffusion checkpoint, got {config.type}')
+    config.device = device
+    checkpoint = Path(model) / 'model.safetensors'
+    if not checkpoint.is_file():
+        checkpoint = Path(hf_hub_download(model, 'model.safetensors', revision=revision))
+    weights = load_file(str(checkpoint))
+    policy = DiffusionPolicy(config)
+    legacy = any(key.startswith('normalize_inputs.') for key in weights)
+    if legacy:
+        stats = legacy_statistics(weights, config)
+        weights = {k: v for k, v in weights.items() if not k.startswith(
+            ('normalize_inputs.', 'normalize_targets.', 'unnormalize_outputs.'))}
+        pre, post = make_pre_post_processors(config, dataset_stats=stats)
+    else:
+        pre, post = make_pre_post_processors(
+            config, model, pretrained_revision=revision,
+            preprocessor_overrides={'device_processor': {'device': device}},
+        )
+    policy.load_state_dict(weights, strict=True)
+    policy.to(device).eval()
+    return policy, pre, post, legacy
 
-# Initialize evaluation environment to render two observation types:
-# an image of the scene and state/position of the agent. The environment
-# also automatically stops running after 300 interactions/steps.
-env = gym.make(
-    "gym_pusht/PushT-v0",
-    obs_type="pixels_agent_pos",
-    max_episode_steps=300,
-)
 
-# We can verify that the shapes of the features expected by the policy match the ones from the observations
-# produced by the environment
-print(policy.config.input_features)
-print(env.observation_space)
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--model', default='lerobot/diffusion_pusht')
+    parser.add_argument('--revision')
+    parser.add_argument('--device')
+    parser.add_argument('--seeds', nargs='+', type=int, default=[42, 43, 44])
+    parser.add_argument('--max-steps', type=int, default=300)
+    parser.add_argument('--output', type=Path, default=Path('outputs/eval/example_pusht_diffusion'))
+    parser.add_argument('--video', action=argparse.BooleanOptionalAction, default=True)
+    args = parser.parse_args()
+    if args.max_steps < 1:
+        parser.error('--max-steps must be positive')
 
-# Similarly, we can check that the actions produced by the policy will match the actions expected by the
-# environment
-print(policy.config.output_features)
-print(env.action_space)
+    import gym_pusht  # noqa: F401
+    import gymnasium as gym
+    import imageio.v2 as imageio
+    import numpy as np
+    import torch
 
-# Reset the policy and environments to prepare for rollout
-policy.reset()
-numpy_observation, info = env.reset(seed=42)
-
-# Prepare to collect every rewards and all the frames of the episode,
-# from initial state to final state.
-rewards = []
-frames = []
-
-# Render frame of the initial state
-frames.append(env.render())
-
-step = 0
-done = False
-while not done:
-    # Prepare observation for the policy running in Pytorch
-    state = torch.from_numpy(numpy_observation["agent_pos"])
-    image = torch.from_numpy(numpy_observation["pixels"])
-
-    # Convert to float32 with image from channel first in [0,255]
-    # to channel last in [0,1]
-    state = state.to(torch.float32)
-    image = image.to(torch.float32) / 255
-    image = image.permute(2, 0, 1)
-
-    # Send data tensors from CPU to GPU
-    state = state.to(device, non_blocking=True)
-    image = image.to(device, non_blocking=True)
-
-    # Add extra (empty) batch dimension, required to forward the policy
-    state = state.unsqueeze(0)
-    image = image.unsqueeze(0)
-
-    # Create the policy input dictionary
-    observation = {
-        "observation.state": state,
-        "observation.image": image,
+    device = args.device or ('cuda' if torch.cuda.is_available() else 'cpu')
+    args.output.mkdir(parents=True, exist_ok=True)
+    if device.startswith('cuda'):
+        torch.cuda.reset_peak_memory_stats()
+    policy, pre, post, legacy = load_policy(args.model, args.revision, device)
+    env = gym.make('gym_pusht/PushT-v0', obs_type='pixels_agent_pos',
+                   max_episode_steps=args.max_steps)
+    episodes = []
+    try:
+        for seed in args.seeds:
+            torch.manual_seed(seed)
+            np.random.seed(seed)
+            policy.reset()
+            pre.reset()
+            post.reset()
+            observation, _ = env.reset(seed=seed)
+            frames, rewards, latency = [], [], []
+            if args.video:
+                frames.append(env.render())
+            started = time.monotonic()
+            for step in range(args.max_steps):
+                batch = {
+                    'observation.state': torch.from_numpy(observation['agent_pos']).float(),
+                    'observation.image': torch.from_numpy(observation['pixels']).permute(2, 0, 1).float() / 255,
+                }
+                begin = time.monotonic()
+                with torch.inference_mode():
+                    action = post(policy.select_action(pre(batch))).squeeze(0).cpu().numpy()
+                latency.append((time.monotonic() - begin) * 1000)
+                if not np.isfinite(action).all():
+                    raise ValueError('Policy returned a non-finite action')
+                observation, reward, terminated, truncated, _ = env.step(action)
+                rewards.append(float(reward))
+                if args.video:
+                    frames.append(env.render())
+                if terminated or truncated:
+                    break
+            result = {'seed': seed, 'success': bool(terminated), 'steps': step + 1,
+                      'max_reward': max(rewards), 'final_reward': rewards[-1],
+                      'wall_s': time.monotonic() - started,
+                      'action_latency_p95_ms': float(np.percentile(latency, 95))}
+            episodes.append(result)
+            print(json.dumps(result), flush=True)
+            if args.video:
+                imageio.mimsave(args.output / f'rollout_{seed}.mp4', frames, fps=env.metadata['render_fps'])
+    finally:
+        env.close()
+    report = {
+        'model': args.model, 'revision': args.revision, 'device': device,
+        'legacy_statistics_restored': legacy, 'arm_simulation': False, 'vla': False,
+        'episodes': episodes, 'success_rate': sum(e['success'] for e in episodes) / len(episodes),
+        'peak_allocated_mib': torch.cuda.max_memory_allocated() / 2**20 if device.startswith('cuda') else None,
+        'peak_reserved_mib': torch.cuda.max_memory_reserved() / 2**20 if device.startswith('cuda') else None,
     }
+    (args.output / 'metrics.json').write_text(json.dumps(report, indent=2) + '\n')
+    print(json.dumps(report, indent=2))
 
-    # Predict the next action with respect to the current observation
-    with torch.inference_mode():
-        action = policy.select_action(observation)
 
-    # Prepare the action for the environment
-    numpy_action = action.squeeze(0).to("cpu").numpy()
-
-    # Step through the environment and receive a new observation
-    numpy_observation, reward, terminated, truncated, info = env.step(numpy_action)
-    print(f"{step=} {reward=} {terminated=}")
-
-    # Keep track of all the rewards and frames
-    rewards.append(reward)
-    frames.append(env.render())
-
-    # The rollout is considered done when the success state is reached (i.e. terminated is True),
-    # or the maximum number of iterations is reached (i.e. truncated is True)
-    done = terminated | truncated | done
-    step += 1
-
-if terminated:
-    print("Success!")
-else:
-    print("Failure!")
-
-# Get the speed of environment (i.e. its number of frames per second).
-fps = env.metadata["render_fps"]
-
-# Encode all frames into a mp4 video.
-video_path = output_directory / "rollout.mp4"
-imageio.mimsave(str(video_path), numpy.stack(frames), fps=fps)
-
-print(f"Video of the evaluation is available in '{video_path}'.")
+if __name__ == '__main__':
+    main()

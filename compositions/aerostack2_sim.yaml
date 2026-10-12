@@ -1,4 +1,4 @@
-# FastDDS transport of every ROS container: shared memory sized for the
+# Optional Fast DDS fallback for ROS containers: shared memory sized for the
 # camera frames, UDP with larger socket buffers (applications/aerostack2/README.md).
 x-fastdds-profile: &fastdds-profile /workspace/systems/aerodrone/config/fastdds.xml
 x-fastdds-mount: &fastdds-mount ../systems/aerodrone/config/fastdds.xml:/workspace/systems/aerodrone/config/fastdds.xml:ro
@@ -21,7 +21,7 @@ services:
   demnav_assets:
     image: salsicha/cyberphysics:demnav-${CYBERPHYSICS_TAG:-latest}
     network_mode: host
-    env_file: [../systems/aerodrone/config/topics.env, ../applications/aerostack2/config/mount_tamalpais.env]
+    env_file: [../systems/ros2/middleware.env, ../systems/aerodrone/config/topics.env, ../applications/aerostack2/config/mount_tamalpais.env]
     volumes:
       - demnav_gazebo_cache:/data/demnav_cache
     command: >
@@ -34,7 +34,7 @@ services:
   wildnav_assets:
     image: salsicha/cyberphysics:wildnav-${CYBERPHYSICS_TAG:-latest}
     network_mode: host
-    env_file: [../systems/aerodrone/config/topics.env, ../applications/aerostack2/config/mount_tamalpais.env]
+    env_file: [../systems/ros2/middleware.env, ../systems/aerodrone/config/topics.env, ../applications/aerostack2/config/mount_tamalpais.env]
     environment:
       WILDNAV_TILE_URL: ${WILDNAV_TILE_URL:-https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}}
     volumes:
@@ -51,6 +51,7 @@ services:
     restart: "no"
 
   target_assets:
+    env_file: [../systems/ros2/middleware.env]
     # Tracking targets (cars, people; systems/aerodrone/tracking.md): the
     # pinned Gazebo Fuel models of applications/aerostack2/missions/
     # tracking_targets.json, downloaded once into the cache, their licence
@@ -94,6 +95,7 @@ services:
     restart: "no"
 
   gazebo:
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
     stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     network_mode: host
@@ -116,14 +118,15 @@ services:
       - ../applications/aerostack2/models:/workspace/applications/aerostack2/models:ro
       - ../applications/gazebo/config:/workspace/config:ro
       - ../applications/gazebo/scripts:/workspace/scripts:ro
-      - ../applications/gazebo/models/rgbd_camera.sdf.jinja:/opt/ros/humble/share/as2_gazebo_assets/models/rgbd_camera/rgbd_camera.sdf.jinja:ro
-      - ../applications/gazebo/models/hd_camera.sdf.jinja:/opt/ros/humble/share/as2_gazebo_assets/models/hd_camera/hd_camera.sdf.jinja:ro
-      - ../applications/gazebo/models/quadrotor_ardupilot.sdf.jinja:/opt/ros/humble/share/as2_gazebo_assets/models/quadrotor_base/quadrotor_base.sdf.jinja:ro
+      - ../applications/gazebo/models/rgbd_camera.sdf.jinja:/opt/aerostack2/share/as2_gazebo_assets/models/rgbd_camera/rgbd_camera.sdf.jinja:ro
+      - ../applications/gazebo/models/hd_camera.sdf.jinja:/opt/aerostack2/share/as2_gazebo_assets/models/hd_camera/hd_camera.sdf.jinja:ro
+      - ../applications/gazebo/models/quadrotor_ardupilot.sdf.jinja:/opt/aerostack2/share/as2_gazebo_assets/models/quadrotor_base/quadrotor_base.sdf.jinja:ro
     command: >
       ros2 launch as2_gazebo_assets launch_simulation.py use_sim_time:=true
         simulation_config_file:=/data/navsim_assets/world_gazebo.yaml headless:=true
 
   gazebo_bridges:
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
     stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     network_mode: host
@@ -136,12 +139,13 @@ services:
       - /dev/shm:/dev/shm
       - *fastdds-mount
       - navsim_gazebo_assets:/data/navsim_assets:ro
-      - ../applications/gazebo/scripts/drone_bridges_isolated.py:/opt/ros/humble/share/as2_gazebo_assets/launch/drone_bridges.py:ro
+      - ../applications/gazebo/scripts/drone_bridges_isolated.py:/opt/aerostack2/share/as2_gazebo_assets/launch/drone_bridges.py:ro
     command: >
       ros2 launch as2_gazebo_assets drone_bridges.py namespace:=aerodrone
         simulation_config_file:=/data/navsim_assets/world_gazebo.yaml
 
   gazebo_targets:
+    env_file: [../systems/ros2/middleware.env]
     # Moves the tracking targets (cars, people; terrain_assets puts them in
     # the world) along their tracks with Gazebo's clock, through the world's
     # set_pose service, and publishes their ground truth on
@@ -180,7 +184,7 @@ services:
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
     network_mode: host
     depends_on: [gazebo_bridges, navigator_sitl]
-    env_file: [../systems/aerodrone/config/topics.env, ../applications/aerostack2/config/mount_tamalpais.env]
+    env_file: [../systems/ros2/middleware.env, ../systems/aerodrone/config/topics.env, ../applications/aerostack2/config/mount_tamalpais.env]
     environment:
       ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
       FASTRTPS_DEFAULT_PROFILES_FILE: *fastdds-profile
@@ -194,6 +198,7 @@ services:
     command: python3 /workspace/scripts/gazebo_ardupilot_backend.py
 
   mavros:
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
     stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     network_mode: host
@@ -206,6 +211,7 @@ services:
     command: ros2 launch mavros apm.launch fcu_url:=tcp://127.0.0.1:5760
 
   navigation_bridge:
+    env_file: [../systems/ros2/middleware.env]
     # Relays the ArduPilot EKF origin to /navigation/origin (the anchor of
     # every local navigation output) and, by default (GPS_INPUT_CORRECTIONS,
     # false turns it off), sends accepted DemNav/WildNav fixes to ArduPilot
@@ -231,7 +237,7 @@ services:
     network_mode: host
     ipc: host
     depends_on: [gazebo_bridges, mavros]
-    env_file: [../systems/aerodrone/config/topics.env, ../applications/aerostack2/config/mount_tamalpais.env]
+    env_file: [../systems/ros2/middleware.env, ../systems/aerodrone/config/topics.env, ../applications/aerostack2/config/mount_tamalpais.env]
     environment:
       ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
       FASTRTPS_DEFAULT_PROFILES_FILE: *fastdds-profile
@@ -267,7 +273,7 @@ services:
     network_mode: host
     ipc: host
     depends_on: [gazebo_bridges, demnav]
-    env_file: [../systems/aerodrone/config/topics.env, ../applications/aerostack2/config/mount_tamalpais.env]
+    env_file: [../systems/ros2/middleware.env, ../systems/aerodrone/config/topics.env, ../applications/aerostack2/config/mount_tamalpais.env]
     environment:
       ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
       FASTRTPS_DEFAULT_PROFILES_FILE: *fastdds-profile
@@ -302,6 +308,7 @@ services:
         attitude_sigma_deg:=0.5 match_sigma_floor_m:=1.0
 
   aerostack2_autonomy:
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
     stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     network_mode: host
@@ -325,6 +332,7 @@ services:
         go_to_threshold:=3.0
 
   flight_ready:
+    env_file: [../systems/ros2/middleware.env]
     # Ready to fly: MAVROS has a GPS fix and local odometry, and every
     # Aerostack2 server the mission tree calls can be discovered; the tree
     # gives each action server only 1 s while it is being built
@@ -352,6 +360,7 @@ services:
     restart: "no"
 
   wilderness_mission:
+    env_file: [../systems/ros2/middleware.env]
     # AERODRONE_MISSION=tracking flies the tracking scenario instead of the
     # wilderness mission: take off, hold 40 m above the moving targets and
     # hover until stopped (tracking_mission.xml; flight_ready reads the
@@ -401,7 +410,7 @@ services:
     ipc: host
     depends_on:
       flight_ready: {condition: service_completed_successfully}
-    env_file: [../systems/aerodrone/config/topics.env, ../applications/aerostack2/config/mount_tamalpais.env]
+    env_file: [../systems/ros2/middleware.env, ../systems/aerodrone/config/topics.env, ../applications/aerostack2/config/mount_tamalpais.env]
     environment:
       ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
       FASTRTPS_DEFAULT_PROFILES_FILE: *fastdds-profile
@@ -430,6 +439,7 @@ services:
   # ground truth is the pose its bridge publishes (stamped in simulation
   # time), the frame ArduPilot's JSON backend flies.
   gps_denial_recorder:
+    env_file: [../systems/ros2/middleware.env]
     profiles: ["denial"]
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
     network_mode: host
@@ -451,6 +461,7 @@ services:
     restart: "no"
 
   gps_denier:
+    env_file: [../systems/ros2/middleware.env]
     # Once the mission reaches cruise (140 m above home) waits
     # GPS_DENIAL_START_S, sets SIM_GPS_DISABLE=1 for GPS_DENIAL_DURATION_S,
     # restores GPS 1 and exits GPS_DENIAL_RECOVERY_S later: all simulation

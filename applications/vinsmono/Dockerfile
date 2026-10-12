@@ -22,6 +22,7 @@ RUN apt-get update && apt-get install -q -y --no-install-recommends \
       ros-${ROS_DISTRO}-cv-bridge \
       ros-${ROS_DISTRO}-image-transport \
       ros-${ROS_DISTRO}-tf2-ros \
+      ros-${ROS_DISTRO}-rmw-zenoh-cpp \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspace
@@ -42,7 +43,9 @@ COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh && mkdir -p /data/vinsmono
 
 ENTRYPOINT ["/entrypoint.sh"]
+ENV RMW_IMPLEMENTATION=rmw_zenoh_cpp \
+    ZENOH_ROUTER_CHECK_ATTEMPTS=-1 \
+    ZENOH_CONFIG_OVERRIDE='scouting/multicast/enabled=true;listen/endpoints=["tcp/0.0.0.0:0"];connect/endpoints=[]'
 CMD ["ros2", "launch", "vins_estimator", "vins_mono.launch.py", \
      "config_file:=/etc/vinsmono/calibration.yaml"]
-
 

@@ -1,0 +1,7 @@
+{
+  "passed": false,
+  "model": "lerobot/smolvla_base",
+  "revision": "5e8d12a6e2975b0e5e5fce7c8caf47c371d257b6",
+  "normalized_inputs_only": false,
+  "error": "ValueError: Checkpoint is missing valid MEAN_STD statistics for observation.state. Use a fine-tuned SO101 checkpoint with matching processors, joint units and cameras. The public SmolVLA base is suitable for model benchmarking/fine-tuning, not direct joint commands; missing normalization must not become identity."
+}

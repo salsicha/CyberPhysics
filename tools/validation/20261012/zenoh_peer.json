@@ -1,0 +1,21 @@
+{
+  "passed": true,
+  "backend": "rmw_zenoh_cpp",
+  "frames": 302,
+  "image_bytes": 2764800,
+  "rate_hz": 12.08,
+  "max_gap_s": 1.5307446140795946,
+  "generations": [
+    "one",
+    "two"
+  ],
+  "late_join_latched": [
+    "one",
+    "two"
+  ],
+  "service_and_action": {
+    "one": true,
+    "two": true
+  },
+  "payload_errors": []
+}

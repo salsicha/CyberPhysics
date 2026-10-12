@@ -1,7 +1,5 @@
-#!/usr/bin/env python3
-
-import unittest
 import importlib.util
+import unittest
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -112,6 +110,37 @@ class SO101AdapterTest(unittest.TestCase):
         low, high = server.checkpoint_state_range(preprocessor)
         self.assertTrue(server.looks_like_lerobot_range_values(low, high))
         self.assertIsNone(server.checkpoint_state_range(SimpleNamespace(steps=[normalizer.__class__()])))
+
+    def test_checkpoint_range_reads_loaded_tensors_instead_of_empty_constructor_stats(self):
+        normalizer = SimpleNamespace(stats={}, _tensor_stats={'observation.state': {
+            'min': np.full(6, -100.0), 'max': np.full(6, 100.0)}})
+        low, high = server.checkpoint_state_range(SimpleNamespace(steps=[normalizer]))
+        self.assertTrue(server.looks_like_lerobot_range_values(low, high))
+
+    def test_required_normalization_cannot_silently_become_identity(self):
+        mode = SimpleNamespace(value='MEAN_STD')
+        norm_map = {'STATE': mode, 'ACTION': mode}
+        state = SimpleNamespace(type='STATE', shape=(6,))
+        action = SimpleNamespace(type='ACTION', shape=(6,))
+        config = SimpleNamespace(input_features={'observation.state': state},
+                                 output_features={'action': action}, normalization_mapping=norm_map)
+        pre_step = SimpleNamespace(features=config.input_features, norm_map=norm_map,
+                                   stats={}, _tensor_stats={'observation.state': {
+                                       'mean': np.zeros(6), 'std': np.ones(6)}})
+        post_step = SimpleNamespace(features=config.output_features, norm_map=norm_map,
+                                    stats={}, _tensor_stats={'action': {
+                                        'mean': np.zeros(6), 'std': np.ones(6)}})
+        pre, post = SimpleNamespace(steps=[pre_step]), SimpleNamespace(steps=[post_step])
+        server.require_checkpoint_statistics(config, pre, post)
+        for broken in ({}, {'so100.buffer.action': {'mean': np.zeros(6), 'std': np.ones(6)}},
+                       {'action': {'mean': np.zeros(6)}},
+                       {'action': {'mean': np.zeros(6), 'std': np.full(6, np.inf)}},
+                       {'action': {'mean': np.zeros(5), 'std': np.ones(6)}},
+                       {'action': {'mean': np.zeros(6), 'std': -np.ones(6)}}):
+            with self.subTest(statistics=broken):
+                post_step._tensor_stats = broken
+                with self.assertRaisesRegex(ValueError, 'statistics for action'):
+                    server.require_checkpoint_statistics(config, pre, post)
 
     def test_invalid_joint_vector_is_rejected(self):
         with self.assertRaises(ValueError):

@@ -6,6 +6,7 @@
 # removed rather than left failing on every `up`.
 services:
   so101_cbf:
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:so101-latest
     container_name: so101_cbf
     network_mode: host

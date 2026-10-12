@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -q -y --no-install-recommends \
     python3-colcon-common-extensions \
     python3-numpy \
     python3-pip \
+    ros-$ROS_DISTRO-rmw-zenoh-cpp \
     ros-$ROS_DISTRO-controller-manager \
     ros-$ROS_DISTRO-controller-manager-msgs \
     ros-$ROS_DISTRO-controller-interface \
@@ -40,6 +41,9 @@ COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 ENTRYPOINT ["/entrypoint.sh"]
+ENV RMW_IMPLEMENTATION=rmw_zenoh_cpp \
+    ZENOH_ROUTER_CHECK_ATTEMPTS=-1 \
+    ZENOH_CONFIG_OVERRIDE='scouting/multicast/enabled=true;listen/endpoints=["tcp/0.0.0.0:0"];connect/endpoints=[]'
 CMD ["ros2", "launch", "so101_description", "gazebo.launch.py"]
 
 # Policy evaluation image (salsicha/cyberphysics:lerobot-latest), selected with
@@ -61,6 +65,9 @@ RUN apt-get update && apt-get install -q -y --no-install-recommends \
 ARG LEROBOT_VERSION=0.6.0
 RUN python3 -m venv /opt/lerobot_venv && \
     /opt/lerobot_venv/bin/pip install --no-cache-dir --upgrade pip && \
+    /opt/lerobot_venv/bin/pip install --no-cache-dir \
+    --index-url https://download.pytorch.org/whl/cu126 \
+    "torch==2.11.0" "torchvision==0.26.0" && \
     /opt/lerobot_venv/bin/pip install --no-cache-dir \
     "lerobot[smolvla,pi,diffusion]==${LEROBOT_VERSION}" \
     gym-pusht \

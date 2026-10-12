@@ -14,6 +14,7 @@
 
 services:
   rangefinder:
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:rangefinder-${CYBERPHYSICS_TAG:-latest}
     container_name: rangefinder
     network_mode: host
@@ -37,6 +38,7 @@ services:
         -p frame_id:=${RANGEFINDER_FRAME_ID:-rangefinder_link}
 
   rangefinder_sim:
+    env_file: [../systems/ros2/middleware.env]
     profiles: [sim]
     image: salsicha/cyberphysics:rangefinder-${CYBERPHYSICS_TAG:-latest}
     container_name: rangefinder_sim

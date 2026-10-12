@@ -1,5 +1,6 @@
 services:
   oak1_driver:
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:oak1-latest
     restart: unless-stopped
     network_mode: "host"

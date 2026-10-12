@@ -13,6 +13,7 @@
 
 services:
   ue_server:
+    env_file: [../systems/ros2/middleware.env]
     network_mode: host
     pull_policy: if_not_present
     image: salsicha/cyberphysics:unrealengine-${CYBERPHYSICS_TAG:-latest}
@@ -49,6 +50,7 @@ services:
               capabilities: [gpu]
 
   ue_rosbridge:
+    env_file: [../systems/ros2/middleware.env]
     network_mode: host
     pull_policy: if_not_present
     image: salsicha/cyberphysics:unrealengine-${CYBERPHYSICS_TAG:-latest}
@@ -70,6 +72,7 @@ services:
         bson_only_mode:=${ROSBRIDGE_BSON_ONLY:-true}
 
   ue_client:
+    env_file: [../systems/ros2/middleware.env]
     network_mode: host
     pull_policy: if_not_present
     image: salsicha/cyberphysics:unrealengine-${CYBERPHYSICS_TAG:-latest}

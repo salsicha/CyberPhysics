@@ -48,7 +48,7 @@ def extract_fallbacks(text):
             else:
                 j += 1
         expr = text[start + 2:j - 1]
-        match = re.match(r'([A-Za-z_][A-Za-z0-9_]*):?-(.*)$', expr, re.S)
+        match = re.match(r'([A-Za-z_][A-Za-z0-9_]*):?-(.*)$', expr, re.DOTALL)
         if match:
             var, default = match.group(1), match.group(2)
             if '${' in default:
@@ -92,7 +92,14 @@ def parse_env_file(path):
             if not line or line.startswith('#') or '=' not in line:
                 continue
             key, _, value = line.partition('=')
-            values[key.strip()] = value.strip()
+            key, value = key.strip(), value.strip()
+            # Compose env files can let the host override their own default,
+            # e.g. RMW_IMPLEMENTATION=${RMW_IMPLEMENTATION:-rmw_zenoh_cpp}.
+            # Compare that literal default, independently of this shell's env.
+            fallback = re.fullmatch(r'\$\{' + re.escape(key) + r':?-(.*)\}', value)
+            if fallback and '${' not in fallback.group(1):
+                value = fallback.group(1)
+            values[key] = value
     return values
 
 

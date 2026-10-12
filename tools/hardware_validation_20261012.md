@@ -143,37 +143,18 @@ place; see `applications/jetson.md`. The Pi has no NVIDIA GPU, so these tests do
 not constitute physical Jetson GPU acceptance. Memory and throughput on the
 actual Jetson remain to be measured.
 
-A future DDS-to-Zenoh backend migration would retain ROS topics, services,
-actions and client APIs. Add `ros-jazzy-rmw-zenoh-cpp` to the Jazzy image family,
-run a matching router, and select `RMW_IMPLEMENTATION=rmw_zenoh_cpp` consistently.
-The Humble family can use its matching package within an isolated Humble graph,
-but native rmw_zenoh cannot exchange messages between Humble and newer ROS
-releases. Standardizing connected graphs on Ubuntu 24.04 / ROS 2 Jazzy is the
-recommended target here. Rebuild dependent images and test QoS, late-joining
-subscribers, service/action reconnects, camera throughput and GPU components.
-The package check found no Jazzy Aerostack2 binaries: that family needs a
-pinned build of upstream's Jazzy-compatible source, not just a changed base
-image tag.
+The subsequently requested migration now selects native `rmw_zenoh_cpp` on
+Ubuntu 24.04 / ROS 2 Jazzy throughout connected ROS graphs. Aerostack2 is
+source-pinned, Isaac uses external Jazzy libraries, and DDS remains an explicit
+fallback. The micro-ROS agent/subscriber pair and the statically linked
+Space ROS rover graph remain documented DDS exceptions. Deployment
+instructions and required image rebuilds are in the
+[ROS middleware guide](../systems/ros2/README.md); measured transport, flight
+and hardware results are in the [Zenoh validation report](zenoh_validation_20261012.md).
+These later changes do not turn the preceding DDS measurements into Zenoh
+measurements, or establish physical Jetson GPU performance.
 
-| Connected image family | Migration target |
-|---|---|
-| `ros2`, `racecarneo`, `pantiltros`, `depthanything`, `nvblox` | Retain Ubuntu 24.04 / Jazzy; install its `rmw_zenoh_cpp` package and rebuild descendants. Retain JetPack 7.2 / Isaac ROS 4.6 on Orin. |
-| `aerostack2`, `demnav`, `wildnav`, `oak1`, `boat`, `submarine` | Rebuild the currently Humble-based family on Ubuntu 24.04 / Jazzy; validate source/dependency compatibility, then select native Zenoh throughout each connected graph. |
-| Isaac Sim 6.0.1 | Keep the simulator version; use Jazzy and supply matching external Python 3.12 ROS/Zenoh libraries. The drone's current bundled Humble setup must change. |
-| Operator/recording tools | Install the same RMW, configure router endpoints and restart any ROS CLI daemon previously using DDS. |
-
-The current car/turret ROS nodes, Nav2, MAVROS, camera bridges and navigation
-nodes use normal ROS client APIs and are candidates for this backend change.
-MAVLink, USB camera transport and serial servo protocols remain as they are.
-The separate `compositions/arduino.yaml` micro-ROS agent is a DDS-specific
-exception: changing its RMW environment variable does not migrate its MCU
-traffic. That path needs a separately validated adapter or firmware migration;
-see the [micro-ROS Agent architecture](https://github.com/micro-ROS/micro-ROS-Agent).
-
-Isaac Sim documents Linux/Jazzy support with external Zenoh libraries; its
-Humble configuration is untested. BlueOS already occupies TCP 7447 on this Pi,
-so a local Zenoh router would need a different configured port, such as 7448.
-The current changes do not switch the backend or assume that Zenoh fixes
-MAVROS executor cost. Sources:
-[ROS rmw_zenoh](https://github.com/ros2/rmw_zenoh),
-[NVIDIA ROS installation](https://docs.isaacsim.omniverse.nvidia.com/latest/installation/install_ros.html).
+The separately requested transformer/arm evaluation is recorded in the
+[arm-policy report](arm_policy_validation_20261012.md). It distinguishes real
+model inference from the scripted arm baseline and documents the remaining
+checkpoint, access and physics limitations.

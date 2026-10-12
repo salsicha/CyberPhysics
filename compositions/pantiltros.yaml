@@ -4,6 +4,7 @@
 
 services:
   pantilt_yolo:
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:pantiltros-${CYBERPHYSICS_TAG:-latest}
     pull_policy: build
     build:
@@ -18,7 +19,7 @@ services:
     working_dir: /workspace/cache/models
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
-      - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+      - RMW_IMPLEMENTATION=${RMW_IMPLEMENTATION:-rmw_zenoh_cpp}
       - FASTDDS_BUILTIN_TRANSPORTS=UDPv4?sockets_size=4194304
       - YOLO_CONFIG_DIR=/workspace/cache/ultralytics
       - TORCH_HOME=/workspace/cache/torch

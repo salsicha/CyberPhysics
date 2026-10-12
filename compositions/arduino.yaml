@@ -19,6 +19,10 @@ services:
   uros:
     network_mode: "host"
     image: salsicha/cyberphysics:ros2-latest
+    # The micro-ROS XRCE agent is DDS-specific. Keep this isolated graph on
+    # Fast DDS until an explicit MCU/ROS bridge migration is validated.
+    environment:
+      RMW_IMPLEMENTATION: rmw_fastrtps_cpp
     privileged: true
     devices:
       - /dev:/dev
@@ -31,6 +35,8 @@ services:
   ros_sub:
     network_mode: "host"
     image: salsicha/cyberphysics:ros2-latest
+    environment:
+      RMW_IMPLEMENTATION: rmw_fastrtps_cpp
     volumes:
       - /dev/shm:/dev/shm
     command: >

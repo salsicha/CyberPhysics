@@ -4,6 +4,7 @@
 # corrections are accepted.
 services:
   wildnav:
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:wildnav-${CYBERPHYSICS_TAG:-arm64}
     container_name: wildnav
     stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM

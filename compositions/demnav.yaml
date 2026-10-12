@@ -3,6 +3,7 @@
 # publishes local outputs.
 services:
   demnav:
+    env_file: [../systems/ros2/middleware.env]
     network_mode: "host"
     pull_policy: if_not_present
     image: salsicha/cyberphysics:demnav-latest

@@ -28,6 +28,7 @@ services:
     depends_on:
       - airplane_sitl
     env_file:
+      - ../systems/ros2/middleware.env
       - ../systems/airplane/config/sitl.env
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
@@ -50,6 +51,7 @@ services:
     depends_on:
       - airplane_mavros
     env_file:
+      - ../systems/ros2/middleware.env
       - ../systems/airplane/config/sitl.env
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
@@ -63,6 +65,7 @@ services:
         -p namespace:=${AIRPLANE_NAMESPACE:-plane0}
 
   airplane_navigation_ready:
+    env_file: [../systems/ros2/middleware.env]
     # Requests 20 Hz local odometry/attitude from ArduPlane (its default SITL
     # streams publish MAVROS odometry at 1 Hz) and exits once GPS and local
     # odometry are valid.
@@ -92,6 +95,7 @@ services:
     depends_on:
       - airplane_mavros
     env_file:
+      - ../systems/ros2/middleware.env
       - ../systems/airplane/config/sitl.env
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
@@ -107,6 +111,7 @@ services:
         -p origin_alt:=${ORIGIN_ALT:-280.0}
 
   airplane_navigation_bridge:
+    env_file: [../systems/ros2/middleware.env]
     # EKF origin -> /navigation/origin, the anchor of all local navigation
     # outputs. GPS_INPUT corrections are designed and SITL-validated for
     # ArduCopter only and stay off here (systems/airplane/README.md).
@@ -138,6 +143,7 @@ services:
     depends_on:
       - airplane_ground_truth
     env_file:
+      - ../systems/ros2/middleware.env
       - ../systems/airplane/config/sitl.env
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
@@ -168,6 +174,7 @@ services:
       - airplane_bridge
       - airplane_satellite_camera
     env_file:
+      - ../systems/ros2/middleware.env
       - ../systems/airplane/config/sitl.env
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
@@ -212,6 +219,7 @@ services:
       - airplane_satellite_camera
       - airplane_demnav
     env_file:
+      - ../systems/ros2/middleware.env
       - ../systems/airplane/config/sitl.env
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
@@ -257,6 +265,7 @@ services:
     depends_on:
       - airplane_wildnav
     env_file:
+      - ../systems/ros2/middleware.env
       - ../systems/airplane/config/sitl.env
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
@@ -275,6 +284,7 @@ services:
         -p min_fixes:=${NAV_EVAL_MIN_FIXES:-3}
 
   airplane_rosbridge:
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
     container_name: airplane_sim_rosbridge
     stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM

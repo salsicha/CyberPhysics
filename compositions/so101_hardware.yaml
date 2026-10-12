@@ -26,6 +26,7 @@ x-ros-ulimits: &ros-ulimits
 
 services:
   so101_depth_camera:
+    env_file: [../systems/ros2/middleware.env]
     network_mode: host
     pull_policy: if_not_present
     privileged: true
@@ -82,6 +83,7 @@ services:
         --task-id ${SO101_TASK_ID:-pick_red_block_left_bin}
 
   so101_groot_bridge:
+    env_file: [../systems/ros2/middleware.env]
     profiles:
       - policy
     image: salsicha/cyberphysics:so101-${CYBERPHYSICS_TAG:-latest}
@@ -111,6 +113,7 @@ services:
         -p camera_info_topic:=${SO101_CAMERA_INFO_TOPIC:-/so101/depth_camera/color/camera_info}
 
   so101_hil_guard:
+    env_file: [../systems/ros2/middleware.env]
     profiles:
       - policy
     image: salsicha/cyberphysics:so101-${CYBERPHYSICS_TAG:-latest}
@@ -137,6 +140,7 @@ services:
         -p max_joint_step:=${SO101_HIL_MAX_JOINT_STEP:-0.04}
 
   so101_foxglove_bridge:
+    env_file: [../systems/ros2/middleware.env]
     network_mode: host
     image: salsicha/cyberphysics:ros2-${CYBERPHYSICS_TAG:-latest}
     container_name: so101_foxglove_bridge

@@ -100,6 +100,7 @@ def generate_launch_description():
             launch_arguments={
                 'namespace': namespace,
                 'use_sim_time': 'false',
+                'plugin_name': 'follow_reference_plugin_position',
             }.items(),
         ),
     ])

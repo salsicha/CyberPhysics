@@ -85,8 +85,9 @@ def main():
         if args.tracking:
             a = {r[1] for r in samples['/tracking/detections']}
             b = {r[1] for r in samples['/tracking/image/compressed']}
-            report['tracking_paired_stamps'] = len(a & b)
-            report['tracking_unpaired_stamps'] = len(a ^ b)
+            c = {r[1] for r in samples['/tracking/camera_info']}
+            report['tracking_paired_stamps'] = len(a & b & c)
+            report['tracking_unpaired_stamps'] = len((a | b | c) - (a & b & c))
         report['passed'] = (
             all(rows for rows in samples.values())
             and report['topics']['/oak1/relative_depth']['hz'] >= (2.0 if args.tracking else 3.0)

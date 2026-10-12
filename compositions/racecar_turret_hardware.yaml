@@ -89,6 +89,7 @@ services:
   # them into /scan for SLAM Toolbox, Nav2 and the collision monitor
   # (systems/racecar_turret/config/scan_filter.yaml).
   racecar_turret_scan_filter:
+    env_file: [../systems/ros2/middleware.env]
     network_mode: host
     pull_policy: if_not_present
     image: salsicha/cyberphysics:racecarneo-${CYBERPHYSICS_TAG:-latest}
@@ -158,6 +159,7 @@ services:
   # (/dev/v4l/by-id/usb-...-video-index0): with the RealSense plugged in,
   # /dev/video0 is usually one of the RealSense's nodes.
   turret_camera:
+    env_file: [../systems/ros2/middleware.env]
     <<: *pantiltros-image
     container_name: racecar_turret_camera
     ulimits: *ros-ulimits
@@ -197,6 +199,7 @@ services:
     network_mode: host
     restart: unless-stopped
     env_file:
+      - ../systems/ros2/middleware.env
       - ../applications/pantiltros/config/jetson_uart.env
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
@@ -213,6 +216,7 @@ services:
       --params-file /workspace/pantiltros/config/arduino_bridge.yaml
 
   turret_tracker:
+    env_file: [../systems/ros2/middleware.env]
     <<: *pantiltros-image
     container_name: racecar_turret_tracker
     ulimits: *ros-ulimits

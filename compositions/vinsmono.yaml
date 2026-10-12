@@ -3,6 +3,7 @@
 
 services:
   vinsmono:
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:vinsmono-${CYBERPHYSICS_TAG:-latest}
     pull_policy: build
     build:
@@ -14,7 +15,7 @@ services:
     restart: unless-stopped
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
-      - RMW_IMPLEMENTATION=${RMW_IMPLEMENTATION:-rmw_fastrtps_cpp}
+      - RMW_IMPLEMENTATION=${RMW_IMPLEMENTATION:-rmw_zenoh_cpp}
       - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
     volumes:
       - ../systems/vinsmono/calibration/vins_mono.yaml:/etc/vinsmono/calibration.yaml:ro

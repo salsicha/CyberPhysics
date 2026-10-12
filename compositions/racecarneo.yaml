@@ -4,6 +4,7 @@
 # subscribers (applications/racecarneo/README.md).
 services:
   racecarneo_sim:
+    env_file: [../systems/ros2/middleware.env]
     network_mode: host
     pull_policy: if_not_present
     image: salsicha/cyberphysics:racecarneo-${CYBERPHYSICS_TAG:-latest}
@@ -32,6 +33,7 @@ services:
   # Sensor frames (base_link -> racecarneo/*) from the URDF, the same
   # source the hardware stack uses; the bridge publishes only odom -> base_link.
   racecarneo_robot_state_publisher:
+    env_file: [../systems/ros2/middleware.env]
     network_mode: host
     pull_policy: if_not_present
     image: salsicha/cyberphysics:racecarneo-${CYBERPHYSICS_TAG:-latest}
@@ -48,6 +50,7 @@ services:
         sim_geometry:=true
 
   racecarneo_bridge:
+    env_file: [../systems/ros2/middleware.env]
     network_mode: host
     pull_policy: if_not_present
     image: salsicha/cyberphysics:racecarneo-${CYBERPHYSICS_TAG:-latest}
@@ -67,6 +70,7 @@ services:
         --params-file /workspace/config/bridge.yaml
 
   racecarneo_cmd_vel_to_ackermann:
+    env_file: [../systems/ros2/middleware.env]
     network_mode: host
     pull_policy: if_not_present
     image: salsicha/cyberphysics:racecarneo-${CYBERPHYSICS_TAG:-latest}
@@ -92,6 +96,7 @@ services:
   # Publishes /depth_anything/depth/image and points as on the car, but
   # nvblox maps the simulator's own depth (below).
   racecarneo_depthanything:
+    env_file: [../systems/ros2/middleware.env]
     network_mode: host
     pull_policy: if_not_present
     image: salsicha/cyberphysics:depthanything-${CYBERPHYSICS_TAG:-latest}
@@ -136,6 +141,7 @@ services:
   # RACECAR_NVBLOX_DEPTH_TOPIC=/depth_anything/depth/image maps Depth
   # Anything's depth instead.
   racecarneo_nvblox:
+    env_file: [../systems/ros2/middleware.env]
     network_mode: host
     pull_policy: if_not_present
     image: salsicha/cyberphysics:nvblox-${CYBERPHYSICS_TAG:-latest}
@@ -164,6 +170,7 @@ services:
               capabilities: [gpu, compute, utility]
 
   racecarneo_slam:
+    env_file: [../systems/ros2/middleware.env]
     network_mode: host
     pull_policy: if_not_present
     image: salsicha/cyberphysics:racecarneo-${CYBERPHYSICS_TAG:-latest}
@@ -182,6 +189,7 @@ services:
         slam_params_file:=/workspace/config/slam_toolbox.yaml
 
   racecarneo_nav2:
+    env_file: [../systems/ros2/middleware.env]
     network_mode: host
     pull_policy: if_not_present
     # The nvblox image ships nvblox_nav2 (NvbloxCostmapLayer) alongside Nav2.
@@ -206,6 +214,7 @@ services:
 
 
   racecarneo_stack_validator:
+    env_file: [../systems/ros2/middleware.env]
     profiles: ["validation"]
     network_mode: host
     pull_policy: if_not_present
@@ -224,6 +233,7 @@ services:
         --freshness-s ${RACECAR_STACK_VALIDATION_FRESHNESS:-5}
 
   racecarneo_mission_runner:
+    env_file: [../systems/ros2/middleware.env]
     profiles: ["missions"]
     network_mode: host
     pull_policy: if_not_present
@@ -243,6 +253,7 @@ services:
         --mission-id ${RACECAR_MISSION_ID:-simple_loop}
 
   racecarneo_nicegui:
+    env_file: [../systems/ros2/middleware.env]
     network_mode: host
     pull_policy: if_not_present
     image: salsicha/cyberphysics:nicegui-${CYBERPHYSICS_TAG:-latest}
@@ -257,6 +268,7 @@ services:
 
   # Foxglove WebSocket server: connect Foxglove to ws://localhost:8765.
   foxglove_bridge:
+    env_file: [../systems/ros2/middleware.env]
     network_mode: host
     image: salsicha/cyberphysics:ros2-${CYBERPHYSICS_TAG:-latest}
     container_name: racecarneo_foxglove_bridge

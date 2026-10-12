@@ -9,6 +9,7 @@ services:
     restart: unless-stopped
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
     volumes:
       - ../systems/lunar_rover/config:/workspace/config:ro
       - /dev/shm:/dev/shm
@@ -27,6 +28,7 @@ services:
       - lunar_rover_sim
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
     volumes:
       - ../systems/lunar_rover/config:/workspace/config:ro
       - /dev/shm:/dev/shm

@@ -1,0 +1,14 @@
+# Optional router for links where peer multicast discovery is unavailable.
+# 7448 avoids the BlueOS service already using TCP 7447 on the test Pi.
+services:
+  zenoh_router:
+    image: salsicha/cyberphysics:ros2-${CYBERPHYSICS_TAG:-latest}
+    network_mode: host
+    environment:
+      RMW_IMPLEMENTATION: rmw_zenoh_cpp
+      ZENOH_CONFIG_OVERRIDE: 'listen/endpoints=["tcp/0.0.0.0:${ZENOH_PORT:-7448}"];connect/endpoints=${ZENOH_ROUTER_PEERS:-[]};scouting/multicast/enabled=true'
+    command: ros2 run rmw_zenoh_cpp rmw_zenohd
+    stop_signal: SIGINT
+    restart: unless-stopped
+    ulimits:
+      nofile: {soft: 1024, hard: 524288}

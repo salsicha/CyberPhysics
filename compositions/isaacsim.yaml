@@ -31,6 +31,7 @@ services:
     restart: "no"
 
   isaacsim:
+    env_file: [../systems/ros2/middleware.env]
     network_mode: "host"
     image: salsicha/cyberphysics:isaac-${CYBERPHYSICS_TAG:-latest}
     container_name: isaacsim
@@ -55,7 +56,7 @@ services:
       - ~/docker/isaac-sim/6.0.1/logs:/isaac-sim/.nvidia-omniverse/logs:rw
       - ~/docker/isaac-sim/6.0.1/data:/isaac-sim/.local/share/ov/data:rw
       - ~/docker/isaac-sim/6.0.1/documents:/isaac-sim/Documents:rw
-    entrypoint: []
+    entrypoint: ["/workspace/applications/isaac/scripts/with_ros.sh"]
     command: >
       stdbuf -o L
       ./runapp.sh

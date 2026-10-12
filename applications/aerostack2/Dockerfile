@@ -1,6 +1,6 @@
 ARG TAG=latest
 
-FROM ros:humble-ros-base
+FROM ros:jazzy-ros-base
 
 ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US.UTF-8 \
@@ -8,83 +8,50 @@ ENV LANG=en_US.UTF-8 \
     PYTHONIOENCODING=UTF-8 \
     DEBIAN_FRONTEND=noninteractive \
     PATH="/venv/bin:$PATH" \
-    ROS_DISTRO=humble
+    ROS_DISTRO=jazzy
 
 # This prevents ROS setup.bash from failing
 SHELL ["/bin/bash","-c"]
 
-# The main ROS 2 Humble repository dropped mavros, mavros-extras and
-# libmavconn in its September 2026 sync (only mavros-msgs 2.15.1 synced).
-# Install the MAVROS 2.14.0 set this stack was validated with from the
-# dated ROS snapshot; everything else still comes from the main repository.
-# Aerostack2's Gazebo assets are pinned to the Aerostack2 release of the
-# other as2 packages (1.1.3): compositions/aerostack2_sim.yaml runs their
-# launch_simulation.py and bind-mounts its own drone_bridges.py and
-# quadrotor_base, hd_camera and rgbd_camera templates over this layout
-# (asserted below).
-# The pins are upstream versions, applied by apt preferences: the build farm
-# builds each architecture separately, so a full Debian version
-# (2.14.0-1jammy.<build date>) exists for only one of amd64 and arm64, and
-# the snapshot has no arm64 as2-gazebo-assets (the main repository does).
-ARG ROS_SNAPSHOT=2026-08-07
-ARG MAVROS_VERSION=2.14.0
-ARG MAVLINK_VERSION=2026.6.6
-ARG AS2_GAZEBO_ASSETS_VERSION=1.1.3
-COPY ros-snapshots.asc /tmp/ros-snapshots.asc
-RUN gpg --show-keys --with-colons /tmp/ros-snapshots.asc \
-      | grep -q '^fpr:::::::::4B63CF8FDE49746E98FA01DDAD19BAB3CBF125EA:' && \
-    gpg --dearmor -o /usr/share/keyrings/ros-snapshots.gpg /tmp/ros-snapshots.asc && \
-    echo "deb [signed-by=/usr/share/keyrings/ros-snapshots.gpg] http://snapshots.ros.org/humble/${ROS_SNAPSHOT}/ubuntu jammy main" \
-      > /etc/apt/sources.list.d/ros-snapshots.list && \
-    rm /tmp/ros-snapshots.asc && \
-    printf '%s\n' \
-      "Package: ros-${ROS_DISTRO}-mavros ros-${ROS_DISTRO}-mavros-extras ros-${ROS_DISTRO}-mavros-msgs ros-${ROS_DISTRO}-libmavconn" \
-      "Pin: version ${MAVROS_VERSION}-1jammy.*" \
-      "Pin-Priority: 1001" \
-      "" \
-      "Package: ros-${ROS_DISTRO}-mavlink" \
-      "Pin: version ${MAVLINK_VERSION}-1jammy.*" \
-      "Pin-Priority: 1001" \
-      "" \
-      "Package: ros-${ROS_DISTRO}-as2-gazebo-assets" \
-      "Pin: version ${AS2_GAZEBO_ASSETS_VERSION}-1jammy.*" \
-      "Pin-Priority: 1001" \
-      > /etc/apt/preferences.d/cyberphysics-pins
+# Aerostack2 has no Jazzy binary release yet. Pin the upstream source after
+# its Jazzy and BehaviorTree.CPP 4 compatibility fixes, before later controller
+# and state-estimator refactors. Never build a moving branch in deployment.
+ARG AS2_REVISION=97ade9f1d43ac760da8f69312e8ef9d2b4bf2328
+RUN apt-get update -o Acquire::Retries=5 && apt-get install -q -y --no-install-recommends \
+    git python3-pip python3-venv python3-setuptools python3-rosdep \
+    python3-colcon-common-extensions libgl1-mesa-dri libgeographiclib-dev \
+    ros-${ROS_DISTRO}-ros-gz ros-${ROS_DISTRO}-mavros \
+    ros-${ROS_DISTRO}-mavros-extras ros-${ROS_DISTRO}-rosbridge-suite \
+    ros-${ROS_DISTRO}-vision-msgs ros-${ROS_DISTRO}-rmw-zenoh-cpp \
+    geographiclib-tools
 
-# vision_msgs carries the object-tracking detections
-# (systems/aerodrone/tracking.md) for the tracker, rosbridge and the
-# images built on this one (oak1).
-RUN apt update && apt install -q -y --no-install-recommends \
-    python3-pip python3-venv python3-setuptools libgl1-mesa-dri \
-    ros-${ROS_DISTRO}-as2-core ros-${ROS_DISTRO}-as2-msgs \
-    ros-${ROS_DISTRO}-as2-state-estimator \
-    ros-${ROS_DISTRO}-as2-motion-controller \
-    ros-${ROS_DISTRO}-as2-behaviors-motion \
-    ros-${ROS_DISTRO}-as2-behaviors-trajectory-generation \
-    ros-${ROS_DISTRO}-as2-behaviors-perception \
-    ros-${ROS_DISTRO}-as2-behavior-tree \
-    ros-${ROS_DISTRO}-as2-platform-gazebo \
-    ros-${ROS_DISTRO}-as2-gazebo-assets \
-    ros-${ROS_DISTRO}-ros-gz \
-    ros-${ROS_DISTRO}-mavros \
-    ros-${ROS_DISTRO}-mavros-extras \
-    ros-${ROS_DISTRO}-mavros-msgs \
-    ros-${ROS_DISTRO}-libmavconn \
-    ros-${ROS_DISTRO}-mavlink \
-    ros-${ROS_DISTRO}-rosbridge-suite \
-    ros-${ROS_DISTRO}-vision-msgs \
-    geographiclib-tools python3-colcon-common-extensions && \
-    rm -rf /var/lib/apt/lists/* && \
-    for pin in mavros:${MAVROS_VERSION} mavros-extras:${MAVROS_VERSION} \
-        mavros-msgs:${MAVROS_VERSION} libmavconn:${MAVROS_VERSION} \
-        mavlink:${MAVLINK_VERSION} as2-gazebo-assets:${AS2_GAZEBO_ASSETS_VERSION}; do \
-      installed=$(dpkg-query -W -f '${Version}' "ros-${ROS_DISTRO}-${pin%%:*}") && \
-      case "${installed}" in "${pin#*:}-1jammy."*) ;; \
-        *) echo "ros-${ROS_DISTRO}-${pin%%:*} is ${installed}, not ${pin#*:}"; exit 1 ;; esac; \
-    done
+RUN git init /as2_ws/src/aerostack2 && \
+    git -C /as2_ws/src/aerostack2 remote add origin https://github.com/aerostack2/aerostack2.git && \
+    (for attempt in 1 2 3; do \
+      git -c http.version=HTTP/1.1 -C /as2_ws/src/aerostack2 \
+        fetch --depth 1 origin "$AS2_REVISION" && exit 0; \
+      sleep 5; \
+    done; exit 1) && \
+    git -C /as2_ws/src/aerostack2 checkout --detach FETCH_HEAD && \
+    test "$(git -C /as2_ws/src/aerostack2 rev-parse HEAD)" = "$AS2_REVISION"
 
-# The Gazebo stack's launch files resolve and every bind-mount target exists.
-RUN . /opt/ros/${ROS_DISTRO}/setup.bash && \
+ARG AS2_PACKAGES="as2_state_estimator as2_motion_controller as2_behaviors_motion as2_behaviors_trajectory_generation as2_behavior_tree as2_platform_gazebo as2_gazebo_assets"
+ARG BUILD_JOBS=3
+# colcon supplies Make's own -j flag unless MAKEFLAGS already limits it;
+# CMAKE_BUILD_PARALLEL_LEVEL alone does not bound a Unix Makefiles build.
+RUN . /opt/ros/${ROS_DISTRO}/setup.bash && cd /as2_ws && \
+    { test -f /etc/ros/rosdep/sources.list.d/20-default.list || rosdep init; } && \
+    rosdep update --rosdistro "$ROS_DISTRO" && \
+    rosdep install --from-paths $(colcon list --paths-only --packages-up-to $AS2_PACKAGES) \
+      --ignore-src --rosdistro "$ROS_DISTRO" -t build -t buildtool -t build_export -t exec -y && \
+    MAKEFLAGS="-j${BUILD_JOBS} -l${BUILD_JOBS}" CMAKE_BUILD_PARALLEL_LEVEL="$BUILD_JOBS" \
+      colcon build --merge-install --executor sequential \
+      --install-base /opt/aerostack2 --packages-up-to $AS2_PACKAGES \
+      --cmake-args -DBUILD_TESTING=OFF -DCMAKE_BUILD_TYPE=Release -DPython3_EXECUTABLE=/usr/bin/python3 && \
+    rm -rf /as2_ws /var/lib/apt/lists/*
+
+# Assert the source-built layout used by the Gazebo composition's mounts.
+RUN . /opt/ros/${ROS_DISTRO}/setup.bash && . /opt/aerostack2/setup.bash && \
     share="$(ros2 pkg prefix as2_gazebo_assets)/share/as2_gazebo_assets" && \
     for file in launch/launch_simulation.py launch/drone_bridges.py \
         models/quadrotor_base/quadrotor_base.sdf.jinja \
@@ -100,11 +67,8 @@ RUN /opt/ros/${ROS_DISTRO}/lib/mavros/install_geographiclib_datasets.sh
 
 COPY requirements.txt /requirements.txt
 RUN python3 -m venv --system-site-packages /venv
-# Ubuntu 22.04's pip lets the build-isolation environment see the system's
-# setuptools 59 (through --system-site-packages), which ignores pyproject
-# [project] metadata and installs local packages as "UNKNOWN" without their
-# modules or console scripts. A current pip isolates the build properly; the
-# venv keeps the system setuptools that colcon needs.
+# Pin the Python build frontend while retaining the system ROS/colcon modules
+# in the venv. Local pyproject packages must keep their module/entry-point metadata.
 RUN . /venv/bin/activate && pip3 install --upgrade pip==25.2
 RUN . /venv/bin/activate && pip3 install -r /requirements.txt
 
@@ -120,12 +84,19 @@ RUN . /venv/bin/activate && \
     test -x /venv/bin/mavros_mirror
 
 COPY src /workspace/src
-RUN . /opt/ros/${ROS_DISTRO}/setup.bash && \
+RUN . /opt/ros/${ROS_DISTRO}/setup.bash && . /opt/aerostack2/setup.bash && \
     cd /workspace && \
-    colcon build --merge-install
+    MAKEFLAGS="-j${BUILD_JOBS} -l${BUILD_JOBS}" CMAKE_BUILD_PARALLEL_LEVEL="$BUILD_JOBS" \
+      colcon build --merge-install && \
+    . /workspace/install/setup.bash && \
+    ros2 launch as2_platform_blueos blueos_autonomy.launch.py --show-args > /dev/null
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
+
+ENV RMW_IMPLEMENTATION=rmw_zenoh_cpp \
+    ZENOH_ROUTER_CHECK_ATTEMPTS=-1 \
+    ZENOH_CONFIG_OVERRIDE='scouting/multicast/enabled=true;listen/endpoints=["tcp/0.0.0.0:0"];connect/endpoints=[]'
 
 WORKDIR /workspace
 

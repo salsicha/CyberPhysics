@@ -13,13 +13,13 @@ from __future__ import annotations
 
 import json
 
+import yaml
 from as2_gazebo_assets.utils.launch_exception import InvalidSimulationConfigFile
 from as2_gazebo_assets.world import World
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, LogInfo, OpaqueFunction, Shutdown
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
-import yaml
 
 # Relative to the drone namespace.
 SIMULATED_IMU_TOPIC = "sensor_measurements/imu"
@@ -42,23 +42,33 @@ def drone_bridges(context):
         if drone.model_name != namespace:
             continue
         bridges, custom_bridges = drone.bridges(world.world_name)
-        remappings = []
+        bridge_groups = [([], [])]
+        sources = set()
         for bridge in bridges:
             source, destination = bridge.remapping()
             if destination == "/tf":
                 destination = "/simulation/tf"
             elif destination == SIMULATED_IMU_TOPIC:
                 destination = GROUND_TRUTH_IMU_TOPIC
-            remappings.append((source, destination))
+            # Jazzy AS2 maps RGBD camera_info to both RGB and depth topics.
+            # ROS remappings cannot send one source name to two destinations
+            # in one process: the first rule wins. Isolate duplicate sources.
+            if source in sources:
+                bridge_groups.append(([bridge], [(source, destination)]))
+            else:
+                sources.add(source)
+                bridge_groups[0][0].append(bridge)
+                bridge_groups[0][1].append((source, destination))
 
         nodes = [Node(
             package="ros_gz_bridge",
             executable="parameter_bridge",
+            name=f"ros_gz_bridge_{index}",
             namespace=drone.model_name,
             output="screen",
-            arguments=[bridge.argument() for bridge in bridges],
+            arguments=[bridge.argument() for bridge in group],
             remappings=remappings,
-        )]
+        ) for index, (group, remappings) in enumerate(bridge_groups)]
         nodes.append(Node(
             package="as2_gazebo_assets",
             executable="ground_truth_bridge",

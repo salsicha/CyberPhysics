@@ -1,6 +1,7 @@
 
 services:
   qgroundcontrol:
+    env_file: [../ros2/middleware.env]
     network_mode: "host"
     image: salsicha/cyberphysics:qgroundcontrol-latest
     container_name: qgroundcontrol

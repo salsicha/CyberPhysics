@@ -35,7 +35,7 @@ services:
       - ${CYBERPHYSICS_ISAAC_CACHE:-/tmp/cyberphysics/isaac-sim/6.0.1/so101}/pip:/isaac-sim/.cache/pip:rw
       - ${CYBERPHYSICS_ISAAC_CACHE:-/tmp/cyberphysics/isaac-sim/6.0.1/so101}/glcache:/isaac-sim/.cache/nvidia/GLCache:rw
       - ${CYBERPHYSICS_ISAAC_CACHE:-/tmp/cyberphysics/isaac-sim/6.0.1/so101}/computecache:/isaac-sim/.nv/ComputeCache:rw
-      - ../applications/smolvla/smolvla/telemetry:/workspace/telemetry:rw
+      - ${SO101_TELEMETRY_DIR:-../applications/smolvla/smolvla/telemetry}:/workspace/telemetry:rw
     entrypoint: ["/bin/chown"]
     command:
       - "1234:1234"
@@ -49,6 +49,7 @@ services:
     restart: "no"
 
   isaacsim:
+    env_file: [../systems/ros2/middleware.env]
     profiles: [sim]
     image: salsicha/cyberphysics:isaac-${CYBERPHYSICS_TAG:-latest}
     container_name: so101_smolvla_isaacsim
@@ -66,8 +67,8 @@ services:
       - XAUTHORITY=/isaac-sim/.xauth/Xauthority
       - ROS_DISTRO=jazzy
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
-      - RMW_IMPLEMENTATION=${RMW_IMPLEMENTATION:-rmw_fastrtps_cpp}
-      - LD_LIBRARY_PATH=/isaac-sim/exts/isaacsim.ros2.core/jazzy/lib
+      - RMW_IMPLEMENTATION=${RMW_IMPLEMENTATION:-rmw_zenoh_cpp}
+
       - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
       - NVIDIA_DRIVER_CAPABILITIES=${NVIDIA_DRIVER_CAPABILITIES:-graphics,utility,compute}
       - SO101_HEADLESS=${SO101_HEADLESS:-false}
@@ -88,7 +89,7 @@ services:
       - so101_smolvla_isaac_xauth:/isaac-sim/.xauth:ro
       - ../systems:/workspace/systems:ro
       - ../applications/so101:/workspace/so101:ro
-      - ../applications/smolvla/smolvla/telemetry:/workspace/telemetry:rw
+      - ${SO101_TELEMETRY_DIR:-../applications/smolvla/smolvla/telemetry}:/workspace/telemetry:rw
       - ${CYBERPHYSICS_ISAAC_CACHE:-/tmp/cyberphysics/isaac-sim/6.0.1/so101}/kit:/isaac-sim/kit/cache:rw
       - ${CYBERPHYSICS_ISAAC_CACHE:-/tmp/cyberphysics/isaac-sim/6.0.1/so101}/user:/isaac-sim/.cache:rw
       - ${CYBERPHYSICS_ISAAC_CACHE:-/tmp/cyberphysics/isaac-sim/6.0.1/so101}/ov:/isaac-sim/.cache/ov:rw
@@ -101,7 +102,7 @@ services:
       timeout: 2s
       start_period: 180s
       retries: 3
-    entrypoint: []
+    entrypoint: ["/workspace/applications/isaac/scripts/with_ros.sh"]
     # The launcher forwards SIGTERM so `down` flushes telemetry and metrics.
     command: >
       bash /workspace/so101/scripts/run_isaacsim_so101.sh
@@ -139,6 +140,7 @@ services:
       - HF_TOKEN=${HF_TOKEN:-}
       - SMOLVLA_MODEL_PATH=${SMOLVLA_MODEL_PATH:-lerobot/smolvla_base}
       - SMOLVLA_DEVICE=${SMOLVLA_DEVICE:-cuda}
+      - SMOLVLA_REVISION=${SMOLVLA_REVISION:-}
       - SMOLVLA_CHECKPOINT_UNITS=${SMOLVLA_CHECKPOINT_UNITS:-so101}
       - SMOLVLA_JOINT_MAPPING=${SMOLVLA_JOINT_MAPPING:-/workspace/systems/so101/config/lerobot_joint_mapping.json}
       - SMOLVLA_SKIP_UNIT_CHECK=${SMOLVLA_SKIP_UNIT_CHECK:-false}
@@ -167,6 +169,7 @@ services:
       retries: 4
 
   so101_smolvla_bridge:
+    env_file: [../systems/ros2/middleware.env]
     profiles: [sim]
     image: salsicha/cyberphysics:so101-${CYBERPHYSICS_TAG:-latest}
     container_name: so101_smolvla_bridge
@@ -195,6 +198,7 @@ services:
         -p command_rate_hz:=${SMOLVLA_POLICY_FPS:-30.0}
 
   foxglove_bridge:
+    env_file: [../systems/ros2/middleware.env]
     profiles: [observe]
     image: salsicha/cyberphysics:ros2-${CYBERPHYSICS_TAG:-latest}
     container_name: so101_smolvla_foxglove_bridge

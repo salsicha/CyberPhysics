@@ -2,6 +2,7 @@
 
 services:
   submarine_mavros:
+    env_file: [../systems/ros2/middleware.env]
     # MAVLink from BlueOS's router through its internal TCP server (the
     # "Internal Link" endpoint, 127.0.0.1:5777): no BlueOS endpoint to add,
     # and MAVROS joins as component 1:191, which no BlueOS service uses.
@@ -25,6 +26,7 @@ services:
         fcu_url:=${BLUEOS_FCU_URL:-tcp://127.0.0.1:5777}
 
   submarine_bridge:
+    env_file: [../systems/ros2/middleware.env]
     # /sub0/sensor_measurements/*. The pressure is the external depth
     # sensor's SCALED_PRESSURE2, decoded from MAVROS's raw MAVLink stream;
     # without one, the Navigator's own barometer with a warning
@@ -50,6 +52,7 @@ services:
         -p namespace:=${SUBMARINE_NAMESPACE:-sub0}
 
   submarine_message_rates:
+    env_file: [../systems/ros2/middleware.env]
     # Asks ArduSub for the telemetry rates the bridge needs
     # (systems/submarine/config/message_rates.yaml; its default streams
     # send RAW_IMU, the pressure and GPS_RAW_INT at 2 Hz) at start, after
@@ -77,6 +80,7 @@ services:
         --namespace /mavros --rates /workspace/config/message_rates.yaml
 
   submarine_rosbridge:
+    env_file: [../systems/ros2/middleware.env]
     # Port 9092: BlueOS's Cable Guy holds 9090 on the host network. Host
     # IPC and /dev/shm, or Fast DDS's shared-memory transport delivers it
     # no messages (compositions/blueos_nav_core.yaml).

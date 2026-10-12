@@ -13,6 +13,7 @@
 
 services:
   tello:
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:tello-${CYBERPHYSICS_TAG:-latest}
     pull_policy: if_not_present
     container_name: tello
@@ -32,6 +33,7 @@ services:
   # T takeoff, L land, E emergency stop, F flip forward,
   # arrows move, W/S up/down, A/D yaw.
   tello_teleop:
+    env_file: [../systems/ros2/middleware.env]
     profiles: ["teleop"]
     image: salsicha/cyberphysics:tello-${CYBERPHYSICS_TAG:-latest}
     pull_policy: if_not_present

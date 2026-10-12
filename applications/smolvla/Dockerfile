@@ -41,18 +41,20 @@ RUN GIT_LFS_SKIP_SMUDGE=1 git clone \
       "${LEROBOT_REPO}" lerobot
 
 WORKDIR /opt/lerobot
-# The LeRobot lock selects cu128. PyTorch 2.11 cu128 dropped Volta kernels;
-# the matching cu126 wheels retain sm_70 support for 32 GB V100 systems.
-
+# The LeRobot lock selects cu128. Install its non-CUDA dependencies from the
+# frozen lock, then the selected Torch wheel and that wheel's CUDA libraries.
+# Installing cu128 first and replacing it duplicates multi-GB downloads and
+# leaves unused CUDA packages. cu126 retains sm_70 support for V100 systems.
 
 RUN --mount=type=cache,target=/root/.cache/uv,sharing=locked \
     set -euo pipefail && \
     export UV_HTTP_TIMEOUT=300 UV_CONCURRENT_DOWNLOADS=4 && \
-      uv sync --frozen --no-dev --no-install-project \
+    skip_cuda="$(python3.12 -c 'import tomllib; p=tomllib.load(open("uv.lock", "rb"))["package"]; print(" ".join("--no-install-package " + n for n in sorted({x["name"] for x in p}) if n in ("torch", "torchvision", "triton") or n.startswith(("nvidia-", "cuda-"))))')" && \
+      uv sync --frozen --no-dev --no-install-project $skip_cuda \
         --extra smolvla \
         --extra training \
         --extra peft && \
-    uv pip install --python /opt/lerobot/.venv/bin/python --reinstall \
+    uv pip install --python /opt/lerobot/.venv/bin/python \
       --index-url "${PYTORCH_INDEX_URL}" \
       "torch==2.11.0" \
       "torchvision==0.26.0" \

@@ -27,6 +27,7 @@ SHELL ["/bin/bash", "-c"]
 RUN apt-get update && apt-get install -q -y --no-install-recommends \
       python3-msgpack \
       python3-serial \
+      ros-${ROS_DISTRO}-rmw-zenoh-cpp \
     && rm -rf /var/lib/apt/lists/*
 
 COPY entrypoint.sh /entrypoint.sh
@@ -35,4 +36,7 @@ RUN chmod +x /entrypoint.sh
 WORKDIR /scripts
 
 ENTRYPOINT ["/entrypoint.sh"]
+ENV RMW_IMPLEMENTATION=rmw_zenoh_cpp \
+    ZENOH_ROUTER_CHECK_ATTEMPTS=-1 \
+    ZENOH_CONFIG_OVERRIDE='scouting/multicast/enabled=true;listen/endpoints=["tcp/0.0.0.0:0"];connect/endpoints=[]'
 CMD ["bash"]

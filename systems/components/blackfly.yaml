@@ -1,5 +1,6 @@
 services:
   blackfly:
+    env_file: [../ros2/middleware.env]
     restart: always
     network_mode: "host"
     init: true

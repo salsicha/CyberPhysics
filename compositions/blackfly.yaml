@@ -12,6 +12,7 @@
 version: "3.9"
 services:
   blackfly_autoconfigure_ip:
+    env_file: [../systems/ros2/middleware.env]
     network_mode: "host"
     ipc: "host"
     image: salsicha/cyberphysics:blackfly-latest
@@ -19,6 +20,7 @@ services:
       - EXPECTED_NUM_BLACKFLY_CAMERAS=1
     command: /bin/bash -c "/scripts/blackfly-autoconfigure-ip.sh $$EXPECTED_NUM_BLACKFLY_CAMERAS"
   blackfly:
+    env_file: [../systems/ros2/middleware.env]
     restart: unless-stopped
     network_mode: "host"
     ipc: "host"
@@ -36,6 +38,7 @@ services:
         exec ros2 launch spinnaker_camera_driver blackfly_s_gige.launch.py
         camera_name:=blackfly_1 serial:="'$$CAMERA_SERIAL1'" frame_rate:=10
   record:
+    env_file: [../systems/ros2/middleware.env]
     restart: always
     pull_policy: never
     image: salsicha/cyberphysics:record-latest

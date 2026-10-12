@@ -4,6 +4,7 @@
 services:
   rai:
     network_mode: "host"
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:rai-latest
     container_name: rai
     environment:

@@ -15,6 +15,7 @@
 
 services:
   tracking_detector:
+    env_file: [../systems/ros2/middleware.env]
     # The aircraft's detector on the simulated downward camera: the ONNX its
     # OAK-1 blob is compiled from, on the CPU with ONNX Runtime, and a
     # host-side tracker giving the IDs DepthAI's ObjectTracker gives on the
@@ -47,7 +48,7 @@ services:
     image: salsicha/cyberphysics:demnav-${CYBERPHYSICS_TAG:-latest}
     network_mode: host
     ipc: host
-    env_file: [../systems/aerodrone/config/topics.env]
+    env_file: [../systems/ros2/middleware.env, ../systems/aerodrone/config/topics.env]
     environment:
       ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
       FASTRTPS_DEFAULT_PROFILES_FILE: /workspace/systems/aerodrone/config/fastdds.xml
@@ -70,6 +71,7 @@ services:
         -p dem_cache_dir:=/data/demnav_cache
 
   tracking_launcher:
+    env_file: [../systems/ros2/middleware.env]
     # Stands in for the foam dart launcher's servo bridge (the aircraft's
     # launcher_bridge in aerodrone_tracking.yaml), so the tracker's fire
     # control (TRACKING_LAUNCHER_FITTED=true in the simulators' env files)
@@ -97,6 +99,7 @@ services:
         -p tracking_topic_prefix:=${TRACKING_TOPIC_PREFIX:-/tracking}
 
   tracking_rosbridge:
+    env_file: [../systems/ros2/middleware.env]
     # The web page's link to ROS, as blueos_nav_core.yaml's rosbridge on
     # the aircraft: port 9092 there and here, since the page connects to
     # that port (BlueOS holds 9090 on the aircraft).
@@ -114,6 +117,7 @@ services:
     command: ros2 launch rosbridge_server rosbridge_websocket_launch.xml port:=9092
 
   tracking_ui:
+    env_file: [../systems/ros2/middleware.env]
     # The map-goal and object-tracking page on http://localhost:8080, served
     # from the repository as blueos_aerostack.yaml's aerostack_gui does on
     # the aircraft (applications/aerostack2/README.md).

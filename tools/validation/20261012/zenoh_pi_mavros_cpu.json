@@ -1,0 +1,32 @@
+{
+  "samples_percent_one_core": [
+    7.23,
+    3.75,
+    4.05,
+    5.12,
+    5.04,
+    5.14,
+    4.55,
+    4.73,
+    4.63,
+    4.21,
+    5.08,
+    5.3,
+    4.28,
+    4.29,
+    4.6,
+    5.15,
+    4.88,
+    4.87,
+    4.46,
+    4.93
+  ],
+  "sample_count": 20,
+  "mean_percent_one_core": 4.814500000000001,
+  "max_percent_one_core": 7.23,
+  "tracking_inference_active": true,
+  "plugin_count": 19,
+  "ros_distro": "jazzy",
+  "rmw": "rmw_zenoh_cpp",
+  "platform": "Raspberry Pi 5 arm64"
+}

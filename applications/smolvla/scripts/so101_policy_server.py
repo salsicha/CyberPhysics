@@ -5,8 +5,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
-import traceback
 from pathlib import Path
 from typing import Any
 
@@ -169,7 +169,7 @@ def so101_to_isaac_units(action: np.ndarray, mapping: dict[str, Any] = IDENTITY_
 def checkpoint_state_range(preprocessor: Any) -> tuple[np.ndarray, np.ndarray] | None:
     """Return the observation.state min/max a LeRobot normaliser was fitted on."""
     for step in getattr(preprocessor, "steps", None) or []:
-        stats = getattr(step, "stats", None)
+        stats = processor_statistics(step)
         if not isinstance(stats, dict):
             continue
         state = stats.get("observation.state")
@@ -183,6 +183,57 @@ def checkpoint_state_range(preprocessor: Any) -> tuple[np.ndarray, np.ndarray] |
             values.append(np.asarray(value, dtype=np.float64))
         return values[0], values[1]
     return None
+
+
+def processor_statistics(step: Any) -> dict:
+    # LeRobot 0.6 loads checkpoint tensors into _tensor_stats without updating
+    # the constructor's public stats field. Reading only stats misses them.
+    loaded = getattr(step, "_tensor_stats", None)
+    stats = loaded if isinstance(loaded, dict) else getattr(step, "stats", {})
+    return stats if isinstance(stats, dict) else {}
+
+
+def require_checkpoint_statistics(config: Any, preprocessor: Any, postprocessor: Any) -> None:
+    """Reject silently skipped normalization before interpreting model outputs as joints."""
+    required = {
+        "MEAN_STD": ("mean", "std"), "MIN_MAX": ("min", "max"),
+        "QUANTILES": ("q01", "q99"), "QUANTILE10": ("q10", "q90"),
+    }
+    for features, processor in ((config.input_features, preprocessor),
+                                (config.output_features, postprocessor)):
+        for key, feature in features.items():
+            mode = config.normalization_mapping[feature.type].value
+            if mode == "IDENTITY":
+                continue
+            normalizers = [step for step in processor.steps
+                           if key in getattr(step, "features", {}) and hasattr(step, "norm_map")]
+            statistics = None
+            for step in normalizers:
+                if step.norm_map.get(feature.type) == config.normalization_mapping[feature.type]:
+                    statistics = processor_statistics(step).get(key)
+                    break
+            message = (
+                f"Checkpoint is missing valid {mode} statistics for {key}. "
+                "Use a fine-tuned SO101 checkpoint with matching processors, joint units and cameras. "
+                "The public SmolVLA base is suitable for model benchmarking/fine-tuning, "
+                "not direct joint commands; missing normalization must not become identity."
+            )
+            if not isinstance(statistics, dict) or mode not in required:
+                raise ValueError(message)
+            for name in required[mode]:
+                value = statistics.get(name)
+                if hasattr(value, "detach"):
+                    value = value.detach().cpu().numpy()
+                if value is None:
+                    raise ValueError(message)
+                value = np.asarray(value)
+                if not np.all(np.isfinite(value)) or (name == "std" and np.any(value < 0)):
+                    raise ValueError(message)
+                try:
+                    if np.broadcast_shapes(value.shape, tuple(feature.shape)) != tuple(feature.shape):
+                        raise ValueError(message)
+                except ValueError as exc:
+                    raise ValueError(message) from exc
 
 
 def _joint_vector(value: Any, label: str) -> np.ndarray:
@@ -302,6 +353,14 @@ class SmolVLASO101Policy:
             raise SystemExit("SmolVLA checkpoint has no visual input feature")
         config.n_action_steps = max(1, min(int(action_horizon), int(config.chunk_size)))
 
+        self.preprocessor, self.postprocessor = make_pre_post_processors(
+            config,
+            model_path,
+            pretrained_revision=revision,
+            preprocessor_overrides={"device_processor": {"device": str(self.device)}},
+        )
+        require_checkpoint_statistics(config, self.preprocessor, self.postprocessor)
+
         print(
             f"Loading SmolVLA checkpoint={model_path} device={self.device} "
             f"units={checkpoint_units} images={self.image_keys} "
@@ -319,13 +378,17 @@ class SmolVLASO101Policy:
             base_policy = SmolVLAPolicy.from_pretrained(
                 base_path,
                 config=config,
-                revision=revision,
+                revision=peft_config.revision,
+                local_files_only=local_files_only,
+                strict=True,
             )
             self.policy = PeftModel.from_pretrained(
                 base_policy,
                 model_path,
                 config=peft_config,
                 is_trainable=False,
+                revision=revision,
+                local_files_only=local_files_only,
             )
             self.policy.to(self.device)
             self.policy.eval()
@@ -335,14 +398,9 @@ class SmolVLASO101Policy:
                 config=config,
                 revision=revision,
                 local_files_only=local_files_only,
+                strict=True,
             )
 
-        self.preprocessor, self.postprocessor = make_pre_post_processors(
-            config,
-            model_path,
-            pretrained_revision=revision,
-            preprocessor_overrides={"device_processor": {"device": str(self.device)}},
-        )
         self.config = config
         if self.checkpoint_units == "so101":
             self._check_checkpoint_units(skip_unit_check)
@@ -451,7 +509,7 @@ class PolicyServer:
                     response = self._dispatch(request)
                     response_payload = pack(response)
                 except Exception as exc:
-                    traceback.print_exc()
+                    logging.getLogger(__name__).exception("Policy request failed")
                     response_payload = pack({"error": f"{type(exc).__name__}: {exc}"})
                 socket.send(response_payload)
         except KeyboardInterrupt:
@@ -462,7 +520,7 @@ class PolicyServer:
 
     def _dispatch(self, request: Any) -> Any:
         if not isinstance(request, dict):
-            raise ValueError("Policy request must be a mapping")
+            raise TypeError("Policy request must be a mapping")
         endpoint = request.get("endpoint")
         if endpoint == "health":
             return {

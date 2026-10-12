@@ -1,15 +1,20 @@
 services:
   lerobot:
+    env_file: [../systems/ros2/middleware.env]
     network_mode: "host"
-    image: salsicha/cyberphysics:lerobot-latest
+    image: salsicha/cyberphysics:lerobot-${CYBERPHYSICS_TAG:-latest}
     volumes:
       - "/tmp/.X11-unix:/tmp/.X11-unix"
+      - lerobot_cache:/root/.cache/huggingface
+      - ${LEROBOT_OUTPUT_DIR:-../generated/lerobot}:/workspace/outputs
+      - ../applications/so101/scripts:/workspace/src/so101_description/scripts:ro
     environment:
       - "DISPLAY=${DISPLAY}"
       - XAUTHORITY
+      - HF_TOKEN=${HF_TOKEN:-}
       - NVIDIA_DRIVER_CAPABILITIES=all
       - EGL_PLATFORM=surfaceless
-    command: ["/opt/lerobot_venv/bin/python3", "evaluate_pretrained_policy.py"]
+    command: ["/opt/lerobot_venv/bin/python3", "evaluate_pretrained_policy.py", "--output", "/workspace/outputs/pusht"]
     deploy:
       resources:
         reservations:
@@ -17,3 +22,6 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
+
+volumes:
+  lerobot_cache:

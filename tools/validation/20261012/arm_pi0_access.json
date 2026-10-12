@@ -1,0 +1,9 @@
+{
+  "passed": false,
+  "model": "lerobot/pi0_base",
+  "revision": "6e245399ad403ccf02b8112b73cfdc2633068f38",
+  "dtype": "bfloat16",
+  "placeholder_observations": true,
+  "arm_simulation": false,
+  "error": "ValueError: Failed to instantiate processor step 'tokenizer_processor' with config: {'max_length': 48, 'task_key': 'task', 'padding_side': 'right', 'padding': 'max_length', 'truncation': True, 'tokenizer_name': 'google/paligemma-3b-pt-224'}. Error: You are trying to access a gated repo.\nMake sure to have access to it at https://huggingface.co/google/paligemma-3b-pt-224.\n403 Client Error. (Request ID: Root=1-6acd4070-531f271758f9c1b45acfd352;03b8064f-649a-4ce8-aa02-cd919d31d871)\n\nCannot access gated repo for url https://huggingface.co/google/paligemma-3b-pt-224/resolve/main/config.json.\nAccess to model google/paligemma-3b-pt-224 is restricted and you are not in the authorized list. Visit https://huggingface.co/google/paligemma-3b-pt-224 to ask for access."
+}

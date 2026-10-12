@@ -1,5 +1,6 @@
 services:
   realsense:
+    env_file: [../systems/ros2/middleware.env]
     network_mode: host
     pull_policy: if_not_present
     privileged: true
@@ -17,6 +18,7 @@ services:
       ros2 launch realsense2_camera rs_launch.py
 
   nvblox:
+    env_file: [../systems/ros2/middleware.env]
     network_mode: host
     pull_policy: if_not_present
     image: salsicha/cyberphysics:nvblox-${CYBERPHYSICS_TAG:-latest}
@@ -43,6 +45,7 @@ services:
               capabilities: [gpu, compute, utility]
 
   nvblox_quickstart:
+    env_file: [../systems/ros2/middleware.env]
     network_mode: host
     pull_policy: if_not_present
     image: salsicha/cyberphysics:nvblox-${CYBERPHYSICS_TAG:-latest}
@@ -72,6 +75,7 @@ services:
               capabilities: [gpu, compute, utility]
 
   foxglove_bridge:
+    env_file: [../systems/ros2/middleware.env]
     network_mode: host
     image: salsicha/cyberphysics:ros2-${CYBERPHYSICS_TAG:-latest}
     container_name: foxglove_bridge

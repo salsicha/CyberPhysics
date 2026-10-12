@@ -2,6 +2,7 @@
 # record-host-shutdown.yaml for the opt-in override.
 services:
   record:
+    env_file: [../ros2/middleware.env]
     restart: always
     pull_policy: never
     image: salsicha/cyberphysics:record-latest

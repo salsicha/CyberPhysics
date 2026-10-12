@@ -30,9 +30,10 @@ docker compose -f compositions/aerostack2_isaac.yaml up
 An NVIDIA GPU, NVIDIA Container Toolkit, NGC access while building, and acceptance of
 the NVIDIA EULA are required. Persistent Isaac caches are initialized by the
 composition. RGB/depth data comes from the Isaac render product rather than
-procedural arrays. The supplied UDP-only Fast DDS profile is required for
-interoperability between Isaac's bundled Humble middleware and the other ROS 2
-containers.
+procedural arrays. The image installs external ROS 2 Jazzy (Python 3.12) and native
+`rmw_zenoh_cpp`; its entrypoint sources that installation before starting Kit.
+Rebuild the image and ROS peers together. See the
+[middleware guide](../../systems/ros2/README.md) for router and DDS fallback settings.
 
 `scripts/aerodrone_navsim.py` steps the physics exactly once per ArduPilot
 servo frame (lock-step; `World.step(render=True)` would run a whole camera

@@ -75,6 +75,15 @@ RUN . /venv/bin/activate && . /opt/ros/$ROS2_DISTRO/setup.bash && \
 # through the ament index
 RUN cp -a /opt/ros_setup_orig/. /opt/ros/$ROS2_DISTRO/ && rm -rf /opt/ros_setup_orig
 
+# Native ROS middleware. LAN peer discovery also lets a standalone Compose
+# stack start without a separately managed router. An explicit router/client
+# topology can override ZENOH_CONFIG_OVERRIDE at runtime.
+RUN apt-get update && apt-get install -q -y --no-install-recommends \
+    ros-${ROS_DISTRO}-rmw-zenoh-cpp && rm -rf /var/lib/apt/lists/*
+ENV RMW_IMPLEMENTATION=rmw_zenoh_cpp \
+    ZENOH_ROUTER_CHECK_ATTEMPTS=-1 \
+    ZENOH_CONFIG_OVERRIDE='scouting/multicast/enabled=true;listen/endpoints=["tcp/0.0.0.0:0"];connect/endpoints=[]'
+
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 

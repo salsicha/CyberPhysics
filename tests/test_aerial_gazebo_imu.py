@@ -5,7 +5,6 @@ from types import SimpleNamespace as NS
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from conftest import REPO, load_script
 
 
@@ -26,6 +25,8 @@ def bridges_module():
         Bridge('/world/w/model/aerodrone/link/internal/sensor/imu/imu', 'sensor_measurements/imu'),
         Bridge('/model/aerodrone/pose', '/tf'),
         Bridge('/world/w/model/aerodrone/model/downward_rgb/link/camera', 'sensor_measurements/downward_rgb/image_raw'),
+        Bridge('/gz/rgbd/camera_info', 'sensor_measurements/downward_rgbd/camera_info'),
+        Bridge('/gz/rgbd/camera_info', 'sensor_measurements/downward_rgbd/depth/camera_info'),
     ], ['ground_truth_custom_bridge']))
     with patch.dict(sys.modules):
         for name in ('as2_gazebo_assets', 'as2_gazebo_assets.utils',
@@ -64,3 +65,18 @@ def test_backend_reads_the_simulator_imu_not_the_mavros_republish():
         if '=' in line and not line.startswith('#'))
     assert topics['GAZEBO_IMU_TOPIC'] == '/aerodrone/ground_truth/imu'
     assert topics['GAZEBO_IMU_TOPIC'] != topics['IMU_TOPIC']
+
+
+def test_both_camera_info_topics_survive_jazzy_duplicate_source(bridges_module, tmp_path):
+    config = tmp_path / 'world.yaml'
+    config.write_text('world_name: w\n')
+    nodes = [node for node in bridges_module.drone_bridges(str(config))
+             if node.package == 'ros_gz_bridge']
+    destinations = []
+    for node in nodes:
+        sources = [source for source, _ in node.remappings]
+        assert len(sources) == len(set(sources))
+        destinations.extend(target for source, target in node.remappings
+                            if source == '/gz/rgbd/camera_info')
+    assert set(destinations) == {'sensor_measurements/downward_rgbd/camera_info',
+                                 'sensor_measurements/downward_rgbd/depth/camera_info'}

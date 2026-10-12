@@ -59,7 +59,7 @@ services:
     network_mode: host
     ipc: host
     restart: unless-stopped
-    env_file: [../systems/aerodrone/config/tracking.env]
+    env_file: [../systems/ros2/middleware.env, ../systems/aerodrone/config/tracking.env]
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
       - FASTRTPS_DEFAULT_PROFILES_FILE
@@ -113,6 +113,7 @@ services:
         -p fire_min_interval_s:=${TRACKING_FIRE_MIN_INTERVAL_S:-2.0}
 
   launcher_bridge:
+    env_file: [../systems/ros2/middleware.env]
     # The aircraft's foam dart launcher (hardware/aerodrone.md, "Foam dart
     # launcher"): its two ST3215s, the rack (ID 14) and the trigger (ID 15),
     # on a Waveshare Bus Servo Adapter (A) on the Pi 5's USB (jumper on B),

@@ -136,3 +136,15 @@ def test_unsolved_run_still_writes_metrics_on_close(tmp_path):
     scene.close()
     metrics = json.loads((tmp_path / 'run_metrics.json').read_text())
     assert metrics['task_completed'] is False and metrics['success'] is False
+
+
+def test_reports_replace_read_only_previous_run_without_partial_json(tmp_path):
+    from so101_task_scene import write_json_atomic
+
+    report = tmp_path / 'run.json'
+    report.write_text('{"old": true}')
+    report.chmod(0o444)
+    write_json_atomic(report, {'complete': [1, 2, 3]})
+    assert json.loads(report.read_text()) == {'complete': [1, 2, 3]}
+    assert report.stat().st_mode & 0o777 == 0o644
+    assert list(tmp_path.iterdir()) == [report]

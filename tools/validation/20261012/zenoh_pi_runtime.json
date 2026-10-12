@@ -1,0 +1,16 @@
+{
+  "platform": "Raspberry Pi 5",
+  "architecture": "aarch64",
+  "rmw": "rmw_zenoh_cpp",
+  "ros_distro": "jazzy",
+  "aerostack2_image": "salsicha/cyberphysics:aerostack2-zenoh-arm64",
+  "aerostack2_image_id": "sha256:7863b499aa8ba449f7a0e4e82ffa282a82c6f18759f40a725e4080ee90a26795",
+  "oak1_image": "salsicha/cyberphysics:oak1-zenoh-arm64",
+  "oak1_image_id": "sha256:4406baf14790cc4969b9a6b69fb0d816bd7f158909ac47d0a8a35f8e77824992",
+  "packages": {
+    "ros-jazzy-mavros": "2.16.0-1noble.20260927.172210",
+    "ros-jazzy-rmw-zenoh-cpp": "0.2.11-1noble.20260915.184907",
+    "ros-jazzy-zenoh-cpp-vendor": "0.2.11-1noble.20260914.175810"
+  },
+  "build_note": "Native arm64 source build passed. Final Dockerfile adds MAKEFLAGS to enforce the same intended compiler job limit; image predates only that concurrency correction."
+}

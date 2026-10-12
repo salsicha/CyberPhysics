@@ -26,6 +26,7 @@ x-unoq-image: &unoq-image
 
 services:
   unoq_sub:
+    env_file: [../systems/ros2/middleware.env]
     <<: *unoq-image
     container_name: unoq_sub
     network_mode: host
@@ -47,6 +48,7 @@ services:
 
   # One-shot publisher, as arduino.yaml's ros_sub service
   unoq_led_on:
+    env_file: [../systems/ros2/middleware.env]
     <<: *unoq-image
     profiles: ["pub"]
     network_mode: host

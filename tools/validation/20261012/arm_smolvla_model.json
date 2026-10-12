@@ -1,0 +1,40 @@
+{
+  "passed": true,
+  "model": "lerobot/smolvla_base",
+  "revision": "5e8d12a6e2975b0e5e5fce7c8caf47c371d257b6",
+  "device": "cuda",
+  "gpu_name": "NVIDIA RTX 4000 Ada Generation Laptop GPU",
+  "load_s": 19.859458487015218,
+  "iterations": 8,
+  "latency_ms": [
+    1502.4877639953047,
+    472.8854689747095,
+    231.06796899810433,
+    153.25677813962102,
+    209.56213399767876,
+    171.96446401067078,
+    193.1299390271306,
+    300.21619284525514
+  ],
+  "latency_p50_ms": 220.31505149789155,
+  "latency_p95_ms": 1142.126960738096,
+  "peak_allocated_mib": 933.056640625,
+  "peak_reserved_mib": 976.0,
+  "parameters": 450046176,
+  "parameter_bytes": 906639456,
+  "torch": "2.11.0+cu126",
+  "camera_keys": [
+    "observation.images.camera1",
+    "observation.images.camera2",
+    "observation.images.camera3"
+  ],
+  "normalized_inputs_only": true,
+  "adapter_statistics_validated": false,
+  "synthetic_observations": true,
+  "task_success_evaluated": false,
+  "first_inference_ms": 1502.4877639953047,
+  "warm_latency_p50_ms": 209.56213399767876,
+  "warm_latency_p95_ms": 421.0846861358731,
+  "concurrent_gpu_workload": "Isaac GPS-denied flight simulation",
+  "derived_latency_summary": true
+}

@@ -16,6 +16,7 @@ include:
 
 services:
   aerostack:
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-arm64}
     container_name: aerostack
     stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
@@ -38,6 +39,7 @@ services:
         takeoff_altitude:=${TAKEOFF_ALTITUDE:-2.0}
 
   aerodrone_message_rates:
+    env_file: [../systems/ros2/middleware.env]
     # The readiness gate asks ArduCopter for its telemetry rates once and exits;
     # an autopilot reboot mid-session forgets them. This keeps the same
     # rates (systems/aerodrone/config/message_rates.yaml): at start, after
@@ -66,6 +68,7 @@ services:
         --rates /workspace/systems/aerodrone/config/message_rates.yaml
 
   behavior_tree:
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-arm64}
     container_name: aerostack_behavior_tree
     # run_behavior_tree.py passes SIGINT on to ros2 launch (which ignores
@@ -102,6 +105,7 @@ services:
           use_sim_time:=false
 
   aerostack_gui:
+    env_file: [../systems/ros2/middleware.env]
     # The map-goal and object-tracking page (applications/aerostack2/README.md,
     # "Map mission" and "Object tracking UI") on port 8080, served from the
     # repository like the scripts above: a new page needs no image rebuild.

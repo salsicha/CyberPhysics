@@ -11,6 +11,7 @@ include:
 
 services:
   rangefinder:
+    env_file: [../systems/ros2/middleware.env]
     # Benewake TFmini-S/TF-Luna, downward, on a 3.3 V USB-UART adapter
     # (applications/rangefinder). Publishes sensor_msgs/Range on
     # RANGEFINDER_TOPIC, DemNav's height-above-ground input. Set

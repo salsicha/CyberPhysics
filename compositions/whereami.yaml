@@ -23,6 +23,7 @@
 
 services:
   whereami:
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:whereami-${CYBERPHYSICS_TAG:-latest}
     container_name: whereami
     network_mode: host
@@ -53,6 +54,7 @@ services:
   # One-off training CLI: `run --rm whereami_train <whereami command>`, e.g.
   # learn -l <room> -n <samples>, locations, crossval, train, predict_proba.
   whereami_train:
+    env_file: [../systems/ros2/middleware.env]
     profiles: [train]
     image: salsicha/cyberphysics:whereami-${CYBERPHYSICS_TAG:-latest}
     network_mode: host

@@ -19,6 +19,7 @@ services:
     command: /workspace/applications/ardupilot_sitl/scripts/run_vehicle_sitl.sh
 
   mavros:
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
     stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     network_mode: host
@@ -28,6 +29,7 @@ services:
     command: ros2 launch mavros apm.launch fcu_url:=tcp://127.0.0.1:5760
 
   submarine_bridge:
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:submarine-${CYBERPHYSICS_TAG:-latest}
     network_mode: host
     ipc: host
@@ -37,6 +39,7 @@ services:
     command: mavros_mirror --ros-args --params-file /workspace/config/bridge_sim.yaml
 
   navigator_arm:
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
     network_mode: host
     # Same IPC namespace as MAVROS: Fast DDS picks shared-memory transport
@@ -50,6 +53,7 @@ services:
     restart: "no"
 
   pipeline_waypoint_nav:
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:submarine-${CYBERPHYSICS_TAG:-latest}
     network_mode: host
     ipc: host
@@ -62,6 +66,7 @@ services:
         --params-file /workspace/config/pipeline_inspection.yaml
 
   submarine_rosbridge:
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:submarine-${CYBERPHYSICS_TAG:-latest}
     stop_signal: SIGINT  # ros2 launch as PID 1 ignores SIGTERM
     network_mode: host

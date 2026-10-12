@@ -62,6 +62,7 @@ services:
     # models (downloaded once into the cache volume, licence and SHA-256
     # checked) baked for Isaac, their routes and the floor texture
     # (applications/isaac/scripts/racecar_turret_assets.py).
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:racecarneo-${CYBERPHYSICS_TAG:-latest}
     pull_policy: if_not_present
     container_name: racecar_turret_isaac_assets
@@ -97,6 +98,7 @@ services:
     # Lock-step physics, the car, its sensors and the turret, the arena and
     # its people; /clock, the RACECAR's topics (racecarneo_ros_bridge.py's),
     # the turret's and /simulation/truth.
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:isaac-${CYBERPHYSICS_TAG:-latest}
     container_name: racecar_turret_isaac_sim
     network_mode: host
@@ -111,8 +113,8 @@ services:
       ACCEPT_EULA: Y
       PRIVACY_CONSENT: Y
       ROS_DISTRO: jazzy
-      RMW_IMPLEMENTATION: rmw_fastrtps_cpp
-      LD_LIBRARY_PATH: /isaac-sim/exts/isaacsim.ros2.core/jazzy/lib
+      RMW_IMPLEMENTATION: ${RMW_IMPLEMENTATION:-rmw_zenoh_cpp}
+
       NVIDIA_DRIVER_CAPABILITIES: all
       ISAAC_PHYSICS_HZ: ${ISAAC_PHYSICS_HZ:-120.0}
       ISAAC_RENDER_HZ: ${ISAAC_RENDER_HZ:-15.0}
@@ -135,7 +137,7 @@ services:
       - ~/docker/isaac-sim/6.0.1/logs:/isaac-sim/.nvidia-omniverse/logs:rw
       - ~/docker/isaac-sim/6.0.1/config:/isaac-sim/.nvidia-omniverse/config:rw
       - ~/docker/isaac-sim/6.0.1/data:/isaac-sim/.local/share/ov/data:rw
-    entrypoint: []
+    entrypoint: ["/workspace/applications/isaac/scripts/with_ros.sh"]
     command: >
       /workspace/applications/isaac/scripts/run_racecar_turret_isaac.sh --headless
         --assets /data/racecar_turret_assets
@@ -152,6 +154,7 @@ services:
       start_period: 10s
 
   racecar_turret_odom_tf:
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:racecarneo-${CYBERPHYSICS_TAG:-latest}
     pull_policy: if_not_present
     container_name: racecar_turret_isaac_odom_tf
@@ -166,6 +169,7 @@ services:
   racecar_turret_robot_state_publisher:
     # The RACECAR's sensor frames and the turret (racecar_turret.urdf.xacro,
     # simulator optical frames), the turret joints from /turret/joint_states.
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:racecarneo-${CYBERPHYSICS_TAG:-latest}
     pull_policy: if_not_present
     container_name: racecar_turret_isaac_robot_state_publisher
@@ -185,6 +189,7 @@ services:
   racecar_turret_cmd_vel_to_ackermann:
     # The hardware car's limits (cmd_vel_to_ackermann.yaml: 0.33 m wheelbase,
     # 0.42 rad steering, 0.35 m/s), which the simulated car has too.
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:racecarneo-${CYBERPHYSICS_TAG:-latest}
     pull_policy: if_not_present
     container_name: racecar_turret_isaac_cmd_vel_to_ackermann
@@ -201,6 +206,7 @@ services:
         -p use_sim_time:=true
 
   racecar_turret_slam:
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:racecarneo-${CYBERPHYSICS_TAG:-latest}
     pull_policy: if_not_present
     container_name: racecar_turret_isaac_slam
@@ -224,6 +230,7 @@ services:
   racecar_turret_depthanything:
     # As on the car (racecarneo_hardware.yaml): its depth and points are
     # published, but nvblox maps the camera's own depth (see the header).
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:depthanything-${CYBERPHYSICS_TAG:-latest}
     pull_policy: if_not_present
     container_name: racecar_turret_isaac_depthanything
@@ -256,6 +263,7 @@ services:
               capabilities: [gpu, compute, utility]
 
   racecar_turret_nvblox:
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:nvblox-${CYBERPHYSICS_TAG:-latest}
     pull_policy: if_not_present
     container_name: racecar_turret_isaac_nvblox
@@ -297,6 +305,7 @@ services:
 
   racecar_turret_nav2:
     # The nvblox image ships nvblox_nav2 (NvbloxCostmapLayer) alongside Nav2.
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:nvblox-${CYBERPHYSICS_TAG:-latest}
     pull_policy: if_not_present
     container_name: racecar_turret_isaac_nav2
@@ -327,6 +336,7 @@ services:
     # the UI) selects the target through /turret/command.
     # RACECAR_TURRET_COMPENSATION=false turns off base-rotation compensation
     # and target lead together (the comparison run of the evaluation).
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:pantiltros-${CYBERPHYSICS_TAG:-latest}
     pull_policy: if_not_present
     container_name: racecar_turret_isaac_tracker
@@ -338,7 +348,7 @@ services:
       racecar_turret_isaacsim: {condition: service_healthy}
     environment:
       <<: *ros-env
-      RMW_IMPLEMENTATION: rmw_fastrtps_cpp
+      RMW_IMPLEMENTATION: ${RMW_IMPLEMENTATION:-rmw_zenoh_cpp}
       YOLO_CONFIG_DIR: /workspace/cache/ultralytics
       TORCH_HOME: /workspace/cache/torch
       PANTILT_MODEL_DIR: /workspace/cache/models
@@ -365,6 +375,7 @@ services:
     # tools/racecar_turret_isaac_test.sh: selects the target as the UI does,
     # drives the course and records the run for tools/racecar_turret_scorer.py.
     profiles: ["evaluation"]
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:racecarneo-${CYBERPHYSICS_TAG:-latest}
     pull_policy: if_not_present
     container_name: racecar_turret_isaac_evaluation
@@ -395,6 +406,7 @@ services:
     # tools/racecar_turret_isaac_test.sh runs): do they see the arena's
     # obstacles? The nvblox image has nvblox_msgs.
     profiles: ["evaluation"]
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:nvblox-${CYBERPHYSICS_TAG:-latest}
     pull_policy: if_not_present
     container_name: racecar_turret_isaac_map_recorder

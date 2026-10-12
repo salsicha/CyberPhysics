@@ -1,5 +1,6 @@
 services:
   nicegui:
+    env_file: [../ros2/middleware.env]
     restart: always
     pull_policy: never
     image: salsicha/cyberphysics:nicegui-latest

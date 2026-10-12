@@ -16,7 +16,7 @@
 # height at home), GPS_INPUT_CORRECTIONS, GPS_DENIED_OUTPUT and the mission
 # timing variables read by tools/gps_denied_sitl_mission.py.
 
-# FastDDS transport of every ROS container: shared memory sized for the
+# Optional Fast DDS fallback for ROS containers: shared memory sized for the
 # camera frames, UDP with larger socket buffers (applications/aerostack2/README.md).
 x-ros: &ros
   network_mode: host
@@ -56,6 +56,7 @@ services:
     command: /workspace/applications/ardupilot_sitl/scripts/run_arducopter_sitl.sh
 
   mavros:
+    env_file: [../systems/ros2/middleware.env]
     <<: *ros
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
     depends_on: [sitl]
@@ -63,6 +64,7 @@ services:
     command: ros2 launch mavros apm.launch fcu_url:=tcp://127.0.0.1:${SITL_PORT:-5760}
 
   mirror:
+    env_file: [../systems/ros2/middleware.env]
     <<: *ros
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
     depends_on: [mavros]
@@ -73,6 +75,7 @@ services:
         --ros-args -p namespace:=aerodrone -p mavros_namespace:=/mavros
 
   ground_truth:
+    env_file: [../systems/ros2/middleware.env]
     <<: *ros
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
     depends_on: [mavros]
@@ -84,6 +87,7 @@ services:
         -p origin_alt:=${ORIGIN_ALT:-102.0}
 
   camera:
+    env_file: [../systems/ros2/middleware.env]
     <<: *ros
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
     depends_on: [ground_truth]
@@ -105,6 +109,7 @@ services:
         -p camera_mount_yaw_deg:=0.0
 
   navigation_bridge:
+    env_file: [../systems/ros2/middleware.env]
     <<: *ros
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
     depends_on: [mavros]
@@ -115,6 +120,7 @@ services:
         -p gps_input_enabled:=${GPS_INPUT_CORRECTIONS:-true}
 
   demnav:
+    env_file: [../systems/ros2/middleware.env]
     <<: *ros
     image: salsicha/cyberphysics:demnav-${CYBERPHYSICS_TAG:-latest}
     depends_on: [mirror, camera]
@@ -141,6 +147,7 @@ services:
         "rangefinder_topic:=''" cache_dir:=/tmp/demnav_cache
 
   wildnav:
+    env_file: [../systems/ros2/middleware.env]
     <<: *ros
     image: salsicha/cyberphysics:wildnav-${CYBERPHYSICS_TAG:-latest}
     depends_on: [mirror, camera, demnav]
@@ -167,6 +174,7 @@ services:
         cache_dir:=/tmp/wildnav_cache
 
   mission:
+    env_file: [../systems/ros2/middleware.env]
     <<: *ros
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
     depends_on: [navigation_bridge, demnav, wildnav]
@@ -191,6 +199,7 @@ services:
   # valid DemNav match, corrections being applied and MAVROS's static TF
   # (the only TF this stack has). No rangefinder here.
   validator:
+    env_file: [../systems/ros2/middleware.env]
     <<: *ros
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
     profiles: ["validation"]

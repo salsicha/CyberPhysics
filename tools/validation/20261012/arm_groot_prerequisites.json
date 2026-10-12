@@ -1,0 +1,12 @@
+{
+  "backbone_config_access": false,
+  "model_inference_tested": false,
+  "error": "403 Client Error. (Request ID: Root=1-6acd4104-59fd4f586c354a537d8f343b;e5b09136-8694-4b5a-aa07-4d6139b55ab0)\n\nCannot access gated repo for url https://huggingface.co/nvidia/Cosmos-Reason2-2B/resolve/main/config.json.\nAccess to model nvidia/Cosmos-Reason2-2B is restricted and you are not in the authorized list. Visit https://huggingface.co/nvidia/Cosmos-Reason2-2B to ask for access.",
+  "runtime_import_passed": true,
+  "torch": "2.9.0+cu128",
+  "cuda_available": true,
+  "gpu_memory_mib": 12282,
+  "required_memory_mib": 16384,
+  "fine_tuned_so101_checkpoint_present": false,
+  "prerequisites_passed": false
+}
