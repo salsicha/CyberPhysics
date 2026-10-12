@@ -4,20 +4,23 @@
   "frame_id": "world",
   "robot_spawn": {
     "xyz": [0.0, 0.0, 0.431],
-    "rpy": [0.0, 0.0, 0.0]
+    "rpy": [0.0, 0.0, 0.0],
+    "rests_on": "arm_base_mount"
   },
   "camera": {
     "name": "groot_camera",
+    "model": "RealSense D435i colour stream: 16:9, 69.4 x 42.5 deg, 640x360 at 30 fps",
     "frame_id": "groot_camera_rgb_optical_frame",
     "mount": "fixed_over_table",
     "image_topic": "/so101/camera/image_raw",
     "camera_info_topic": "/so101/camera/camera_info",
     "depth_topic": "/so101/camera/depth/image_rect_raw",
     "pose_frame": "groot_camera_link in world: +X optical axis, +Y left, +Z up (URDF base_to_groot_camera must match)",
-    "xyz": [0.17, -0.52, 0.92],
-    "rpy": [0.0, 0.785, 1.449],
-    "resolution": [640, 480],
-    "horizontal_fov_deg": 69.0
+    "xyz": [0.1697563, -0.5219908, 0.9181126],
+    "rpy": [0.0, 0.8464847, 1.449],
+    "resolution": [640, 360],
+    "horizontal_fov_deg": 69.4,
+    "frame_rate_hz": 30.0
   },
   "static_assets": [
     {
@@ -30,38 +33,44 @@
     {
       "name": "arm_base_mount",
       "type": "mount_plate",
-      "xyz": [0.0, 0.0, 0.43],
-      "size": [0.22, 0.22, 0.06],
-      "material": "black_anodized_aluminum"
+      "xyz": [0.0, 0.0, 0.4155],
+      "size": [0.22, 0.22, 0.031],
+      "material": "black_anodized_aluminum",
+      "rests_on": "workbench"
     },
     {
       "name": "left_bin",
       "type": "target_bin",
-      "xyz": [0.30, 0.25, 0.45],
+      "xyz": [0.30, 0.25, 0.4175],
       "size": [0.18, 0.12, 0.035],
-      "material": "blue_plastic"
+      "material": "blue_plastic",
+      "rests_on": "workbench"
     },
     {
       "name": "right_bin",
       "type": "target_bin",
-      "xyz": [0.30, -0.25, 0.45],
+      "xyz": [0.30, -0.25, 0.4175],
       "size": [0.18, 0.12, 0.035],
-      "material": "red_plastic"
+      "material": "red_plastic",
+      "rests_on": "workbench"
     },
     {
       "name": "occluder_box",
       "type": "occluder",
-      "xyz": [0.46, -0.02, 0.515],
+      "xyz": [0.46, -0.02, 0.435],
       "rpy": [0.0, 0.0, 0.12],
       "size": [0.05, 0.16, 0.07],
-      "material": "matte_gray_cardboard"
+      "material": "matte_gray_cardboard",
+      "rests_on": "workbench"
     },
     {
       "name": "calibration_board",
       "type": "aprilgrid",
-      "xyz": [0.18, 0.43, 0.69],
+      "xyz": [0.18, 0.43, 0.506],
       "rpy": [1.5708, 0.0, 0.0],
       "size": [0.28, 0.20, 0.006],
+      "rests_on": "workbench",
+      "standoff_m": 0.006,
       "tag_family": "tag36h11",
       "tag_rows": 4,
       "tag_cols": 6,
@@ -75,34 +84,37 @@
       "role": "target",
       "shape": "box",
       "color": "red",
-      "xyz": [0.30, -0.10, 0.4825],
+      "xyz": [0.30, -0.10, 0.4225],
       "rpy": [0.0, 0.0, 0.18],
       "size": [0.045, 0.045, 0.045],
       "mass_kg": 0.045,
-      "friction": 0.8
+      "friction": 0.8,
+      "rests_on": "workbench"
     },
     {
       "id": "blue_cylinder_distractor",
       "role": "distractor",
       "shape": "cylinder",
       "color": "blue",
-      "xyz": [0.38, 0.02, 0.49],
+      "xyz": [0.38, 0.02, 0.43],
       "rpy": [0.0, 0.0, 0.0],
       "radius_m": 0.027,
       "height_m": 0.06,
       "mass_kg": 0.035,
-      "friction": 0.65
+      "friction": 0.65,
+      "rests_on": "workbench"
     },
     {
       "id": "green_block_distractor",
       "role": "distractor",
       "shape": "box",
       "color": "green",
-      "xyz": [0.27, 0.10, 0.48],
+      "xyz": [0.27, 0.10, 0.42],
       "rpy": [0.0, 0.0, -0.35],
       "size": [0.04, 0.055, 0.04],
       "mass_kg": 0.04,
-      "friction": 0.75
+      "friction": 0.75,
+      "rests_on": "workbench"
     }
   ],
   "tasks": [

@@ -14,6 +14,7 @@ DEFAULT_THRESHOLDS = {
     "approach_tolerance_m": 0.035,
     "grasp_close_width_m": 0.018,
     "workspace_radius_m": 0.62,
+    # Fallback only: a scenario with a table uses its top (table_top_z).
     "workspace_min_z_m": 0.40,
     "recovery_window_s": 20.0,
     "placement_height_tolerance_m": 0.02,
@@ -67,6 +68,14 @@ def asset_by_name(scenario, name):
         if asset.get("name") == name:
             return asset
     raise SystemExit(f"Destination {name!r} not found in scenario")
+
+
+def table_top_z(scenario):
+    """Height of the scenario table's top (the static asset of type "table"), or None."""
+    for asset in scenario.get("static_assets", []):
+        if asset.get("type") == "table":
+            return float(asset["xyz"][2]) + 0.5 * float(asset["size"][2])
+    return None
 
 
 def min_distance(samples, a_key, b_key):
@@ -223,7 +232,9 @@ def score(scenario, telemetry, task_id=""):
     ground_truth_reported = telemetry.get("policy_used_ground_truth")
     duration = float(telemetry.get("duration_s", samples[-1].get("time", math.inf) if samples else math.inf))
 
-    reachability = norm3(target_initial) <= thresholds["workspace_radius_m"] and target_initial[2] >= thresholds["workspace_min_z_m"]
+    min_z = table_top_z(scenario)
+    min_z = thresholds["workspace_min_z_m"] if min_z is None else min_z
+    reachability = norm3(target_initial) <= thresholds["workspace_radius_m"] and target_initial[2] >= min_z
     approach_ok = min_approach <= thresholds["approach_tolerance_m"]
     grasp_closed = bool(telemetry.get("grasp_closed", False)) or any(
         float(sample.get("gripper_width_m", math.inf)) <= thresholds["grasp_close_width_m"]

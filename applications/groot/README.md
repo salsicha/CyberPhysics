@@ -417,7 +417,10 @@ The hil profile is deliberately disarmed by default. A hardware driver must
 translate its native calibrated motor representation to this repository's ROS
 contract: radians for the five arm joints and metres-opening for the gripper.
 The inference camera must match the training camera name, viewpoint, resolution,
-and preprocessing.
+and preprocessing. The SO-101 front camera is the RealSense D435i's 16:9 colour
+stream at 640x360 in every simulator and on the hardware; checkpoints trained
+on the earlier 640x480 simulated camera need retraining (see "Camera" in
+applications/so101/README.md).
 
 Start disarmed, validate the first predictions and emergency stop, and only then
 start a new process with SO101_HIL_ARMED=true. See

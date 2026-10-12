@@ -13,8 +13,8 @@ Hardware (bill of materials, printed parts, printing and assembly):
 - `config/controllers.yaml`: ROS 2 control configuration for Gazebo.
 - `config/groot_demo.yaml`: SO-101 + GR00T bridge parameters for Isaac Sim.
 - `worlds/empty.sdf`: minimal Gazebo world for the arm.
-- `worlds/picking_table.sdf`: tabletop picking scene with bins, target objects, clutter, an occluder, calibration board, lighting, and collision geometry.
-- `scenarios/picking_table.json`: simulator-neutral task and scene metadata for Isaac Sim, Genesis, Gazebo, and GR00T scoring.
+- `scenarios/picking_table.json`: the tabletop picking scene and its tasks, the single source of truth for Isaac Sim, Genesis, Gazebo, GR00T scoring and the printed station (see "Scene" below).
+- `worlds/picking_table.sdf`: the scene as a Gazebo world (bins, target objects, clutter, an occluder, calibration board, the camera sensor, lighting, and collision geometry), generated from the scenario by `applications/so101/scripts/scenario_world.py`; do not edit it by hand.
 - `validation/groot_demo_sync_manifest.example.json`: example topic synchronization manifest for GR00T regression bags.
 - `validation/acceptance_thresholds.json`: default SO-101 picking acceptance thresholds.
 
@@ -59,18 +59,53 @@ limits, and the simulators cannot reach poses the real arm cannot (e.g. elbow
 the limits with the same rule (`tests/test_so101_joint_limits.py` recomputes
 them) and regenerate the URDF.
 
+## Scene
+
+`scenarios/picking_table.json` is the only place the scene's poses and
+heights are written. Each asset and object names the surface it stands on
+(`rests_on`, plus `standoff_m` for the AprilGrid board, which stands in its
+printed feet 6 mm above the table), and the robot spawn rests on
+`arm_base_mount`: the table top is at 0.400 m, the 31 mm riser under the arm
+spans 0.400-0.431 m, the arm's base stands on it (spawn z 0.431 m, the
+underside of the URDF's base box), and the bins, objects and occluder stand on
+the table. `so101_common.scene_support_errors` checks every such contact and
+that nothing interpenetrates; the tests and
+`validate_calibration_and_dataset.py` run it, Isaac and Genesis report its
+findings at start-up, and `scenario_world.py` refuses to write a Gazebo world
+from an inconsistent scenario. Isaac (kinematic objects), Gazebo and Genesis
+(free objects) therefore start the task from the same state, which is also
+the printed station's (`hardware/parts/so101/`, derived from this file).
+
+After editing the scenario, regenerate the Gazebo world:
+
+```bash
+python3 applications/so101/scripts/scenario_world.py   # --check to verify
+```
+
 ## GR00T Demo Camera
 
 The SO-101 URDF includes a fixed `groot_camera_link` and
 `groot_camera_rgb_optical_frame`. The scenario's `camera` block
-(`scenarios/picking_table.json`) is the single source of the camera model: Isaac
-renders from it, `/so101/camera/camera_info` publishes its intrinsics (69° HFOV,
-640x480) and the URDF joint `base_to_groot_camera` must equal its pose
-(`validate_calibration_and_dataset.py` checks this).
+(`scenarios/picking_table.json`) is the single source of the camera model:
+Isaac, Gazebo and Genesis render from it, `/so101/camera/camera_info`
+publishes its intrinsics and the URDF joint `base_to_groot_camera` must equal
+its pose (`validate_calibration_and_dataset.py` checks this).
 
-The same pose is the nominal mount for the physical rig: the camera sits
-0.17 m forward, 0.52 m to the right of and 0.47 m above `base_link`, pitched 45°
-down and yawed 83° to look across the table at the arm (xyz `0.17 -0.52 0.4665`,
-rpy `0 0.785 1.449`). It is a nominal value, not a measurement of a particular
-rig: after mounting a RealSense, measure its pose (e.g. with an AprilTag on the
-base) and update both the scenario and the URDF.
+It models the station's RealSense D435i colour stream: 16:9, 69.4 deg
+horizontal and 42.5 deg vertical view, 640x360 at 30 fps (the hardware
+compositions select the same mode, `rgb_camera.color_profile:=640x360x30`),
+square pixels, fx = fy = 462.1 px.
+
+The same pose is the nominal mount for the physical rig: the camera's RGB
+centre sits 0.170 m forward, 0.522 m to the right of and 0.465 m above
+`base_link`, pitched 48.5 deg down and yawed 83 deg to look across the table
+at the arm (xyz `0.1697563 -0.5219908 0.4646126`, rpy `0 0.8464847 1.449`).
+That is where the printed camera head puts it when trimmed to 48.5 deg, the
+pitch the station's assembly check recommends: the bins, objects, occluder,
+riser and arm base then all lie within 88 % of the half-image (at the old
+45 deg the D435i cut off the near edge of the right bin). It is a nominal
+value, not a measurement of a particular rig: after mounting a RealSense,
+measure its pose (e.g. with an AprilTag on the base) and update both the
+scenario and the URDF. The change from the earlier 640x480, 69 deg, 45 deg
+camera and what it means for trained policies is described in
+`applications/so101/README.md` ("Camera").

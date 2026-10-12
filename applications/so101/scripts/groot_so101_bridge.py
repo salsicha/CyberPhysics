@@ -37,7 +37,7 @@ def letterbox_nearest(image: np.ndarray, height: int, width: int, fill=0) -> np.
 
     The image is scaled (nearest neighbour) to fit and centred on a canvas of
     ``fill``, the same resize-with-pad a LeRobot/SmolVLA preprocessor applies,
-    instead of squashing a 4:3 frame into a square.
+    instead of squashing a 16:9 (or 4:3) frame into a square.
     """
     source_height, source_width = image.shape[:2]
     if (source_height, source_width) == (height, width):
@@ -137,8 +137,9 @@ class SO101GrootBridge(Node):
         self.declare_parameter("action_key", "joint_positions")
         self.declare_parameter("policy_schema", "auto")
         # 0 sends frames at native resolution so the policy's own processor
-        # resizes them exactly as it did the (native 640x480) training videos.
-        # Positive values letterbox (aspect-preserving resize + pad).
+        # resizes them exactly as it did the training videos (recorded at the
+        # camera's native 640x360, the D435i's 16:9 colour stream, simulated
+        # or real). Positive values letterbox (aspect-preserving resize + pad).
         self.declare_parameter("image_width", 0)
         self.declare_parameter("image_height", 0)
         self.declare_parameter("joint_history_size", 4)

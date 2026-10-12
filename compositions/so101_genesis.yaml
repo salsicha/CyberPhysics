@@ -15,7 +15,10 @@ services:
       - ../systems:/workspace/systems:ro
       - /dev/dri:/dev/dri
       - ../applications/so101:/workspace/so101:ro
-    command: python3 /workspace/so101/scripts/genesis_so101.py --urdf /workspace/systems/so101/urdf/so101.urdf
+    command: >
+      python3 /workspace/so101/scripts/genesis_so101.py
+        --urdf /workspace/systems/so101/urdf/so101.urdf
+        --scenario /workspace/systems/so101/scenarios/picking_table.json
     deploy:
       resources:
         reservations:

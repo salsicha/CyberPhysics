@@ -675,7 +675,9 @@ def assembly_block(report):
         "bodies": "Bodies in the check",
         # so101 station
         "pitch_sweep": "Camera cradle swept through its pitch range against the head",
+        "scene_camera_is_the_d435i_colour_stream": "Scene camera models the D435i's colour stream",
         "task_area_in_view_at_scene_pitch": "Bins and objects in the D435i's image at the scene's pitch",
+        "scene_pitch_is_the_recommended_pitch": "Scene camera pitched at the recommended pitch",
         "recommended_pitch_deg": "Recommended camera pitch (deg down)",
         "task_area_in_view_at_recommended_pitch": "Bins and objects in the image at the recommended pitch",
         "camera_view_clear_of_station": "Camera's view clear of the station's own parts",

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate SO-101 camera calibration, joint limits, frame alignment, and dataset sync manifests."""
+"""Validate the SO-101 scene, camera calibration, joint limits, frame alignment, and dataset sync manifests."""
 
 import argparse
 import json
@@ -17,6 +17,7 @@ from so101_common import (
     joint_limits_file,
     rpy_to_matrix,
     scenario_camera,
+    scene_support_errors,
 )
 
 
@@ -160,6 +161,17 @@ def validate_scenario_camera(scenario_path, camera_info_path=None):
     return metrics
 
 
+def validate_scene(scenario_path):
+    """Every asset, object and the robot rest on what they stand on, and
+    nothing interpenetrates (so101_common.scene_support_errors)."""
+    scenario = load_json(scenario_path)
+    errors = scene_support_errors(scenario)
+    if errors:
+        raise AssertionError("Inconsistent scenario: " + "; ".join(errors))
+    return {"scenario": scenario.get("name"), "resting_entities": 1 + sum(
+        1 for entry in scenario.get("static_assets", []) + scenario.get("objects", []) if "rests_on" in entry)}
+
+
 def validate_tf_manifest(tf_path):
     transforms = load_json(tf_path).get("transforms", [])
     by_child = {entry["child_frame_id"]: entry for entry in transforms}
@@ -210,6 +222,7 @@ def main():
     args = parser.parse_args()
 
     results = {
+        "scene": validate_scene(args.scenario),
         "urdf_alignment": validate_urdf_alignment(args.urdf, args.scenario),
         "joint_limits": validate_joint_limits(args.urdf),
         "scenario_camera": validate_scenario_camera(args.scenario, args.camera_info_json),

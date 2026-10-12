@@ -1,10 +1,12 @@
 """One SO-101 camera model: renderer, CameraInfo and TF must agree.
 
-Isaac renders from the scenario "camera" block (pose of groot_camera_link in
-the world, resolution, horizontal FOV). CameraInfo must carry the intrinsics
-of that FOV, and the URDF mount (TF) must place the optical frame where the
+Isaac, Gazebo and Genesis render from the scenario "camera" block (pose of
+groot_camera_link in the world, resolution, horizontal FOV), which models the
+RealSense D435i's 16:9 colour stream. CameraInfo must carry the intrinsics of
+that FOV, and the URDF mount (TF) must place the optical frame where the
 renderer is. The validator must check against the renderer, not a constant.
 """
+import itertools
 import json
 import math
 import sys
@@ -56,10 +58,25 @@ def test_camera_info_matches_rendered_field_of_view():
     width, height = camera['resolution']
     values = common.camera_info_values(width, height, camera['horizontal_fov_deg'])
     fx = values['k'][0]
-    assert fx == pytest.approx(465.6, abs=0.1)  # not the 60-degree 554
-    assert 2 * math.degrees(math.atan(width / 2 / fx)) == pytest.approx(69.0)
-    assert values['k'][4] == fx  # Isaac keeps pixels square
+    assert fx == pytest.approx(462.1, abs=0.1)  # not the 60-degree 554
+    assert 2 * math.degrees(math.atan(width / 2 / fx)) == pytest.approx(69.4)
+    assert values['k'][4] == fx  # the simulators keep pixels square
     assert common.CAMERA_FX == pytest.approx(fx)
+    assert (common.CAMERA_WIDTH, common.CAMERA_HEIGHT) == (width, height)
+
+
+def test_camera_is_the_d435i_colour_stream():
+    """16:9 with the D435i colour field of view (datasheet 69.4 x 42.5 deg),
+    at the 640x360 mode the hardware compositions select."""
+    camera = common.scenario_camera(scenario())
+    width, height = camera['resolution']
+    assert (width, height) == (640, 360) and width * 9 == height * 16
+    fx = common.camera_info_values(width, height, camera['horizontal_fov_deg'])['k'][4]
+    assert camera['horizontal_fov_deg'] == pytest.approx(69.4)
+    assert 2 * math.degrees(math.atan(height / 2 / fx)) == pytest.approx(42.5, abs=0.1)
+    for compose in ('so101_hardware.yaml', 'so101_groot_isaac.yaml'):
+        text = (REPO / 'compositions' / compose).read_text()
+        assert f'rgb_camera.color_profile:={width}x{height}x30' in text, compose
 
 
 @pytest.mark.parametrize('path', [URDF, XACRO], ids=['urdf', 'xacro'])
@@ -106,19 +123,45 @@ def project(points, data):
     return pixels, width, height
 
 
-def test_camera_sees_the_robot_objects_and_both_bins():
+def box_corners(lower, upper):
+    return [np.where(np.array(pick), upper, lower) for pick in itertools.product((0, 1), repeat=3)]
+
+
+def test_camera_sees_the_whole_task_area():
+    """Every corner of the bins, the objects, the occluder and the arm's base
+    and riser is inside the image, at least 5 % of the half-image from its
+    edges (the printed station's assembly check uses the same margin)."""
     data = scenario()
-    _, base_xyz = world_from_base(data)
-    points = {'robot_base': base_xyz}
-    points.update({entry['id']: entry['xyz'] for entry in data['objects']})
-    points.update({entry['name']: entry['xyz'] for entry in data['static_assets']
-                   if entry['type'] == 'target_bin'})
-    pixels, width, height = project(points, data)
-    margin = 40
-    for name, pixel in pixels.items():
-        assert pixel is not None, f'{name} is behind the camera'
-        u, v = pixel
-        assert margin <= u <= width - margin and margin <= v <= height - margin, (name, pixel)
+    boxes = {name: common.entity_bounds(entry) for name, entry in common.scene_entities(data).items()
+             if entry.get('type') in ('target_bin', 'occluder', 'mount_plate') or name in
+             {entry['id'] for entry in data['objects']}}
+    boxes['robot_base'] = common.robot_base_bounds(data)
+    assert {'left_bin', 'right_bin', 'red_block_target', 'green_block_distractor',
+            'blue_cylinder_distractor', 'occluder_box', 'arm_base_mount', 'robot_base'} <= set(boxes)
+    for name, (lower, upper) in boxes.items():
+        corners = {f'{name}{index}': corner for index, corner in enumerate(box_corners(lower, upper))}
+        pixels, width, height = project(corners, data)
+        for corner, pixel in pixels.items():
+            assert pixel is not None, f'{corner} is behind the camera'
+            u, v = pixel
+            assert abs(u - width / 2) <= 0.95 * width / 2 and abs(v - height / 2) <= 0.95 * height / 2, (
+                corner, pixel)
+
+
+def test_scene_pitch_is_the_printed_heads_recommended_pitch():
+    """The camera pitch is the one the station's assembly check recommends
+    for the D435i (the printed head is trimmed to it)."""
+    sys.path.insert(0, str(REPO))
+    from hardware.parts.so101 import assembly
+    from hardware.parts.so101 import _station as station
+    camera = common.scenario_camera(scenario())
+    assert math.degrees(camera['rpy'][1]) == pytest.approx(assembly.best_pitch(), abs=0.01)
+    lo, hi = station.PITCH_RANGE_DEG
+    assert lo < math.degrees(camera['rpy'][1]) < hi
+    # The camera pivots about the head: the scene camera is the RGB centre
+    # of the printed station at that pitch.
+    station_rgb = np.asarray(station.rgb_centre(assembly.best_pitch())) / 1000.0
+    np.testing.assert_allclose(common.base_to_camera_link(scenario())[0], station_rgb, atol=1e-4)
 
 
 def test_validator_checks_the_renderer_not_a_constant(tmp_path):
@@ -126,19 +169,27 @@ def test_validator_checks_the_renderer_not_a_constant(tmp_path):
     assert metrics['camera_mount_xyz_error_m'] < 1e-6
 
     moved = tmp_path / 'moved.urdf'
-    moved.write_text(URDF.read_text().replace(
-        'xyz="0.17 -0.52 0.4665" rpy="0.0 0.785 1.449"', 'xyz="0.24 -0.28 0.34" rpy="0.0 0.72 2.36"'))
+    xyz, rpy = urdf_camera_origin(URDF)
+    mount = f'xyz="{" ".join(map(str, xyz))}" rpy="{" ".join(map(str, rpy))}"'
+    assert mount in URDF.read_text()
+    moved.write_text(URDF.read_text().replace(mount, 'xyz="0.24 -0.28 0.34" rpy="0.0 0.72 2.36"'))
     with pytest.raises(AssertionError, match='scenario camera'):
         validate_urdf_alignment(moved, SCENARIO)
 
     camera = common.scenario_camera(scenario())
-    info = dict(common.camera_info_values(640, 480, camera['horizontal_fov_deg']),
+    width, height = camera['resolution']
+    info = dict(common.camera_info_values(width, height, camera['horizontal_fov_deg']),
                 frame_id=camera['frame_id'])
     good = tmp_path / 'camera_info.json'
     good.write_text(json.dumps(info))
     assert validate_scenario_camera(SCENARIO, good)['camera_info_k_error'] < 1e-9
     stale = tmp_path / 'stale_camera_info.json'
-    stale.write_text(json.dumps(dict(info, k=[554.0, 0, 320, 0, 554.0, 240, 0, 0, 1],
-                                     p=[554.0, 0, 320, 0, 0, 554.0, 240, 0, 0, 0, 1, 0])))
+    stale.write_text(json.dumps(dict(info, k=[554.0, 0, 320, 0, 554.0, 180, 0, 0, 1],
+                                     p=[554.0, 0, 320, 0, 0, 554.0, 180, 0, 0, 0, 1, 0])))
     with pytest.raises(AssertionError, match='camera_info.k'):
         validate_scenario_camera(SCENARIO, stale)
+    # The old 4:3 simulated camera no longer matches.
+    old = tmp_path / 'old_camera_info.json'
+    old.write_text(json.dumps(dict(common.camera_info_values(640, 480, 69.0), frame_id=camera['frame_id'])))
+    with pytest.raises(AssertionError, match='resolution'):
+        validate_scenario_camera(SCENARIO, old)

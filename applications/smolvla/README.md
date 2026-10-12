@@ -264,8 +264,11 @@ default port 5555.
 
 The bridge resets the server (dropping its queued action chunk) before the first
 request, when joint feedback resumes after a gap such as an Isaac restart, and
-when the task changes. It sends camera frames at native resolution; SmolVLA's
-own preprocessing resizes with padding exactly as during training.
+when the task changes. It sends camera frames at native resolution (640x360, the
+D435i's 16:9 colour stream, simulated or real); SmolVLA's own preprocessing
+resizes with padding exactly as during training. Checkpoints fine-tuned on the
+earlier 640x480 simulated camera see a different view (see "Camera" in
+applications/so101/README.md).
 
 ## Validation
 

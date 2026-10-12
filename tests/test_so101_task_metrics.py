@@ -12,6 +12,7 @@ import sys
 from unittest.mock import MagicMock
 
 import numpy as np
+import pytest
 
 from conftest import REPO
 
@@ -99,6 +100,10 @@ def test_demo_episode_is_solved_but_flagged_as_ground_truth(tmp_path):
     drive_demo_episode(scene, scenario_with_task)
 
     assert scene.status == 'solved'
+    # Released standing on the bin, not hanging at the jaw centre.
+    destination = scene.destination
+    resting_z = destination['xyz'][2] + 0.5 * (destination['size'][2] + scene.target['size'][2])
+    assert scene.target_position[2] == pytest.approx(resting_z, abs=1e-3)
     metrics = json.loads((tmp_path / 'so101_task_telemetry_metrics.json').read_text())
     assert metrics['task_completed'] is True
     assert metrics['success'] is False

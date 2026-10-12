@@ -137,13 +137,20 @@ def test_so101_footprints_cite_sources():
 
 
 def test_so101_station_matches_the_scene():
-    """The station is built from the scene: riser height from the spawn, and
-    the camera RGB centre at the scene camera's position at its pitch."""
+    """The station is built from the scene: riser height from the spawn and
+    the scene's mount, the camera RGB centre at the scene camera's position
+    at its pitch (48.5 deg, the head's recommended trim), and the bins and
+    objects standing on the table where the scene puts them."""
     from hardware.parts.so101 import _station as S
     assert S.TABLE_Z == pytest.approx(-53.5)
     assert S.PLATE_TOP - S.PLATE_BOTTOM == pytest.approx(31.0)
-    assert S.CAM_XYZ == pytest.approx((170.0, -520.0, 466.5))
+    assert S.SCENE["arm_base_mount"]["size"][2] * 1000.0 == pytest.approx(31.0)
+    assert S.CAM_XYZ == pytest.approx((169.756, -521.991, 464.613), abs=1e-3)
+    assert S.PITCH_DEG == pytest.approx(48.5, abs=1e-3)
     assert S.rgb_centre(S.PITCH_DEG) == pytest.approx(S.CAM_XYZ)
+    for name in S.TASK_ITEMS:
+        (_, _, cz), (_, _, sz) = S.scene_box(name)
+        assert cz - sz / 2 == pytest.approx(S.TABLE_Z), name
     lo, hi = S.PITCH_RANGE_DEG
     assert lo < S.PITCH_DEG < hi
     # turning about the pivot keeps the RGB centre's distance to it

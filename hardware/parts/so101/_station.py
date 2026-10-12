@@ -9,14 +9,16 @@ Everything is derived from the simulator scene,
 systems/so101/scenarios/picking_table.json, so the physical station is the
 simulated one:
 
-* the arm stands on a 31 mm riser (station_base_plate): the scene spawns
-  the arm 31 mm above the workbench top (robot_spawn z 0.431 m, table top
-  0.400 m);
+* the arm stands on a 31 mm riser (station_base_plate), the scene's
+  arm_base_mount: 31 mm tall on the workbench top (0.400 m), the arm's
+  spawn (0.431 m) on its top;
 * the RealSense D435i's RGB optical centre is at the scene camera's
-  position (base_link xyz 0.17, -0.52, 0.4665 m), looking 83 deg left of x
-  and pitched 45 deg down (rpy 0, 0.785, 1.449); the camera head pivots so
-  the pitch can be trimmed (see assembly.py);
-* bins and objects have the scene's sizes and stand on the table.
+  position (base_link xyz 0.1698, -0.522, 0.4646 m), looking 83 deg left of
+  x and pitched 48.5 deg down (rpy 0, 0.846485, 1.449), the pitch the
+  assembly check recommends for the D435i's 42.5 deg vertical view; the
+  camera head pivots so the pitch can be trimmed (see assembly.py);
+* bins and objects have the scene's sizes and stand on the table, where the
+  scene puts them.
 """
 import json
 import math
@@ -56,6 +58,9 @@ _mount = SCENE["arm_base_mount"]
 PLATE_HALF = _mount["size"][0] * 1000.0 / 2      # 220 x 220 mm footprint, as the scene's mount
 PLATE_TOP = ARM_UNDERSIDE_Z                       # the arm stands on it
 PLATE_BOTTOM = TABLE_Z                            # 31 mm riser
+_mount_z = world_to_station(_mount["xyz"])[2]
+assert abs(_mount_z - _mount["size"][2] * 500.0 - PLATE_BOTTOM) < 1e-6, "the scene's mount must stand on the table"
+assert abs(_mount_z + _mount["size"][2] * 500.0 - PLATE_TOP) < 1e-6, "the scene's arm must stand on its mount"
 PLATE_SKIN = 3.0
 PLATE_WALL = 3.0
 RIB_T = 1.6
@@ -69,7 +74,7 @@ _cam = SCENARIO["camera"]
 CAM_XYZ = world_to_station(_cam["xyz"])           # RGB optical centre (groot_camera_link)
 CAM_ROLL, CAM_PITCH, CAM_YAW = _cam["rpy"]        # rad
 assert abs(CAM_ROLL) < 1e-9
-PITCH_DEG = math.degrees(CAM_PITCH)               # 45 deg down
+PITCH_DEG = math.degrees(CAM_PITCH)               # 48.5 deg down
 YAW_DEG = math.degrees(CAM_YAW)                   # 83 deg left of x
 PITCH_RANGE_DEG = (38.0, 57.0)                    # the head's lock slot
 
@@ -146,14 +151,17 @@ def rgb_centre(pitch_deg):
 # ----------------------------------------------------------------- task area
 def scene_box(name):
     """(centre, size) of a scene object or bin standing on the table, mm,
-    station frame (z from the table top, not the scene's)."""
+    station frame. The scene puts them on the table; a scene that does not
+    is an error (so101_common.scene_support_errors checks the same)."""
     e = SCENE[name]
     if e.get("shape") == "cylinder":
         size = (2000.0 * e["radius_m"], 2000.0 * e["radius_m"], 1000.0 * e["height_m"])
     else:
         size = tuple(1000.0 * s for s in e["size"])
     c = world_to_station(e["xyz"])
-    return (c[0], c[1], TABLE_Z + size[2] / 2), size
+    assert e.get("rests_on") == "workbench" and abs(c[2] - size[2] / 2 - TABLE_Z) < 1e-6, (
+        f"{name} does not stand on the table in {SCENARIO_FILE.name}")
+    return c, size
 
 
 TASK_ITEMS = ("left_bin", "right_bin", "red_block_target", "green_block_distractor",

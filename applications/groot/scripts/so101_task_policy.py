@@ -24,6 +24,17 @@ JOINT_LIMITS = URDF_JOINT_LIMITS.astype(np.float32)
 # ends at the centre of the jaws, which is the point used for demo grasping.
 SHOULDER_PIVOT_Z = 0.0225 + 0.065 + 0.045
 ARM_LINK_LENGTHS = np.array([0.14, 0.13, 0.055 + 0.052 + 0.035], dtype=np.float64)
+# The jaws (systems/so101/urdf/so101.urdf gripper_jaw_link/fixed_jaw_link) are
+# 75 mm long along the tool, centred on the jaw centre, and 25 mm wide across
+# it. The demo turns the wrist a quarter turn so the jaws open sideways, not
+# down into the table, and grasps high enough that the jaw tips stay
+# SURFACE_CLEARANCE above the surface the object stands on: objects rest on
+# the table (systems/so101/scenarios/picking_table.json), and a 45 mm block
+# cannot be held at its centre by 75 mm jaws without them reaching below it.
+JAW_HALF_LENGTH = 0.075 / 2.0
+JAW_HALF_WIDTH = 0.025 / 2.0
+GRASP_WRIST_ROLL = math.pi / 2.0
+SURFACE_CLEARANCE = 0.005
 
 
 @dataclass(frozen=True)
@@ -38,8 +49,18 @@ def _xyz(entry: dict[str, Any]) -> np.ndarray:
 
 
 def _size(entry: dict[str, Any]) -> np.ndarray:
+    if entry.get("shape") == "cylinder":
+        diameter = 2.0 * float(entry.get("radius_m", 0.0))
+        return np.array([diameter, diameter, float(entry.get("height_m", 0.0))], dtype=np.float64)
     size = entry.get("size", [0.0, 0.0, 0.0])
     return np.asarray((list(size) + [0.0, 0.0, 0.0])[:3], dtype=np.float64)
+
+
+def jaw_reach_below(joints) -> float:
+    """How far the jaws reach below the jaw centre (m) at this tool pitch,
+    with the wrist turned so they open sideways."""
+    pitch = float(np.sum(np.asarray(joints, dtype=np.float64)[1:4]))
+    return JAW_HALF_LENGTH * abs(math.cos(pitch)) + JAW_HALF_WIDTH * abs(math.sin(pitch))
 
 
 def forward_kinematics(joints: np.ndarray, robot_spawn_xyz=(0.0, 0.0, 0.0)) -> np.ndarray:
@@ -61,6 +82,7 @@ def solve_position_ik(
     robot_spawn_xyz=(0.0, 0.0, 0.0),
     gripper_width=0.04,
     preferred_joints=None,
+    wrist_roll=0.0,
 ) -> np.ndarray:
     """Solve a position-only IK target with a downward-biased gripper pose."""
     target = np.asarray(target_xyz, dtype=np.float64)
@@ -98,7 +120,7 @@ def solve_position_ik(
                 pitch_joints > JOINT_LIMITS[1:4, 1]
             ):
                 continue
-            candidate = np.array([pan, shoulder, elbow, wrist, 0.0, gripper_width])
+            candidate = np.array([pan, shoulder, elbow, wrist, wrist_roll, gripper_width])
             score = abs(float(tool_pitch) - 2.4) + 0.03 * float(np.dot(pitch_joints, pitch_joints))
             if preferred is not None:
                 score += 0.12 * float(np.linalg.norm(candidate[:4] - preferred[:4]))
@@ -137,16 +159,21 @@ def build_pick_place_plan(scenario: dict[str, Any]) -> list[TaskWaypoint]:
 
     spawn = _xyz(scenario.get("robot_spawn", {}))
     target_xyz = _xyz(target)
-    destination_xyz = _xyz(destination)
-    place_xyz = destination_xyz.copy()
-    place_xyz[2] += 0.5 * (_size(destination)[2] + _size(target)[2])
-    transit_z = max(float(target_xyz[2] + 0.15), float(place_xyz[2] + 0.15))
+    target_height = _size(target)[2]
+    # The jaws close on the object high enough to clear the surface it
+    # stands on, and the object keeps that offset below the jaw centre until
+    # it is released standing on the destination's top.
+    grasp_xyz = _jaw_centre_clear_of(target_xyz, target_xyz[2] - 0.5 * target_height, spawn)
+    grip_offset = float(grasp_xyz[2] - target_xyz[2])
+    place_xyz = _xyz(destination)
+    place_xyz[2] += 0.5 * (_size(destination)[2] + target_height) + grip_offset
+    transit_z = max(float(grasp_xyz[2] + 0.15), float(place_xyz[2] + 0.15))
 
     poses = [
-        ("pregrasp", target_xyz + [0.0, 0.0, 0.12], 0.04),
-        ("grasp", target_xyz, 0.04),
-        ("close_gripper", target_xyz, 0.01),
-        ("lift", np.array([target_xyz[0], target_xyz[1], transit_z]), 0.01),
+        ("pregrasp", grasp_xyz + [0.0, 0.0, 0.12], 0.04),
+        ("grasp", grasp_xyz, 0.04),
+        ("close_gripper", grasp_xyz, 0.01),
+        ("lift", np.array([grasp_xyz[0], grasp_xyz[1], transit_z]), 0.01),
         ("transfer", np.array([place_xyz[0], place_xyz[1], transit_z]), 0.01),
         ("place", place_xyz, 0.01),
         ("release", place_xyz, 0.04),
@@ -156,10 +183,22 @@ def build_pick_place_plan(scenario: dict[str, Any]) -> list[TaskWaypoint]:
     plan = []
     preferred = None
     for name, xyz, gripper_width in poses:
-        joints = solve_position_ik(xyz, spawn, gripper_width, preferred)
+        joints = solve_position_ik(xyz, spawn, gripper_width, preferred, GRASP_WRIST_ROLL)
         plan.append(TaskWaypoint(name=name, joints=joints, end_effector_xyz=np.asarray(xyz)))
         preferred = joints
     return plan
+
+
+def _jaw_centre_clear_of(xyz, surface_z, spawn) -> np.ndarray:
+    """``xyz``, raised until the jaws there clear ``surface_z`` by SURFACE_CLEARANCE."""
+    centre = np.asarray(xyz, dtype=np.float64).copy()
+    for _ in range(8):
+        joints = solve_position_ik(centre, spawn, 0.04, None, GRASP_WRIST_ROLL)
+        needed = surface_z + SURFACE_CLEARANCE + jaw_reach_below(joints)
+        if centre[2] >= needed - 1e-4:
+            return centre
+        centre[2] = needed
+    return centre
 
 
 class ScriptedPickPlaceController:

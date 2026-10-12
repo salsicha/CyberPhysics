@@ -43,14 +43,45 @@ source of truth, see `systems/so101/README.md`), so every container that runs
 these scripts, including the CBF controller and the HIL guard, needs that mount
 (or `SO101_JOINT_LIMITS_FILE`); `so101_common.py` refuses to start without it.
 
+## The scene
+
+`systems/so101/scenarios/picking_table.json` is the one description of the
+picking scene, and the one place its heights are written: the arm's spawn
+pose, the pose and size of the table, the 31 mm riser (`arm_base_mount`), the
+bins, objects, occluder and calibration board, and the fixed camera. Every
+asset and object names the surface it stands on (`rests_on`), and
+`so101_common.scene_support_errors` checks that it does: its underside on
+that surface's top (the arm's underside is its spawn z, the URDF's root
+link), nothing floating or sunk, nothing interpenetrating. So every simulator
+starts the task from the same state as the printed station
+(`hardware/parts/so101/`, built from the same file): Isaac keeps its objects
+kinematic where the scenario puts them, Gazebo and Genesis simulate them as
+free bodies, which stay put because they already rest on the table.
+
+- Isaac builds the scene from the scenario at start-up (`so101_task_scene.py`).
+- Gazebo loads `systems/so101/worlds/picking_table.sdf`, generated from the
+  scenario: after editing the scenario, run
+  `python3 applications/so101/scripts/scenario_world.py` (`--check` reports a
+  stale world; the tests run it). `gazebo.launch.py` spawns the arm at the
+  scenario's `robot_spawn` (`scenario_file` launch argument).
+- Genesis builds the scene from the scenario (`--scenario`).
+- `validate_calibration_and_dataset.py` and the simulators report an
+  inconsistent scenario.
+
 ## Gazebo Harmonic
 
 ```bash
 docker compose -f compositions/so101_gazebo.yaml up
 ```
 
-Gazebo uses `gz_ros2_control` and a joint-group position controller. The default world is `/workspace/systems/so101/worlds/picking_table.sdf`, a tabletop pick-and-place scene mirrored by `/workspace/systems/so101/scenarios/picking_table.json`. The relay
-maps the common command topic to the Gazebo controller topic.
+Gazebo uses `gz_ros2_control` and a joint-group position controller. The default world is `/workspace/systems/so101/worlds/picking_table.sdf`, generated from `/workspace/systems/so101/scenarios/picking_table.json` (see "The scene"). The relay
+maps the common command topic to the Gazebo controller topic. The world's RGB-D
+sensor is the scenario camera; `gazebo.launch.py` bridges it to
+`/so101/camera/image_raw`, `/so101/camera/camera_info`,
+`/so101/camera/depth/image_rect_raw` and `/so101/camera/depth/camera_info`
+(frame `groot_camera_rgb_optical_frame`; the depth image is registered to the
+colour image). With `headless:=true` the server renders with
+`--headless-rendering` (EGL), so the camera works without a display.
 
 ## Genesis
 
@@ -61,10 +92,16 @@ make -C applications build_so101 build_genesis
 docker compose -f compositions/so101_genesis.yaml up
 ```
 
-Use `--headless` by appending it to the Genesis service command for server runs.
+Use `--headless` by appending it to the Genesis service command for server runs
+(with `PYOPENGL_PLATFORM=egl` so the camera renders without a display).
 Use `--backend cpu` on machines without a compatible GPU. The adapter loads
-`systems/so101/urdf/so101.urdf` as a fixed-base robot and applies PD position
-control at each simulation step.
+`systems/so101/urdf/so101.urdf` as a fixed-base robot at the scenario's spawn
+pose, builds the scene from `--scenario` (fixed boxes for the table, riser,
+bins, occluder and board; the objects as free bodies with the scenario's mass
+and friction), applies PD position control at each simulation step, keeps
+simulated time at wall-clock rate, and renders the scenario camera to the
+common camera topics at its frame rate (`--no-camera` to skip it). It prints
+the objects' positions every `SO101_LOG_HEARTBEAT_SECONDS` (30 s).
 
 ## Isaac Sim
 
@@ -170,7 +207,11 @@ server's `--scenario-file`) and the measured joint state. It does not perceive
 the scene, so its runs are reported with `policy_used_ground_truth: true` and
 never count as a policy success. The bridge only forwards object poses to a
 policy when started with `-p send_ground_truth:=true`, which also marks every
-command as ground-truth assisted.
+command as ground-truth assisted. Because the objects stand on the table, the
+plan turns the wrist a quarter turn (the jaws open sideways) and closes the
+jaws about 19 mm above the block's centre, so the 75 mm jaws stay 5 mm clear
+of the table; the block keeps that offset while held and is released
+standing on the bin.
 
 Bridge timing and inputs:
 
@@ -181,6 +222,46 @@ Bridge timing and inputs:
 - Camera frames are sent at native resolution (`image_width`/`image_height`
   `0`), as the training videos were recorded, so the policy's own processor
   resizes them. Positive values letterbox (aspect-preserving) instead.
+  The camera is 640x360 (see "Camera" below) in every simulator and on the
+  hardware (`rgb_camera.color_profile:=640x360x30`).
+
+### Camera
+
+The scenario camera models the RealSense D435i's colour stream, the camera of
+the physical station: 16:9, 69.4 deg horizontal and 42.5 deg vertical view,
+published at 640x360 and 30 fps (CameraInfo fx = fy = 462.1 px, centred
+principal point; depth registered to it). It is pitched 48.5 deg down, the
+pitch the printed camera head is trimmed to (the station's assembly check
+recommends it: the bins, objects, occluder, riser and arm base all lie within
+88 % of the half-image), at the RGB centre the printed station puts there
+(`hardware/parts/so101/`). The earlier simulated camera was 640x480 at
+69 deg (54.5 deg vertical) and 45 deg pitch, a view the real camera cannot
+produce: from 45 deg the D435i cuts off the near edge of the right bin.
+
+Policies trained on the old 640x480 simulated camera see a different image:
+
+- the aspect ratio is 16:9 instead of 4:3. The bridge sends native frames, so
+  the policy's processor resizes them: SmolVLA pads to a square (a 640x360
+  frame fills 512x288 of its 512x512 input instead of 512x384); a GR00T
+  processor that resizes or crops to a square without padding stretches the
+  scene differently;
+- the view is narrower vertically (42.5 instead of 54.5 deg) and pitched
+  3.5 deg further down: the new image is old rows 91-455, objects sit about
+  28 px higher than in the old frame, and the far strip of the old view
+  (behind the left bin) is gone. Horizontally the views match (69.4 vs
+  69 deg).
+
+Retrain or fine-tune on data recorded with the new camera (simulated or the
+real D435i, which now give the same image size and field of view). To reuse
+an old dataset, warp its frames into the new camera with the homography of
+the pitch change, `H = K_old R_x(3.5 deg) K_new^-1` (the 3 mm move of the
+lens is negligible), or approximately crop rows 90-453 of the 640x480 frame
+and resize to 640x360 (about 4 px off on average, 11 px at the bottom
+corners, which lie just outside the old image). An old checkpoint cannot be
+given the view it was trained on: what the new camera does not see is lost.
+Padding new frames into a 640x480 canvas at rows 91-455 keeps the objects
+roughly where the checkpoint saw them, but expect lower success than on its
+training data.
 - The policy server is reset before the first request, after joint feedback
   resumes from a gap longer than `episode_reset_gap_s` (for example a simulator
   restart) or becomes invalid, and when `task_id`/`instruction` is changed with
@@ -193,10 +274,11 @@ Isaac now materializes the table, bins, target, distractors, and camera from
 `systems/so101/scenarios/picking_table.json`. Its `camera` block is the single
 camera definition: `xyz`/`rpy` are the pose of `groot_camera_link` in the world
 (+X optical axis, +Y left, +Z up, Isaac's `camera_axes="world"`), CameraInfo
-uses `fx = fy = (width/2)/tan(horizontal_fov_deg/2)` (465.6 px for 69 degrees at
+uses `fx = fy = (width/2)/tan(horizontal_fov_deg/2)` (462.1 px for 69.4 degrees at
 640 px), and the URDF `base_to_groot_camera` joint must equal that pose relative
 to `base_link`. The calibration validator and tests enforce all three. For deterministic demo behavior it
-uses kinematic grasp attachment at the jaws, publishes JSON task progress on
+uses kinematic grasp attachment at the jaws (the target keeps the offset from
+the jaw centre it had when they closed), publishes JSON task progress on
 `/so101/task_status`, and writes these host files:
 
 - `data/groot/telemetry/so101_task_telemetry.json`
@@ -297,8 +379,9 @@ GPU, VRAM, or driver requirements.
 
 ## Calibration And Dataset Checks
 
-Validate the scenario camera, URDF camera/gripper alignment, and collision
-geometry before collecting policy data:
+Validate the scene (every asset and object resting on its surface, nothing
+interpenetrating), the scenario camera, URDF camera/gripper alignment, and
+collision geometry before collecting policy data:
 
 ```bash
 PYTHONPATH=applications/so101/scripts \

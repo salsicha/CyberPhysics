@@ -193,7 +193,7 @@ def create_rendered_camera(camera_config):
         prim_path="/World/groot_camera",
         position=np.asarray(camera_config["xyz"], dtype=np.float64),
         orientation=isaac_orientation_from_rpy(camera_config["rpy"]),
-        frequency=30,
+        frequency=int(round(float(camera_config.get("frame_rate_hz", 30.0)))),
         resolution=(int(width), int(height)),
     )
     camera.initialize()

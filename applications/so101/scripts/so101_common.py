@@ -25,25 +25,49 @@ JOINT_NAMES = [
 # systems/so101/README.md. Containers find it under /workspace/systems.
 JOINT_LIMITS_FILE_ENV = "SO101_JOINT_LIMITS_FILE"
 JOINT_LIMITS_RELATIVE_PATH = Path("systems", "so101", "config", "joint_limits.json")
+# systems/so101/scenarios/picking_table.json is the single source of truth for
+# the scene: the robot's spawn pose, the pose and size of every asset and
+# object (each one's "rests_on" names the surface it stands on; see
+# scene_support_errors), and the fixed camera (pose, resolution, field of
+# view). The camera constants below are read from it; Gazebo's world is
+# generated from it (scenario_world.py), Isaac and Genesis build their scenes
+# from it, and the printed station (hardware/parts/so101) is derived from it.
+SCENARIO_FILE_ENV = "SO101_SCENARIO_FILE"
+SCENARIO_RELATIVE_PATH = Path("systems", "so101", "scenarios", "picking_table.json")
 
 
-def joint_limits_file(start=__file__):
-    """Locate joint_limits.json: $SO101_JOINT_LIMITS_FILE, then a systems/ dir above ``start``."""
-    override = os.environ.get(JOINT_LIMITS_FILE_ENV)
+def _systems_file(relative_path, env_name, start, what):
+    """$env_name, then ``relative_path`` under a directory above ``start``, then /workspace."""
+    override = os.environ.get(env_name)
     if override:
         return Path(override)
     here = Path(start).resolve()
-    candidates = [parent / JOINT_LIMITS_RELATIVE_PATH for parent in here.parents]
-    workspace = Path("/workspace") / JOINT_LIMITS_RELATIVE_PATH
+    candidates = [parent / relative_path for parent in here.parents]
+    workspace = Path("/workspace") / relative_path
     if workspace not in candidates:
         candidates.append(workspace)
     for candidate in candidates:
         if candidate.is_file():
             return candidate
     raise FileNotFoundError(
-        f"SO-101 joint limits not found: mount the repository's systems/ at /workspace/systems "
-        f"or set {JOINT_LIMITS_FILE_ENV} (searched {', '.join(str(path) for path in candidates)})"
+        f"SO-101 {what} not found: mount the repository's systems/ at /workspace/systems "
+        f"or set {env_name} (searched {', '.join(str(path) for path in candidates)})"
     )
+
+
+def joint_limits_file(start=__file__):
+    """Locate joint_limits.json: $SO101_JOINT_LIMITS_FILE, then a systems/ dir above ``start``."""
+    return _systems_file(JOINT_LIMITS_RELATIVE_PATH, JOINT_LIMITS_FILE_ENV, start, "joint limits")
+
+
+def scenario_file(start=__file__):
+    """Locate the default scenario: $SO101_SCENARIO_FILE, then a systems/ dir above ``start``."""
+    return _systems_file(SCENARIO_RELATIVE_PATH, SCENARIO_FILE_ENV, start, "scenario")
+
+
+def load_scenario_file(path=None):
+    path = Path(path) if path is not None else scenario_file()
+    return json.loads(path.read_text())
 
 
 def load_joint_limits(path=None, names=JOINT_NAMES):
@@ -89,21 +113,27 @@ TASK_STATUS_TOPIC = "/so101/task_status"
 # saturation, ground-truth use), consumed by the simulator's task metrics.
 POLICY_STATS_TOPIC = "/so101/policy_stats"
 
-# The scenario's "camera" block (systems/so101/scenarios/*.json) is the single
-# source of truth for the simulated camera: Isaac renders from it, CameraInfo
-# is derived from its resolution and horizontal FOV, and the URDF/TF camera
-# mount must equal its pose relative to base_link (enforced by
-# validate_calibration_and_dataset.py and the tests). These are its defaults.
-CAMERA_WIDTH = 640
-CAMERA_HEIGHT = 480
-CAMERA_HFOV_DEG = 69.0  # RealSense D435i colour; Isaac keeps pixels square
+# The scenario's "camera" block is the single source of truth for the
+# simulated camera: Isaac, Gazebo and Genesis render from it, CameraInfo is
+# derived from its resolution and horizontal FOV, and the URDF/TF camera mount
+# must equal its pose relative to base_link (enforced by
+# validate_calibration_and_dataset.py and the tests). It models the RealSense
+# D435i's 16:9 colour stream (69.4 x 42.5 deg) at 640x360, the mode the
+# hardware compositions select. These are the default scenario's values.
+DEFAULT_SCENARIO = load_scenario_file()
+_DEFAULT_CAMERA = DEFAULT_SCENARIO["camera"]
+CAMERA_WIDTH, CAMERA_HEIGHT = (int(value) for value in _DEFAULT_CAMERA["resolution"])
+CAMERA_HFOV_DEG = float(_DEFAULT_CAMERA["horizontal_fov_deg"])  # simulators keep pixels square
 # Pose of groot_camera_link in the scenario world frame, in ROS body axes
-# (+X optical axis, +Y left, +Z up), i.e. Isaac's Camera camera_axes="world".
-DEFAULT_CAMERA_XYZ = (0.17, -0.52, 0.92)
-DEFAULT_CAMERA_RPY = (0.0, 0.785, 1.449)
+# (+X optical axis, +Y left, +Z up), i.e. Isaac's Camera camera_axes="world"
+# and Gazebo's camera sensor frame.
+DEFAULT_CAMERA_XYZ = tuple(float(value) for value in _DEFAULT_CAMERA["xyz"])
+DEFAULT_CAMERA_RPY = tuple(float(value) for value in _DEFAULT_CAMERA["rpy"])
 # systems/so101/urdf/so101.urdf.xacro world_to_base: base_link sits this far
-# above the spawn pose of the URDF's root ``world`` link.
+# above the spawn pose of the URDF's root ``world`` link, which is the
+# underside of the arm's base: base_link's box is BASE_LINK_SIZE.
 SPAWN_TO_BASE_LINK = (0.0, 0.0, 0.0225)
+BASE_LINK_SIZE = (0.12, 0.12, 0.045)
 
 
 def camera_focal_length_px(width=CAMERA_WIDTH, horizontal_fov_deg=CAMERA_HFOV_DEG):
@@ -116,15 +146,10 @@ CAMERA_FY = CAMERA_FX
 CAMERA_CX = CAMERA_WIDTH / 2.0
 CAMERA_CY = CAMERA_HEIGHT / 2.0
 
-# base_to_groot_camera in systems/so101/urdf/so101.urdf.xacro; equals
-# base_to_camera_link() of the picking_table scenario camera.
-BASE_TO_CAMERA_LINK_TRANSLATION = (0.17, -0.52, 0.4665)
-BASE_TO_CAMERA_LINK_RPY = DEFAULT_CAMERA_RPY
 CAMERA_LINK_TO_OPTICAL_TRANSLATION = (0.0, 0.0, 0.0)
 CAMERA_LINK_TO_OPTICAL_RPY = (-1.57079632679, 0.0, -1.57079632679)
 CAMERA_TO_DEPTH_TRANSLATION = (0.0, 0.0, 0.0)
 CAMERA_TO_DEPTH_RPY = (0.0, 0.0, 0.0)
-WORLD_TO_TABLE_TRANSLATION = (0.42, 0.0, 0.425)
 WORLD_TO_TABLE_RPY = (0.0, 0.0, 0.0)
 
 # Kinematic dimensions to the centre of the jaws.
@@ -230,6 +255,144 @@ def base_to_camera_link(scenario=None):
     translation = spawn_rotation.T @ (np.asarray(camera["xyz"], dtype=np.float64) - base_xyz)
     rotation = spawn_rotation.T @ rpy_to_matrix(camera["rpy"])
     return tuple(float(value) for value in translation), matrix_to_rpy(rotation)
+
+
+# Display colours of the scene's materials and object colours (linear RGB),
+# shared by every simulator so they render the same scene.
+SCENE_COLORS = {
+    "black_anodized_aluminum": (0.08, 0.08, 0.09),
+    "blue": (0.04, 0.18, 0.76),
+    "blue_plastic": (0.06, 0.32, 0.58),
+    "green": (0.08, 0.58, 0.22),
+    "laminated_wood": (0.55, 0.49, 0.38),
+    "matte_gray_cardboard": (0.42, 0.42, 0.38),
+    "red": (0.85, 0.06, 0.04),
+    "red_plastic": (0.66, 0.22, 0.14),
+    "white": (0.92, 0.92, 0.88),
+}
+APRILGRID_COLOR = (0.94, 0.94, 0.90)
+
+
+def scene_color(entry):
+    if entry.get("type") == "aprilgrid":
+        return APRILGRID_COLOR
+    return SCENE_COLORS.get(entry.get("color") or entry.get("material"), (0.45, 0.45, 0.45))
+
+
+def scene_entities(scenario):
+    """{name: entry} for the scenario's static assets (by name) and objects (by id)."""
+    entities = {entry["name"]: entry for entry in (scenario or {}).get("static_assets", [])}
+    entities.update({entry["id"]: entry for entry in (scenario or {}).get("objects", [])})
+    return entities
+
+
+def entity_half_extents(entry):
+    """World-axis half extents (x, y, z) of a box or z-axis cylinder after its rpy."""
+    rotation = rpy_to_matrix(entry.get("rpy", [0.0, 0.0, 0.0]))
+    if entry.get("shape") == "cylinder":
+        axis = np.abs(rotation[:, 2])
+        radius = float(entry["radius_m"])
+        return axis * float(entry["height_m"]) / 2.0 + radius * np.sqrt(np.clip(1.0 - axis ** 2, 0.0, 1.0))
+    return np.abs(rotation) @ (np.asarray(entry["size"][:3], dtype=np.float64) / 2.0)
+
+
+def entity_bounds(entry):
+    """(lower, upper) world corners of an entry's axis-aligned bounding box."""
+    centre = np.asarray(entry["xyz"][:3], dtype=np.float64)
+    half = entity_half_extents(entry)
+    return centre - half, centre + half
+
+
+def robot_base_bounds(scenario):
+    """Bounding box of the URDF's base_link box at the scenario's spawn pose."""
+    spawn = (scenario or {}).get("robot_spawn", {})
+    entry = {
+        "xyz": (np.asarray(spawn.get("xyz", [0.0, 0.0, 0.0]), dtype=np.float64)
+                + rpy_to_matrix(spawn.get("rpy", [0.0, 0.0, 0.0])) @ np.asarray(SPAWN_TO_BASE_LINK)).tolist(),
+        "rpy": spawn.get("rpy", [0.0, 0.0, 0.0]),
+        "size": list(BASE_LINK_SIZE),
+    }
+    return entity_bounds(entry)
+
+
+def table_entry(scenario):
+    """The scenario's table (the static asset of type "table")."""
+    for entry in (scenario or {}).get("static_assets", []):
+        if entry.get("type") == "table":
+            return entry
+    raise ValueError("scenario has no static asset of type 'table'")
+
+
+def table_top_xyz(scenario):
+    """Centre of the table's top surface (the table_frame origin)."""
+    table = table_entry(scenario)
+    top = entity_bounds(table)[1][2]
+    return (float(table["xyz"][0]), float(table["xyz"][1]), float(top))
+
+
+def resting_xyz(scenario, entry, support=None):
+    """Where ``entry`` (an asset or object of ``scenario``) is centred when it
+    stands on top of ``support`` (default: its "rests_on"), at its x, y."""
+    support = support or entry["rests_on"]
+    support_top = entity_bounds(scene_entities(scenario)[support])[1][2]
+    half = entity_half_extents(entry)
+    xyz = [float(value) for value in entry["xyz"][:3]]
+    xyz[2] = float(support_top + float(entry.get("standoff_m", 0.0)) + half[2])
+    return xyz
+
+
+def scene_support_errors(scenario, tolerance=1e-6):
+    """Physical inconsistencies of a scenario, as messages (empty if none).
+
+    Every static asset except the table, every object and the robot spawn
+    must name the surface it stands on ("rests_on"); its underside must be
+    on that surface's top (plus "standoff_m", e.g. a board standing in printed
+    feet) and its centre over it. The robot's underside is its spawn z (the
+    URDF's root link). No two bodies, the robot's base box included, may
+    interpenetrate. This keeps one source of truth for the heights: an entity
+    floating above, or sunk into, what it stands on is an error, whatever the
+    simulator would do with it.
+    """
+    errors = []
+    entities = scene_entities(scenario)
+    bounds = {name: entity_bounds(entry) for name, entry in entities.items()}
+    spawn = (scenario or {}).get("robot_spawn", {})
+    bounds["robot_base"] = robot_base_bounds(scenario)
+    standing = [("robot_spawn", spawn, float(bounds["robot_base"][0][2]), bounds["robot_base"])]
+    for name, entry in entities.items():
+        if entry.get("type") == "table":
+            continue
+        standing.append((name, entry, float(bounds[name][0][2]), bounds[name]))
+    for name, entry, underside, (lower, upper) in standing:
+        support = entry.get("rests_on")
+        if support is None:
+            errors.append(f"{name} does not say what it rests on (rests_on)")
+            continue
+        if support not in entities:
+            errors.append(f"{name} rests on {support!r}, which is not in the scenario")
+            continue
+        support_lower, support_upper = bounds[support]
+        expected = float(support_upper[2]) + float(entry.get("standoff_m", 0.0))
+        if abs(underside - expected) > tolerance:
+            errors.append(
+                f"{name}'s underside is at {underside:.4f} m but {support}'s top"
+                f"{' plus its standoff' if entry.get('standoff_m') else ''} is at {expected:.4f} m"
+            )
+        centre = (lower + upper) / 2.0
+        if np.any(centre[:2] < support_lower[:2] - tolerance) or np.any(centre[:2] > support_upper[:2] + tolerance):
+            errors.append(f"{name} is not over {support}")
+    names = sorted(bounds)
+    for index, first in enumerate(names):
+        for second in names[index + 1:]:
+            overlap = (np.minimum(bounds[first][1], bounds[second][1])
+                       - np.maximum(bounds[first][0], bounds[second][0]))
+            if np.all(overlap > tolerance):
+                errors.append(f"{first} and {second} overlap by {1000.0 * float(np.min(overlap)):.1f} mm")
+    return errors
+
+
+BASE_TO_CAMERA_LINK_TRANSLATION, BASE_TO_CAMERA_LINK_RPY = base_to_camera_link(DEFAULT_SCENARIO)
+WORLD_TO_TABLE_TRANSLATION = table_top_xyz(DEFAULT_SCENARIO)
 
 
 def camera_info_values(width=CAMERA_WIDTH, height=CAMERA_HEIGHT, horizontal_fov_deg=CAMERA_HFOV_DEG):

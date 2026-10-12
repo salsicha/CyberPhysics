@@ -13,9 +13,12 @@ sys.path.insert(0, str(ROOT / "applications" / "so101" / "scripts"))
 from score_picking_task import score
 from so101_common import JOINT_NAMES, safe_hardware_target, synthetic_rgbd
 from so101_task_policy import (
+    GRASP_WRIST_ROLL,
+    SURFACE_CLEARANCE,
     ScriptedPickPlaceController,
     build_pick_place_plan,
     forward_kinematics,
+    jaw_reach_below,
 )
 
 
@@ -60,6 +63,34 @@ def test_task_plan_is_reachable_and_completes():
     assert controller.status == "solved"
 
 
+def test_demo_grasps_objects_standing_on_the_table_without_reaching_into_it():
+    """The objects rest on the table: the jaws (75 mm long, opened sideways)
+    close on the object high enough to clear the table, and release it
+    standing on the bin with the jaws clear of the bin."""
+    scenario = load_scenario()
+    table_top = next(a for a in scenario["static_assets"] if a["type"] == "table")
+    table_top = table_top["xyz"][2] + table_top["size"][2] / 2
+    for task in scenario["tasks"]:
+        scenario["selected_task"] = task
+        plan = {waypoint.name: waypoint for waypoint in build_pick_place_plan(scenario)}
+        target = next(o for o in scenario["objects"] if o["id"] == task["target_object"])
+        bin_ = next(a for a in scenario["static_assets"] if a["name"] == task["destination"])
+        bin_top = bin_["xyz"][2] + bin_["size"][2] / 2
+        assert target["xyz"][2] - target["size"][2] / 2 == pytest.approx(table_top)
+        for name, waypoint in plan.items():
+            assert waypoint.joints[4] == pytest.approx(GRASP_WRIST_ROLL), name
+            lowest = waypoint.end_effector_xyz[2] - jaw_reach_below(waypoint.joints)
+            support = table_top if name in ("pregrasp", "grasp", "close_gripper", "lift") else bin_top
+            assert lowest >= support + SURFACE_CLEARANCE - 1e-4, name
+        offset = plan["grasp"].end_effector_xyz - np.asarray(target["xyz"])
+        assert offset[:2] == pytest.approx([0.0, 0.0])
+        assert 0.0 <= offset[2] < 0.035     # within the scorer's approach tolerance
+        # held at that offset, the object stands on the bin when released
+        released = plan["release"].end_effector_xyz - offset
+        assert released[:2] == pytest.approx(bin_["xyz"][:2])
+        assert released[2] - target["size"][2] / 2 == pytest.approx(bin_top)
+
+
 def test_demo_controller_accepts_server_side_scenario():
     scenario = load_scenario()
     scenario["selected_task"] = scenario["tasks"][0]
@@ -93,10 +124,12 @@ def completed_telemetry():
     plan = build_pick_place_plan(scenario)
     target = next(entry for entry in scenario["objects"] if entry["id"] == "red_block_target")
     object_xyz = np.asarray(target["xyz"], dtype=np.float64)
+    # The jaws close above the block's centre; it keeps that offset while held.
+    grip_offset = object_xyz - plan[1].end_effector_xyz
     samples = []
     for index, waypoint in enumerate(plan):
         if waypoint.name in ("close_gripper", "lift", "transfer", "place", "release"):
-            object_xyz = waypoint.end_effector_xyz.copy()
+            object_xyz = waypoint.end_effector_xyz + grip_offset
         samples.append({
             "time": float(index * 2),
             "end_effector_xyz": waypoint.end_effector_xyz.tolist(),

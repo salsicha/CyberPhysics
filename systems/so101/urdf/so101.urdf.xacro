@@ -115,7 +115,7 @@
        "camera") relative to base_link; checked by validate_calibration_and_dataset.py. -->
   <joint name="base_to_groot_camera" type="fixed">
     <parent link="base_link"/><child link="groot_camera_link"/>
-    <origin xyz="0.17 -0.52 0.4665" rpy="0.0 0.785 1.449"/>
+    <origin xyz="0.1697563 -0.5219908 0.4646126" rpy="0.0 0.8464847 1.449"/>
   </joint>
   <link name="groot_camera_rgb_optical_frame"/>
   <joint name="groot_camera_optical_joint" type="fixed">

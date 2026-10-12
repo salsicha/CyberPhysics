@@ -46,6 +46,7 @@ services:
         camera_name:=depth_camera
         camera_namespace:=so101
         enable_color:=true
+        rgb_camera.color_profile:=640x360x30
         enable_depth:=true
         align_depth.enable:=true
         pointcloud.enable:=true

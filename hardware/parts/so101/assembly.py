@@ -5,11 +5,11 @@ tools/build_printable_parts.py:
   * interference: no two bodies overlap (screws modelled at their nominal
     diameter through their holes), with the camera cradle swept through its
     whole pitch range against the camera head;
-  * camera view: from the scene's camera pose, with the D435i's real colour
-    field of view (69.4 x 42.5 deg, narrower vertically than the simulated
-    640 x 480 camera's 54.5 deg), every bin and object of the scene is in
-    the image, the camera sees no part of the station, and the pitch the
-    head should be trimmed to for the best margin;
+  * camera view: the scene's camera models the D435i's colour stream (its
+    field of view, 69.4 x 42.5 deg, and 16:9 image); from the scene's camera
+    pose every bin and object of the scene is in the image, the camera sees
+    no part of the station, and the scene's pitch is the one the head should
+    be trimmed to for the best margin;
   * reach: the camera, head and post are out of the arm's reach;
   * the station board carries everything.
 
@@ -27,6 +27,8 @@ from hardware.parts.so101._footprints import Extrusion2020, RealSenseD435i, SO10
 OVERLAP_TOLERANCE_MM3 = 0.5
 SCREW_SLACK = 0.02
 VIEW_MARGIN = 0.95             # every task item within 95 % of the half-image, both ways
+PITCH_GRID_DEG = 0.25          # resolution of the recommended pitch
+FOV_TOLERANCE_DEG = 0.5        # scene camera vs the D435i colour field of view
 BOARD_EDGE_BACK = 250.0        # arm's pan axis from the board's back edge (scene: 255 mm from the bench edge)
 BOARD_EDGE_RIGHT = 640.0       # pan axis from the board's right edge
 # Reach of the arm from the shoulder-lift axis, from systems/so101/urdf/so101.urdf:
@@ -228,8 +230,17 @@ def task_view(pitch_deg):
 def best_pitch():
     """Pitch in the head's range with the most margin around the task area."""
     lo, hi = S.PITCH_RANGE_DEG
-    candidates = [lo + 0.5 + 0.25 * k for k in range(int((hi - lo - 1.0) / 0.25) + 1)]
+    candidates = [lo + 0.5 + PITCH_GRID_DEG * k for k in range(int((hi - lo - 1.0) / PITCH_GRID_DEG) + 1)]
     return min(candidates, key=lambda p: max(task_view(p)[0].values()))
+
+
+def scene_camera_fov():
+    """(horizontal, vertical) field of view, degrees, of the scene's camera
+    (square pixels, as every simulator renders it)."""
+    cam = S.SCENARIO["camera"]
+    width, height = cam["resolution"]
+    th = math.tan(math.radians(cam["horizontal_fov_deg"]) / 2)
+    return cam["horizontal_fov_deg"], math.degrees(2 * math.atan(th * height / width))
 
 
 def _frustum(pitch_deg, depth=1500.0, start=1.0):
@@ -278,14 +289,27 @@ def check(entries=None):
     report["pitch_sweep"] = (sweep_hits or
                              f"clear from {PITCH_SWEEP[0]:g} to {PITCH_SWEEP[-1]:g} deg")
 
+    hfov, vfov = scene_camera_fov()
+    fov_ok = (abs(hfov - RealSenseD435i.COLOR_FOV_DEG[0]) <= FOV_TOLERANCE_DEG
+              and abs(vfov - RealSenseD435i.COLOR_FOV_DEG[1]) <= FOV_TOLERANCE_DEG)
+    width, height = S.SCENARIO["camera"]["resolution"]
+    report["scene_camera_is_the_d435i_colour_stream"] = (
+        f"{'yes' if fov_ok else '**no**'} ({width} x {height}, {hfov:.1f} x {vfov:.1f} deg; D435i colour "
+        f"{RealSenseD435i.COLOR_FOV_DEG[0]:g} x {RealSenseD435i.COLOR_FOV_DEG[1]:g} deg)")
     worst, nearest = task_view(S.PITCH_DEG)
     out = [f"{n} ({w:.2f})" for n, w in worst.items() if w > 1.0]
+    scene_view_ok = max(worst.values()) <= VIEW_MARGIN
     report["task_area_in_view_at_scene_pitch"] = (
-        f"yes at {S.PITCH_DEG:.1f} deg (worst {max(worst.values()):.2f})" if not out else
-        f"no at {S.PITCH_DEG:.1f} deg: {', '.join(out)} partly outside the D435i's 42.5 deg vertical view")
+        f"{'yes' if scene_view_ok else '**no**'} at {S.PITCH_DEG:.1f} deg (worst {max(worst.values()):.2f})"
+        if not out else
+        f"**no** at {S.PITCH_DEG:.1f} deg: {', '.join(out)} partly outside the D435i's 42.5 deg vertical view")
     bp = best_pitch()
     bworst, bnear = task_view(bp)
     report["recommended_pitch_deg"] = bp
+    pitch_ok = abs(S.PITCH_DEG - bp) <= PITCH_GRID_DEG / 2
+    report["scene_pitch_is_the_recommended_pitch"] = (
+        f"{'yes' if pitch_ok else '**no**'} ({S.PITCH_DEG:.1f} deg in "
+        f"systems/so101/scenarios/{S.SCENARIO_FILE.name})")
     view_ok = max(bworst.values()) <= VIEW_MARGIN
     report["task_area_in_view_at_recommended_pitch"] = (
         f"{'yes' if view_ok else '**no**'} (worst {max(bworst.values()):.2f} of the half-image; "
@@ -323,7 +347,7 @@ def check(entries=None):
                                       f"{BOARD_EDGE_BACK:g} mm from its back edge, {BOARD_EDGE_RIGHT:g} mm from its right edge)")
     report["camera_rgb_at_recommended_pitch_mm"] = [round(v, 1) for v in S.rgb_centre(bp)]
     report["passed"] = (not overlaps and not sweep_hits and view_ok and near_ok and not fov_hits and reach_ok
-                        and not off_board)
+                        and not off_board and fov_ok and scene_view_ok and pitch_ok)
     return report
 
 

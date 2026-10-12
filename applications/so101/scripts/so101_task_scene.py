@@ -14,22 +14,16 @@ from score_picking_task import score
 from so101_common import (
     JOINT_LIMIT_VIOLATION_TOLERANCE,
     LOWER_LIMITS,
+    SCENE_COLORS,
     UPPER_LIMITS,
     forward_kinematics,
+    scene_color,
+    scene_support_errors,
 )
 
 
-COLORS = {
-    "black_anodized_aluminum": (0.08, 0.08, 0.09),
-    "blue": (0.04, 0.18, 0.76),
-    "blue_plastic": (0.06, 0.32, 0.58),
-    "green": (0.08, 0.58, 0.22),
-    "laminated_wood": (0.55, 0.49, 0.38),
-    "matte_gray_cardboard": (0.42, 0.42, 0.38),
-    "red": (0.85, 0.06, 0.04),
-    "red_plastic": (0.66, 0.22, 0.14),
-    "white": (0.92, 0.92, 0.88),
-}
+# The palette every simulator renders the scene with (so101_common).
+COLORS = SCENE_COLORS
 
 
 def load_scenario(path):
@@ -55,7 +49,7 @@ def _safe_name(value):
 
 
 def _color(entry):
-    return COLORS.get(entry.get("color") or entry.get("material"), (0.45, 0.45, 0.45))
+    return scene_color(entry)
 
 
 def _rotation_degrees(entry):
@@ -120,6 +114,11 @@ class SO101TaskScene:
         self.destination_position = np.asarray(self.destination["xyz"][:3], dtype=np.float64)
         self.target_translate = None
         self.attached = False
+        # Where the target sits relative to the jaw centre while held: the
+        # jaws close on it wherever it is (the demo grasps above the centre of
+        # an object standing on the table, so the jaw tips clear the table),
+        # and it keeps that offset until released.
+        self.grasp_offset = np.zeros(3)
         self.released = False
         self.grasp_closed = False
         self.max_lift = 0.0
@@ -147,6 +146,12 @@ class SO101TaskScene:
         self._build_scene()
 
     def _build_scene(self):
+        # Objects are kinematic here (they stay where the scenario puts them),
+        # so a scenario whose objects do not rest on their surfaces would
+        # start Isaac in a different state from Gazebo and Genesis, which
+        # drop them.
+        for error in scene_support_errors(self.scenario):
+            print(f"SO-101 scenario inconsistency: {error}", flush=True)
         UsdGeom.Xform.Define(self.stage, "/World/Task")
         for asset in self.scenario.get("static_assets", []):
             create_box(self.stage, f"/World/Task/{_safe_name(asset['name'])}", asset)
@@ -213,9 +218,10 @@ class SO101TaskScene:
             if not self.attached and not self.released and joints[5] <= 0.018 and distance <= 0.045:
                 self.attached = True
                 self.grasp_closed = True
+                self.grasp_offset = self.target_position - end_effector
                 self.status = "target_grasped"
             if self.attached:
-                self._set_target_position(end_effector)
+                self._set_target_position(end_effector + self.grasp_offset)
                 self.max_lift = max(self.max_lift, float(self.target_position[2] - self.target_initial[2]))
                 if self.max_lift >= float(self.task.get("success", {}).get("object_lift_height_m", 0.08)):
                     self.status = "transporting_target"

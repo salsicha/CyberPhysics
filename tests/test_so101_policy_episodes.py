@@ -15,7 +15,7 @@ import pytest
 
 from test_so101_groot_bridge import joint_state, make_bridge, pack, policy_server, unpack
 from groot_so101_bridge import letterbox_nearest
-from so101_common import JOINT_NAMES
+from so101_common import CAMERA_HEIGHT, CAMERA_WIDTH, JOINT_NAMES
 
 
 class RecordingClient:
@@ -122,19 +122,27 @@ def test_action_computed_across_an_episode_boundary_is_dropped():
 
 
 def test_native_resolution_frames_are_sent_unchanged():
+    # The camera is the D435i's 16:9 colour stream (640x360), sim and real.
+    assert (CAMERA_WIDTH, CAMERA_HEIGHT) == (640, 360)
+    h, w = CAMERA_HEIGHT, CAMERA_WIDTH
     bridge, _ = ready_bridge(width=0, height=0)
-    image = np.random.default_rng(0).integers(0, 255, (480, 640, 3), dtype=np.uint8)
-    bridge._image_cb(NS(encoding='rgb8', height=480, width=640, step=640 * 3,
+    image = np.random.default_rng(0).integers(0, 255, (h, w, 3), dtype=np.uint8)
+    bridge._image_cb(NS(encoding='rgb8', height=h, width=w, step=w * 3,
                         data=image.tobytes()))
-    depth = np.full((480, 640), 0.7, dtype=np.float32)
-    bridge._depth_cb(NS(encoding='32FC1', height=480, width=640, step=640 * 4,
+    depth = np.full((h, w), 0.7, dtype=np.float32)
+    bridge._depth_cb(NS(encoding='32FC1', height=h, width=w, step=w * 4,
                         data=depth.tobytes()))
 
     observation = bridge._observation()
 
-    assert observation['video']['front'].shape == (1, 1, 480, 640, 3)
+    assert observation['video']['front'].shape == (1, 1, h, w, 3)
     np.testing.assert_array_equal(observation['video']['front'][0, 0], image)
-    assert observation['depth']['front_depth'].shape == (1, 1, 480, 640, 1)
+    assert observation['depth']['front_depth'].shape == (1, 1, h, w, 1)
+
+
+def test_placeholder_frame_before_the_first_image_has_the_camera_shape():
+    bridge, _ = ready_bridge(width=0, height=0)
+    assert bridge._observation()['video']['front'].shape == (1, 1, CAMERA_HEIGHT, CAMERA_WIDTH, 3)
 
 
 def test_resize_preserves_aspect_ratio_instead_of_squashing():
@@ -149,6 +157,9 @@ def test_resize_preserves_aspect_ratio_instead_of_squashing():
     assert not content[:, :111].any() and content[:, 113:].all()
     depth = letterbox_nearest(np.ones((480, 640), np.float32), 224, 224, fill=np.nan)
     assert np.isnan(depth[0]).all() and np.all(depth[28:-28] == 1.0)
+    # The 16:9 camera: 640x360 -> 224x126 content, 49-row bands.
+    wide = letterbox_nearest(np.full((360, 640, 3), 255, np.uint8), 224, 224)
+    assert not wide[:49].any() and not wide[-49:].any() and wide[49:-49].all()
 
 
 def published_stats(bridge):
