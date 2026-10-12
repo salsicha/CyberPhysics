@@ -5,8 +5,9 @@ origin is the hub centre on the plane of the arm-tube axes. Modules whose
 name starts with "_" are helpers, not printed parts.
 
 Frame: 500 mm motor-to-motor (X500 class), quad X, four 16 mm carbon arm
-tubes clamped between two printed hub plates; 2216-size ~920 KV motors,
-10 x 4.5 in propellers, 4S LiPo, about 2.1 kg take-off mass.
+tubes clamped between two printed hub plates; T-Motor MN3510 KV700 motors,
+T-Motor P12*4 (12 x 4 in) propellers, AIR 40A ESCs, 4S LiPo, about 2.5 kg
+take-off mass (3.2 kg with the launcher).
 
 Optional payload: the foam dart launcher of hardware/parts/turret/_launcher.py
 hangs under the hub pointing straight down, its bore on the vertical axis
@@ -16,10 +17,10 @@ aircraft; see "Foam dart launcher (optional payload)" below.
 """
 import math
 
+from hardware.parts.aerodrone._footprints import TMotorMN3510KV700, TMotorP12x4
 from hardware.parts.common.footprints import (
     BenewakeTFminiS,
     CarbonTube16,
-    Holybro2216KV920,
     LuxonisOAK1,
     RaspberryPi5,
 )
@@ -137,10 +138,17 @@ BATTERY_TOP_Z = BOT_Z[0] - TRAY_POST_H - BATTERY_TRAY_T                    # -32
 LEG_THICKNESS = 12.0
 GROUND_Z = -206.0
 
+# Propulsion: the motor and propeller every part and check uses.
+MOTOR = TMotorMN3510KV700
+PROP = TMotorP12x4
+# Adjacent motors on the square quad X, and the gap between their propeller tips.
+ADJACENT_MOTOR_SPACING = WHEELBASE / math.sqrt(2.0)          # 353.6
+PROP_TIP_GAP = ADJACENT_MOTOR_SPACING - PROP.DIAMETER         # 48.8 with 12 in propellers
+
 # Motor mount (in its own frame: u out along the arm, origin on the motor axis)
 MOTOR_PLATE_Z = (10.0, 14.0)
 MOTOR_SEAT_Z = MOTOR_PLATE_Z[1]
-PROP_Z = MOTOR_SEAT_Z + Holybro2216KV920.HEIGHT + 4.0
+PROP_Z = MOTOR_SEAT_Z + MOTOR.HEIGHT + 4.0
 
 
 # --------------------------------------------------------------------- foam dart launcher (optional payload)

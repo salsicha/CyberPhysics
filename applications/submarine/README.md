@@ -20,7 +20,9 @@ submarine topics:
 - `/sub0/sensor_measurements/gps`
 - `/sub0/sensor_measurements/odom`
 - `/sub0/sensor_measurements/imu`
-- `/sub0/sensor_measurements/pressure`
+- `/sub0/sensor_measurements/pressure` (on the vehicle, the external depth
+  sensor's SCALED_PRESSURE2, decoded from MAVROS's raw MAVLink stream:
+  `systems/submarine/README.md`, "Depth pressure")
 - `/sub0/sensor_measurements/battery`
 
 If `enable_velocity_setpoints` is set to `true`, it also converts

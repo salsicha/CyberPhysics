@@ -5,9 +5,9 @@ cable clips are printed; the arm tubes, propulsion, battery, electronics,
 sensors and fasteners are bought (see the bill of materials,
 [hardware/aerodrone.md](../../aerodrone.md), for what and why). The
 frame is a 500 mm quad X (X500 class): four 16 mm carbon tubes clamped
-between two printed hub plates, 2216-size motors on printed mounts, 10 in
-propellers, a 4S pack under the hub, the Pi 5 + Navigator stack on top
-with the top deck over it (`top_deck`: the HaLowLink 2 for the ground link
+between two printed hub plates, T-Motor MN3510 KV700 motors on printed
+mounts, 12 in propellers, a 4S pack under the hub, the Pi 5 + Navigator
+stack on top with the top deck over it (`top_deck`: the HaLowLink 2 for the ground link
 in `halow_cradle`, its antenna standing up at the deck's front), and the
 downward OAK-1 and rangefinder on a nose under the front.
 
@@ -40,22 +40,21 @@ orientation, and arrange.
 <!-- BEGIN GENERATED: plates (tools/build_printable_parts.py) -->
 #### Plate A: ASA, 0.20 mm layers
 
-Filament **Bambu ASA**, **Textured PEI Plate**, process **0.20mm Standard**. Estimated 5 h 54 min and 188 g of filament (estimates; slice for real numbers).
+Filament **Bambu ASA**, **Textured PEI Plate**, process **0.20mm Standard**. Estimated 6 h 21 min and 202 g of filament (estimates; slice for real numbers).
 
 | Part | Qty | Per-object settings | Orientation | File |
 |---|---|---|---|---|
 | `hub_bottom_plate` | 1 | 4 wall loops, 4/4 top/bottom shells, 25% gyroid, supports: none, brim: outer brim only, 5 mm | flat underside on the plate, clamp blocks up | [stl](stl/hub_bottom_plate.stl) |
-| `oak1_cradle` | 1 | 4 wall loops, 5/4 top/bottom shells, 40% gyroid, supports: none, brim: auto | upside down: camera seat on the plate, walls up | [stl](stl/oak1_cradle.stl) |
-| `motor_mount` | 3 | 5 wall loops, 6/6 top/bottom shells, 50% gyroid, supports: none, brim: auto | upside down: motor seat on the plate, tube clamp up (slit on top) | [stl](stl/motor_mount.stl) |
+| `motor_mount` | 4 | 5 wall loops, 6/6 top/bottom shells, 50% gyroid, supports: none, brim: auto | upside down: motor seat on the plate, tube clamp up (slit on top) | [stl](stl/motor_mount.stl) |
 
 #### Plate B: ASA, 0.20 mm layers
 
-Filament **Bambu ASA**, **Textured PEI Plate**, process **0.20mm Standard**. Estimated 6 h 59 min and 212 g of filament (estimates; slice for real numbers).
+Filament **Bambu ASA**, **Textured PEI Plate**, process **0.20mm Standard**. Estimated 6 h 44 min and 204 g of filament (estimates; slice for real numbers).
 
 | Part | Qty | Per-object settings | Orientation | File |
 |---|---|---|---|---|
 | `hub_top_plate` | 1 | 4 wall loops, 4/4 top/bottom shells, 25% gyroid, supports: none, brim: outer brim only, 5 mm | upside down: flat top face on the plate, clamp blocks up | [stl](stl/hub_top_plate.stl) |
-| `motor_mount` | 1 | 5 wall loops, 6/6 top/bottom shells, 50% gyroid, supports: none, brim: auto | upside down: motor seat on the plate, tube clamp up (slit on top) | [stl](stl/motor_mount.stl) |
+| `oak1_cradle` | 1 | 4 wall loops, 5/4 top/bottom shells, 40% gyroid, supports: none, brim: auto | upside down: camera seat on the plate, walls up | [stl](stl/oak1_cradle.stl) |
 | `tall_leg_socket` | 4 | 5 wall loops, 6/6 top/bottom shells, 40% gyroid, supports: none, brim: auto | upside down: the flange's top face on the plate (the block leans out at 36 deg, no supports) | [stl](stl/tall_leg_socket.stl) |
 
 #### Plate C: ASA, 0.20 mm layers
@@ -150,9 +149,10 @@ plates when Bambu Studio's auto-arrange fits them.
 1. **Print the fit-test parts first** and check them against the real
    parts before printing the rest. These are the parts with dimensions not
    stated in the cited datasheets:
-   - `motor_mount`: your motor's base against the slots (Holybro's
-     "16x16 mm" read as a cross of holes 16 mm apart), the screw depth, and
-     the 8.5 mm centre hole (shaft end, circlip).
+   - `motor_mount`: the MN3510's base on the 42 mm seat, its four M3 (a
+     25 mm circle) in the slots' outer ends, the screw depth (M3 x 8 engage
+     4 mm: they must stop short of the windings), and the 10 mm centre hole
+     (shaft end, circlip).
    - `sensor_nose` and `oak1_stage`: the damper-ball necks in the 6.5 mm
      holes of the 2 mm tabs (generic balls have no drawing); the TFmini-S
      or TF-Luna ear holes in the rangefinder slots.
@@ -251,9 +251,10 @@ right**.
 3. **Motor mounts on the tubes.** Slide each tube into a `motor_mount`
    until it touches the stop at the end of the bore. Fit the two M3 x 25
    pinch screws into the inserts, but leave them loose.
-4. **Motors.** Bolt each motor to its `motor_mount` with four M3 x 8 (or
-   the motor's own screws) from underneath, blue thread locker, snug
-   (about 1 N m into the metal base). Lead wires toward the hub.
+4. **Motors.** Bolt each MN3510 to its `motor_mount` with four M3 x 8 from
+   underneath, in the slots' outer ends (the 25 mm circle), blue thread
+   locker, snug (about 1 N m into the metal base). Lead wires toward the
+   hub, between two slots; cut them to about 200 mm (the ESC is on the arm).
    *Check:* turn the bell by hand: no rubbing, no screw touching the
    windings.
 5. **Hub.** Lay the `hub_bottom_plate` blocks up, the four nose inserts
@@ -269,8 +270,9 @@ right**.
    is parallel to the plate, then tighten the pinch screws.
    *Check:* the four motor shafts are vertical with the frame on a flat
    table (a tilted motor costs yaw authority).
-7. **ESCs and arm wiring.** Zip-tie one ESC under each tube between the hub
-   and the middle of the arm; snap two `cable_clip`s onto each tube
+7. **ESCs and arm wiring.** Zip-tie one AIR 40A under each tube between the
+   hub plate's ear and the inner cable clip (113-169 mm from the hub
+   centre); snap two `cable_clip`s onto each tube
    (outer half, tab underneath) and tie the motor leads and ESC signal lead
    to their tabs. Solder or plug the motor leads; swap any two to reverse a
    motor later.
@@ -278,7 +280,8 @@ right**.
    the power distribution (board or harness), the 5 V supply and, on the
    left, the HaLowLink 2's own 5 V regulator (behind a 2 A fuse), held with
    zip ties through the four centre slots of the `hub_bottom_plate`. The
-   battery lead (XT60) comes out through the rear slot. See **Wiring**.
+   battery lead (XT90, 10 AWG) comes out through the rear slot. See
+   **Wiring**.
 
 ![Landing legs and battery](images/step_legs_battery.png)
 
@@ -402,9 +405,10 @@ with this aircraft's breech, the safety on and no darts.
 
 Power path (see the BOM's "Power and wiring" for parts and budget):
 
-- **Battery** XT60 -> **Power Sense Module** (5.5 mm bullets in, #6 spades
-  out: fit an XT60 pigtail on its input) -> power distribution -> the four
-  ESCs and the **5 V 6 A supply**. The supply's 0.1 in header output feeds
+- **Battery** XT90 -> **Power Sense Module** (5.5 mm bullets in, #6 spades
+  out: fit an XT90 pigtail on 10 AWG on its input) -> power distribution
+  (10 AWG) -> the four ESCs (14 AWG) and the **5 V 6 A
+  supply**. The supply's 0.1 in header output feeds
   the Navigator's main 5 V input; the Navigator powers the Pi 5 through the
   40-pin header. Nothing else feeds the Pi.
 - **Power Sense Module** sense cable (JST-GH 6) -> Navigator **POWER**.
@@ -421,13 +425,18 @@ Power path (see the BOM's "Power and wiring" for parts and budget):
 - **HaLowLink 2** (the ground link; no SiK telemetry radio): power from
   the power distribution through an inline **2 A** fuse to its own
   **Pololu D36V28F5** 5 V regulator (in the hub, left side, on foam tape),
-  a USB-A socket on its output and a USB-A to USB-C cable into the unit's
-  USB-C; never from the Navigator's 5 V rail. Data: the unit's **LAN** port
+  its output on 20 AWG to a **USB-C plug wired as a power source** (CC to
+  VBUS through 10 kOhm, no pull-down on CC; the BOM's "Radio") into the
+  unit's USB-C; never a USB-A socket with a USB-A to USB-C cable or adapter
+  (the HaLowLink user guide warns against it), and never from the
+  Navigator's 5 V rail. Data: the unit's **LAN** port
   to the Pi 5's Ethernet. Antenna: the SMA extension to the bulkhead on the
   cradle's stay (tie the cable to the cradle's arm). BlueOS keeps eth0 at
   192.168.2.2 and its "GCS Client Link" to 192.168.2.1:14550: nothing to
-  configure on the aircraft. Set the unit's region to the country of
-  operation.
+  configure on the Pi. The unit itself takes the static 192.168.2.252 and
+  its 2.4 GHz access point is turned off (hardware/ground_station.md,
+  "Pairing a vehicle's unit"). Its region is set at the factory: buy the
+  one for the country of operation.
 - **OAK-1**: a USB 3 Type-C cable with a **right-angle C plug pointing
   sideways**, up through a cable notch in the side of the nose and along the
   front of the hub to one of the Pi 5's blue USB 3 ports. Leave a loose
@@ -477,32 +486,39 @@ Generated by the assembly check (`assembly.py`), from the CAD and datasheet mass
 
 - Battery centre for a centred CG (mm along x; negative = behind the hub centre): -31.2
 - Battery within the tray: yes
-- Centre of gravity with the battery there (x, y, z mm from the hub centre): -0.0; 0.4; 1.0
-- Estimated take-off mass (g): 2331
+- Centre of gravity with the battery there (x, y, z mm from the hub centre): -0.0; 0.4; 2.6
+- Estimated take-off mass (g): 2520
 - Bodies in the check: 153
 - Interference between parts (screws modelled through their holes): none
 - Intended press fits: 12
 - Camera view clear: yes (69 x 55 deg + 2 deg margin)
 - Rangefinder beam clear: yes
 - Propeller discs clear: yes (5 mm radial, 3 mm below and 9 mm above the disc)
+- prop_tip_gap_mm: 49 between adjacent 12 in propellers (354 mm between their motors; at least 30, a tenth of the diameter)
+- prop_body_gap_mm: 12 from a propeller disc to the nearest other body (rear left propeller / top_deck; at least 5)
+- prop_overhang: top_deck 16 mm above the rear left propeller's disc, reaching 17 mm in from its tip; top_deck 16 mm above the rear right propeller's disc, reaching 17 mm in from its tip
+- prop_ground_strike_deg: a propeller tip reaches the ground at 49 deg of roll or pitch about two feet; the aircraft tips over at 27 deg (propellers 252 mm above the ground)
 - launcher_battery_on_deck_mm: pack centre at x -35.8, y 0.1 for a centred CG with a full clip (the straps and the GPS mast allow x -46.2..-25.8)
-- launcher_cg_mm: full clip (6 darts): (-0.0, -0.0, -5.2); empty clip: (0.1, 0.0, -4.7), battery not moved; tolerance 3 mm from the hub centre
+- launcher_cg_mm: full clip (6 darts): (0.0, 0.0, -3.6); empty clip: (0.1, 0.0, -3.1), battery not moved; tolerance 3 mm from the hub centre
 - launcher_bore_to_cg_mm: 0.00 (full clip), 0.07 (empty): the bore is the vertical line through the hub centre
 - launcher_bodies: 240
 - launcher_interferences: none (cocked with a full clip, primed)
 - launcher_camera_view_clear: yes: launcher, hanger, tall legs and deck out of the OAK-1's 69 x 55 deg view + 2 deg, cocked and primed
 - launcher_rangefinder_beam_clear: yes
-- halow_antenna_clearance_mm: vertical, from the HaLowLink's SMA on the top deck: arm tubes 107, GPS mast and puck 131, launcher 131, battery 85, propeller discs 71
+- halow_antenna_clearance_mm: vertical, from the HaLowLink's SMA on the top deck: arm tubes 107, GPS mast and puck 131, launcher 131, battery 85, propeller discs 59
 - launcher_propeller_clearance: yes
+- launcher_prop_body_gap_mm: 12 from a propeller disc to the nearest other body (rear left propeller / top_deck; at least 5)
+- launcher_prop_overhang: top_deck 16 mm above the rear left propeller's disc, reaching 17 mm in from its tip; top_deck 16 mm above the rear right propeller's disc, reaching 17 mm in from its tip
 - launcher_view_margin_mm: the view's rear edge (with the margin) passes 7 mm in front of the barrel at the muzzle (227 mm below the lens)
 - launcher_clearance_mm: 5.5 at the closest (launcher_collar_screw / hub_bottom_plate, primed): the launcher clears the airframe, legs, deck and sensors in both states
 - launcher_mount_clearance_mm: 2.5 from the hanger and cam guide to the rest (launcher_hanger / sensor_nose)
 - launcher_dart_path: clear: a 14 mm path from the muzzle straight down to the ground meets nothing
-- launcher_ground_clearance_mm: muzzle 50 above the ground on the feet (lowest point launcher_barrel at 50); legs 338 mm under the hub, feet at (+-230, +-230); tip-over 33 deg (CG 351 mm above the ground)
+- launcher_ground_clearance_mm: muzzle 50 above the ground on the feet (lowest point launcher_barrel at 50); legs 338 mm under the hub, feet at (+-230, +-230); tip-over 33 deg (CG 353 mm above the ground); a propeller tip reaches the ground at 76 deg
 - launcher_compass_to_battery_mm: 160 from the GPS/compass to the battery's centre (at least 150; run ArduPilot's compass-motor calibration)
 - launcher_mass_g: launcher 415 with a full clip (printed 261, two servos 110, spring, barrel, hardware, darts); the configuration adds +644 g in all (hanger, cam guide, deck, tall legs, servo adapter, regulator, wiring; less the tray and landing legs)
-- launcher_takeoff_mass_g: 2975 with a full clip, 2969 empty
-- flight_impact: without the launcher 2331 g: thrust-to-weight 2.29 (table maximum, 1332 g per motor) or 2.06 (T1045 rated 1.2 kg), hover 58 % throttle at 16 V (about 62 % at 14.8 V), 21.4 A, about 11.2 min on 5000 mAh to 20 % left; with the launcher, full clip 2975 g: thrust-to-weight 1.79 (table maximum, 1332 g per motor) or 1.61 (T1045 rated 1.2 kg), hover 66 % throttle at 16 V (about 71 % at 14.8 V), 29.0 A, about 8.3 min on 5000 mAh to 20 % left
+- launcher_takeoff_mass_g: 3165 with a full clip, 3159 empty
+- flight_impact: without the launcher 2520 g: thrust-to-weight 2.54 at 14.8 V (table maximum, 1600 g per motor; 2.97 at 16 V; the P12*4's 4 kg rating would allow 6.3), hover 53 % throttle, 18.7 A at 14.8 V, 5217 rpm (87 Hz), MOT_THST_HOVER about 0.31, about 12.8 min on 5000 mAh to 20 % left; with the launcher, full clip 3165 g: thrust-to-weight 2.02 at 14.8 V (table maximum, 1600 g per motor; 2.36 at 16 V; the P12*4's 4 kg rating would allow 5.1), hover 61 % throttle, 26.4 A at 14.8 V, 5915 rpm (99 Hz), MOT_THST_HOVER about 0.38, about 9.1 min on 5000 mAh to 20 % left
+- launcher_thrust_to_weight_ok: yes: at least 2 at 14.8 V with a full clip
 - launcher_passed: yes
 - All assembly checks passed: yes
 <!-- END GENERATED: assembly -->
@@ -524,19 +540,27 @@ Generated by the assembly check (`assembly.py`), from the CAD and datasheet mass
 - **Propeller direction.** Props off: run the ArduPilot motor test (one
   motor at a time) and check order and spin: motors 1 and 2 (front right,
   rear left) counter-clockwise, 3 and 4 (front left, rear right) clockwise
-  seen from above. Fit CCW props on 1 and 2, CW props on 3 and 4.
+  seen from above. Fit CCW props on 1 and 2, CW props on 3 and 4: each
+  P12*4 on its motor's 12 mm prop face with T-Motor's two M3 x 12 and the
+  cover plate (blue thread locker, into metal).
 - **Vibration isolation.** The stack tray and the camera stage must touch
   nothing but their grommets and dampers; no taut cable may bridge them.
   After the first hover, check ArduPilot's VIBE (below 30 m/s/s, no
-  clipping) and set up the harmonic notch; balance the props if needed.
+  clipping) and check the harmonic notch (it starts from
+  `arducopter_hardware.params`, hardware/aerodrone.md "ArduPilot
+  parameters") against the flight's FFT log; balance the props if needed.
 - **Props-off first power-up.** Smoke stopper or current-limited supply on
-  the battery lead. Check the 5 V rail at the Navigator (5.0-5.35 V), the
+  the battery lead. Load the parameters (`arducopter.params`, then
+  `arducopter_hardware.params` twice with a reboot between, then
+  `arducopter_gps_input.params`) and check the ESCs' throttle range. Check
+  the 5 V rail at the Navigator (5.0-5.35 V), the
   Navigator and Pi LEDs, BlueOS reachable, `vcgencmd get_throttled` = 0x0
   with the whole stack running, the OAK-1 on USB 3 (`lsusb -t`: 5000M) and
   the rangefinder publishing on `/aerodrone/rangefinder`.
 - **HaLow link**: with both HaLowLinks paired, from the ground laptop at
-  192.168.2.1: `ping 192.168.2.2`, BlueOS at http://192.168.2.2, and
-  MAVLink in Cockpit or QGroundControl on UDP 14550. Then the range test
+  192.168.2.1: `ping 192.168.2.2`, BlueOS at http://192.168.2.2, the
+  unit's own page at https://192.168.2.252, and MAVLink in Cockpit or
+  QGroundControl on UDP 14550. Then the range test
   in hardware/ground_station.md. With the link up and transmitting, check
   the GPS's satellite count and the compass (ArduPilot's compass-motor
   calibration) against the unit switched off. ArduPilot's GCS failsafe
@@ -544,7 +568,10 @@ Generated by the assembly check (`assembly.py`), from the CAD and datasheet mass
   manual control.
 - **Every flight**: battery straps through both slot pairs and tight, props
   tight, no cracked print (especially motor mounts, hub plates, legs), the
-  HaLow antenna vertical and tight.
+  HaLow antenna vertical and tight. The top deck's rear corners and strap
+  slots sit over the rear propellers' tips (16 mm above them, the assembly
+  check): the straps tight under the deck and their tails on top of the
+  pack.
 
 Launcher configuration (toy power, foam darts only; safety glasses for
 everyone nearby):
@@ -566,8 +593,9 @@ everyone nearby):
   calibration (`COMPASS_MOT`); interference above 30 % means the pack or its
   lead is too close to the mast.
 - **Hover throttle**: let ArduPilot relearn `MOT_THST_HOVER`
-  (`MOT_HOVER_LEARN 2`) in the first hovers with the launcher, and again
-  after taking it off; re-run AutoTune.
+  (`MOT_HOVER_LEARN 2`) in the first hovers with the launcher (start from
+  0.38 instead of the overlay's 0.31), and again after taking it off; copy
+  the learned value to `INS_HNTCH_REF`; re-run AutoTune.
 - **Before every flight with the launcher**: safety on and muzzle cap on
   until the aircraft is on its take-off spot, the hanger, cam guide and leg
   sockets free of cracks and their screws tight, the safety lanyard fitted;

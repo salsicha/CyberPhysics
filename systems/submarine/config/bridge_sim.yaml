@@ -3,6 +3,11 @@
     namespace: sub0
     mavros_namespace: /mavros
     mirror_pressure: true
+    # ArduSub SITL's barometers are all water-pressure sensors
+    # (AP_Baro_SITL), and barometer 0 is the depth sensor ArduSub uses: the
+    # bridge mirrors MAVROS's pressure topic, made from it (bridge.yaml
+    # decodes the vehicle's external depth sensor instead).
+    pressure_source: pressure_topic
     pressure_topic: /mavros/imu/static_pressure
     enable_velocity_setpoints: true
     cmd_vel_topic: /sub0/cmd_vel

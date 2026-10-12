@@ -7,7 +7,9 @@ tools/build_printable_parts.py:
     the wrong place shows up as an overlap), except declared press fits;
   * camera view: nothing enters the OAK-1's 69 x 55 deg view (plus a
     margin) below the lens;
-  * rangefinder beam and propeller discs are clear;
+  * rangefinder beam and propeller discs are clear; the propellers' tip
+    gap, their distance to every other body, what overhangs their discs,
+    and the tilt at which a tip would touch the ground;
   * centre of gravity: where the battery must sit for the CG to be on the
     hub centre, and the take-off mass.
 
@@ -21,7 +23,8 @@ the tip-over angle on the feet; the compass's distance from the battery; the HaL
 top deck in both configurations) against the arms, propellers, GPS mast
 and launcher;
 and the flight impact (take-off mass, thrust-to-weight, hover throttle and
-flight time from the motor and propeller test data).
+flight time from the motor and propeller test data; the launcher
+configuration must reach a thrust-to-weight of TW_MIN).
 
 ``figures()`` renders the assembly-instruction images.
 """
@@ -30,17 +33,15 @@ import math
 from pathlib import Path
 
 from hardware.parts.aerodrone import _frame as F
-from hardware.parts.aerodrone._footprints import HaLowLink2, PololuD36V28F5
+from hardware.parts.aerodrone._footprints import HaLowLink2, PololuD36V28F5, TMotorAir40A
 from hardware.parts.common import fasteners
 from hardware.parts.common.footprints import (
     BenewakeTFminiS,
     BlueRoboticsNavigator,
     CarbonTube16,
-    Holybro2216KV920,
     HolybroM10GPS,
     LipoEnvelope4S,
     LuxonisOAK1,
-    Propeller1045,
     RaspberryPi5,
     SiliconeDamperBall,
 )
@@ -49,8 +50,8 @@ OVERLAP_TOLERANCE_MM3 = 0.5
 FOV_MARGIN_DEG = 2.0
 SCREW_SLACK = 0.02          # screw bodies are this much under nominal diameter
 CLIP_R = (176.0, 192.0)
-ESC_R = (118.0, 168.0)
-ESC_SIZE = (50.0, 22.0, 8.0)     # envelope, not a datasheet
+ESC_SIZE = TMotorAir40A.SIZE     # envelope from reseller listings
+ESC_R = (113.0, 113.0 + ESC_SIZE[0])   # under the tube, between the hub ear and the inner cable clip
 CARBON_DENSITY = 1.55            # g/cm3, roll-wrapped carbon tube
 
 # Pairs (name prefixes) that overlap on purpose.
@@ -63,8 +64,9 @@ PRESS_FITS = (
 
 # Masses of purchased parts (g) and where they come from.
 PURCHASED_MASS = {
-    "motor": (Holybro2216KV920.MASS_G, "reseller listing (unverified)"),
-    "prop": (Propeller1045.MASS_G, "T-Motor T1045 specification"),
+    "motor": (F.MOTOR.MASS_G, "T-Motor MN3510 KV700: 97 g without its cables, plus about 200 mm of its leads "
+                              "(estimate; 118 g with the full 600 mm)"),
+    "prop": (F.PROP.MASS_G, "T-Motor P12*4 specification"),
     "pi5": (RaspberryPi5.MASS_G, "typical (unverified)"),
     "heatsink": (BlueRoboticsNavigator.HEATSINK_MASS_G, "Blue Robotics"),
     "navigator": (BlueRoboticsNavigator.MASS_G, "Blue Robotics"),
@@ -72,10 +74,11 @@ PURCHASED_MASS = {
     "gps": (HolybroM10GPS.MASS_G, "Holybro"),
     "tfmini": (BenewakeTFminiS.MASS_G, "Benewake"),
     "battery": (LipoEnvelope4S.MASS_G, "design envelope"),
-    "esc": (25.0, "estimate for a 20-30 A ESC with leads"),
+    "esc": (TMotorAir40A.MASS_G, "T-Motor AIR 40A with its cables (reseller listings)"),
     "power_module": (20.0, "estimate"),
     "bec": (25.0, "estimate"),
-    "wiring_rc_telemetry": (125.0, "estimate: wiring, XT60, RC receiver, USB-UART, cables (no SiK radio: MAVLink over HaLow)"),
+    "wiring_rc_telemetry": (135.0, "estimate: wiring, XT90 and 10 AWG battery leads, RC receiver, USB-UART, cables "
+                                   "(no SiK radio: MAVLink over HaLow)"),
     "halow": (HaLowLink2.MASS_G, "Morse Micro HaLowLink 2 product brief (in its case)"),
     "halow_antenna": (HaLowLink2.ANTENNA_MASS_G, "estimate (the brief gives 66 g for the stand and the antenna)"),
     "halow_regulator": (PololuD36V28F5.MASS_G, "estimate (Pololu D36V28F5, weight not stated)"),
@@ -122,22 +125,22 @@ def _purchased():
         tube = cad.cyl(CarbonTube16.OD, tube_len, (F.TUBE_R0, 0, 0), (1, 0, 0)).cut(
             cad.cyl(CarbonTube16.ID, tube_len + 2, (F.TUBE_R0 - 1, 0, 0), (1, 0, 0)))
         add(f"arm_tube_{i}", _arm_place(tube, a), tube_mass)
-        # motor with four threaded holes on the 16 mm cross
-        motor = cad.cyl(Holybro2216KV920.DIAMETER, Holybro2216KV920.HEIGHT, (0, 0, F.MOTOR_SEAT_Z))
-        for ang in (0, 90, 180, 270):
-            hx, hy = cad.polar(Holybro2216KV920.MOUNT_PATTERN[0] / 2, ang)
+        # motor with four threaded holes on its 25 mm circle, in the mount's slots
+        from hardware.parts.aerodrone import motor_mount as MM
+        motor = cad.cyl(F.MOTOR.DIAMETER, F.MOTOR.HEIGHT, (0, 0, F.MOTOR_SEAT_Z))
+        for ang in MM.MOTOR_SLOT_ANGLES:
+            hx, hy = cad.polar(F.MOTOR.MOUNT_PCD / 2, ang)
             motor = motor.cut(cad.cyl(fasteners.MAJOR["M3"], 6.0, (hx, hy, F.MOTOR_SEAT_Z - 0.01)))
-            add(f"motor_screw_{i}_{ang}", _arm_place(
+            add(f"motor_screw_{i}_{ang:g}", _arm_place(
                 _screw((hx, hy, F.MOTOR_PLATE_Z[0]), (0, 0, 1), 8.0, "M3"), a, F.MOTOR_R),
                 PURCHASED_MASS["screw"][0])
         add(f"motor_{i}", _arm_place(motor, a, F.MOTOR_R), PURCHASED_MASS["motor"][0])
-        prop = cad.cyl(Propeller1045.DIAMETER, 3.0, (0, 0, F.PROP_Z))
+        prop = cad.cyl(F.PROP.DIAMETER, 3.0, (0, 0, F.PROP_Z))
         add(f"prop_{i}", _arm_place(prop, a, F.MOTOR_R), PURCHASED_MASS["prop"][0])
         esc = cad.box(ESC_R[0], ESC_R[1], -ESC_SIZE[1] / 2, ESC_SIZE[1] / 2,
                       -CarbonTube16.OD / 2 - ESC_SIZE[2] - 0.5, -CarbonTube16.OD / 2 - 0.5)
         add(f"esc_{i}", _arm_place(esc, a), PURCHASED_MASS["esc"][0])
         # pinch screws of the motor mount
-        from hardware.parts.aerodrone import motor_mount as MM
         for u in MM.PINCH_U:
             add(f"pinch_screw_{i}_{u:g}", _arm_place(
                 _screw((u, -MM.BODY_HALF_W, MM.PINCH_Z), (0, 1, 0), 25.0, "M3"), a, F.MOTOR_R),
@@ -415,7 +418,7 @@ def check(entries=None):
 
     prop_hits = []
     for i, a in enumerate(F.ARM_ANGLES):
-        disc = _arm_place(cad.cyl(Propeller1045.DIAMETER + 10.0, 12.0, (0, 0, F.PROP_Z - 3.0)), a, F.MOTOR_R)
+        disc = _arm_place(cad.cyl(F.PROP.DIAMETER + 10.0, 12.0, (0, 0, F.PROP_Z - 3.0)), a, F.MOTOR_R)
         db = disc.BoundingBox()
         for n, s, b in boxes:
             if n in (f"prop_{i}", f"motor_{i}") or not _bbox_overlap(db, b):
@@ -423,7 +426,23 @@ def check(entries=None):
             if s.intersect(disc).Volume() > OVERLAP_TOLERANCE_MM3:
                 prop_hits.append(f"prop {i}: {n}")
     report["propeller_clearance"] = prop_hits or "yes (5 mm radial, 3 mm below and 9 mm above the disc)"
-    base_ok = not overlaps and not in_view and not blocked and not prop_hits and tray_ok
+    tip_ok = F.PROP_TIP_GAP >= PROP_TIP_GAP_MIN
+    report["prop_tip_gap_mm"] = (f"{F.PROP_TIP_GAP:.0f} between adjacent {F.PROP.DIAMETER / 25.4:g} in propellers "
+                                 f"({F.ADJACENT_MOTOR_SPACING:.0f} mm between their motors; at least "
+                                 f"{PROP_TIP_GAP_MIN:.0f}, a tenth of the diameter)")
+    (gap, pair), over = propeller_gaps(bodies)
+    gap_ok = gap >= PROP_BODY_GAP_MIN
+    report["prop_body_gap_mm"] = f"{gap:.0f} from a propeller disc to the nearest other body ({pair}; at least {PROP_BODY_GAP_MIN:g})"
+    report["prop_overhang"] = over or "nothing within 100 mm above the propeller discs"
+    edge = BASE_FOOT_R / math.sqrt(2.0)
+    tip_over = math.degrees(math.atan2(edge - max(abs(cg[0]), abs(cg[1])), cg[2] - F.GROUND_Z))
+    strike = prop_strike_deg(BASE_FOOT_R, F.GROUND_Z)
+    report["prop_ground_strike_deg"] = (f"a propeller tip reaches the ground at {strike:.0f} deg of roll or pitch about two "
+                                        f"feet; the aircraft tips over at {tip_over:.0f} deg (propellers "
+                                        f"{F.PROP_Z - F.GROUND_Z:.0f} mm above the ground)")
+    strike_ok = strike > tip_over
+    base_ok = (not overlaps and not in_view and not blocked and not prop_hits and tray_ok and tip_ok and gap_ok
+               and strike_ok)
     lr = launcher_check(entries, base_mass_g=auw)
     report.update(lr)
     report["passed"] = bool(base_ok and lr["launcher_passed"])
@@ -451,20 +470,24 @@ PAYLOAD_MASS_G = {
     "regulator": (8.0, "estimate: Pololu D36V50F12, 25 x 25 mm board (weight not stated)"),
     "launcher_wiring": (25.0, "estimate: 12 V leads (20 AWG), fuse holder, servo bus and USB cables"),
 }
-# Motor and propeller test data: T-Motor AIR2216 II KV920 with the T1045
-# propeller at 16 V (Air Gear 450 II datasheet,
-# https://cdn.robotshop.com/media/T/Tmo/RB-Tmo-267/pdf/ligpower_airgear_450ii_combo_set_multi_rotor_uav_p_datasheet.pdf):
-# (throttle %, thrust g, current A). Holybro publishes no thrust table for its
-# 2216 KV920 (the BOM's motor, the same 2216/920 KV class); its X500 V2 page
-# gives "Payload 1500 g (without battery, 70% throttle)".
-THRUST_TABLE = ((30, 210, 1.44), (35, 259, 1.87), (40, 309, 2.29), (45, 373, 2.86), (50, 447, 3.60),
-                (55, 536, 4.53), (60, 628, 5.61), (65, 729, 6.78), (70, 814, 7.92), (75, 906, 9.20),
-                (80, 993, 10.59), (85, 1087, 12.11), (90, 1191, 13.81), (95, 1289, 15.68), (100, 1332, 16.37))
-PROP_THRUST_LIMIT_G = 1200.0       # T1045 "thrust limitation 1.2 kg" (same datasheet)
-TABLE_V = 16.0
+# Motor and propeller test data: T-Motor MN3510 KV700 with the T-MOTOR
+# 12*4CF propeller at 14.8 V, T-Motor's test table on the motor's page
+# (https://store.tmotor.com/product/mn3510-motor-navigator-type.html; the
+# U3 KV700's page gives the same table): (throttle %, thrust g, current A,
+# rpm). The propeller is sold as the P12*4 (TMotorP12x4).
+THRUST_TABLE = ((50, 580, 3.8, 5000), (65, 880, 7.4, 6300), (75, 1100, 10.3, 7300), (85, 1360, 14.0, 7700),
+                (100, 1600, 16.8, 8300))
+PROP_THRUST_LIMIT_G = F.PROP.THRUST_LIMIT_G   # P12*4 "thrust limitation 4kg"
+TABLE_V = 14.8                     # the table's voltage: the 4S pack's nominal 3.7 V per cell
+PACK_CELLS = 4
 PACK_MAH = 5000.0
 PACK_USABLE = 0.8
+CELL_V_FULL = 4.2                  # MOT_BAT_VOLT_MAX per cell (ArduPilot's tuning guide)
 AVIONICS_A = 1.1                   # 5 V rail 2.8 A typical (14 W) from the pack at ~15 V and 90 %, launcher servos idle
+TW_MIN = 2.0                       # the launcher configuration's thrust-to-weight floor (table maximum, 14.8 V)
+PROP_TIP_GAP_MIN = 0.1 * F.PROP.DIAMETER     # this design's rule for adjacent propeller tips
+PROP_BODY_GAP_MIN = 5.0            # propeller (3 mm disc) to any other body
+BASE_FOOT_R = 150.0                # landing leg foot centre along the arm (landing_leg.TENON)
 
 
 def turret_masses():
@@ -672,7 +695,7 @@ def halow_clearances(bodies):
     for label, prefixes in groups:
         d, _ = min_distance(ant, [(n, s) for n, s in bodies if n.startswith(prefixes)], limit=1e6)
         out.append(f"{label} {d:.0f}")
-    discs = [(f"disc_{i}", _arm_place(cad.cyl(Propeller1045.DIAMETER, 12.0, (0, 0, F.PROP_Z - 3.0)), a, F.MOTOR_R))
+    discs = [(f"disc_{i}", _arm_place(cad.cyl(F.PROP.DIAMETER, 12.0, (0, 0, F.PROP_Z - 3.0)), a, F.MOTOR_R))
              for i, a in enumerate(F.ARM_ANGLES)]
     d, _ = min_distance(ant, discs, limit=1e6)
     out.append(f"propeller discs {d:.0f}")
@@ -680,25 +703,91 @@ def halow_clearances(bodies):
 
 
 def interpolate_hover(thrust_g):
-    """(throttle %, current A) per motor at 16 V for this thrust, from THRUST_TABLE."""
+    """(throttle %, current A, rpm) per motor at TABLE_V for this thrust, from THRUST_TABLE."""
     pts = THRUST_TABLE
-    for (t0, g0, a0), (t1, g1, a1) in zip(pts, pts[1:]):
+    for (t0, g0, a0, r0), (t1, g1, a1, r1) in zip(pts, pts[1:]):
         if g0 <= thrust_g <= g1:
             f = (thrust_g - g0) / (g1 - g0)
-            return t0 + f * (t1 - t0), a0 + f * (a1 - a0)
-    return (None, None)
+            return t0 + f * (t1 - t0), a0 + f * (a1 - a0), r0 + f * (r1 - r0)
+    return (None, None, None)
+
+
+def max_thrust_g(volts):
+    """One motor's full-throttle thrust at this pack voltage: the table's
+    maximum scaled with the square of the voltage (rpm follows the voltage,
+    thrust the square of the rpm)."""
+    return THRUST_TABLE[-1][1] * (volts / TABLE_V) ** 2
 
 
 def flight_numbers(mass_g):
-    """Thrust-to-weight, hover throttle and current, flight time (16 V table)."""
+    """Thrust-to-weight, hover throttle, current and rotor frequency, flight
+    time (TABLE_V table), and the hover thrust as ArduPilot's MOT_THST_HOVER
+    sees it (a fraction of the full-pack thrust, with MOT_BAT_VOLT_MAX set)."""
     per_motor = mass_g / 4
-    thr, amps = interpolate_hover(per_motor)
+    thr, amps, rpm = interpolate_hover(per_motor)
     tw_table = 4 * THRUST_TABLE[-1][1] / mass_g
+    tw_16v = 4 * max_thrust_g(16.0) / mass_g
     tw_prop = 4 * PROP_THRUST_LIMIT_G / mass_g
     total_a = 4 * amps + AVIONICS_A
     minutes = PACK_MAH / 1000 * PACK_USABLE / total_a * 60
-    return {"tw_table": tw_table, "tw_prop": tw_prop, "hover_pct": thr, "hover_a": total_a, "minutes": minutes,
-            "hover_pct_14v8": thr * TABLE_V / 14.8}
+    thst_hover = per_motor / max_thrust_g(PACK_CELLS * CELL_V_FULL)
+    return {"tw_table": tw_table, "tw_16v": tw_16v, "tw_prop": tw_prop, "hover_pct": thr, "hover_a": total_a,
+            "minutes": minutes, "hover_rpm": rpm, "hover_hz": rpm / 60.0, "thst_hover": thst_hover}
+
+
+def prop_discs(diameter_extra=0.0, z0=None, height=3.0):
+    """[(i, disc)] for the four propellers (disc of the propeller's diameter
+    plus ``diameter_extra``, ``height`` tall from ``z0``, default the propeller's plane)."""
+    from hardware.parts.common import cad
+    z0 = F.PROP_Z if z0 is None else z0
+    return [(i, _arm_place(cad.cyl(F.PROP.DIAMETER + diameter_extra, height, (0, 0, z0)), a, F.MOTOR_R))
+            for i, a in enumerate(F.ARM_ANGLES)]
+
+
+PROP_NAMES = {45.0: "front left", 135.0: "rear left", -135.0: "rear right", -45.0: "front right"}
+
+
+def propeller_gaps(bodies):
+    """The propellers against everything else: the smallest distance from a
+    propeller disc to another body (its own motor and screws excepted), and
+    what overhangs a disc within 100 mm above it (the inflow side): the
+    vertical gap and how far in from the tip it reaches."""
+    from hardware.parts.common import cad
+
+    def own(n, i):
+        return n.startswith(("prop_", f"motor_screw_{i}_")) or n == f"motor_{i}"
+
+    best = (math.inf, None)
+    for i, d in prop_discs():
+        dist, pair = min_distance([(f"{PROP_NAMES[F.ARM_ANGLES[i]]} propeller", d)],
+                                  [(n, s) for n, s in bodies if not own(n, i)])
+        if dist < best[0]:
+            best = (dist, pair)
+    over = []
+    radius = F.PROP.DIAMETER / 2
+    for i, d in prop_discs(z0=F.PROP_Z + 3.0, height=100.0):
+        db = d.BoundingBox()
+        mx, my = cad.polar(F.MOTOR_R, F.ARM_ANGLES[i])
+        for n, s in bodies:
+            if own(n, i) or not _bbox_overlap(db, s.BoundingBox()):
+                continue
+            x = s.intersect(d)
+            if x.Volume() <= OVERLAP_TOLERANCE_MM3:
+                continue
+            gap = x.BoundingBox().zmin - (F.PROP_Z + 3.0)
+            inside = radius - min(math.hypot(v.X - mx, v.Y - my) for v in x.Vertices())
+            over.append((gap, f"{n} {gap:.0f} mm above the {PROP_NAMES[F.ARM_ANGLES[i]]} propeller's disc, reaching "
+                              f"{inside:.0f} mm in from its tip"))
+    over.sort()
+    return best, [t for _, t in over]
+
+
+def prop_strike_deg(foot_r, ground_z):
+    """Roll or pitch about the edge through two adjacent feet at which the
+    outermost propeller tip reaches the ground."""
+    edge = foot_r / math.sqrt(2.0)
+    tip = F.MOTOR_R / math.sqrt(2.0) + F.PROP.DIAMETER / 2
+    return math.degrees(math.atan2(F.PROP_Z - ground_z, tip - edge))
 
 
 def launcher_check(entries, base_mass_g=None):
@@ -769,7 +858,7 @@ def launcher_check(entries, base_mass_g=None):
     rx = F.RANGEFINDER_X
     beam = cad.cone(20.0, 20.0 + 2 * 1000 * math.tan(math.radians(2.0)), 1000.0,
                     (rx, 0, F.NOSE_Z[0] - BenewakeTFminiS.HEIGHT - 0.5), (0, 0, -1))
-    discs = [(i, _arm_place(cad.cyl(Propeller1045.DIAMETER + 10.0, 12.0, (0, 0, F.PROP_Z - 3.0)), a, F.MOTOR_R))
+    discs = [(i, _arm_place(cad.cyl(F.PROP.DIAMETER + 10.0, 12.0, (0, 0, F.PROP_Z - 3.0)), a, F.MOTOR_R))
              for i, a in enumerate(F.ARM_ANGLES)]
     in_view, blocked, prop_hits = [], [], []
     for label, conf in states.items():
@@ -789,6 +878,11 @@ def launcher_check(entries, base_mass_g=None):
     report["launcher_rangefinder_beam_clear"] = blocked or "yes"
     report["halow_antenna_clearance_mm"] = halow_clearances(full["bodies"])
     report["launcher_propeller_clearance"] = prop_hits or "yes"
+    (pgap, ppair), pover = propeller_gaps(full["bodies"])
+    report["launcher_prop_body_gap_mm"] = (f"{pgap:.0f} from a propeller disc to the nearest other body ({ppair}; at "
+                                           f"least {PROP_BODY_GAP_MIN:g})")
+    report["launcher_prop_overhang"] = pover or "nothing within 100 mm above the propeller discs"
+    prop_gap_ok = pgap >= PROP_BODY_GAP_MIN
 
     # the muzzle's view margin: how far the barrel's end is behind the view's rear edge
     muzzle_z = F.launcher_muzzle_z()
@@ -829,11 +923,13 @@ def launcher_check(entries, base_mass_g=None):
     low = min(((s.BoundingBox().zmin, n) for n, s in full["bodies"] if not n.startswith(("tall_leg_foot", "leg_tube"))))
     feet_r = F.TALL_LEG_FOOT_R / math.sqrt(2)
     tip = math.degrees(math.atan2(feet_r, cg_full[2] - ground))
+    strike = prop_strike_deg(F.TALL_LEG_FOOT_R, ground)
     report["launcher_ground_clearance_mm"] = (f"muzzle {muzzle_z - ground:.0f} above the ground on the feet (lowest point "
                                               f"{low[1]} at {low[0] - ground:.0f}); legs {F.BOT_Z[0] - ground:.0f} mm under "
                                               f"the hub, feet at (+-{feet_r:.0f}, +-{feet_r:.0f}); tip-over {tip:.0f} deg "
-                                              f"(CG {cg_full[2] - ground:.0f} mm above the ground)")
-    land_ok = low[0] - ground >= F.LAUNCHER_GROUND_CLEARANCE - 0.5 and not hits
+                                              f"(CG {cg_full[2] - ground:.0f} mm above the ground); a propeller tip reaches "
+                                              f"the ground at {strike:.0f} deg")
+    land_ok = low[0] - ground >= F.LAUNCHER_GROUND_CLEARANCE - 0.5 and not hits and strike > tip
 
     # compass: the GPS puck against the battery on the deck
     gps = (F.MAST_COLUMN_XY[0], F.MAST_COLUMN_XY[1], F.TOP_Z[1] + F.MAST_HEIGHT + HolybroM10GPS.V2[1] / 2)
@@ -854,13 +950,17 @@ def launcher_check(entries, base_mass_g=None):
         if not mass:
             continue
         f = flight_numbers(mass)
-        lines.append(f"{label} {mass:.0f} g: thrust-to-weight {f['tw_table']:.2f} (table maximum, 1332 g per motor) or "
-                     f"{f['tw_prop']:.2f} (T1045 rated 1.2 kg), hover {f['hover_pct']:.0f} % throttle at 16 V "
-                     f"(about {f['hover_pct_14v8']:.0f} % at 14.8 V), {f['hover_a']:.1f} A, about {f['minutes']:.1f} min "
-                     f"on {PACK_MAH:.0f} mAh to {100 * (1 - PACK_USABLE):.0f} % left")
+        lines.append(f"{label} {mass:.0f} g: thrust-to-weight {f['tw_table']:.2f} at {TABLE_V:g} V (table maximum, "
+                     f"{THRUST_TABLE[-1][1]} g per motor; {f['tw_16v']:.2f} at 16 V; the P12*4's 4 kg rating would allow "
+                     f"{f['tw_prop']:.1f}), hover {f['hover_pct']:.0f} % throttle, {f['hover_a']:.1f} A at {TABLE_V:g} V, "
+                     f"{f['hover_rpm']:.0f} rpm ({f['hover_hz']:.0f} Hz), MOT_THST_HOVER about {f['thst_hover']:.2f}, "
+                     f"about {f['minutes']:.1f} min on {PACK_MAH:.0f} mAh to {100 * (1 - PACK_USABLE):.0f} % left")
     report["flight_impact"] = lines
+    tw_ok = flight_numbers(mass_full)["tw_table"] >= TW_MIN
+    report["launcher_thrust_to_weight_ok"] = (f"{'yes' if tw_ok else 'NO'}: at least {TW_MIN:g} at {TABLE_V:g} V with a "
+                                              "full clip")
     report["launcher_passed"] = bool(cg_ok and not overlaps and not in_view and not blocked and not prop_hits and gap_ok
-                                     and land_ok and compass_ok)
+                                     and land_ok and compass_ok and prop_gap_ok and tw_ok)
     return report
 
 

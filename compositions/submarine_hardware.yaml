@@ -21,6 +21,10 @@ services:
         fcu_url:=${BLUEOS_FCU_URL:-tcp://127.0.0.1:5777}
 
   submarine_bridge:
+    # /sub0/sensor_measurements/*. The pressure is the external depth
+    # sensor's SCALED_PRESSURE2, decoded from MAVROS's raw MAVLink stream;
+    # without one, the Navigator's own barometer with a warning
+    # (config/bridge.yaml; systems/submarine/README.md, "Depth pressure").
     image: salsicha/cyberphysics:submarine-${CYBERPHYSICS_TAG:-arm64}
     container_name: submarine_bridge
     network_mode: host

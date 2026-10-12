@@ -1,0 +1,68 @@
+# Aerodrone HARDWARE-ONLY overlay: the printed aircraft's propulsion, battery
+# and vibration filtering. Load it on the aircraft after arducopter.params
+# and before arducopter_gps_input.params:
+#
+#   arducopter.params -> arducopter_hardware.params -> arducopter_gps_input.params
+#
+# NEVER layered by the simulators: applications/ardupilot_sitl/scripts/
+# run_arducopter_sitl.sh loads arducopter.params, arducopter_sitl.params,
+# arducopter_gps_input.params and the backend file only, so Gazebo and Isaac
+# keep their own vehicle models (Gazebo's MOT_THST_HOVER 0.67 in
+# arducopter.params, Isaac's 0.43) and fly exactly as before.
+#
+# Propulsion (hardware/aerodrone.md, "Airframe and propulsion"): T-Motor
+# MN3510 KV700 motors, T-Motor P12*4 propellers, T-Motor AIR 40A ESCs (PWM),
+# 4S 5000 mAh LiPo, Blue Robotics Power Sense Module. The numbers below come
+# from the assembly check's flight impact (hardware/parts/aerodrone/README.md,
+# "Checks") with T-Motor's MN3510 KV700 + 12*4CF test table at 14.8 V;
+# tests/test_ardupilot_param_validation.py keeps them consistent with it.
+#
+# Loading: INS_HNTCH_ENABLE and BATT_MONITOR create their parameter groups
+# only after a reboot. Load the file, reboot the autopilot (from BlueOS, or
+# `reboot` in MAVProxy), load it again, then load
+# arducopter_gps_input.params (systems/aerodrone/README.md). With MAVProxy
+# from the ground laptop:
+#   param load systems/aerodrone/config/arducopter_hardware.params
+#
+# Battery voltage compensation of the motor output: 4.2 V and 3.3 V per cell
+# (ArduPilot, "Setting the Aircraft Up for Tuning").
+MOT_BAT_VOLT_MAX,16.8
+MOT_BAT_VOLT_MIN,13.2
+# Hover thrust as a fraction of the full-pack thrust, without the launcher:
+# an initial value that ArduPilot refines in flight (MOT_HOVER_LEARN 2, learn
+# and save). With the foam dart launcher fitted start from 0.38 instead, and
+# relearn whenever the launcher goes on or comes off.
+MOT_THST_HOVER,0.31
+MOT_HOVER_LEARN,2
+# Blue Robotics Power Sense Module on the Navigator's POWER port (Blue
+# Robotics' scale factors; BlueOS normally sets them and the ADC pins).
+BATT_MONITOR,4
+BATT_VOLT_MULT,11.0
+BATT_AMP_PERVLT,37.8788
+BATT_AMP_OFFSET,0.330
+# 4S 5000 mAh pack. The flight times in hardware/aerodrone.md stop at 20 %
+# left (1000 mAh): RTL there, land at 10 %. Voltage thresholds use the
+# sag-compensated resting voltage.
+BATT_CAPACITY,5000
+BATT_ARM_VOLT,15.2
+BATT_LOW_VOLT,14.0
+BATT_CRT_VOLT,13.6
+BATT_LOW_MAH,1000
+BATT_CRT_MAH,500
+BATT_FS_VOLTSRC,1
+BATT_FS_LOW_ACT,2
+BATT_FS_CRT_ACT,1
+# Harmonic notch, throttle-based (the PWM ESCs report no rpm): just under the
+# motors' hover frequency without the launcher, about 5200 rpm (87 Hz) by
+# T-Motor's table, its first and second harmonics, half that width. With the
+# throttle it moves up to about 94 Hz in the launcher configuration's hover
+# (99 Hz by the table). A starting point: check it against the first flight's
+# FFT log (ArduPilot, "Managing Gyro Noise with the Dynamic Harmonic Notch
+# Filters") and keep INS_HNTCH_REF equal to the learned MOT_THST_HOVER.
+INS_HNTCH_ENABLE,1
+INS_HNTCH_MODE,1
+INS_HNTCH_REF,0.31
+INS_HNTCH_FREQ,85
+INS_HNTCH_BW,42
+INS_HNTCH_HMNCS,3
+INS_HNTCH_ATT,40

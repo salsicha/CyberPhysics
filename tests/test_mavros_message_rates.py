@@ -1,5 +1,5 @@
-"""The BlueOS airplane, boat and submarine stacks ask the autopilot for the
-MAVLink message rates their bridges and navigation need.
+"""The BlueOS Aerodrone, airplane, boat and submarine stacks keep asking the
+autopilot for the MAVLink message rates their bridges and navigation need.
 
 On a Raspberry Pi 5 Navigator under BlueOS, MAVROS's /mavros/imu/data and
 every other stream of these stacks ran at about 1 Hz: a fresh ArduPlane or
@@ -12,6 +12,10 @@ function) for the messages in systems/<platform>/config/message_rates.yaml,
 at start and again after a reconnect or an autopilot restart. Measured on
 the Pi: imu/data 1 -> 20 Hz (ArduPlane), 1 -> 10 Hz (ArduRover), and after
 an autopilot restart the rates came back within seconds.
+
+The Aerodrone's flight_ready asks for its rates once and exits, so an
+autopilot reboot mid-session left the drone at ArduCopter's own stream
+rates; its BlueOS stack now runs the same keeper with flight_ready's rates.
 """
 import itertools
 import json
@@ -34,8 +38,10 @@ from conftest import REPO, install_ros_stubs, load_script
 SCRIPTS = REPO / 'applications/aerostack2/scripts'
 KEEPER = SCRIPTS / 'mavros_message_rates.py'
 # platform: (composition, --env-file of its README run, rates service, MAVROS
-# service, bridge service, bridge parameter file)
+# service, the MAVROS client beside it (its bridge), bridge parameter file)
 STACKS = {
+    'aerodrone': ('aerodrone_hardware.yaml', None, 'aerodrone_message_rates', 'mavros',
+                  'aerostack', None),
     'airplane': ('airplane_hardware.yaml', 'systems/airplane/config/blueos.env',
                  'airplane_message_rates', 'mavros', 'airplane_bridge',
                  'systems/airplane/config/mavros_bridge.yaml'),
@@ -189,10 +195,12 @@ def rendered_services(composition, env_file):
             ['docker', 'compose', 'version'], capture_output=True).returncode:
         pytest.skip('Docker Compose is not installed')
     env = {key: value for key, value in os.environ.items()
-           if key not in ('COMPOSE_FILE', 'COMPOSE_ENV_FILES')}
+           if key not in ('COMPOSE_FILE', 'COMPOSE_ENV_FILES', 'BLUEOS_FCU_URL')}
+    args = ['docker', 'compose']
+    if env_file:
+        args += ['--env-file', str(REPO / env_file)]
     rendered = subprocess.run(
-        ['docker', 'compose', '--env-file', str(REPO / env_file),
-         '-f', str(REPO / 'compositions' / composition), 'config', '--format', 'json'],
+        args + ['-f', str(REPO / 'compositions' / composition), 'config', '--format', 'json'],
         env=env, check=True, capture_output=True, text=True)
     return json.loads(rendered.stdout)['services']
 
@@ -231,7 +239,7 @@ def test_each_hardware_stack_keeps_its_platform_rates(platform):
     assert rates['container_name'] == name
 
 
-@pytest.mark.parametrize('platform', sorted(STACKS))
+@pytest.mark.parametrize('platform', sorted(name for name in STACKS if STACKS[name][5]))
 def test_each_rates_file_covers_every_topic_its_bridge_mirrors(platform, keeper_module):
     """Every MAVROS topic the platform's mavros_mirror republishes is made
     from messages requested well above ArduPilot's 1 Hz default, the
@@ -258,6 +266,14 @@ def test_each_rates_file_covers_every_topic_its_bridge_mirrors(platform, keeper_
         'ATTITUDE', 'ATTITUDE_QUATERNION', 'RAW_IMU', 'LOCAL_POSITION_NED')}) == 1
     assert rates['VFR_HUD'] > ARDUPILOT_DEFAULT_HZ
     assert ('SCALED_PRESSURE' in rates) == bool(parameters.get('mirror_pressure'))
+    # The submarine's pressure is its external depth sensor's message
+    # (SCALED_PRESSURE2, decoded by the bridge), barometer 0 the fallback:
+    # both at one rate (tests/test_submarine_depth_pressure.py).
+    if parameters.get('pressure_source') == 'ardusub_depth_sensor':
+        depth = parameters['depth_sensor_message']
+        assert rates[depth] == rates['SCALED_PRESSURE'] >= NAVIGATION_MIN_HZ
+    else:
+        assert 'SCALED_PRESSURE2' not in rates
 
 
 def test_the_airplane_gets_the_rates_its_simulation_runs_at(modules):
@@ -272,6 +288,60 @@ def test_the_airplane_gets_the_rates_its_simulation_runs_at(modules):
     for message in ('ATTITUDE', 'ATTITUDE_QUATERNION', 'LOCAL_POSITION_NED'):
         identifier = keeper.MESSAGE_IDS[message]
         assert airplane[identifier] == ready.MESSAGE_RATES_HZ[identifier] == 20.0
+
+
+def test_the_aerodrone_keeps_the_rates_flight_ready_asks_for(modules):
+    """flight_ready (wait_for_mavros_navigation.py) still asks once, before
+    the map-goal tree starts, and exits; aerodrone_message_rates keeps the
+    same rates for the rest of the session, through autopilot reboots."""
+    ready, keeper = modules
+    rates = platform_rates(keeper, 'aerodrone')
+    assert rates == ready.MESSAGE_RATES_HZ
+    stack = yaml.safe_load((REPO / 'compositions/blueos_aerostack.yaml').read_text())
+    flight_ready = stack['services']['flight_ready']
+    assert 'wait_for_mavros_navigation.py' in flight_ready['command']
+    assert flight_ready['restart'] == 'no'
+    # The keeper watches imu/data at the 20 Hz both ask for.
+    assert keeper_with(keeper, rates, Autopilot()).attitude_rate_hz() == 20.0
+
+
+# BlueOS composition: (--env-file of its README run, the rate keepers it runs)
+BLUEOS_KEEPERS = {
+    'aerodrone_hardware.yaml': (None, {'aerodrone_message_rates'}),
+    'blueos_aerostack.yaml': (None, {'aerodrone_message_rates'}),
+    'blueos_drone.yaml': (None, {'aerodrone_message_rates'}),
+    'airplane_hardware.yaml': (STACKS['airplane'][1], {'airplane_message_rates'}),
+    'boat_hardware.yaml': (STACKS['boat'][1], {'boat_message_rates'}),
+    'submarine_hardware.yaml': (STACKS['submarine'][1], {'submarine_message_rates'}),
+    # Included by the drone and the airplane, each with its own keeper.
+    'blueos_nav_core.yaml': (None, set()),
+}
+
+
+@pytest.mark.parametrize('composition', sorted(BLUEOS_KEEPERS))
+def test_every_blueos_mavros_has_one_rate_keeper(composition):
+    """One keeper per MAVROS: the shared navigation core runs MAVROS for the
+    drone (blueos_aerostack.yaml) and the airplane, and each adds its own
+    rates; a keeper in the core would ask the airplane for the drone's."""
+    env_file, expected = BLUEOS_KEEPERS[composition]
+    services = rendered_services(composition, env_file)
+    keepers = {name for name, service in services.items()
+               if KEEPER.name in ' '.join(service.get('command') or [])}
+    assert keepers == expected
+    assert sum('apm.launch' in ' '.join(service.get('command') or [])
+               for service in services.values()) == 1
+
+
+@pytest.mark.parametrize('composition', ['aerostack2_sim.yaml', 'aerostack2_isaac.yaml'])
+def test_the_aerodrone_simulations_ask_once(composition):
+    """ArduCopter SITL starts with these stacks and nothing reboots it under
+    them, so flight_ready's one request holds. A keeper there would also
+    measure imu/data in wall-clock time and take a simulation running
+    slower than half real time for lost rates."""
+    services = yaml.safe_load((REPO / 'compositions' / composition).read_text())['services']
+    commands = {name: str(service.get('command', '')) for name, service in services.items()}
+    assert not any(KEEPER.name in command for command in commands.values())
+    assert 'wait_for_mavros_navigation.py' in commands['flight_ready']
 
 
 @pytest.mark.parametrize('platform', sorted(STACKS))

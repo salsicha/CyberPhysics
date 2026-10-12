@@ -4,10 +4,11 @@
 # applications/aerostack2/scripts/mavros_message_rates.py with this file: it
 # asks at start, after every MAVROS reconnect, and whenever /mavros/imu/data
 # falls below half its rate (an autopilot reboot, a ground station resetting
-# the streams). ArduSub's default stream rates (SR0_*) gave attitude at
-# 10 Hz but RAW_IMU, the pressure and GPS_RAW_INT at 2 Hz on BlueOS's link,
-# and a vehicle's stored SR0_* values may be lower. The intervals live in
-# the autopilot's RAM, for that link: no parameter is written.
+# the streams). ArduSub's default stream rates (MAV1_* on ArduSub 4.7,
+# SR0_* before) gave attitude at 10 Hz but RAW_IMU, the pressure and
+# GPS_RAW_INT at 2 Hz on BlueOS's link, and a vehicle's stored values may be
+# lower. The intervals live in the autopilot's RAM, for that link: no
+# parameter is written.
 #
 # MAVLink message name (or numeric id): rate in Hz.
 message_rates_hz:
@@ -28,12 +29,16 @@ message_rates_hz:
   # from the EKF's source (a DVL), z the depth. ArduSub sends it only once
   # the EKF has an origin.
   LOCAL_POSITION_NED: 10
-  # /mavros/imu/static_pressure -> /sub0/sensor_measurements/pressure (the
-  # mirror_pressure of bridge.yaml), at the odometry's rate. MAVROS makes it
-  # from SCALED_PRESSURE, the autopilot's barometer 0; it does not publish
-  # SCALED_PRESSURE2, where ArduSub reports an external depth sensor such as
-  # a Bar30 (README.md, "Telemetry rates").
+  # /sub0/sensor_measurements/pressure, at the odometry's rate: the bridge
+  # decodes SCALED_PRESSURE2, the external depth sensor (a Bar30 is
+  # ArduSub's barometer 1 on a Navigator), from MAVROS's raw MAVLink
+  # stream, and falls back to /mavros/imu/static_pressure, which MAVROS
+  # makes from SCALED_PRESSURE (barometer 0, the Navigator's own) when no
+  # depth sensor reports (README.md, "Depth pressure"). Both at one rate.
+  # Without a second barometer ArduSub accepts the request and sends no
+  # SCALED_PRESSURE2.
   SCALED_PRESSURE: 10
+  SCALED_PRESSURE2: 10
   # /mavros/global_position/global -> /sub0/sensor_measurements/gps (a
   # surface GPS, if fitted). MAVROS takes its fix status and covariance from
   # the latest GPS_RAW_INT. 5 Hz: a GPS receiver's default update rate on

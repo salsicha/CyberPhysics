@@ -1185,23 +1185,23 @@
    },
    "stl": "hardware/parts/aerodrone/stl/motor_mount.stl",
    "step": "generated/parts/aerodrone/motor_mount.step",
-   "volume_cm3": 25.29,
-   "area_cm2": 108.7,
+   "volume_cm3": 26.57,
+   "area_cm2": 116.4,
    "print_size_mm": [
-    69.0,
-    34.0,
+    72.9,
+    42.0,
     31.0
    ],
    "footprint_mm": [
-    69.0,
-    34.0
+    72.9,
+    42.0
    ],
-   "triangles": 2236,
+   "triangles": 2244,
    "estimate": {
-    "mass_g": 23.8,
-    "time_min": 46,
-    "mass_g_all": 95.3,
-    "time_min_all": 186
+    "mass_g": 25.1,
+    "time_min": 49,
+    "mass_g_all": 100.3,
+    "time_min_all": 194
    },
    "validation": {
     "passed": true,
@@ -1212,14 +1212,14 @@
     "min_wall_mm": 2.0,
     "min_wall_p1_mm": 2.0,
     "min_wall_required_mm": 1.2,
-    "bed_contact_mm2": 1750,
+    "bed_contact_mm2": 2069,
     "errors": []
    },
    "mates_with": [
     {
-     "part": "Holybro 2216 KV920 motor",
-     "dimensions": "four M3 holes on a 16 x 16 mm cross; slots reach 16 x 19 and 19 x 19 mm",
-     "source": "Holybro PX4 Development Kit X500 V2 specification (https://docs.holybro.com/drone-development-kit/px4-development-kit-x500v2.md): 'Holybro 2216 KV920 Motor', mounting pattern 16x16mm, 1045 propellers, 500 mm wheelbase, 16 mm carbon fiber tubes",
+     "part": "T-Motor MN3510 KV700 motor",
+     "dimensions": "four M3 holes on a 25 mm circle, 90 deg apart; the slots run from 19 to 25 mm; 41.8 mm can on a 42 mm seat",
+     "source": "T-Motor MN3510 KV360/KV630/KV700 product page (https://store.tmotor.com/product/mn3510-motor-navigator-type.html): KV700 'Motor Dimensions \u03a641.8\u00d728.5mm', 'Weight Excluding Cables 97g', 'Weight Including Cables 118g', 600 mm 18# cables, 'No.of Cells(Lipo) 3-4S', 'Max Continuous Current 180S 25A', 'Max Power (180S) 555W', 50 m\u03a9, 4 mm shaft; the page's drawing: base '4-M3 \u00d825', prop face '4-M3 \u00d812'; test data with the T-MOTOR 12*4CF propeller at 14.8 V (assembly.THRUST_TABLE)",
      "verified": true
     },
     {
@@ -1229,9 +1229,9 @@
      "verified": true
     },
     {
-     "part": "motor base: hole layout, thread depth, centre",
-     "dimensions": "the 16 x 16 mm pattern read as a cross (opposite holes 16 mm apart); M3 x 8 screws engage 4 mm through the 4 mm plate (check they stop short of the windings); 8.5 mm centre hole for the shaft end and circlip",
-     "source": "not in the Holybro specification: check on the motor",
+     "part": "motor base: thread depth, centre",
+     "dimensions": "M3 x 8 screws engage 4 mm through the 4 mm seat (check they stop short of the windings); 10 mm centre hole for the shaft end and circlip",
+     "source": "not dimensioned on T-Motor's page: check on the motor",
      "verified": false
     }
    ],
@@ -1244,9 +1244,9 @@
    ],
    "fasteners": [
     {
-     "item": "M3 x 8 socket head cap screw (or the motor's own screws)",
+     "item": "M3 x 8 socket head cap screw",
      "qty": 4,
-     "use": "motor to mount"
+     "use": "motor to mount (T-Motor's two M3 x 12 are for the propeller)"
     },
     {
      "item": "M3 x 25 socket head cap screw",
@@ -2034,16 +2034,12 @@
      "qty": 1
     },
     {
-     "id": "oak1_cradle",
-     "qty": 1
-    },
-    {
      "id": "motor_mount",
-     "qty": 3
+     "qty": 4
     }
    ],
-   "time_min": 354,
-   "mass_g": 188
+   "time_min": 381,
+   "mass_g": 202
   },
   {
    "name": "B",
@@ -2055,7 +2051,7 @@
      "qty": 1
     },
     {
-     "id": "motor_mount",
+     "id": "oak1_cradle",
      "qty": 1
     },
     {
@@ -2063,8 +2059,8 @@
      "qty": 4
     }
    ],
-   "time_min": 419,
-   "mass_g": 212
+   "time_min": 404,
+   "mass_g": 204
   },
   {
    "name": "C",
@@ -2199,36 +2195,49 @@
   "cg_mm": [
    -0.0,
    0.4,
-   1.0
+   2.6
   ],
-  "takeoff_mass_g": 2331,
+  "takeoff_mass_g": 2520,
   "bodies": 153,
   "interferences": "none",
   "intended_press_fits": 12,
   "camera_view_clear": "yes (69 x 55 deg + 2 deg margin)",
   "rangefinder_beam_clear": "yes",
   "propeller_clearance": "yes (5 mm radial, 3 mm below and 9 mm above the disc)",
+  "prop_tip_gap_mm": "49 between adjacent 12 in propellers (354 mm between their motors; at least 30, a tenth of the diameter)",
+  "prop_body_gap_mm": "12 from a propeller disc to the nearest other body (rear left propeller / top_deck; at least 5)",
+  "prop_overhang": [
+   "top_deck 16 mm above the rear left propeller's disc, reaching 17 mm in from its tip",
+   "top_deck 16 mm above the rear right propeller's disc, reaching 17 mm in from its tip"
+  ],
+  "prop_ground_strike_deg": "a propeller tip reaches the ground at 49 deg of roll or pitch about two feet; the aircraft tips over at 27 deg (propellers 252 mm above the ground)",
   "launcher_battery_on_deck_mm": "pack centre at x -35.8, y 0.1 for a centred CG with a full clip (the straps and the GPS mast allow x -46.2..-25.8)",
-  "launcher_cg_mm": "full clip (6 darts): (-0.0, -0.0, -5.2); empty clip: (0.1, 0.0, -4.7), battery not moved; tolerance 3 mm from the hub centre",
+  "launcher_cg_mm": "full clip (6 darts): (0.0, 0.0, -3.6); empty clip: (0.1, 0.0, -3.1), battery not moved; tolerance 3 mm from the hub centre",
   "launcher_bore_to_cg_mm": "0.00 (full clip), 0.07 (empty): the bore is the vertical line through the hub centre",
   "launcher_bodies": 240,
   "launcher_interferences": "none (cocked with a full clip, primed)",
   "launcher_camera_view_clear": "yes: launcher, hanger, tall legs and deck out of the OAK-1's 69 x 55 deg view + 2 deg, cocked and primed",
   "launcher_rangefinder_beam_clear": "yes",
-  "halow_antenna_clearance_mm": "vertical, from the HaLowLink's SMA on the top deck: arm tubes 107, GPS mast and puck 131, launcher 131, battery 85, propeller discs 71",
+  "halow_antenna_clearance_mm": "vertical, from the HaLowLink's SMA on the top deck: arm tubes 107, GPS mast and puck 131, launcher 131, battery 85, propeller discs 59",
   "launcher_propeller_clearance": "yes",
+  "launcher_prop_body_gap_mm": "12 from a propeller disc to the nearest other body (rear left propeller / top_deck; at least 5)",
+  "launcher_prop_overhang": [
+   "top_deck 16 mm above the rear left propeller's disc, reaching 17 mm in from its tip",
+   "top_deck 16 mm above the rear right propeller's disc, reaching 17 mm in from its tip"
+  ],
   "launcher_view_margin_mm": "the view's rear edge (with the margin) passes 7 mm in front of the barrel at the muzzle (227 mm below the lens)",
   "launcher_clearance_mm": "5.5 at the closest (launcher_collar_screw / hub_bottom_plate, primed): the launcher clears the airframe, legs, deck and sensors in both states",
   "launcher_mount_clearance_mm": "2.5 from the hanger and cam guide to the rest (launcher_hanger / sensor_nose)",
   "launcher_dart_path": "clear: a 14 mm path from the muzzle straight down to the ground meets nothing",
-  "launcher_ground_clearance_mm": "muzzle 50 above the ground on the feet (lowest point launcher_barrel at 50); legs 338 mm under the hub, feet at (+-230, +-230); tip-over 33 deg (CG 351 mm above the ground)",
+  "launcher_ground_clearance_mm": "muzzle 50 above the ground on the feet (lowest point launcher_barrel at 50); legs 338 mm under the hub, feet at (+-230, +-230); tip-over 33 deg (CG 353 mm above the ground); a propeller tip reaches the ground at 76 deg",
   "launcher_compass_to_battery_mm": "160 from the GPS/compass to the battery's centre (at least 150; run ArduPilot's compass-motor calibration)",
   "launcher_mass_g": "launcher 415 with a full clip (printed 261, two servos 110, spring, barrel, hardware, darts); the configuration adds +644 g in all (hanger, cam guide, deck, tall legs, servo adapter, regulator, wiring; less the tray and landing legs)",
-  "launcher_takeoff_mass_g": "2975 with a full clip, 2969 empty",
+  "launcher_takeoff_mass_g": "3165 with a full clip, 3159 empty",
   "flight_impact": [
-   "without the launcher 2331 g: thrust-to-weight 2.29 (table maximum, 1332 g per motor) or 2.06 (T1045 rated 1.2 kg), hover 58 % throttle at 16 V (about 62 % at 14.8 V), 21.4 A, about 11.2 min on 5000 mAh to 20 % left",
-   "with the launcher, full clip 2975 g: thrust-to-weight 1.79 (table maximum, 1332 g per motor) or 1.61 (T1045 rated 1.2 kg), hover 66 % throttle at 16 V (about 71 % at 14.8 V), 29.0 A, about 8.3 min on 5000 mAh to 20 % left"
+   "without the launcher 2520 g: thrust-to-weight 2.54 at 14.8 V (table maximum, 1600 g per motor; 2.97 at 16 V; the P12*4's 4 kg rating would allow 6.3), hover 53 % throttle, 18.7 A at 14.8 V, 5217 rpm (87 Hz), MOT_THST_HOVER about 0.31, about 12.8 min on 5000 mAh to 20 % left",
+   "with the launcher, full clip 3165 g: thrust-to-weight 2.02 at 14.8 V (table maximum, 1600 g per motor; 2.36 at 16 V; the P12*4's 4 kg rating would allow 5.1), hover 61 % throttle, 26.4 A at 14.8 V, 5915 rpm (99 Hz), MOT_THST_HOVER about 0.38, about 9.1 min on 5000 mAh to 20 % left"
   ],
+  "launcher_thrust_to_weight_ok": "yes: at least 2 at 14.8 V with a full clip",
   "launcher_passed": true,
   "passed": true
  }

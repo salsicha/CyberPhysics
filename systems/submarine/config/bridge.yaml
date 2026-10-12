@@ -3,7 +3,23 @@
     namespace: sub0
     mavros_namespace: /mavros
     mirror_pressure: true
+    # /sub0/sensor_measurements/pressure is the water pressure of ArduSub's
+    # external depth sensor (a Bar30 on the Navigator's I2C6 header is
+    # barometer 1, SCALED_PRESSURE2), decoded from MAVROS's raw MAVLink
+    # stream: MAVROS publishes only barometer 0, the Navigator's own
+    # barometer inside the enclosure. With no depth sensor reporting, the
+    # bridge publishes pressure_topic (barometer 0) and logs a warning.
+    # README.md, "Depth pressure".
+    pressure_source: ardusub_depth_sensor
+    depth_sensor_message: SCALED_PRESSURE2
+    depth_sensor_timeout_s: 5.0
     pressure_topic: /mavros/imu/static_pressure
+    # MAVROS 2's router hands every MAVLink message to its UAS node here
+    # (/uas<tgt_system>); sys_status says whether ArduSub has a depth sensor.
+    mavlink_source_topic: /uas1/mavlink_source
+    sys_status_topic: /mavros/sys_status
+    autopilot_system_id: 1
+    autopilot_component_id: 1
     enable_velocity_setpoints: false
     cmd_vel_topic: /sub0/cmd_vel
     mavros_velocity_topic: /mavros/setpoint_velocity/cmd_vel

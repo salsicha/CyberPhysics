@@ -30,8 +30,11 @@ def test_hardware_commands_use_consistent_vehicle_identity(namespace):
     services = json.loads(rendered.stdout)['services']
     vehicle = namespace or 'aerodrone'
     # Object tracking is opt-in (compositions/aerodrone_tracking.yaml): the
-    # `tracking` profile adds the tracker and nothing else to these 11.
-    assert len(services) == 11
+    # `tracking` profile adds the tracker and nothing else to these 12.
+    assert len(services) == 12
+    # flight_ready's telemetry rates, kept after it exits (an autopilot
+    # reboot mid-session forgets them): tests/test_mavros_message_rates.py.
+    assert 'mavros_message_rates.py' in ' '.join(services['aerodrone_message_rates']['command'])
     tracking = subprocess.run(
         ['docker', 'compose', '-f', str(REPO / 'compositions/aerodrone_hardware.yaml'),
          '--profile', 'tracking', 'config', '--format', 'json'],

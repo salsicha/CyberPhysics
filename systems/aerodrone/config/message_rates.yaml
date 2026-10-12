@@ -1,0 +1,34 @@
+# MAVLink message rates the Aerodrone keeps asking ArduCopter for (README.md,
+# "Telemetry rates"): the rates flight_ready
+# (applications/aerostack2/scripts/wait_for_mavros_navigation.py,
+# MESSAGE_RATES_HZ) asks for once before the mission tree starts, kept the
+# same here (a test compares them). The aerodrone_message_rates service of
+# compositions/blueos_aerostack.yaml (in aerodrone_hardware.yaml) runs
+# applications/aerostack2/scripts/mavros_message_rates.py with this file: it
+# asks at start, after every MAVROS reconnect, and whenever /mavros/imu/data
+# falls below half its rate. An autopilot reboot mid-session forgets the
+# intervals (they live in its RAM, for BlueOS's link; no parameter is
+# written), and flight_ready has exited by then.
+#
+# MAVLink message name (or numeric id): rate in Hz.
+message_rates_hz:
+  # /mavros/global_position/global (position from GLOBAL_POSITION_INT, fix
+  # status and covariance from the latest GPS_RAW_INT), which the
+  # Aerostack2 platform (as2_platform_blueos) republishes as the drone's
+  # GPS for DemNav and WildNav.
+  GPS_RAW_INT: 5
+  GLOBAL_POSITION_INT: 5
+  # Attitude: /mavros/imu/data (the platform's IMU) and the orientation of
+  # every local_position/odom message. MAVROS publishes imu/data from
+  # ATTITUDE_QUATERNION once it has seen one and from ATTITUDE before
+  # that, so both at one rate.
+  ATTITUDE: 20
+  ATTITUDE_QUATERNION: 20
+  # /mavros/local_position/odom: the odometry the platform republishes,
+  # which Aerostack2 flies on and DemNav and WildNav read.
+  LOCAL_POSITION_NED: 20
+  # /mavros/vfr_hud, /mavros/battery, and /mavros/extended_state, whose
+  # landed state the platform reads around takeoff.
+  VFR_HUD: 5
+  BATTERY_STATUS: 2
+  EXTENDED_SYS_STATE: 2

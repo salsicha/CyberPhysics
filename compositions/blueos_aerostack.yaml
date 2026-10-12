@@ -2,8 +2,8 @@
 #
 # The navigation core (MAVROS, OAK-1 MegaDepth, DemNav, WildNav,
 # rosbridge) lives in blueos_nav_core.yaml, whose defaults render exactly
-# this drone deployment; only the Aerostack2 autonomy, behavior tree, and
-# GUI services are drone-specific.
+# this drone deployment; only the Aerostack2 autonomy, behavior tree, GUI
+# and telemetry-rate services are drone-specific.
 
 include:
   - blueos_nav_core.yaml
@@ -59,6 +59,32 @@ services:
         --behavior-tree /workspace/install/share/as2_platform_blueos/resource/map_goal.xml
         --behavior-namespace /${DRONE_NAMESPACE:-drone0}
     restart: "no"
+
+  aerodrone_message_rates:
+    # flight_ready asks ArduCopter for its telemetry rates once and exits;
+    # an autopilot reboot mid-session forgets them. This keeps the same
+    # rates (systems/aerodrone/config/message_rates.yaml): at start, after
+    # every MAVROS reconnect, and when the attitude stream drops while
+    # MAVROS stays connected (systems/aerodrone/README.md, "Telemetry
+    # rates"). It sends only message interval commands: no parameter
+    # writes, modes or arming.
+    image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-arm64}
+    container_name: aerodrone_message_rates
+    network_mode: host
+    ipc: host
+    restart: unless-stopped
+    depends_on:
+      - mavros
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    volumes:
+      - ../applications/aerostack2/scripts:/workspace/applications/aerostack2/scripts:ro
+      - ../systems/aerodrone/config:/workspace/systems/aerodrone/config:ro
+      - /dev/shm:/dev/shm
+    command: >
+      python3 /workspace/applications/aerostack2/scripts/mavros_message_rates.py
+        --namespace /mavros
+        --rates /workspace/systems/aerodrone/config/message_rates.yaml
 
   behavior_tree:
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-arm64}

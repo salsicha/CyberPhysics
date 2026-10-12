@@ -2,8 +2,11 @@
 # on the aircraft. Pre-arm checks and the RC (throttle) and GCS failsafes stay
 # enabled; ArduPilot's default auto-disarm delay applies.
 #
-# Load arducopter_gps_input.params after it on the aircraft too (GPS-denied
-# corrections, ../README.md). Simulators layer it first, then the SITL-only
+# On the aircraft load arducopter_hardware.params after it (the printed
+# aircraft's propulsion, battery and harmonic notch, never loaded by the
+# simulators; it replaces the MOT_THST_HOVER below, which Gazebo's model
+# learned), then arducopter_gps_input.params (GPS-denied corrections,
+# ../README.md). Simulators layer this file first, then the SITL-only
 # relaxations in arducopter_sitl.params, then arducopter_gps_input.params
 # (unless GPS_INPUT_CORRECTIONS=false) and backend physics compensation
 # (applications/isaac/config/aerodrone_sitl.params); see
