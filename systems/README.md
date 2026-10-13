@@ -21,6 +21,7 @@ Data that is specific to one vehicle may also live with its system: `racecarneo/
 - `racecarneo/`: MIT RACECAR Neo configuration and calibration.
 - `racecar_turret/`: the RACECAR Neo with the PanTiltROS turret on a raised plate: its interface contract, combined URDF, turret tracker profiles, turret camera calibration and lidar mask (`hardware/racecar_turret.md`, `compositions/racecar_turret_hardware.yaml`).
 - `so101/`: SO-101 arm description and controller configuration.
+- `franka/`: PerAct language-conditioned reaching task configuration for Isaac.
 - `realsense/` and `blackfly/`: physical camera configuration.
 - `vinsmono/`: camera/IMU calibration for the VINS-Mono stack.
 - `components/`: compose fragments and opt-in overrides, layered onto a stack with an extra `-f` (for example `./start.sh blackfly -f systems/components/record-host-shutdown.yaml`); runnable stacks live in `compositions/`.

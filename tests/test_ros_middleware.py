@@ -13,6 +13,7 @@ from conftest import REPO
     'boat_hardware', 'submarine_hardware', 'racecar_turret_hardware',
     'racecar_turret_isaac', 'turret_hardware', 'turret_sim', 'turret_uno_q',
     'so101_smolvla_isaac', 'so101_groot_isaac', 'so101_gazebo',
+    'franka_peract_isaac',
     'spaceros', 'lunar_rover_sim', 'lunar_rover_hardware',
 ])
 @pytest.mark.parametrize('rmw', [None, 'rmw_fastrtps_cpp'])

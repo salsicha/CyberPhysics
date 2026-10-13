@@ -1,0 +1,6 @@
+{
+  "stiffness": [4000, 4000, 4000, 4000, 4000, 4000, 4000, 1000, 1000],
+  "damping": [200, 200, 200, 200, 200, 200, 200, 80, 80],
+  "minimum_trajectory_seconds": 2.0,
+  "joint_displacement_per_second": 0.5
+}

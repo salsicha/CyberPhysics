@@ -25,6 +25,8 @@ docker compose -f compositions/<stack>.yaml down --remove-orphans
 ## Examples
 
 `smolvla_workcell.yaml` runs the [learned SO-ARM100 contact workcell](../applications/smolvla/WORKCELL.md).
+`franka_peract_isaac.yaml` runs the [PerAct + Franka reaching demo](../applications/peract/README.md),
+with separate collection, training and simulation profiles.
 `arduino.yaml` runs [native Zenoh MCU routers](../applications/embedded_zenoh/README.md)
 after flashing the new firmware; `arduino_xrce.yaml` preserves the legacy DDS/XRCE demo.
 

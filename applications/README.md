@@ -43,7 +43,7 @@ hardware images and, in separate jobs, nvblox, pantiltros and depthanything.
 The latter verify ARM64 dependencies and CUDA-enabled binaries without
 a GPU; run `tools/jetson_gpu_smoke.sh` on the Jetson for GPU acceptance.
 The amd64 versions of those three GPU images, isaac, groot, turret_sim,
-smolvla, lerobot and matlab remain outside this build workflow. vinsmono
+smolvla, peract, lerobot and matlab remain outside this build workflow. vinsmono
 is built and smoke-tested by `ci.yml`. A new app needs its own build step.
 
 ## CAD Toolchain

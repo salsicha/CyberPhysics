@@ -1,0 +1,121 @@
+# PerAct predicts sparse reaching poses; Isaac executes them with Franka IK and joint trajectories.
+# Run: ./start.sh franka_peract_isaac --profile sim
+name: franka_peract_isaac
+x-isaac: &isaac
+  image: salsicha/cyberphysics:isaac-${CYBERPHYSICS_TAG:-latest}
+  env_file: [../systems/ros2/middleware.env]
+  network_mode: host
+  ipc: host
+  gpus: all
+  environment:
+    ACCEPT_EULA: Y
+    PRIVACY_CONSENT: ${PRIVACY_CONSENT:-Y}
+    NVIDIA_DRIVER_CAPABILITIES: graphics,utility,compute
+    DISPLAY: ${DISPLAY:-:0}
+    XAUTHORITY: /isaac-sim/.xauth/Xauthority
+    PERACT_HEADLESS: ${PERACT_HEADLESS:-false}
+    ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
+    PYTHONDONTWRITEBYTECODE: "1"
+  volumes:
+    - /tmp/.X11-unix:/tmp/.X11-unix:ro
+    - peract_xauth:/isaac-sim/.xauth:ro
+    - peract_isaac_cache:/isaac-sim/.cache
+    - peract_kit_cache:/isaac-sim/kit/cache
+    - ../applications/peract/scripts:/workspace/peract_scripts:ro
+    - ../systems:/workspace/systems:ro
+    - ${PERACT_RESULTS_DIR:-../generated/peract}:/workspace/results
+  entrypoint: [/workspace/applications/isaac/scripts/with_ros.sh]
+
+services:
+  init:
+    profiles: [sim, collect, train]
+    image: salsicha/cyberphysics:isaac-${CYBERPHYSICS_TAG:-latest}
+    network_mode: none
+    user: "0:0"
+    volumes:
+      - ${XAUTHORITY:-/tmp/.Xauthority}:/host.Xauthority:ro
+      - peract_xauth:/xauth
+      - peract_isaac_cache:/cache
+      - peract_kit_cache:/kit
+      - peract_training_cache:/training-cache
+      - ${PERACT_RESULTS_DIR:-../generated/peract}:/results
+    entrypoint: [/bin/bash, -ec]
+    command:
+      - |
+        if [ -f /host.Xauthority ]; then cp /host.Xauthority /xauth/Xauthority; chmod 0600 /xauth/Xauthority; else rm -f /xauth/Xauthority; fi
+        chown -R 1234:1234 /xauth
+        mkdir -p /results/training /results/trained /results/evaluation
+        chown 1234:1234 /cache /kit /training-cache /results /results/training /results/trained /results/evaluation
+    restart: "no"
+
+  peract_policy:
+    profiles: [sim]
+    image: salsicha/cyberphysics:peract-${CYBERPHYSICS_TAG:-latest}
+    build: ../applications/peract
+    network_mode: host
+    gpus: all
+    user: "1234:1234"
+    volumes:
+      - ../applications/peract/scripts:/workspace/peract_scripts:ro
+      - ${PERACT_MODEL_DIR:-../generated/peract/trained}:/workspace/models:ro
+    command: >
+      python /workspace/peract_scripts/policy_server.py
+      --checkpoint /workspace/models/peract_reach.pt
+      --port ${PERACT_PORT:-5562}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:${PERACT_PORT:-5562}/health', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      start_period: 60s
+      retries: 5
+
+  isaacsim:
+    <<: *isaac
+    profiles: [sim]
+    depends_on:
+      init: {condition: service_completed_successfully}
+      peract_policy: {condition: service_healthy}
+    command: >
+      ./python.sh /workspace/peract_scripts/isaac_franka.py
+      --config /workspace/systems/franka/config/peract_reach.json
+      --output /workspace/results/evaluation
+      --seed ${PERACT_SEED:-9876}
+      --episodes ${PERACT_EPISODES:-20}
+      --policy-url http://127.0.0.1:${PERACT_PORT:-5562}
+
+  collect:
+    <<: *isaac
+    profiles: [collect]
+    depends_on:
+      init: {condition: service_completed_successfully}
+    command: >
+      ./python.sh /workspace/peract_scripts/isaac_franka.py
+      --config /workspace/systems/franka/config/peract_reach.json
+      --mode collect --headless --seed 123 --samples ${PERACT_TRAIN_SCENES:-256}
+      --output /workspace/results/training
+
+  train:
+    profiles: [train]
+    image: salsicha/cyberphysics:peract-${CYBERPHYSICS_TAG:-latest}
+    build: ../applications/peract
+    user: "1234:1234"
+    gpus: all
+    depends_on:
+      init: {condition: service_completed_successfully}
+    volumes:
+      - ../applications/peract/scripts:/workspace/peract_scripts:ro
+      - ../systems:/workspace/systems:ro
+      - ${PERACT_RESULTS_DIR:-../generated/peract}:/workspace/results
+      - peract_training_cache:/workspace/cache
+    command: >
+      python /workspace/peract_scripts/train.py
+      --config /workspace/systems/franka/config/peract_reach.json
+      --dataset /workspace/results/training/dataset.npz
+      --output /workspace/results/trained/peract_reach.pt
+      --steps ${PERACT_TRAIN_STEPS:-3000}
+
+volumes:
+  peract_xauth:
+  peract_isaac_cache:
+  peract_kit_cache:
+  peract_training_cache:

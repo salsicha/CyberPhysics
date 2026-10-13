@@ -64,6 +64,10 @@ docker compose -f compositions/racecarneo.yaml up
 
 That stack runs the headless MIT RACECAR Neo simulator, publishes ROS 2 camera/lidar/IMU/odometry topics, estimates metric monocular depth with Depth Anything, builds nvblox TSDF/ESDF slices, runs Nav2, and serves a NiceGUI waypoint interface at `http://localhost:8080`.
 
+For a language-conditioned arm demo, see [PerAct with Franka in Isaac](applications/peract/README.md).
+It follows the same application/system/composition split and includes local
+data collection, training and evaluation profiles.
+
 ## Observe ROS Data
 
 Foxglove can be launched through a compose stack or on the host:

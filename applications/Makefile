@@ -67,6 +67,8 @@ build_isaac:
 	APP=isaac ./_build_it.sh
 build_groot:
 	APP=groot ./_build_it.sh
+build_peract:
+	APP=peract ./_build_it.sh
 build_smolvla:
 	APP=smolvla ./_build_it.sh
 build_smolvla_workcell: build_smolvla
