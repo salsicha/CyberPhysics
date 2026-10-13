@@ -1,0 +1,48 @@
+{
+  "passed": true,
+  "transport": "serial",
+  "rmw": "rmw_zenoh_cpp",
+  "domain": 81,
+  "bidirectional_tests": [
+    {
+      "value": 1,
+      "name": "Alice",
+      "passed": true
+    },
+    {
+      "value": 0,
+      "name": "Bob",
+      "passed": true
+    },
+    {
+      "value": -1,
+      "name": "Zo\u00eb",
+      "passed": true
+    },
+    {
+      "value": -2147483648,
+      "name": "min",
+      "passed": true
+    },
+    {
+      "value": 2147483647,
+      "name": "max",
+      "passed": true
+    },
+    {
+      "value": 7,
+      "name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "passed": true
+    }
+  ],
+  "router_restart": true,
+  "mcu_restart": true,
+  "oversized_string_rejected": true,
+  "hardware_test": false,
+  "router_recovery_s": 2.2663411621470004,
+  "routed": true,
+  "serial_router_recovery_s": 10.278819329105318,
+  "malformed_cdr_rejected": true,
+  "big_endian_cdr": true,
+  "image": "sha256:ee2a14535a94c50b8a1c818f3c33c0354583555d1a8d36a4be744786abad3f29"
+}

@@ -33,6 +33,11 @@ Follow-up audit records:
 
 See the [complete request ledger](../../task_completion_20261012.md).
 
+The subsequent [VLA and embedded Zenoh report](../../vla_embedded_validation_20261012.md)
+uses `arm_workcell_contact.json`, `embedded_zenoh_tcp.json`,
+`embedded_zenoh_serial.json` and `embedded_zenoh_builds.json` in this directory.
+It preserves failed VLA acceptance as well as successful MCU protocol checks.
+
 Turret `summary.yolo_contract` retains the acceptance scenario's original
 reference-model settings. Each follow-up wrapper records the checkpoint and
 confidence actually used, plus hashes of the bind-mounted runtime source.

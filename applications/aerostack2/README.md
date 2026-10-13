@@ -393,7 +393,7 @@ DemNav, WildNav, OAK-1, boat and submarine descendants together.
 
 Every ROS service loads `systems/ros2/middleware.env`. Local/LAN peer discovery
 works without a separate router; see the [middleware guide](../../systems/ros2/README.md)
-for routed networks, migration and the micro-ROS exception. ROS domain IDs
+for routed networks, migration and the native MCU firmware path. ROS domain IDs
 still isolate vehicles. MAVLink between MAVROS and the autopilot is unchanged.
 
 The existing Fast DDS profiles remain for an explicit DDS fallback. Their

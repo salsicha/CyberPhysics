@@ -1,0 +1,3716 @@
+{
+  "model": "ahmedsohail2003/smolvla-so101-pickplace-v2",
+  "revision": "f43f9f3a1c81b050f9747919c53019fcae2caec0",
+  "environment_revision": "5822ac1dd508c92183fd8ecc99f91d6ec386549b",
+  "robot": "MuJoCo Menagerie SO-ARM100; not the SO101 Isaac URDF",
+  "model_sha256": "e9cf64d37dba15549a2ec6ea6a996ecb78035340b79c106da5b98d96b88f066b",
+  "mujoco": "3.10.0",
+  "torch": "2.11.0+cu126",
+  "seed": 123,
+  "action_horizon": 50,
+  "gpu": "NVIDIA RTX 4000 Ada Generation Laptop GPU",
+  "wall_seconds": 246.13094818708487,
+  "ground_truth_to_policy": false,
+  "scripted_fallback": false,
+  "grasp_model": "free rigid body, friction and force-limited jaw contacts; no attachment",
+  "policy_observations": [
+    "front RGB",
+    "wrist RGB",
+    "joint angles",
+    "instruction"
+  ],
+  "peak_allocated_mib": 920.0693359375,
+  "peak_reserved_mib": 956.0,
+  "latency_p50_ms": 2.5180430384352803,
+  "latency_p95_ms": 2.968252555001527,
+  "fresh_chunk_latency_p50_ms": 125.42326399125159,
+  "fresh_chunk_latency_p95_ms": 130.5165900848806,
+  "fresh_chunks": 521,
+  "language_scope": "One trained task; paraphrases do not establish instruction following for other tasks",
+  "scenarios": {
+    "full": {
+      "successes": 10,
+      "episodes": 20,
+      "success_rate": 0.5,
+      "collision_free_successes": 0
+    },
+    "nominal": {
+      "successes": 14,
+      "episodes": 20,
+      "success_rate": 0.7,
+      "collision_free_successes": 0
+    },
+    "occlusion": {
+      "successes": 14,
+      "episodes": 20,
+      "success_rate": 0.7,
+      "collision_free_successes": 0
+    },
+    "paraphrase": {
+      "successes": 18,
+      "episodes": 20,
+      "success_rate": 0.9,
+      "collision_free_successes": 0
+    },
+    "perturbation": {
+      "successes": 15,
+      "episodes": 20,
+      "success_rate": 0.75,
+      "collision_free_successes": 0
+    },
+    "physics": {
+      "successes": 17,
+      "episodes": 20,
+      "success_rate": 0.85,
+      "collision_free_successes": 0
+    },
+    "visual": {
+      "successes": 9,
+      "episodes": 20,
+      "success_rate": 0.45,
+      "collision_free_successes": 0
+    }
+  },
+  "nominal_task_acceptance_passed": false,
+  "evaluated_robustness_acceptance_passed": false,
+  "collision_free_acceptance_passed": false,
+  "passed": false,
+  "episodes": [
+    {
+      "scenario": "nominal",
+      "episode": 0,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 112,
+      "simulation_seconds": 7.391999999999408,
+      "final_xyz": [
+        -0.17797867011766946,
+        -0.13139299076438848,
+        0.017999947532828915
+      ],
+      "max_lift_m": 0.07001696352632147,
+      "bilateral_lift_m": 0.07001696352632147,
+      "bilateral_contact_steps": 1647,
+      "contact_events": {
+        "object_support": 12,
+        "robot_environment": 7,
+        "jaw_block": 23
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 512.1573793288609,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "nominal",
+      "episode": 1,
+      "success": false,
+      "stable_placement": false,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 240,
+      "simulation_seconds": 15.84000000000196,
+      "final_xyz": [
+        0.05038502775011256,
+        -0.2590063933420357,
+        0.011999947532828922
+      ],
+      "max_lift_m": 0.05162445527970387,
+      "bilateral_lift_m": 0.0516159967610053,
+      "bilateral_contact_steps": 819,
+      "contact_events": {
+        "object_support": 17,
+        "jaw_block": 30
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 1185.7759779587907,
+      "joint_limit_steps": 0,
+      "clipped_commands": 12
+    },
+    {
+      "scenario": "nominal",
+      "episode": 2,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 114,
+      "simulation_seconds": 7.523999999999393,
+      "final_xyz": [
+        -0.17669439748898064,
+        -0.13563151659826497,
+        0.0179999475328289
+      ],
+      "max_lift_m": 0.0701626176165999,
+      "bilateral_lift_m": 0.0701626176165999,
+      "bilateral_contact_steps": 1664,
+      "contact_events": {
+        "object_support": 11,
+        "robot_environment": 8,
+        "jaw_block": 8
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 732.461594096987,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "nominal",
+      "episode": 3,
+      "success": false,
+      "stable_placement": false,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 240,
+      "simulation_seconds": 15.84000000000196,
+      "final_xyz": [
+        0.09343037308601139,
+        -0.16026592538323917,
+        0.011999947532828905
+      ],
+      "max_lift_m": 0.0049622076634473836,
+      "bilateral_lift_m": 0.001695307417014921,
+      "bilateral_contact_steps": 23,
+      "contact_events": {
+        "object_support": 48,
+        "jaw_block": 147,
+        "robot_environment": 43
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 244.44069863411215,
+      "joint_limit_steps": 0,
+      "clipped_commands": 4
+    },
+    {
+      "scenario": "nominal",
+      "episode": 4,
+      "success": false,
+      "stable_placement": false,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 240,
+      "simulation_seconds": 15.84000000000196,
+      "final_xyz": [
+        -0.026884765842850055,
+        -0.20402382547030262,
+        0.011999947532828936
+      ],
+      "max_lift_m": 0.006099799624484054,
+      "bilateral_lift_m": 0.0012372076201376172,
+      "bilateral_contact_steps": 240,
+      "contact_events": {
+        "object_support": 52,
+        "jaw_block": 105,
+        "robot_environment": 28
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 632.8464735119541,
+      "joint_limit_steps": 0,
+      "clipped_commands": 12
+    },
+    {
+      "scenario": "nominal",
+      "episode": 5,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 113,
+      "simulation_seconds": 7.457999999999401,
+      "final_xyz": [
+        -0.17893230855896403,
+        -0.12915656121556715,
+        0.01799836553026549
+      ],
+      "max_lift_m": 0.07037957209951946,
+      "bilateral_lift_m": 0.07037957209951946,
+      "bilateral_contact_steps": 1696,
+      "contact_events": {
+        "object_support": 12,
+        "robot_environment": 11,
+        "jaw_block": 6
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 722.8263344317133,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "nominal",
+      "episode": 6,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 111,
+      "simulation_seconds": 7.325999999999415,
+      "final_xyz": [
+        -0.17310135901974663,
+        -0.13787530281444932,
+        0.01799994753282849
+      ],
+      "max_lift_m": 0.07048894720895371,
+      "bilateral_lift_m": 0.07048894720895371,
+      "bilateral_contact_steps": 1664,
+      "contact_events": {
+        "object_support": 6,
+        "robot_environment": 5,
+        "jaw_block": 24
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 731.8269301360638,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "nominal",
+      "episode": 7,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 113,
+      "simulation_seconds": 7.457999999999401,
+      "final_xyz": [
+        -0.18099873428051103,
+        -0.13238935840341165,
+        0.0179999475328289
+      ],
+      "max_lift_m": 0.07034369442487376,
+      "bilateral_lift_m": 0.07034369442487376,
+      "bilateral_contact_steps": 1653,
+      "contact_events": {
+        "object_support": 22,
+        "robot_environment": 8,
+        "jaw_block": 16
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 530.3334910900012,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "nominal",
+      "episode": 8,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 111,
+      "simulation_seconds": 7.325999999999415,
+      "final_xyz": [
+        -0.1785906796595309,
+        -0.1355085027119461,
+        0.01794094501070325
+      ],
+      "max_lift_m": 0.0688506109632058,
+      "bilateral_lift_m": 0.0688506109632058,
+      "bilateral_contact_steps": 1643,
+      "contact_events": {
+        "object_support": 14,
+        "robot_environment": 8,
+        "jaw_block": 31
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 817.5440870780681,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "nominal",
+      "episode": 9,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 112,
+      "simulation_seconds": 7.391999999999408,
+      "final_xyz": [
+        -0.1810383887951482,
+        -0.1398064632135894,
+        0.01799994753282892
+      ],
+      "max_lift_m": 0.07057144262442101,
+      "bilateral_lift_m": 0.07057144262442101,
+      "bilateral_contact_steps": 1665,
+      "contact_events": {
+        "object_support": 12,
+        "jaw_block": 18,
+        "robot_environment": 4
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 974.4555671547522,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "nominal",
+      "episode": 10,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 113,
+      "simulation_seconds": 7.457999999999401,
+      "final_xyz": [
+        -0.17954661757235574,
+        -0.1298315354325762,
+        0.017999947532828898
+      ],
+      "max_lift_m": 0.07126141947161262,
+      "bilateral_lift_m": 0.07126141947161262,
+      "bilateral_contact_steps": 1667,
+      "contact_events": {
+        "object_support": 16,
+        "robot_environment": 13,
+        "jaw_block": 4
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 977.5313382547198,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "nominal",
+      "episode": 11,
+      "success": false,
+      "stable_placement": false,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 240,
+      "simulation_seconds": 15.84000000000196,
+      "final_xyz": [
+        0.03949477052657565,
+        -0.29483915828860796,
+        0.01199994753282891
+      ],
+      "max_lift_m": 0.005461392292384584,
+      "bilateral_lift_m": 0.0,
+      "bilateral_contact_steps": 0,
+      "contact_events": {
+        "object_support": 41,
+        "jaw_block": 45,
+        "robot_environment": 48
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 154.09198404423847,
+      "joint_limit_steps": 0,
+      "clipped_commands": 2
+    },
+    {
+      "scenario": "nominal",
+      "episode": 12,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 112,
+      "simulation_seconds": 7.391999999999408,
+      "final_xyz": [
+        -0.17495041744074363,
+        -0.12978254059588248,
+        0.017999947532828915
+      ],
+      "max_lift_m": 0.06988490235865841,
+      "bilateral_lift_m": 0.06988490235865841,
+      "bilateral_contact_steps": 1663,
+      "contact_events": {
+        "object_support": 9,
+        "robot_environment": 8,
+        "jaw_block": 3
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 824.7303806784195,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "nominal",
+      "episode": 13,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 111,
+      "simulation_seconds": 7.325999999999415,
+      "final_xyz": [
+        -0.1775444216554093,
+        -0.13112405046049466,
+        0.017999947532828915
+      ],
+      "max_lift_m": 0.07316795447737609,
+      "bilateral_lift_m": 0.07316795447737609,
+      "bilateral_contact_steps": 1662,
+      "contact_events": {
+        "object_support": 9,
+        "robot_environment": 11,
+        "jaw_block": 8
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 853.7063790225372,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "nominal",
+      "episode": 14,
+      "success": false,
+      "stable_placement": false,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 240,
+      "simulation_seconds": 15.84000000000196,
+      "final_xyz": [
+        -0.021851509889313222,
+        -0.26472581361057357,
+        0.014656972460453598
+      ],
+      "max_lift_m": 0.0067979910029189045,
+      "bilateral_lift_m": 0.0037653028263862527,
+      "bilateral_contact_steps": 7,
+      "contact_events": {
+        "object_support": 47,
+        "jaw_block": 84
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 548.2881819474187,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "nominal",
+      "episode": 15,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 113,
+      "simulation_seconds": 7.457999999999401,
+      "final_xyz": [
+        -0.18014787065997398,
+        -0.1412239812780394,
+        0.017963393781937707
+      ],
+      "max_lift_m": 0.07023184427210431,
+      "bilateral_lift_m": 0.07023184427210431,
+      "bilateral_contact_steps": 1664,
+      "contact_events": {
+        "object_support": 10,
+        "robot_environment": 8,
+        "jaw_block": 11
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 814.5229219409903,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "nominal",
+      "episode": 16,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 113,
+      "simulation_seconds": 7.457999999999401,
+      "final_xyz": [
+        -0.17462642206052525,
+        -0.1364909102711901,
+        0.017999947532828915
+      ],
+      "max_lift_m": 0.07034483250429813,
+      "bilateral_lift_m": 0.07034483250429813,
+      "bilateral_contact_steps": 1665,
+      "contact_events": {
+        "object_support": 12,
+        "robot_environment": 8,
+        "jaw_block": 25
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 688.6944378956097,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "nominal",
+      "episode": 17,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 112,
+      "simulation_seconds": 7.391999999999408,
+      "final_xyz": [
+        -0.17748638848138165,
+        -0.13726639184575268,
+        0.017994241500579013
+      ],
+      "max_lift_m": 0.0700707200862481,
+      "bilateral_lift_m": 0.0700707200862481,
+      "bilateral_contact_steps": 1665,
+      "contact_events": {
+        "object_support": 22,
+        "robot_environment": 13,
+        "jaw_block": 30
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 827.3820270738556,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "nominal",
+      "episode": 18,
+      "success": false,
+      "stable_placement": false,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 240,
+      "simulation_seconds": 15.84000000000196,
+      "final_xyz": [
+        0.1479767752148221,
+        -0.21910751396673867,
+        0.011999947532828936
+      ],
+      "max_lift_m": 0.007758254273618981,
+      "bilateral_lift_m": 0.0073309789976576945,
+      "bilateral_contact_steps": 112,
+      "contact_events": {
+        "object_support": 39,
+        "jaw_block": 80,
+        "robot_environment": 23
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 504.5668778681664,
+      "joint_limit_steps": 0,
+      "clipped_commands": 27
+    },
+    {
+      "scenario": "nominal",
+      "episode": 19,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 111,
+      "simulation_seconds": 7.325999999999415,
+      "final_xyz": [
+        -0.17734961552778283,
+        -0.13413644569791597,
+        0.0179999475328289
+      ],
+      "max_lift_m": 0.07294192170398978,
+      "bilateral_lift_m": 0.07294192170398978,
+      "bilateral_contact_steps": 1654,
+      "contact_events": {
+        "object_support": 7,
+        "robot_environment": 9,
+        "jaw_block": 10
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 607.7921453407938,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "visual",
+      "episode": 0,
+      "success": false,
+      "stable_placement": false,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 240,
+      "simulation_seconds": 15.84000000000196,
+      "final_xyz": [
+        -0.07563454126802098,
+        -0.2300569444132083,
+        0.011999947532828905
+      ],
+      "max_lift_m": 0.06569522480501205,
+      "bilateral_lift_m": 0.06567539616821216,
+      "bilateral_contact_steps": 670,
+      "contact_events": {
+        "object_support": 13,
+        "robot_environment": 72,
+        "jaw_block": 8
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 649.5565396085523,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "visual",
+      "episode": 1,
+      "success": false,
+      "stable_placement": false,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 240,
+      "simulation_seconds": 15.84000000000196,
+      "final_xyz": [
+        0.11436483090130026,
+        -0.22126620563748384,
+        0.011999947532828912
+      ],
+      "max_lift_m": 0.005570044802470413,
+      "bilateral_lift_m": 0.005299967421479684,
+      "bilateral_contact_steps": 190,
+      "contact_events": {
+        "object_support": 58,
+        "jaw_block": 118,
+        "robot_environment": 36
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 624.4173927118384,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "visual",
+      "episode": 2,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 175,
+      "simulation_seconds": 11.550000000000527,
+      "final_xyz": [
+        -0.16641222406330175,
+        -0.1340854010135533,
+        0.01799152135721463
+      ],
+      "max_lift_m": 0.07093672592696887,
+      "bilateral_lift_m": 0.07093672592696887,
+      "bilateral_contact_steps": 1700,
+      "contact_events": {
+        "object_support": 15,
+        "jaw_block": 17,
+        "robot_environment": 10
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 719.8562521792232,
+      "joint_limit_steps": 0,
+      "clipped_commands": 1
+    },
+    {
+      "scenario": "visual",
+      "episode": 3,
+      "success": false,
+      "stable_placement": false,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 240,
+      "simulation_seconds": 15.84000000000196,
+      "final_xyz": [
+        0.0985592477470354,
+        -0.1649698581824347,
+        0.0134694481933105
+      ],
+      "max_lift_m": 0.004743304647263885,
+      "bilateral_lift_m": 0.0,
+      "bilateral_contact_steps": 0,
+      "contact_events": {
+        "object_support": 7,
+        "robot_environment": 58,
+        "jaw_block": 54
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 242.07957431642765,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "visual",
+      "episode": 4,
+      "success": false,
+      "stable_placement": false,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 240,
+      "simulation_seconds": 15.84000000000196,
+      "final_xyz": [
+        -0.00522279601480177,
+        -0.20730840793007904,
+        0.0417264383782185
+      ],
+      "max_lift_m": 0.029726438378218503,
+      "bilateral_lift_m": 0.029726438378218503,
+      "bilateral_contact_steps": 365,
+      "contact_events": {
+        "object_support": 40,
+        "robot_environment": 64,
+        "jaw_block": 35
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 1115.7749564002627,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "visual",
+      "episode": 5,
+      "success": false,
+      "stable_placement": false,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 240,
+      "simulation_seconds": 15.84000000000196,
+      "final_xyz": [
+        0.023560163944450555,
+        -0.2374463486834199,
+        0.012885340991873903
+      ],
+      "max_lift_m": 0.06566812439866228,
+      "bilateral_lift_m": 0.06566812439866228,
+      "bilateral_contact_steps": 705,
+      "contact_events": {
+        "object_support": 71,
+        "robot_environment": 72,
+        "jaw_block": 120
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 1146.776222930874,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "visual",
+      "episode": 6,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 111,
+      "simulation_seconds": 7.325999999999415,
+      "final_xyz": [
+        -0.17519135314784554,
+        -0.13934054980576893,
+        0.01799994753282876
+      ],
+      "max_lift_m": 0.07074858478368048,
+      "bilateral_lift_m": 0.07074858478368048,
+      "bilateral_contact_steps": 1664,
+      "contact_events": {
+        "object_support": 26,
+        "jaw_block": 27,
+        "robot_environment": 7
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 843.4343660458286,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "visual",
+      "episode": 7,
+      "success": false,
+      "stable_placement": false,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 240,
+      "simulation_seconds": 15.84000000000196,
+      "final_xyz": [
+        -0.03986920609330306,
+        -0.2456213861942525,
+        0.01199994753282891
+      ],
+      "max_lift_m": 0.005776952227262662,
+      "bilateral_lift_m": 0.0,
+      "bilateral_contact_steps": 0,
+      "contact_events": {
+        "object_support": 19,
+        "robot_environment": 23,
+        "jaw_block": 52
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 316.48222993948974,
+      "joint_limit_steps": 0,
+      "clipped_commands": 10
+    },
+    {
+      "scenario": "visual",
+      "episode": 8,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 111,
+      "simulation_seconds": 7.325999999999415,
+      "final_xyz": [
+        -0.17378031984688047,
+        -0.13357746812810053,
+        0.017999947532828908
+      ],
+      "max_lift_m": 0.06895861652724396,
+      "bilateral_lift_m": 0.06895861652724396,
+      "bilateral_contact_steps": 1650,
+      "contact_events": {
+        "object_support": 24,
+        "jaw_block": 11,
+        "robot_environment": 7
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 969.4264062337452,
+      "joint_limit_steps": 0,
+      "clipped_commands": 1
+    },
+    {
+      "scenario": "visual",
+      "episode": 9,
+      "success": false,
+      "stable_placement": false,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 240,
+      "simulation_seconds": 15.84000000000196,
+      "final_xyz": [
+        0.09313651488257961,
+        -0.18745984955176145,
+        0.011999947532821844
+      ],
+      "max_lift_m": 0.004952945742640678,
+      "bilateral_lift_m": 0.0,
+      "bilateral_contact_steps": 2,
+      "contact_events": {
+        "object_support": 18,
+        "jaw_block": 115,
+        "robot_environment": 25
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 477.5847991641913,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "visual",
+      "episode": 10,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 113,
+      "simulation_seconds": 7.457999999999401,
+      "final_xyz": [
+        -0.1792350581527804,
+        -0.13097439347503131,
+        0.01799994753282837
+      ],
+      "max_lift_m": 0.07163948303532416,
+      "bilateral_lift_m": 0.07163948303532416,
+      "bilateral_contact_steps": 1765,
+      "contact_events": {
+        "object_support": 9,
+        "robot_environment": 6,
+        "jaw_block": 4
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 1075.3579593903896,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "visual",
+      "episode": 11,
+      "success": false,
+      "stable_placement": false,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 240,
+      "simulation_seconds": 15.84000000000196,
+      "final_xyz": [
+        0.0378080613709497,
+        -0.2859059779975476,
+        0.016584159531704504
+      ],
+      "max_lift_m": 0.0053934421798896535,
+      "bilateral_lift_m": 0.004791197498241435,
+      "bilateral_contact_steps": 18,
+      "contact_events": {
+        "object_support": 42,
+        "jaw_block": 116
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 329.5433755343121,
+      "joint_limit_steps": 0,
+      "clipped_commands": 3
+    },
+    {
+      "scenario": "visual",
+      "episode": 12,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 113,
+      "simulation_seconds": 7.457999999999401,
+      "final_xyz": [
+        -0.17467635993560726,
+        -0.12928099635930862,
+        0.017987568373686744
+      ],
+      "max_lift_m": 0.0700033402828925,
+      "bilateral_lift_m": 0.0700033402828925,
+      "bilateral_contact_steps": 1685,
+      "contact_events": {
+        "object_support": 13,
+        "robot_environment": 9,
+        "jaw_block": 12
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 573.7129842545381,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "visual",
+      "episode": 13,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 111,
+      "simulation_seconds": 7.325999999999415,
+      "final_xyz": [
+        -0.17615660472649375,
+        -0.13448976318511907,
+        0.017999947532828898
+      ],
+      "max_lift_m": 0.07241008646056847,
+      "bilateral_lift_m": 0.07241008646056847,
+      "bilateral_contact_steps": 1661,
+      "contact_events": {
+        "object_support": 10,
+        "robot_environment": 9,
+        "jaw_block": 9
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 763.2425050553735,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "visual",
+      "episode": 14,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 112,
+      "simulation_seconds": 7.391999999999408,
+      "final_xyz": [
+        -0.18265038904802602,
+        -0.132422606809431,
+        0.01799230084315386
+      ],
+      "max_lift_m": 0.06926757518164099,
+      "bilateral_lift_m": 0.06926757518164099,
+      "bilateral_contact_steps": 1657,
+      "contact_events": {
+        "object_support": 16,
+        "robot_environment": 11,
+        "jaw_block": 13
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 519.6668857264627,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "visual",
+      "episode": 15,
+      "success": false,
+      "stable_placement": false,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 240,
+      "simulation_seconds": 15.84000000000196,
+      "final_xyz": [
+        0.11025188200459428,
+        -0.23355158903670611,
+        0.011999535325135254
+      ],
+      "max_lift_m": 0.007538369130537903,
+      "bilateral_lift_m": 0.003108988982009909,
+      "bilateral_contact_steps": 2,
+      "contact_events": {
+        "object_support": 48,
+        "robot_environment": 17,
+        "jaw_block": 47
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 179.05750203296967,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "visual",
+      "episode": 16,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 111,
+      "simulation_seconds": 7.325999999999415,
+      "final_xyz": [
+        -0.176204775773408,
+        -0.1361763122457304,
+        0.0179999475328289
+      ],
+      "max_lift_m": 0.07123649427788863,
+      "bilateral_lift_m": 0.07123649427788863,
+      "bilateral_contact_steps": 1658,
+      "contact_events": {
+        "object_support": 17,
+        "robot_environment": 7,
+        "jaw_block": 26
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 373.4255892096564,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "visual",
+      "episode": 17,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 113,
+      "simulation_seconds": 7.457999999999401,
+      "final_xyz": [
+        -0.17461554636516385,
+        -0.13952832745490187,
+        0.017999947532828894
+      ],
+      "max_lift_m": 0.06956918283488452,
+      "bilateral_lift_m": 0.06956918283488452,
+      "bilateral_contact_steps": 1656,
+      "contact_events": {
+        "object_support": 14,
+        "robot_environment": 6,
+        "jaw_block": 34
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 1049.7561861682395,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "visual",
+      "episode": 18,
+      "success": false,
+      "stable_placement": false,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 240,
+      "simulation_seconds": 15.84000000000196,
+      "final_xyz": [
+        0.14918573493155154,
+        -0.20831682367571427,
+        0.011999947452692492
+      ],
+      "max_lift_m": 0.005621886168625939,
+      "bilateral_lift_m": 0.00408229153909374,
+      "bilateral_contact_steps": 3,
+      "contact_events": {
+        "object_support": 16,
+        "jaw_block": 37
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 226.77586196929272,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "visual",
+      "episode": 19,
+      "success": false,
+      "stable_placement": false,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 240,
+      "simulation_seconds": 15.84000000000196,
+      "final_xyz": [
+        -0.085575203143019,
+        -0.2324286236267569,
+        0.011833050267722727
+      ],
+      "max_lift_m": 0.07294485458882279,
+      "bilateral_lift_m": 0.07294485458882279,
+      "bilateral_contact_steps": 772,
+      "contact_events": {
+        "object_support": 42,
+        "robot_environment": 59,
+        "jaw_block": 44
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 684.1300068908188,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "physics",
+      "episode": 0,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 111,
+      "simulation_seconds": 7.325999999999415,
+      "final_xyz": [
+        -0.1815331866901967,
+        -0.12332360063526696,
+        0.017999920064801746
+      ],
+      "max_lift_m": 0.08005246298009697,
+      "bilateral_lift_m": 0.08005246298009697,
+      "bilateral_contact_steps": 1673,
+      "contact_events": {
+        "object_support": 5,
+        "robot_environment": 10,
+        "jaw_block": 25
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 722.2169833531215,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "physics",
+      "episode": 1,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 174,
+      "simulation_seconds": 11.484000000000504,
+      "final_xyz": [
+        -0.17396429263336854,
+        -0.13170758818231076,
+        0.01799990373117587
+      ],
+      "max_lift_m": 0.0677746752760094,
+      "bilateral_lift_m": 0.0677746752760094,
+      "bilateral_contact_steps": 1858,
+      "contact_events": {
+        "object_support": 33,
+        "jaw_block": 81,
+        "robot_environment": 7
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 727.9932492520085,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "physics",
+      "episode": 2,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 114,
+      "simulation_seconds": 7.523999999999393,
+      "final_xyz": [
+        -0.17583736857777116,
+        -0.1362270483776961,
+        0.017999910874654572
+      ],
+      "max_lift_m": 0.0702786899893158,
+      "bilateral_lift_m": 0.0702786899893158,
+      "bilateral_contact_steps": 1664,
+      "contact_events": {
+        "object_support": 8,
+        "robot_environment": 9,
+        "jaw_block": 6
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 846.8403451237591,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "physics",
+      "episode": 3,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 235,
+      "simulation_seconds": 15.510000000001849,
+      "final_xyz": [
+        -0.1704109748020797,
+        -0.1322201643128072,
+        0.017999916453107653
+      ],
+      "max_lift_m": 0.07627080567161358,
+      "bilateral_lift_m": 0.07627080567161358,
+      "bilateral_contact_steps": 1689,
+      "contact_events": {
+        "object_support": 30,
+        "jaw_block": 142,
+        "robot_environment": 22
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 556.4020220305424,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "physics",
+      "episode": 4,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 175,
+      "simulation_seconds": 11.550000000000527,
+      "final_xyz": [
+        -0.17819068895898615,
+        -0.12889694977338612,
+        0.01799991103847621
+      ],
+      "max_lift_m": 0.07289567082914254,
+      "bilateral_lift_m": 0.07289567082914254,
+      "bilateral_contact_steps": 1684,
+      "contact_events": {
+        "object_support": 20,
+        "jaw_block": 62,
+        "robot_environment": 7
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 491.5241387698813,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "physics",
+      "episode": 5,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 114,
+      "simulation_seconds": 7.523999999999393,
+      "final_xyz": [
+        -0.1794867528567158,
+        -0.12933549121646787,
+        0.017999949153362397
+      ],
+      "max_lift_m": 0.07022999090615627,
+      "bilateral_lift_m": 0.07022999090615627,
+      "bilateral_contact_steps": 1691,
+      "contact_events": {
+        "object_support": 23,
+        "robot_environment": 14,
+        "jaw_block": 5
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 828.6717976649685,
+      "joint_limit_steps": 0,
+      "clipped_commands": 1
+    },
+    {
+      "scenario": "physics",
+      "episode": 6,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 111,
+      "simulation_seconds": 7.325999999999415,
+      "final_xyz": [
+        -0.17229546770114498,
+        -0.13640736626204608,
+        0.017999928444763724
+      ],
+      "max_lift_m": 0.07090049988726604,
+      "bilateral_lift_m": 0.07090049988726604,
+      "bilateral_contact_steps": 1619,
+      "contact_events": {
+        "object_support": 14,
+        "robot_environment": 9,
+        "jaw_block": 43
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 603.0185877364847,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "physics",
+      "episode": 7,
+      "success": false,
+      "stable_placement": false,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 240,
+      "simulation_seconds": 15.84000000000196,
+      "final_xyz": [
+        -0.05602100904177609,
+        -0.22882794488135333,
+        0.011999939339526108
+      ],
+      "max_lift_m": 0.01005170244059423,
+      "bilateral_lift_m": 0.01005170244059423,
+      "bilateral_contact_steps": 345,
+      "contact_events": {
+        "object_support": 48,
+        "robot_environment": 72,
+        "jaw_block": 16
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 840.6484960190711,
+      "joint_limit_steps": 0,
+      "clipped_commands": 9
+    },
+    {
+      "scenario": "physics",
+      "episode": 8,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 111,
+      "simulation_seconds": 7.325999999999415,
+      "final_xyz": [
+        -0.1794434463370342,
+        -0.13602787152212806,
+        0.017999941609994425
+      ],
+      "max_lift_m": 0.06926879147024356,
+      "bilateral_lift_m": 0.06926879147024356,
+      "bilateral_contact_steps": 1643,
+      "contact_events": {
+        "object_support": 12,
+        "robot_environment": 10,
+        "jaw_block": 29
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 455.16080901781356,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "physics",
+      "episode": 9,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 111,
+      "simulation_seconds": 7.325999999999415,
+      "final_xyz": [
+        -0.18371580666871623,
+        -0.14080640545547382,
+        0.017999914230940637
+      ],
+      "max_lift_m": 0.07347092483931876,
+      "bilateral_lift_m": 0.07347092483931876,
+      "bilateral_contact_steps": 1659,
+      "contact_events": {
+        "object_support": 11,
+        "jaw_block": 14,
+        "robot_environment": 7
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 531.8661353415397,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "physics",
+      "episode": 10,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 114,
+      "simulation_seconds": 7.523999999999393,
+      "final_xyz": [
+        -0.17785474700665949,
+        -0.12993536182174992,
+        0.017999909852568927
+      ],
+      "max_lift_m": 0.06961146838361444,
+      "bilateral_lift_m": 0.06961146838361444,
+      "bilateral_contact_steps": 1656,
+      "contact_events": {
+        "object_support": 12,
+        "robot_environment": 9,
+        "jaw_block": 5
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 582.1642671854261,
+      "joint_limit_steps": 0,
+      "clipped_commands": 1
+    },
+    {
+      "scenario": "physics",
+      "episode": 11,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 175,
+      "simulation_seconds": 11.550000000000527,
+      "final_xyz": [
+        -0.18119664118746517,
+        -0.13439073531926798,
+        0.017999971382202558
+      ],
+      "max_lift_m": 0.06227546326697189,
+      "bilateral_lift_m": 0.06227546326697189,
+      "bilateral_contact_steps": 1727,
+      "contact_events": {
+        "object_support": 70,
+        "jaw_block": 24,
+        "robot_environment": 11
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 767.9783274237897,
+      "joint_limit_steps": 0,
+      "clipped_commands": 2
+    },
+    {
+      "scenario": "physics",
+      "episode": 12,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 112,
+      "simulation_seconds": 7.391999999999408,
+      "final_xyz": [
+        -0.17509998449113776,
+        -0.13032252855195647,
+        0.017999919612543762
+      ],
+      "max_lift_m": 0.06950160235084506,
+      "bilateral_lift_m": 0.06950160235084506,
+      "bilateral_contact_steps": 1665,
+      "contact_events": {
+        "object_support": 19,
+        "robot_environment": 7,
+        "jaw_block": 7
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 611.8772923843362,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "physics",
+      "episode": 13,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 111,
+      "simulation_seconds": 7.325999999999415,
+      "final_xyz": [
+        -0.17865213520202722,
+        -0.12997158987904628,
+        0.01799993089689801
+      ],
+      "max_lift_m": 0.07294072908595642,
+      "bilateral_lift_m": 0.07294072908595642,
+      "bilateral_contact_steps": 1646,
+      "contact_events": {
+        "object_support": 8,
+        "robot_environment": 9,
+        "jaw_block": 6
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 674.532749010745,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "physics",
+      "episode": 14,
+      "success": false,
+      "stable_placement": false,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 240,
+      "simulation_seconds": 15.84000000000196,
+      "final_xyz": [
+        -0.02050635394851501,
+        -0.26396678417582375,
+        0.015700176510828195
+      ],
+      "max_lift_m": 0.004968385158532901,
+      "bilateral_lift_m": 0.0043209628413885814,
+      "bilateral_contact_steps": 11,
+      "contact_events": {
+        "object_support": 47,
+        "jaw_block": 82
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 443.8707934716454,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "physics",
+      "episode": 15,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 113,
+      "simulation_seconds": 7.457999999999401,
+      "final_xyz": [
+        -0.18269571727874048,
+        -0.13919915285344175,
+        0.017999916716786322
+      ],
+      "max_lift_m": 0.07064070106762316,
+      "bilateral_lift_m": 0.07064070106762316,
+      "bilateral_contact_steps": 1679,
+      "contact_events": {
+        "object_support": 29,
+        "robot_environment": 13,
+        "jaw_block": 39
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 427.3699324433345,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "physics",
+      "episode": 16,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 113,
+      "simulation_seconds": 7.457999999999401,
+      "final_xyz": [
+        -0.17591983462341063,
+        -0.1362227215395018,
+        0.017999959660006747
+      ],
+      "max_lift_m": 0.07032259681177681,
+      "bilateral_lift_m": 0.07032259681177681,
+      "bilateral_contact_steps": 1669,
+      "contact_events": {
+        "object_support": 6,
+        "robot_environment": 5,
+        "jaw_block": 19
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 742.2540430842411,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "physics",
+      "episode": 17,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 111,
+      "simulation_seconds": 7.325999999999415,
+      "final_xyz": [
+        -0.1762886951022334,
+        -0.13753942170142205,
+        0.017999952893704593
+      ],
+      "max_lift_m": 0.06973691457048996,
+      "bilateral_lift_m": 0.06973691457048996,
+      "bilateral_contact_steps": 1660,
+      "contact_events": {
+        "object_support": 11,
+        "robot_environment": 9,
+        "jaw_block": 27
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 993.9551697524453,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "physics",
+      "episode": 18,
+      "success": false,
+      "stable_placement": false,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 240,
+      "simulation_seconds": 15.84000000000196,
+      "final_xyz": [
+        0.14877082993681723,
+        -0.20459499825191516,
+        0.011999950774054241
+      ],
+      "max_lift_m": 0.004184806210296193,
+      "bilateral_lift_m": 0.004163089845015174,
+      "bilateral_contact_steps": 590,
+      "contact_events": {
+        "object_support": 15,
+        "jaw_block": 67
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 308.1449863636714,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "physics",
+      "episode": 19,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 112,
+      "simulation_seconds": 7.391999999999408,
+      "final_xyz": [
+        -0.17807326087714967,
+        -0.13541584559728365,
+        0.01799965977910187
+      ],
+      "max_lift_m": 0.07483693741787746,
+      "bilateral_lift_m": 0.07483693741787746,
+      "bilateral_contact_steps": 1665,
+      "contact_events": {
+        "object_support": 27,
+        "robot_environment": 12,
+        "jaw_block": 40
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 891.496075138396,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "full",
+      "episode": 0,
+      "success": false,
+      "stable_placement": false,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 240,
+      "simulation_seconds": 15.84000000000196,
+      "final_xyz": [
+        -0.06684039332599834,
+        -0.23330253422565564,
+        0.011999948768924613
+      ],
+      "max_lift_m": 0.0628330709074316,
+      "bilateral_lift_m": 0.0627683376467263,
+      "bilateral_contact_steps": 671,
+      "contact_events": {
+        "object_support": 36,
+        "robot_environment": 43,
+        "jaw_block": 54
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 936.935984372708,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "full",
+      "episode": 1,
+      "success": false,
+      "stable_placement": false,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 240,
+      "simulation_seconds": 15.84000000000196,
+      "final_xyz": [
+        0.10318033827609646,
+        -0.23704878795989445,
+        0.03817123633789632
+      ],
+      "max_lift_m": 0.02617123633789632,
+      "bilateral_lift_m": 0.02617123633789632,
+      "bilateral_contact_steps": 413,
+      "contact_events": {
+        "object_support": 16,
+        "jaw_block": 41,
+        "robot_environment": 8
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 950.2381047892976,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "full",
+      "episode": 2,
+      "success": false,
+      "stable_placement": false,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 240,
+      "simulation_seconds": 15.84000000000196,
+      "final_xyz": [
+        -0.012790170942457718,
+        -0.2820035685980927,
+        0.011999939938442176
+      ],
+      "max_lift_m": 0.06579306988036365,
+      "bilateral_lift_m": 0.06579306988036365,
+      "bilateral_contact_steps": 666,
+      "contact_events": {
+        "object_support": 29,
+        "jaw_block": 59,
+        "robot_environment": 18
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 1801.637481760579,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "full",
+      "episode": 3,
+      "success": false,
+      "stable_placement": false,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 240,
+      "simulation_seconds": 15.84000000000196,
+      "final_xyz": [
+        0.10037125050639456,
+        -0.16190243328436366,
+        0.01199995316247635
+      ],
+      "max_lift_m": 0.00011017466759974219,
+      "bilateral_lift_m": 0.0,
+      "bilateral_contact_steps": 0,
+      "contact_events": {
+        "object_support": 4,
+        "robot_environment": 92,
+        "jaw_block": 5
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 246.11725738234628,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "full",
+      "episode": 4,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 113,
+      "simulation_seconds": 7.457999999999401,
+      "final_xyz": [
+        -0.17101075846797148,
+        -0.1310476802011036,
+        0.017999971064079422
+      ],
+      "max_lift_m": 0.07178399072035314,
+      "bilateral_lift_m": 0.07178399072035314,
+      "bilateral_contact_steps": 1656,
+      "contact_events": {
+        "object_support": 11,
+        "jaw_block": 21,
+        "robot_environment": 8
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 585.5643856334141,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "full",
+      "episode": 5,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 112,
+      "simulation_seconds": 7.391999999999408,
+      "final_xyz": [
+        -0.17408821543067132,
+        -0.12926854587319359,
+        0.017999913997112208
+      ],
+      "max_lift_m": 0.07024046474596275,
+      "bilateral_lift_m": 0.07024046474596275,
+      "bilateral_contact_steps": 1682,
+      "contact_events": {
+        "object_support": 11,
+        "robot_environment": 14,
+        "jaw_block": 11
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 666.2153776490346,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "full",
+      "episode": 6,
+      "success": false,
+      "stable_placement": false,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 240,
+      "simulation_seconds": 15.84000000000196,
+      "final_xyz": [
+        -0.006584218973430447,
+        -0.1997720666610198,
+        0.011999936906385433
+      ],
+      "max_lift_m": 0.0017502510018884906,
+      "bilateral_lift_m": 0.001126624947714162,
+      "bilateral_contact_steps": 298,
+      "contact_events": {
+        "object_support": 33,
+        "robot_environment": 36,
+        "jaw_block": 71
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 888.4514158236468,
+      "joint_limit_steps": 0,
+      "clipped_commands": 4
+    },
+    {
+      "scenario": "full",
+      "episode": 7,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 112,
+      "simulation_seconds": 7.391999999999408,
+      "final_xyz": [
+        -0.1797608303240394,
+        -0.1351133562220458,
+        0.017999896184620112
+      ],
+      "max_lift_m": 0.07046959192175391,
+      "bilateral_lift_m": 0.07046959192175391,
+      "bilateral_contact_steps": 1653,
+      "contact_events": {
+        "object_support": 20,
+        "robot_environment": 4,
+        "jaw_block": 17
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 610.1546672815326,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "full",
+      "episode": 8,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 110,
+      "simulation_seconds": 7.2599999999994225,
+      "final_xyz": [
+        -0.17718989641952537,
+        -0.1370316409403133,
+        0.017999935279877508
+      ],
+      "max_lift_m": 0.06882683231032484,
+      "bilateral_lift_m": 0.06882683231032484,
+      "bilateral_contact_steps": 1616,
+      "contact_events": {
+        "object_support": 17,
+        "robot_environment": 10,
+        "jaw_block": 17
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 752.5685131728092,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "full",
+      "episode": 9,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 173,
+      "simulation_seconds": 11.418000000000482,
+      "final_xyz": [
+        -0.17213861237148334,
+        -0.1286472127325738,
+        0.017999935009553117
+      ],
+      "max_lift_m": 0.07512426939975583,
+      "bilateral_lift_m": 0.07512426939975583,
+      "bilateral_contact_steps": 1701,
+      "contact_events": {
+        "object_support": 26,
+        "jaw_block": 61,
+        "robot_environment": 7
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 1309.3918479132246,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "full",
+      "episode": 10,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 114,
+      "simulation_seconds": 7.523999999999393,
+      "final_xyz": [
+        -0.17715714251924286,
+        -0.13393598155588526,
+        0.01799993754244555
+      ],
+      "max_lift_m": 0.07418196384162419,
+      "bilateral_lift_m": 0.07418196384162419,
+      "bilateral_contact_steps": 1667,
+      "contact_events": {
+        "object_support": 8,
+        "robot_environment": 7,
+        "jaw_block": 7
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 1125.8451999232364,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "full",
+      "episode": 11,
+      "success": false,
+      "stable_placement": false,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 240,
+      "simulation_seconds": 15.84000000000196,
+      "final_xyz": [
+        0.06154695347862047,
+        -0.2774435645011767,
+        0.011999903004713989
+      ],
+      "max_lift_m": 0.007699975704276503,
+      "bilateral_lift_m": 0.007404510340354279,
+      "bilateral_contact_steps": 432,
+      "contact_events": {
+        "object_support": 67,
+        "jaw_block": 175,
+        "robot_environment": 8
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 448.82806523902053,
+      "joint_limit_steps": 0,
+      "clipped_commands": 1
+    },
+    {
+      "scenario": "full",
+      "episode": 12,
+      "success": false,
+      "stable_placement": false,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 240,
+      "simulation_seconds": 15.84000000000196,
+      "final_xyz": [
+        -0.041219695782424175,
+        -0.23139900398475513,
+        0.011999915531270094
+      ],
+      "max_lift_m": 0.054290004119676605,
+      "bilateral_lift_m": 0.054290004119676605,
+      "bilateral_contact_steps": 875,
+      "contact_events": {
+        "object_support": 25,
+        "robot_environment": 31,
+        "jaw_block": 5
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 1069.2695555767298,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "full",
+      "episode": 13,
+      "success": false,
+      "stable_placement": false,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 240,
+      "simulation_seconds": 15.84000000000196,
+      "final_xyz": [
+        -0.05639760922192046,
+        -0.19208402157386362,
+        0.011999905450634306
+      ],
+      "max_lift_m": 0.004017470357043123,
+      "bilateral_lift_m": 0.0,
+      "bilateral_contact_steps": 0,
+      "contact_events": {
+        "object_support": 12,
+        "robot_environment": 78,
+        "jaw_block": 2
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 301.75474709616464,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "full",
+      "episode": 14,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 113,
+      "simulation_seconds": 7.457999999999401,
+      "final_xyz": [
+        -0.18236752161425535,
+        -0.13672805811614014,
+        0.017999941883237117
+      ],
+      "max_lift_m": 0.06690982542816194,
+      "bilateral_lift_m": 0.06690982542816194,
+      "bilateral_contact_steps": 1735,
+      "contact_events": {
+        "object_support": 18,
+        "jaw_block": 42,
+        "robot_environment": 9
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 867.7545283362565,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "full",
+      "episode": 15,
+      "success": false,
+      "stable_placement": false,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 240,
+      "simulation_seconds": 15.84000000000196,
+      "final_xyz": [
+        0.06724074375100526,
+        -0.22237986100164456,
+        0.011999926335627659
+      ],
+      "max_lift_m": 0.06526462730226203,
+      "bilateral_lift_m": 0.06526462730226203,
+      "bilateral_contact_steps": 658,
+      "contact_events": {
+        "object_support": 9,
+        "robot_environment": 35,
+        "jaw_block": 8
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 486.8604080371084,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "full",
+      "episode": 16,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 175,
+      "simulation_seconds": 11.550000000000527,
+      "final_xyz": [
+        -0.17531464433701163,
+        -0.13340945902761575,
+        0.01799995040921787
+      ],
+      "max_lift_m": 0.07046602347568523,
+      "bilateral_lift_m": 0.07046602347568523,
+      "bilateral_contact_steps": 1728,
+      "contact_events": {
+        "object_support": 19,
+        "jaw_block": 49,
+        "robot_environment": 4
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 1514.1514010328917,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "full",
+      "episode": 17,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 111,
+      "simulation_seconds": 7.325999999999415,
+      "final_xyz": [
+        -0.1756932649776958,
+        -0.14049304109885813,
+        0.017999961629189744
+      ],
+      "max_lift_m": 0.0701314879845264,
+      "bilateral_lift_m": 0.0701314879845264,
+      "bilateral_contact_steps": 1641,
+      "contact_events": {
+        "object_support": 12,
+        "robot_environment": 4,
+        "jaw_block": 13
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 736.5407132571243,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "full",
+      "episode": 18,
+      "success": false,
+      "stable_placement": false,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 240,
+      "simulation_seconds": 15.84000000000196,
+      "final_xyz": [
+        0.14224878744760355,
+        -0.2042506905588144,
+        0.011999917397841892
+      ],
+      "max_lift_m": 0.0,
+      "bilateral_lift_m": 0.0,
+      "bilateral_contact_steps": 0,
+      "contact_events": {
+        "object_support": 4,
+        "robot_environment": 35
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 160.05935863706594,
+      "joint_limit_steps": 0,
+      "clipped_commands": 28
+    },
+    {
+      "scenario": "full",
+      "episode": 19,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 113,
+      "simulation_seconds": 7.457999999999401,
+      "final_xyz": [
+        -0.17487696007269862,
+        -0.13378116154037847,
+        0.01799991579695539
+      ],
+      "max_lift_m": 0.06927041961238338,
+      "bilateral_lift_m": 0.06927041961238338,
+      "bilateral_contact_steps": 1674,
+      "contact_events": {
+        "object_support": 25,
+        "robot_environment": 5,
+        "jaw_block": 11
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 823.9075491912048,
+      "joint_limit_steps": 0,
+      "clipped_commands": 1
+    },
+    {
+      "scenario": "occlusion",
+      "episode": 0,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 112,
+      "simulation_seconds": 7.391999999999408,
+      "final_xyz": [
+        -0.17797867011766946,
+        -0.13139299076438848,
+        0.017999947532828915
+      ],
+      "max_lift_m": 0.07001696352632147,
+      "bilateral_lift_m": 0.07001696352632147,
+      "bilateral_contact_steps": 1647,
+      "contact_events": {
+        "object_support": 12,
+        "robot_environment": 7,
+        "jaw_block": 23
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 512.1573793288609,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "occlusion",
+      "episode": 1,
+      "success": false,
+      "stable_placement": false,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 240,
+      "simulation_seconds": 15.84000000000196,
+      "final_xyz": [
+        0.05038502775011256,
+        -0.2590063933420357,
+        0.011999947532828922
+      ],
+      "max_lift_m": 0.05162445527970387,
+      "bilateral_lift_m": 0.0516159967610053,
+      "bilateral_contact_steps": 819,
+      "contact_events": {
+        "object_support": 17,
+        "jaw_block": 30
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 1185.7759779587907,
+      "joint_limit_steps": 0,
+      "clipped_commands": 12
+    },
+    {
+      "scenario": "occlusion",
+      "episode": 2,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 114,
+      "simulation_seconds": 7.523999999999393,
+      "final_xyz": [
+        -0.17669439748898064,
+        -0.13563151659826497,
+        0.0179999475328289
+      ],
+      "max_lift_m": 0.0701626176165999,
+      "bilateral_lift_m": 0.0701626176165999,
+      "bilateral_contact_steps": 1664,
+      "contact_events": {
+        "object_support": 11,
+        "robot_environment": 8,
+        "jaw_block": 8
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 732.461594096987,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "occlusion",
+      "episode": 3,
+      "success": false,
+      "stable_placement": false,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 240,
+      "simulation_seconds": 15.84000000000196,
+      "final_xyz": [
+        0.09343037308601139,
+        -0.16026592538323917,
+        0.011999947532828905
+      ],
+      "max_lift_m": 0.0049622076634473836,
+      "bilateral_lift_m": 0.001695307417014921,
+      "bilateral_contact_steps": 23,
+      "contact_events": {
+        "object_support": 48,
+        "jaw_block": 147,
+        "robot_environment": 43
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 244.44069863411215,
+      "joint_limit_steps": 0,
+      "clipped_commands": 4
+    },
+    {
+      "scenario": "occlusion",
+      "episode": 4,
+      "success": false,
+      "stable_placement": false,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 240,
+      "simulation_seconds": 15.84000000000196,
+      "final_xyz": [
+        -0.026884765842850055,
+        -0.20402382547030262,
+        0.011999947532828936
+      ],
+      "max_lift_m": 0.006099799624484054,
+      "bilateral_lift_m": 0.0012372076201376172,
+      "bilateral_contact_steps": 240,
+      "contact_events": {
+        "object_support": 52,
+        "jaw_block": 105,
+        "robot_environment": 28
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 632.8464735119541,
+      "joint_limit_steps": 0,
+      "clipped_commands": 12
+    },
+    {
+      "scenario": "occlusion",
+      "episode": 5,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 113,
+      "simulation_seconds": 7.457999999999401,
+      "final_xyz": [
+        -0.17893230855896403,
+        -0.12915656121556715,
+        0.01799836553026549
+      ],
+      "max_lift_m": 0.07037957209951946,
+      "bilateral_lift_m": 0.07037957209951946,
+      "bilateral_contact_steps": 1696,
+      "contact_events": {
+        "object_support": 12,
+        "robot_environment": 11,
+        "jaw_block": 6
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 722.8263344317133,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "occlusion",
+      "episode": 6,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 111,
+      "simulation_seconds": 7.325999999999415,
+      "final_xyz": [
+        -0.17310135901974663,
+        -0.13787530281444932,
+        0.01799994753282849
+      ],
+      "max_lift_m": 0.07048894720895371,
+      "bilateral_lift_m": 0.07048894720895371,
+      "bilateral_contact_steps": 1664,
+      "contact_events": {
+        "object_support": 6,
+        "robot_environment": 5,
+        "jaw_block": 24
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 731.8269301360638,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "occlusion",
+      "episode": 7,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 113,
+      "simulation_seconds": 7.457999999999401,
+      "final_xyz": [
+        -0.18099873428051103,
+        -0.13238935840341165,
+        0.0179999475328289
+      ],
+      "max_lift_m": 0.07034369442487376,
+      "bilateral_lift_m": 0.07034369442487376,
+      "bilateral_contact_steps": 1653,
+      "contact_events": {
+        "object_support": 22,
+        "robot_environment": 8,
+        "jaw_block": 16
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 530.3334910900012,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "occlusion",
+      "episode": 8,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 111,
+      "simulation_seconds": 7.325999999999415,
+      "final_xyz": [
+        -0.1785906796595309,
+        -0.1355085027119461,
+        0.01794094501070325
+      ],
+      "max_lift_m": 0.0688506109632058,
+      "bilateral_lift_m": 0.0688506109632058,
+      "bilateral_contact_steps": 1643,
+      "contact_events": {
+        "object_support": 14,
+        "robot_environment": 8,
+        "jaw_block": 31
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 817.5440870780681,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "occlusion",
+      "episode": 9,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 112,
+      "simulation_seconds": 7.391999999999408,
+      "final_xyz": [
+        -0.1810383887951482,
+        -0.1398064632135894,
+        0.01799994753282892
+      ],
+      "max_lift_m": 0.07057144262442101,
+      "bilateral_lift_m": 0.07057144262442101,
+      "bilateral_contact_steps": 1665,
+      "contact_events": {
+        "object_support": 12,
+        "jaw_block": 18,
+        "robot_environment": 4
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 974.4555671547522,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "occlusion",
+      "episode": 10,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 113,
+      "simulation_seconds": 7.457999999999401,
+      "final_xyz": [
+        -0.17954661757235574,
+        -0.1298315354325762,
+        0.017999947532828898
+      ],
+      "max_lift_m": 0.07126141947161262,
+      "bilateral_lift_m": 0.07126141947161262,
+      "bilateral_contact_steps": 1667,
+      "contact_events": {
+        "object_support": 16,
+        "robot_environment": 13,
+        "jaw_block": 4
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 977.5313382547198,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "occlusion",
+      "episode": 11,
+      "success": false,
+      "stable_placement": false,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 240,
+      "simulation_seconds": 15.84000000000196,
+      "final_xyz": [
+        0.03949477052657565,
+        -0.29483915828860796,
+        0.01199994753282891
+      ],
+      "max_lift_m": 0.005461392292384584,
+      "bilateral_lift_m": 0.0,
+      "bilateral_contact_steps": 0,
+      "contact_events": {
+        "object_support": 41,
+        "jaw_block": 45,
+        "robot_environment": 48
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 154.09198404423847,
+      "joint_limit_steps": 0,
+      "clipped_commands": 2
+    },
+    {
+      "scenario": "occlusion",
+      "episode": 12,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 112,
+      "simulation_seconds": 7.391999999999408,
+      "final_xyz": [
+        -0.17495041744074363,
+        -0.12978254059588248,
+        0.017999947532828915
+      ],
+      "max_lift_m": 0.06988490235865841,
+      "bilateral_lift_m": 0.06988490235865841,
+      "bilateral_contact_steps": 1663,
+      "contact_events": {
+        "object_support": 9,
+        "robot_environment": 8,
+        "jaw_block": 3
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 824.7303806784195,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "occlusion",
+      "episode": 13,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 111,
+      "simulation_seconds": 7.325999999999415,
+      "final_xyz": [
+        -0.1775444216554093,
+        -0.13112405046049466,
+        0.017999947532828915
+      ],
+      "max_lift_m": 0.07316795447737609,
+      "bilateral_lift_m": 0.07316795447737609,
+      "bilateral_contact_steps": 1662,
+      "contact_events": {
+        "object_support": 9,
+        "robot_environment": 11,
+        "jaw_block": 8
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 853.7063790225372,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "occlusion",
+      "episode": 14,
+      "success": false,
+      "stable_placement": false,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 240,
+      "simulation_seconds": 15.84000000000196,
+      "final_xyz": [
+        -0.021851509889313222,
+        -0.26472581361057357,
+        0.014656972460453598
+      ],
+      "max_lift_m": 0.0067979910029189045,
+      "bilateral_lift_m": 0.0037653028263862527,
+      "bilateral_contact_steps": 7,
+      "contact_events": {
+        "object_support": 47,
+        "jaw_block": 84
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 548.2881819474187,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "occlusion",
+      "episode": 15,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 113,
+      "simulation_seconds": 7.457999999999401,
+      "final_xyz": [
+        -0.18014787065997398,
+        -0.1412239812780394,
+        0.017963393781937707
+      ],
+      "max_lift_m": 0.07023184427210431,
+      "bilateral_lift_m": 0.07023184427210431,
+      "bilateral_contact_steps": 1664,
+      "contact_events": {
+        "object_support": 10,
+        "robot_environment": 8,
+        "jaw_block": 11
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 814.5229219409903,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "occlusion",
+      "episode": 16,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 113,
+      "simulation_seconds": 7.457999999999401,
+      "final_xyz": [
+        -0.17462642206052525,
+        -0.1364909102711901,
+        0.017999947532828915
+      ],
+      "max_lift_m": 0.07034483250429813,
+      "bilateral_lift_m": 0.07034483250429813,
+      "bilateral_contact_steps": 1665,
+      "contact_events": {
+        "object_support": 12,
+        "robot_environment": 8,
+        "jaw_block": 25
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 688.6944378956097,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "occlusion",
+      "episode": 17,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 112,
+      "simulation_seconds": 7.391999999999408,
+      "final_xyz": [
+        -0.17748638848138165,
+        -0.13726639184575268,
+        0.017994241500579013
+      ],
+      "max_lift_m": 0.0700707200862481,
+      "bilateral_lift_m": 0.0700707200862481,
+      "bilateral_contact_steps": 1665,
+      "contact_events": {
+        "object_support": 22,
+        "robot_environment": 13,
+        "jaw_block": 30
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 827.3820270738556,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "occlusion",
+      "episode": 18,
+      "success": false,
+      "stable_placement": false,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 240,
+      "simulation_seconds": 15.84000000000196,
+      "final_xyz": [
+        0.1479767752148221,
+        -0.21910751396673867,
+        0.011999947532828936
+      ],
+      "max_lift_m": 0.007758254273618981,
+      "bilateral_lift_m": 0.0073309789976576945,
+      "bilateral_contact_steps": 112,
+      "contact_events": {
+        "object_support": 39,
+        "jaw_block": 80,
+        "robot_environment": 23
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 504.5668778681664,
+      "joint_limit_steps": 0,
+      "clipped_commands": 27
+    },
+    {
+      "scenario": "occlusion",
+      "episode": 19,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 111,
+      "simulation_seconds": 7.325999999999415,
+      "final_xyz": [
+        -0.17734961552778283,
+        -0.13413644569791597,
+        0.0179999475328289
+      ],
+      "max_lift_m": 0.07294192170398978,
+      "bilateral_lift_m": 0.07294192170398978,
+      "bilateral_contact_steps": 1654,
+      "contact_events": {
+        "object_support": 7,
+        "robot_environment": 9,
+        "jaw_block": 10
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 607.7921453407938,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "perturbation",
+      "episode": 0,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 112,
+      "simulation_seconds": 7.391999999999408,
+      "final_xyz": [
+        -0.1784232015225274,
+        -0.13442906894523562,
+        0.017999947532828915
+      ],
+      "max_lift_m": 0.07278602920089092,
+      "bilateral_lift_m": 0.07278602920089092,
+      "bilateral_contact_steps": 1674,
+      "contact_events": {
+        "object_support": 38,
+        "robot_environment": 10,
+        "jaw_block": 9
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 1438.926838023775,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "perturbation",
+      "episode": 1,
+      "success": false,
+      "stable_placement": false,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 240,
+      "simulation_seconds": 15.84000000000196,
+      "final_xyz": [
+        0.07585327565478271,
+        -0.2793432890786764,
+        0.01199994753282893
+      ],
+      "max_lift_m": 0.053654891013547895,
+      "bilateral_lift_m": 0.053654891013547895,
+      "bilateral_contact_steps": 818,
+      "contact_events": {
+        "object_support": 19,
+        "jaw_block": 40,
+        "robot_environment": 20
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 1123.5930660581594,
+      "joint_limit_steps": 0,
+      "clipped_commands": 2
+    },
+    {
+      "scenario": "perturbation",
+      "episode": 2,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 114,
+      "simulation_seconds": 7.523999999999393,
+      "final_xyz": [
+        -0.17673131926148505,
+        -0.13606331706303829,
+        0.0179999475328289
+      ],
+      "max_lift_m": 0.07032134641138418,
+      "bilateral_lift_m": 0.07032134641138418,
+      "bilateral_contact_steps": 1664,
+      "contact_events": {
+        "object_support": 22,
+        "robot_environment": 9,
+        "jaw_block": 9
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 649.6084688932959,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "perturbation",
+      "episode": 3,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 235,
+      "simulation_seconds": 15.510000000001849,
+      "final_xyz": [
+        -0.18136497120035444,
+        -0.12691610785871343,
+        0.01799994753282891
+      ],
+      "max_lift_m": 0.07185092953176604,
+      "bilateral_lift_m": 0.07185092953176604,
+      "bilateral_contact_steps": 1661,
+      "contact_events": {
+        "object_support": 49,
+        "jaw_block": 119,
+        "robot_environment": 27
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 904.0238501155984,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "perturbation",
+      "episode": 4,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 174,
+      "simulation_seconds": 11.484000000000504,
+      "final_xyz": [
+        -0.18288264638529333,
+        -0.12988496350098258,
+        0.01799994753282889
+      ],
+      "max_lift_m": 0.07288574753888988,
+      "bilateral_lift_m": 0.07288574753888988,
+      "bilateral_contact_steps": 1674,
+      "contact_events": {
+        "object_support": 45,
+        "jaw_block": 181,
+        "robot_environment": 12
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 1747.7614981663696,
+      "joint_limit_steps": 0,
+      "clipped_commands": 1
+    },
+    {
+      "scenario": "perturbation",
+      "episode": 5,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 114,
+      "simulation_seconds": 7.523999999999393,
+      "final_xyz": [
+        -0.17919092612333812,
+        -0.1289542246153259,
+        0.017999947532828905
+      ],
+      "max_lift_m": 0.07057245170314555,
+      "bilateral_lift_m": 0.07057245170314555,
+      "bilateral_contact_steps": 1695,
+      "contact_events": {
+        "object_support": 29,
+        "robot_environment": 12,
+        "jaw_block": 7
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 769.3021751574303,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "perturbation",
+      "episode": 6,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 111,
+      "simulation_seconds": 7.325999999999415,
+      "final_xyz": [
+        -0.17238706262658016,
+        -0.13688936412905295,
+        0.017999947532828294
+      ],
+      "max_lift_m": 0.07071413297760244,
+      "bilateral_lift_m": 0.07071413297760244,
+      "bilateral_contact_steps": 1658,
+      "contact_events": {
+        "object_support": 18,
+        "robot_environment": 7,
+        "jaw_block": 41
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 747.5738307659594,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "perturbation",
+      "episode": 7,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 112,
+      "simulation_seconds": 7.391999999999408,
+      "final_xyz": [
+        -0.17777236671298483,
+        -0.12312676944493742,
+        0.017999947532828908
+      ],
+      "max_lift_m": 0.06191717423066953,
+      "bilateral_lift_m": 0.06191717423066953,
+      "bilateral_contact_steps": 1666,
+      "contact_events": {
+        "object_support": 32,
+        "robot_environment": 18,
+        "jaw_block": 11
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 1132.529542426455,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "perturbation",
+      "episode": 8,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 111,
+      "simulation_seconds": 7.325999999999415,
+      "final_xyz": [
+        -0.18170299744606522,
+        -0.13671835648498543,
+        0.017999947532828846
+      ],
+      "max_lift_m": 0.06774691921986244,
+      "bilateral_lift_m": 0.06774691921986244,
+      "bilateral_contact_steps": 1665,
+      "contact_events": {
+        "object_support": 21,
+        "robot_environment": 5,
+        "jaw_block": 36
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 441.3241356926919,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "perturbation",
+      "episode": 9,
+      "success": false,
+      "stable_placement": false,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 240,
+      "simulation_seconds": 15.84000000000196,
+      "final_xyz": [
+        0.0832053324277492,
+        -0.18394760829424475,
+        0.011986397997732514
+      ],
+      "max_lift_m": 0.010447746432698263,
+      "bilateral_lift_m": 0.010447746432698263,
+      "bilateral_contact_steps": 390,
+      "contact_events": {
+        "object_support": 51,
+        "jaw_block": 26,
+        "robot_environment": 33
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 1127.7688952282813,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "perturbation",
+      "episode": 10,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 114,
+      "simulation_seconds": 7.523999999999393,
+      "final_xyz": [
+        -0.18024602389329988,
+        -0.1310314122635089,
+        0.01799994753282891
+      ],
+      "max_lift_m": 0.07150932018793807,
+      "bilateral_lift_m": 0.07150932018793807,
+      "bilateral_contact_steps": 1659,
+      "contact_events": {
+        "object_support": 27,
+        "robot_environment": 13,
+        "jaw_block": 10
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 597.774508375935,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "perturbation",
+      "episode": 11,
+      "success": false,
+      "stable_placement": false,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 240,
+      "simulation_seconds": 15.84000000000196,
+      "final_xyz": [
+        0.041921918094444316,
+        -0.2956746650668993,
+        0.01199994753282892
+      ],
+      "max_lift_m": 0.0054643903709222785,
+      "bilateral_lift_m": 0.0,
+      "bilateral_contact_steps": 0,
+      "contact_events": {
+        "object_support": 32,
+        "jaw_block": 67,
+        "robot_environment": 57
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 154.09406876377656,
+      "joint_limit_steps": 0,
+      "clipped_commands": 2
+    },
+    {
+      "scenario": "perturbation",
+      "episode": 12,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 112,
+      "simulation_seconds": 7.391999999999408,
+      "final_xyz": [
+        -0.17459563835249473,
+        -0.13008448104317466,
+        0.017999947532828905
+      ],
+      "max_lift_m": 0.06989227300953929,
+      "bilateral_lift_m": 0.06989227300953929,
+      "bilateral_contact_steps": 1662,
+      "contact_events": {
+        "object_support": 19,
+        "robot_environment": 8,
+        "jaw_block": 10
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 550.632162653127,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "perturbation",
+      "episode": 13,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 112,
+      "simulation_seconds": 7.391999999999408,
+      "final_xyz": [
+        -0.17885655333677145,
+        -0.13162890167982452,
+        0.017999947532828905
+      ],
+      "max_lift_m": 0.0726352504445715,
+      "bilateral_lift_m": 0.0726352504445715,
+      "bilateral_contact_steps": 1660,
+      "contact_events": {
+        "object_support": 19,
+        "robot_environment": 10,
+        "jaw_block": 14
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 739.2617380431783,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "perturbation",
+      "episode": 14,
+      "success": false,
+      "stable_placement": false,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 240,
+      "simulation_seconds": 15.84000000000196,
+      "final_xyz": [
+        -0.012484861450328706,
+        -0.2874059740208636,
+        0.011999944772097886
+      ],
+      "max_lift_m": 0.005379910907728963,
+      "bilateral_lift_m": 0.00128130097528871,
+      "bilateral_contact_steps": 3,
+      "contact_events": {
+        "object_support": 28,
+        "jaw_block": 83
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 548.288019722271,
+      "joint_limit_steps": 0,
+      "clipped_commands": 1
+    },
+    {
+      "scenario": "perturbation",
+      "episode": 15,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 112,
+      "simulation_seconds": 7.391999999999408,
+      "final_xyz": [
+        -0.18241888300137288,
+        -0.14174290142626597,
+        0.017999947532828915
+      ],
+      "max_lift_m": 0.07059884589981232,
+      "bilateral_lift_m": 0.07059884589981232,
+      "bilateral_contact_steps": 1659,
+      "contact_events": {
+        "object_support": 14,
+        "robot_environment": 10,
+        "jaw_block": 17
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 425.4691575079015,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "perturbation",
+      "episode": 16,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 113,
+      "simulation_seconds": 7.457999999999401,
+      "final_xyz": [
+        -0.17465459531222133,
+        -0.1365279549853054,
+        0.017978543447714865
+      ],
+      "max_lift_m": 0.07030623289150263,
+      "bilateral_lift_m": 0.07030623289150263,
+      "bilateral_contact_steps": 1666,
+      "contact_events": {
+        "object_support": 20,
+        "robot_environment": 9,
+        "jaw_block": 21
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 675.4439785700719,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "perturbation",
+      "episode": 17,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 112,
+      "simulation_seconds": 7.391999999999408,
+      "final_xyz": [
+        -0.17884879584149382,
+        -0.13963323511912976,
+        0.017988696206325698
+      ],
+      "max_lift_m": 0.06962151959644841,
+      "bilateral_lift_m": 0.06962151959644841,
+      "bilateral_contact_steps": 1653,
+      "contact_events": {
+        "object_support": 24,
+        "robot_environment": 9,
+        "jaw_block": 41
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 870.8964863690939,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "perturbation",
+      "episode": 18,
+      "success": false,
+      "stable_placement": false,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 240,
+      "simulation_seconds": 15.84000000000196,
+      "final_xyz": [
+        0.14807844701272388,
+        -0.218354807584937,
+        0.011999947532828929
+      ],
+      "max_lift_m": 0.007758235642971532,
+      "bilateral_lift_m": 0.007330974955498767,
+      "bilateral_contact_steps": 102,
+      "contact_events": {
+        "object_support": 42,
+        "jaw_block": 69,
+        "robot_environment": 23
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 504.5659570797451,
+      "joint_limit_steps": 0,
+      "clipped_commands": 28
+    },
+    {
+      "scenario": "perturbation",
+      "episode": 19,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 112,
+      "simulation_seconds": 7.391999999999408,
+      "final_xyz": [
+        -0.1763648074394619,
+        -0.13355453800244166,
+        0.017999947532828894
+      ],
+      "max_lift_m": 0.07278172113845614,
+      "bilateral_lift_m": 0.07278172113845614,
+      "bilateral_contact_steps": 1657,
+      "contact_events": {
+        "object_support": 14,
+        "robot_environment": 9,
+        "jaw_block": 23
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 588.532278915473,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "paraphrase",
+      "episode": 0,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 112,
+      "simulation_seconds": 7.391999999999408,
+      "final_xyz": [
+        -0.17797867011766946,
+        -0.13139299076438848,
+        0.017999947532828915
+      ],
+      "max_lift_m": 0.07001696352632147,
+      "bilateral_lift_m": 0.07001696352632147,
+      "bilateral_contact_steps": 1647,
+      "contact_events": {
+        "object_support": 12,
+        "robot_environment": 7,
+        "jaw_block": 23
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 512.1573793288609,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "paraphrase",
+      "episode": 1,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Put the red cube into the blue tray.",
+      "steps": 112,
+      "simulation_seconds": 7.391999999999408,
+      "final_xyz": [
+        -0.17783447721079468,
+        -0.14368137451768007,
+        0.017999947532828887
+      ],
+      "max_lift_m": 0.06840363381146941,
+      "bilateral_lift_m": 0.06840363381146941,
+      "bilateral_contact_steps": 1672,
+      "contact_events": {
+        "object_support": 23,
+        "jaw_block": 35,
+        "robot_environment": 6
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 820.0580675867103,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "paraphrase",
+      "episode": 2,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Lift the red block and move it to the blue container.",
+      "steps": 113,
+      "simulation_seconds": 7.457999999999401,
+      "final_xyz": [
+        -0.17613811797858586,
+        -0.13767010394323678,
+        0.017999947532828863
+      ],
+      "max_lift_m": 0.06913119298351492,
+      "bilateral_lift_m": 0.06913119298351492,
+      "bilateral_contact_steps": 1732,
+      "contact_events": {
+        "object_support": 16,
+        "jaw_block": 18,
+        "robot_environment": 14
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 766.3619894383338,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "paraphrase",
+      "episode": 3,
+      "success": false,
+      "stable_placement": false,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 240,
+      "simulation_seconds": 15.84000000000196,
+      "final_xyz": [
+        0.09343037308601139,
+        -0.16026592538323917,
+        0.011999947532828905
+      ],
+      "max_lift_m": 0.0049622076634473836,
+      "bilateral_lift_m": 0.001695307417014921,
+      "bilateral_contact_steps": 23,
+      "contact_events": {
+        "object_support": 48,
+        "jaw_block": 147,
+        "robot_environment": 43
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 244.44069863411215,
+      "joint_limit_steps": 0,
+      "clipped_commands": 4
+    },
+    {
+      "scenario": "paraphrase",
+      "episode": 4,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Put the red cube into the blue tray.",
+      "steps": 178,
+      "simulation_seconds": 11.748000000000593,
+      "final_xyz": [
+        -0.1758877376065497,
+        -0.12770267462318818,
+        0.017999947532828926
+      ],
+      "max_lift_m": 0.07565675261104962,
+      "bilateral_lift_m": 0.07565675261104962,
+      "bilateral_contact_steps": 1681,
+      "contact_events": {
+        "object_support": 29,
+        "jaw_block": 47,
+        "robot_environment": 15
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 1562.3761294505139,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "paraphrase",
+      "episode": 5,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Lift the red block and move it to the blue container.",
+      "steps": 113,
+      "simulation_seconds": 7.457999999999401,
+      "final_xyz": [
+        -0.17817796314584453,
+        -0.1320139733972588,
+        0.017999947532828908
+      ],
+      "max_lift_m": 0.06968622915600362,
+      "bilateral_lift_m": 0.06968622915600362,
+      "bilateral_contact_steps": 1729,
+      "contact_events": {
+        "object_support": 23,
+        "robot_environment": 14,
+        "jaw_block": 5
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 698.9815579588376,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "paraphrase",
+      "episode": 6,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 111,
+      "simulation_seconds": 7.325999999999415,
+      "final_xyz": [
+        -0.17310135901974663,
+        -0.13787530281444932,
+        0.01799994753282849
+      ],
+      "max_lift_m": 0.07048894720895371,
+      "bilateral_lift_m": 0.07048894720895371,
+      "bilateral_contact_steps": 1664,
+      "contact_events": {
+        "object_support": 6,
+        "robot_environment": 5,
+        "jaw_block": 24
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 731.8269301360638,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "paraphrase",
+      "episode": 7,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Put the red cube into the blue tray.",
+      "steps": 112,
+      "simulation_seconds": 7.391999999999408,
+      "final_xyz": [
+        -0.18367820343528507,
+        -0.13517182280023798,
+        0.0179999475328289
+      ],
+      "max_lift_m": 0.06998843128377089,
+      "bilateral_lift_m": 0.06998843128377089,
+      "bilateral_contact_steps": 1628,
+      "contact_events": {
+        "object_support": 16,
+        "robot_environment": 6,
+        "jaw_block": 12
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 766.4889572907273,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "paraphrase",
+      "episode": 8,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Lift the red block and move it to the blue container.",
+      "steps": 114,
+      "simulation_seconds": 7.523999999999393,
+      "final_xyz": [
+        -0.1786285485832822,
+        -0.13769441365236593,
+        0.017988696206325698
+      ],
+      "max_lift_m": 0.06838206435479813,
+      "bilateral_lift_m": 0.06838206435479813,
+      "bilateral_contact_steps": 1696,
+      "contact_events": {
+        "object_support": 29,
+        "robot_environment": 8,
+        "jaw_block": 32
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 968.6108271387461,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "paraphrase",
+      "episode": 9,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 112,
+      "simulation_seconds": 7.391999999999408,
+      "final_xyz": [
+        -0.1810383887951482,
+        -0.1398064632135894,
+        0.01799994753282892
+      ],
+      "max_lift_m": 0.07057144262442101,
+      "bilateral_lift_m": 0.07057144262442101,
+      "bilateral_contact_steps": 1665,
+      "contact_events": {
+        "object_support": 12,
+        "jaw_block": 18,
+        "robot_environment": 4
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 974.4555671547522,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "paraphrase",
+      "episode": 10,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Put the red cube into the blue tray.",
+      "steps": 111,
+      "simulation_seconds": 7.325999999999415,
+      "final_xyz": [
+        -0.1745777274178081,
+        -0.13921758621894578,
+        0.017999946783301416
+      ],
+      "max_lift_m": 0.06999888185542236,
+      "bilateral_lift_m": 0.06999888185542236,
+      "bilateral_contact_steps": 1666,
+      "contact_events": {
+        "object_support": 34,
+        "robot_environment": 15,
+        "jaw_block": 10
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 888.0336411964532,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "paraphrase",
+      "episode": 11,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Lift the red block and move it to the blue container.",
+      "steps": 232,
+      "simulation_seconds": 15.312000000001783,
+      "final_xyz": [
+        -0.18134340484809977,
+        -0.12903549271273715,
+        0.017999947532828905
+      ],
+      "max_lift_m": 0.07034622599688628,
+      "bilateral_lift_m": 0.07034622599688628,
+      "bilateral_contact_steps": 1704,
+      "contact_events": {
+        "object_support": 16,
+        "jaw_block": 36,
+        "robot_environment": 9
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 743.568003077784,
+      "joint_limit_steps": 0,
+      "clipped_commands": 1
+    },
+    {
+      "scenario": "paraphrase",
+      "episode": 12,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 112,
+      "simulation_seconds": 7.391999999999408,
+      "final_xyz": [
+        -0.17495041744074363,
+        -0.12978254059588248,
+        0.017999947532828915
+      ],
+      "max_lift_m": 0.06988490235865841,
+      "bilateral_lift_m": 0.06988490235865841,
+      "bilateral_contact_steps": 1663,
+      "contact_events": {
+        "object_support": 9,
+        "robot_environment": 8,
+        "jaw_block": 3
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 824.7303806784195,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "paraphrase",
+      "episode": 13,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Put the red cube into the blue tray.",
+      "steps": 113,
+      "simulation_seconds": 7.457999999999401,
+      "final_xyz": [
+        -0.1819671238960979,
+        -0.13287693234584164,
+        0.017999947532828898
+      ],
+      "max_lift_m": 0.0722446631124518,
+      "bilateral_lift_m": 0.0722446631124518,
+      "bilateral_contact_steps": 1657,
+      "contact_events": {
+        "object_support": 11,
+        "robot_environment": 10,
+        "jaw_block": 3
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 595.972802919003,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "paraphrase",
+      "episode": 14,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Lift the red block and move it to the blue container.",
+      "steps": 176,
+      "simulation_seconds": 11.616000000000549,
+      "final_xyz": [
+        -0.1871089416778268,
+        -0.13432220505861853,
+        0.017999947532828915
+      ],
+      "max_lift_m": 0.0694386807155879,
+      "bilateral_lift_m": 0.0694386807155879,
+      "bilateral_contact_steps": 1666,
+      "contact_events": {
+        "object_support": 21,
+        "jaw_block": 39,
+        "robot_environment": 8
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 955.9713752902735,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "paraphrase",
+      "episode": 15,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 113,
+      "simulation_seconds": 7.457999999999401,
+      "final_xyz": [
+        -0.18014787065997398,
+        -0.1412239812780394,
+        0.017963393781937707
+      ],
+      "max_lift_m": 0.07023184427210431,
+      "bilateral_lift_m": 0.07023184427210431,
+      "bilateral_contact_steps": 1664,
+      "contact_events": {
+        "object_support": 10,
+        "robot_environment": 8,
+        "jaw_block": 11
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 814.5229219409903,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "paraphrase",
+      "episode": 16,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Put the red cube into the blue tray.",
+      "steps": 114,
+      "simulation_seconds": 7.523999999999393,
+      "final_xyz": [
+        -0.17537145965212908,
+        -0.1371153834015813,
+        0.0179999475328289
+      ],
+      "max_lift_m": 0.07080168046274882,
+      "bilateral_lift_m": 0.07080168046274882,
+      "bilateral_contact_steps": 1724,
+      "contact_events": {
+        "object_support": 23,
+        "robot_environment": 8,
+        "jaw_block": 13
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 542.2926468893444,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "paraphrase",
+      "episode": 17,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Lift the red block and move it to the blue container.",
+      "steps": 113,
+      "simulation_seconds": 7.457999999999401,
+      "final_xyz": [
+        -0.1769801564644465,
+        -0.1408100554549069,
+        0.01796375598214667
+      ],
+      "max_lift_m": 0.06946227524682955,
+      "bilateral_lift_m": 0.06946227524682955,
+      "bilateral_contact_steps": 1733,
+      "contact_events": {
+        "object_support": 14,
+        "robot_environment": 14,
+        "jaw_block": 25
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 961.7372164213622,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    },
+    {
+      "scenario": "paraphrase",
+      "episode": 18,
+      "success": false,
+      "stable_placement": false,
+      "instruction": "Pick up the red block and place it in the blue tray.",
+      "steps": 240,
+      "simulation_seconds": 15.84000000000196,
+      "final_xyz": [
+        0.1479767752148221,
+        -0.21910751396673867,
+        0.011999947532828936
+      ],
+      "max_lift_m": 0.007758254273618981,
+      "bilateral_lift_m": 0.0073309789976576945,
+      "bilateral_contact_steps": 112,
+      "contact_events": {
+        "object_support": 39,
+        "jaw_block": 80,
+        "robot_environment": 23
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 504.5668778681664,
+      "joint_limit_steps": 0,
+      "clipped_commands": 27
+    },
+    {
+      "scenario": "paraphrase",
+      "episode": 19,
+      "success": true,
+      "stable_placement": true,
+      "instruction": "Put the red cube into the blue tray.",
+      "steps": 112,
+      "simulation_seconds": 7.391999999999408,
+      "final_xyz": [
+        -0.17999455908337644,
+        -0.13543749300248611,
+        0.0179999475328289
+      ],
+      "max_lift_m": 0.07296381042676657,
+      "bilateral_lift_m": 0.07296381042676657,
+      "bilateral_contact_steps": 1637,
+      "contact_events": {
+        "object_support": 22,
+        "robot_environment": 10,
+        "jaw_block": 15
+      },
+      "collision_free_success": false,
+      "max_contact_force_n": 366.62120847307693,
+      "joint_limit_steps": 0,
+      "clipped_commands": 0
+    }
+  ],
+  "image": "sha256:d5a5528889e506ff1c6b01c61914e5cf012c1e38c4a011693be691e82d04537e",
+  "source_sha256": {
+    "applications/smolvla/scripts/evaluate_workcell.py": "bbbb46203075d824eb804890e8152d7647f9e47487946b0727e8f616d65484bc",
+    "applications/smolvla/Dockerfile.workcell": "9af9e1dd62534e84bcf33fcb4ff8eb0137c45e85a2d1540c104d66cde0d59025",
+    "compositions/smolvla_workcell.yaml": "2a92ee6ca28810fd080c094ef0f0fe8c3c33e312f21a73c6942168337acf5157"
+  }
+}

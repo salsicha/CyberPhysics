@@ -1,0 +1,30 @@
+# Complete learned-policy/contact-physics evaluation in the checkpoint's own
+# SO-ARM100 embodiment. It does not send commands to hardware or the SO101 URDF.
+services:
+  workcell:
+    image: salsicha/cyberphysics:smolvla_workcell-${CYBERPHYSICS_TAG:-latest}
+    build:
+      context: ../applications/smolvla
+      dockerfile: Dockerfile.workcell
+      args:
+        TAG: ${CYBERPHYSICS_TAG:-latest}
+    gpus: all
+    user: ${LOCAL_UID:-1000}:${LOCAL_GID:-1000}
+    environment:
+      HOME: /tmp
+      MUJOCO_GL: egl
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility,graphics
+      HF_HOME: /workspace/cache/huggingface
+      HF_TOKEN: ${HF_TOKEN:-}
+      HF_HUB_OFFLINE: ${HF_HUB_OFFLINE:-0}
+      TRANSFORMERS_OFFLINE: ${TRANSFORMERS_OFFLINE:-0}
+    volumes:
+      - smolvla_workcell_cache:/workspace/cache
+      - ../generated/arm_validation/workcell:/workspace/results/workcell
+    command: >
+      python /workspace/smolvla_scripts/evaluate_workcell.py
+        --episodes ${VLA_EPISODES:-20}
+        --seed ${VLA_SEED:-123}
+        --scenarios ${VLA_SCENARIOS:-nominal,visual,physics,full,occlusion,perturbation,paraphrase}
+volumes:
+  smolvla_workcell_cache:

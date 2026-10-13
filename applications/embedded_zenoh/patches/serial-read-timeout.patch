@@ -1,0 +1,71 @@
+--- a/src/link/transport/serial/tty_posix.c
++++ b/src/link/transport/serial/tty_posix.c
+@@ -88,8 +88,9 @@
+     tty.c_cflag &= (tcflag_t)~PARENB;
+     tty.c_cflag &= (tcflag_t)~CSIZE;
+     tty.c_cflag |= (tcflag_t)CS8;
+-    tty.c_cc[VMIN] = 1;
+-    tty.c_cc[VTIME] = 0;
++    /* A lost initial handshake must not block a client forever. */
++    tty.c_cc[VMIN] = 0;
++    tty.c_cc[VTIME] = 5;
+ 
+     if (cfsetispeed(&tty, speed) != 0 || cfsetospeed(&tty, speed) != 0) {
+         close(fd);
+--- a/include/zenoh-pico/system/platform/rpi_pico.h
++++ b/include/zenoh-pico/system/platform/rpi_pico.h
+@@ -98,7 +98,7 @@
+ void _z_usb_uart_init();
+ void _z_usb_uart_deinit();
+ void _z_usb_uart_write(const uint8_t *buf, int length);
+-uint8_t _z_usb_uart_getc();
++int _z_usb_uart_getc();
+ #endif
+ 
+ #endif  // ZENOH_PICO_SYSTEM_RPI_PICO_TYPES_H
+--- a/src/system/rpi_pico/usb_uart.c
++++ b/src/system/rpi_pico/usb_uart.c
+@@ -226,8 +226,9 @@
+     _z_mutex_unlock(&_z_usb_uart_mutex);
+ }
+ 
+-uint8_t _z_usb_uart_getc() {
+-    uint8_t ret = 0;
++int _z_usb_uart_getc() {
++    z_clock_t started = z_clock_now();
++    int ret = 0;
+     bool ready = false;
+     while (true) {
+         _z_mutex_lock(&_z_usb_uart_mutex);
+--- a/src/system/rpi_pico/usb_uart.c
++++ b/src/system/rpi_pico/usb_uart.c
+@@ -239,6 +239,8 @@
+         _z_mutex_unlock(&_z_usb_uart_mutex);
+         if (ready) {
+             break;
++        } else if (z_clock_elapsed_ms(&started) >= 500) {
++            return -1;
+         } else {
+             z_sleep_ms(1);
+         }
+--- a/src/link/transport/serial/uart_rpi_pico.c
++++ b/src/link/transport/serial/uart_rpi_pico.c
+@@ -127,10 +127,15 @@
+ static size_t _z_uart_rpi_pico_read(_z_sys_net_socket_t sock, uint8_t *ptr, size_t len) {
+     for (size_t i = 0; i < len; i++) {
+ #if Z_FEATURE_LINK_SERIAL_USB == 1
+-        ptr[i] = (sock._serial == NULL) ? _z_usb_uart_getc() : uart_getc(sock._serial);
+-#else
++        if (sock._serial == NULL) {
++            int ch = _z_usb_uart_getc();
++            if (ch < 0) return i == 0 ? SIZE_MAX : i;
++            ptr[i] = (uint8_t)ch;
++            continue;
++        }
++#endif
++        if (!uart_is_readable_within_us(sock._serial, 500000)) return i == 0 ? SIZE_MAX : i;
+         ptr[i] = uart_getc(sock._serial);
+-#endif
+     }
+     return len;
+ }

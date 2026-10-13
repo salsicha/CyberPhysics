@@ -1,5 +1,13 @@
 # Arduino
 
+For the Pico 2 W and ESP32 ROS topic demos, the default is now
+[native Zenoh firmware](../embedded_zenoh/README.md) and
+`compositions/arduino.yaml`. Build/flash that firmware before migrating an
+existing board. The micro-ROS sources documented below remain a legacy
+XRCE/DDS fallback via `compositions/arduino_xrce.yaml`; they do not communicate
+with a native Zenoh router without reflashing. UNO Q and turret firmware keep
+their existing board-specific protocols.
+
 Arduino IDE 2.3.10, PlatformIO and arduino-cli in one image
 (`salsicha/cyberphysics:arduino-latest`, `make -C applications build_arduino`),
 with the projects in `scripts/` built at image build time:
@@ -130,7 +138,8 @@ Run on a real UNO Q (offline image, `up --no-build`): `set_led(1)` and
 logs "LED on" and "LED off" for messages 1, 5 and 0. The LED itself was not
 watched.
 
-The UNO Q can also host the micro-ROS agent for the Pico/ESP32 demos below, for
+The UNO Q can host a native Zenoh router for the new firmware, or a legacy
+micro-ROS agent for the Pico/ESP32 demos below, for
 example the agent of the repository's `ros2` image built for arm64
 (`make -C applications target_arm64 build_ros2`, about 4 GB) or the upstream
 `microros/micro-ros-agent:jazzy` image, with the Pico on the board's USB-C
@@ -142,9 +151,10 @@ here.
 - get ESP32 PoE board
 
 
-## Walkthrough:
+## Legacy micro-ROS walkthrough
 
-(This uses Raspberry Pi Pico 2 W)  
+(This uses Raspberry Pi Pico 2 W and Fast DDS. For native Zenoh use the linked
+firmware workflow above.)
 
 1. 
 cd Sub/ && pio run -e pico --target upload --upload-port /dev/ttyUSB0  
@@ -153,10 +163,10 @@ cd Sub/ && pio run -e pico --target upload --upload-port /dev/ttyUSB0
 Unplug and reconnect pico  
 
 3. 
-ros2 run micro_ros_agent micro_ros_agent serial --dev /dev/ttyACM0 baudrate=115200  
+RMW_IMPLEMENTATION=rmw_fastrtps_cpp ros2 run micro_ros_agent micro_ros_agent serial --dev /dev/ttyACM0 baudrate=115200
 
 4. 
-ros2 topic pub /micro_ros_arduino_subscriber std_msgs/msg/Int32 "data: 1" -1  
+RMW_IMPLEMENTATION=rmw_fastrtps_cpp ros2 topic pub /micro_ros_arduino_subscriber std_msgs/msg/Int32 "data: 1" -1
 
 
 
@@ -170,4 +180,3 @@ OR
 (If I switch to the non-daemon/root version of docker)  
 curl -fsSL https://raw.githubusercontent.com/platformio/platformio-core/develop/platformio/assets/system/99-platformio-udev.rules | sudo tee /etc/udev/rules.d/99-platformio-udev.rules  
 sudo service udev restart  
-

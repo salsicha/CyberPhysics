@@ -1,5 +1,11 @@
 # SmolVLA for SO101
 
+For a pretrained arm policy that runs on this computer without a gated model,
+use the [MuJoCo contact-physics workcell](WORKCELL.md). It completes learned
+pick-and-place trials with a public checkpoint and measures failures, contacts
+and robustness. Its embodiment is **SO-ARM100**, despite the checkpoint's
+`so101` name; it is separate from the SO101 Isaac adapter described below.
+
 This application builds a pinned Hugging Face LeRobot/SmolVLA image and serves a
 SmolVLA checkpoint to the existing CyberPhysics SO101 ROS 2 bridge. The separate
 [SO101 SmolVLA Isaac composition](../../compositions/so101_smolvla_isaac.yaml)

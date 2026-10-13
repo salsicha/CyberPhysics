@@ -106,6 +106,50 @@ jobs:
         timeout-minutes: 90
         run: .github/workflows/scripts/ci_build_image.sh ros2 --keep
 
+      - name: Native embedded Zenoh host and Pico 2 W firmware
+        id: embedded
+        if: ${{ !cancelled() && steps.ros2.outcome == 'success' }}
+        timeout-minutes: 30
+        run: |
+          .github/workflows/scripts/ci_build_image.sh embedded_zenoh --keep
+          mkdir -p embedded-firmware
+          id=$(docker create "$REPOSITORY:embedded_zenoh-latest")
+          docker cp "$id:/opt/embedded-pico/embedded_zenoh.uf2" embedded-firmware/
+          docker rm "$id"
+      - name: Native embedded Zenoh TCP and routed serial runtime
+        if: ${{ !cancelled() && steps.embedded.outcome == 'success' }}
+        timeout-minutes: 5
+        run: |
+          for args in '--transport tcp' '--transport serial --routed'; do
+            transport=$(cut -d ' ' -f2 <<< "$args")
+            docker run --rm --network none \
+              -v "$PWD/embedded-results/$transport:/results" \
+              --entrypoint bash "$REPOSITORY:embedded_zenoh-latest" -lc \
+              "source /opt/ros/jazzy/setup.bash && python3 /workspace/embedded_zenoh/tests/runtime_smoke.py $args --output /results"
+          done
+      - name: Native embedded Zenoh ESP32 Ethernet firmware
+        if: ${{ !cancelled() && steps.embedded.outcome == 'success' }}
+        timeout-minutes: 30
+        run: |
+          (cd applications && APP=embedded_zenoh TARGET=embedded_zenoh_esp32 \
+            DOCKERFILE=Dockerfile.esp32 ./_build_it.sh)
+          id=$(docker create "$REPOSITORY:embedded_zenoh_esp32-latest")
+          for file in firmware.bin bootloader.bin partitions.bin; do
+            docker cp "$id:/opt/embedded-esp32/.pio/build/esp32dev/$file" "embedded-firmware/esp32-$file"
+          done
+          docker rm "$id"
+      - name: Upload embedded firmware and protocol measurements
+        if: ${{ !cancelled() && steps.embedded.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: embedded-zenoh
+          path: |
+            embedded-firmware/
+            embedded-results/
+      - name: Remove embedded build images
+        if: ${{ !cancelled() && steps.embedded.outcome == 'success' }}
+        run: docker image rm "$REPOSITORY:embedded_zenoh_esp32-latest" "$REPOSITORY:embedded_zenoh-latest" || true
+
       - name: racecarneo
         if: ${{ !cancelled() && steps.ros2.outcome == 'success' }}
         timeout-minutes: 60

@@ -1,0 +1,45 @@
+
+## Explicit legacy XRCE-DDS fallback; native Zenoh is in arduino.yaml.
+
+services:
+  # Device must be unplugged and replugged after flashing is complete before the agent can connect
+  arduino:
+    profiles: [flash]
+    network_mode: "host"
+    image: salsicha/cyberphysics:arduino-latest
+    depends_on:
+      - uros
+    privileged: true
+    volumes:
+      - "/tmp/.X11-unix:/tmp/.X11-unix"
+    devices:
+      - /dev:/dev
+    command: >
+      bash -c "cd Sub && pio run -e pico --target upload --upload-port /dev/ttyUSB0"
+    restart: "no"
+  uros:
+    network_mode: "host"
+    image: salsicha/cyberphysics:ros2-${CYBERPHYSICS_TAG:-latest}
+    # Requires the original XRCE firmware. Does not communicate with native Zenoh.
+    environment:
+      RMW_IMPLEMENTATION: rmw_fastrtps_cpp
+    privileged: true
+    devices:
+      - /dev:/dev
+    volumes:
+      - /dev/shm:/dev/shm
+    command: >
+      ros2 run micro_ros_agent micro_ros_agent serial --dev /dev/ttyACM0 -b 115200
+    # command: > # WiFi:
+    #   ros2 run micro_ros_agent micro_ros_agent udp4 --port 8888 -v6
+  ros_sub:
+    network_mode: "host"
+    image: salsicha/cyberphysics:ros2-${CYBERPHYSICS_TAG:-latest}
+    environment:
+      RMW_IMPLEMENTATION: rmw_fastrtps_cpp
+    volumes:
+      - /dev/shm:/dev/shm
+    command: >
+      ros2 topic pub /micro_ros_arduino_subscriber std_msgs/msg/Int32 "data: 1" -1
+    # command: >
+    #   ros2 topic echo --qos-durability=transient_local /micro_ros_arduino_node_publisher std_msgs/msg/Int32

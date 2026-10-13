@@ -1,0 +1,13 @@
+ARG TAG=latest
+FROM salsicha/cyberphysics:smolvla-${TAG}
+ARG WORKCELL_REF=5822ac1dd508c92183fd8ecc99f91d6ec386549b
+RUN apt-get update && apt-get install -y --no-install-recommends libegl1 libgl1 libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+RUN GIT_LFS_SKIP_SMUDGE=1 git clone https://github.com/ahmedsohail2003/workcell-partA-imitation.git /opt/workcell \
+    && git -C /opt/workcell checkout "${WORKCELL_REF}" \
+    && uv pip install --python /opt/lerobot/.venv/bin/python \
+       "mujoco==3.10.0" "imageio==2.38.1" "imageio-ffmpeg==0.6.0" /opt/workcell
+ENV MUJOCO_GL=egl NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics
+RUN chmod 1777 /workspace/cache
+COPY scripts/ /workspace/smolvla_scripts/
+CMD ["python", "/workspace/smolvla_scripts/evaluate_workcell.py"]

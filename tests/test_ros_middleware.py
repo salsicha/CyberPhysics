@@ -53,9 +53,18 @@ def test_explicit_remote_endpoint_reaches_included_flight_nodes():
             assert values['ZENOH_CONFIG_OVERRIDE'] == config, name
 
 
-def test_micro_ros_agent_and_its_client_remain_on_the_same_dds_backend():
+def test_embedded_default_is_native_zenoh_and_xrce_is_explicit_legacy():
     import yaml
     services = yaml.safe_load((REPO / 'compositions/arduino.yaml').read_text())['services']
+    assert 'uros' not in services
+    for service in services.values():
+        assert service['environment']['RMW_IMPLEMENTATION'] == 'rmw_zenoh_cpp'
+    serial = services['serial_router']
+    assert serial['profiles'] == ['usb']
+    assert 'serial//dev/zenoh_mcu#baudrate=115200' in serial['environment']['ZENOH_CONFIG_OVERRIDE']
+    assert serial['devices'] == ['${ZENOH_SERIAL_DEVICE:-/dev/ttyACM0}:/dev/zenoh_mcu']
+    assert all('privileged' not in service for service in services.values())
+    services = yaml.safe_load((REPO / 'compositions/arduino_xrce.yaml').read_text())['services']
     for name in ('uros', 'ros_sub'):
         assert services[name]['environment']['RMW_IMPLEMENTATION'] == 'rmw_fastrtps_cpp'
 

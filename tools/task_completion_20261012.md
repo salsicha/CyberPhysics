@@ -1,5 +1,12 @@
 # Requested-task completion audit — 12 October 2026
 
+**Latest VLA/MCU follow-up:** [implementation and measured acceptance](vla_embedded_validation_20261012.md).
+The default MCU examples now have native Zenoh firmware builds and protocol
+tests; the legacy XRCE agent is opt-in. A trained SO-ARM100 contact-physics VLA
+demo now runs, with measured placement successes and explicit reliability and
+collision failures. The earlier audit below is retained as a record, not a
+claim that physical MCU validation or robust learned SO101 manipulation is done.
+
 The earlier work did not close every item. This follow-up found a failing VINS
 CI runtime check, an x86 PyTorch image-build error, a Space ROS DDS exception,
 and remaining turret perception/tracking failures. They were investigated and
@@ -20,8 +27,8 @@ explicit limits rather than successful tests.
 | Match aerial simulators to STL airframe and verify 3.17 kg | Both consume the same assembled geometry, COM, inertia and propulsion data. Loaded CAD/BOM estimate is **3.164661 kg**. Actual aircraft weighing remains unavailable. |
 | Pi MAVROS CPU, offline-FC startup, Docker ownership, BlueOS logs | Complete and tested on 192.168.1.193: configured idle CPU about 4.8% of one core under Zenoh; detached startup returns with FC unavailable; ownership repaired; lossless log archival reclaimed 597 MiB with active maintenance timer. Existing BlueOS containers remain running. |
 | Attached OAK-1 hardware test | Complete device/stream tests on the Pi and across the LAN: matched tracking timestamps, finite relative depth and no unmatched tracking frames. USB 2 was negotiated. An uncontrolled view cannot establish target/depth accuracy. |
-| Replace ROS 2 DDS backend with Zenoh | Native `rmw_zenoh_cpp` is the shared default. Real topics, services, actions, restart recovery, Pi camera traffic and flight simulations passed. Space ROS core and message dispatchers are also rebuilt and tested. The micro-ROS XRCE agent/subscriber pair retains its explicit DDS boundary; it requires a distinct firmware/agent migration. |
-| Test transformer end-effector/arm workflows and fix issues | SmolVLA inference fits (~933 MiB allocated); PushT completes 3/3 tested episodes (~1,099 MiB). Normalization, strict loading, APIs, telemetry and access checks fixed. π0 and GR00T hit authenticated gated-model denials; GR00T additionally requires a larger supported GPU budget. No matching trained SO101 checkpoint is available. [Full findings](arm_policy_validation_20261012.md). |
+| Replace ROS 2 DDS backend with Zenoh | Native `rmw_zenoh_cpp` is the shared default. Real topics, services, actions, restart recovery, Pi camera traffic and flight simulations passed. Space ROS is rebuilt and tested. Pico/ESP32 demos now have native Pico-ROS/zenoh-pico firmware builds with passing TCP/serial protocol tests; physical-board validation is pending. The old XRCE/DDS pair is an explicit fallback. [Firmware follow-up](vla_embedded_validation_20261012.md). |
+| Test transformer end-effector/arm workflows and fix issues | SmolVLA and PushT fit and run. A new public trained SO-ARM100 workcell completes 97/140 contact-physics tasks (14/20 nominal), but fails collision-free acceptance and is distinct from the SO101 Isaac embodiment. π0/GR00T gated access, GR00T GPU requirements, and a matching SO101 checkpoint remain limitations. [Original findings](arm_policy_validation_20261012.md), [learned-arm follow-up](vla_embedded_validation_20261012.md). |
 | Assess actuated launcher magazine/chambering mechanics | CAD/control review and simulated cycles complete. Design has an integrated six-dart clip, not a standard removable Nerf magazine. Chambering occurs during each next firing cycle. Reliable physical feeding, sealing and repeated launching require an assembled mechanism; the servo/sear model is not a feed-physics test. |
 
 ## Follow-up turret results

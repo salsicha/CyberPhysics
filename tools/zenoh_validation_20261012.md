@@ -31,8 +31,11 @@ clients explicitly use client mode and disable multicast. Native Zenoh
 Humble/Jazzy graphs do not interoperate, nor does native Zenoh directly
 exchange ROS messages with DDS or `zenoh-bridge-ros2dds`.
 
-The micro-ROS XRCE agent and its paired subscriber explicitly retain Fast
-DDS. Space ROS and its lunar rover graph now use native Zenoh after the
+The original micro-ROS XRCE agent and its paired subscriber explicitly retain
+Fast DDS in `arduino_xrce.yaml`. A [subsequent firmware migration](vla_embedded_validation_20261012.md)
+replaces the default Pico/ESP32 demo with Pico-ROS/zenoh-pico, tested over native
+TCP and serial framing; physical-board acceptance remains pending.
+Space ROS and its lunar rover graph now use native Zenoh after the
 follow-up source rebuild below. MAVLink, USB, ZeroMQ policy RPC, Gazebo Transport and Foxglove WebSocket
 transport are unchanged. Persistent 4 MiB socket limits and Fast DDS profiles
 remain for the explicit DDS fallback. The Zenoh TCP path skips the DDS UDP

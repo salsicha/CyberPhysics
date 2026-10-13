@@ -1,0 +1,37 @@
+{
+  "hardware_test": false,
+  "pico_and_host_image": "sha256:ee2a14535a94c50b8a1c818f3c33c0354583555d1a8d36a4be744786abad3f29",
+  "esp32_image": "sha256:36752c42ba59aa52f8f1391ebf61860f8b240d470e784f05bdaac574e1176733",
+  "source_sha256": {
+    "applications/embedded_zenoh/src/demo.c": "2c1f251afc2ba203f6f6a5e2b03b60c3dac7fb65b895eecd6738e0bf127246b4",
+    "applications/embedded_zenoh/src/demo.h": "9486872073edbbf9cce1e46bb9cf7b908f40c42610304e4445bd4fd539646dcc",
+    "applications/embedded_zenoh/src/host.c": "e575ab811cb8786813a3ff06eba6598fd94016e008b818ed1cdaca3e25d7bfdf",
+    "applications/embedded_zenoh/src/pico.c": "f61b6f7cc8b1f8f144da07c2f3b62e1adb0a39b606b713f14681774dab52f330",
+    "applications/embedded_zenoh/patches/serial-read-timeout.patch": "472dcbaead70a3e1960f69f686478984ed779a6dad4b8954630be3f2308da5fb",
+    "applications/embedded_zenoh/patches/serial-reset.patch": "4d4f2c69690889e69ed8aa79d275900aa9e8bc49d874b55b5a1d50e0489cf5de",
+    "applications/embedded_zenoh/patches/stream-eof.patch": "8ac7c63ce4ee4a630ca9e9d7623ce26b4b9e112d4d7af0a14d3d29f18d19b732",
+    "applications/embedded_zenoh/patches/usb-write-timeout.patch": "3f56f23373a28e1ba0abe575594c84f37db47f5dba73feb48b4ec518f47ffe0f",
+    "applications/embedded_zenoh/CMakeLists.txt": "451baa612b3c5ef1dad6338174c9a429255bde2877fe711191195cfc9040f480",
+    "applications/embedded_zenoh/Dockerfile": "22738ea4a5170bd30ff40c675158e76bb4d0506fb48256633d3d39d8509d7fbe",
+    "applications/embedded_zenoh/Dockerfile.esp32": "d5fd4b2cc018299172e8bd806a9430403aec6e2003a96b9036042fbae458cb7d",
+    "applications/embedded_zenoh/stage_esp32.py": "1ab98ad40b7d8f5774198e6770bb6e263c38d2fe3fb12e81aa1417e9959962f4",
+    "applications/embedded_zenoh/tests/runtime_smoke.py": "42aa088b1dada9f3ddde36d47d8682303d5ed3835c3066c391b18107f1c188cf",
+    "applications/embedded_zenoh/esp32/src/main.cpp": "08f81a5f02203e0f01db248eeea4bc061856f75bc85a5fbd9f8bff98af07241d",
+    "applications/embedded_zenoh/esp32/platformio.ini": "052f06322bedaf2fa49ffd968f4986f7672ccac8721bc39bcbc2704c23a7f3ab"
+  },
+  "pico_sections_bytes": {
+    "text": 451944,
+    "data": 0,
+    "bss": 187132
+  },
+  "esp32_static_ram_bytes": 45196,
+  "esp32_flash_bytes": 859977,
+  "pico_build_output": "   text\t   data\t    bss\t    dec\t    hex\tfilename\n 451944\t      0\t 187132\t 639076\t  9c064\t/opt/embedded-pico/embedded_zenoh.elf\n377ed30d49d184af676518b3388600a366bab7682266a307f39c3157b0bb4be8  /opt/embedded-pico/embedded_zenoh.uf2\nbe555e3d6af0cfaf008cecdbd54c328335775e4d58c27eabd099e38bf80b39e2  /opt/embedded-host/embedded_zenoh\nros-jazzy-rmw-zenoh-cpp\t0.2.11-1noble.20260915.171026\nros-jazzy-zenoh-cpp-vendor\t0.2.11-1noble.20260914.172423\n",
+  "esp32_build_output": "07bc9cf3f3c91320cb2b09d19a69789bf0422b7dd3f8450dc6a04a67fd76045f  /opt/embedded-esp32/.pio/build/esp32dev/firmware.bin\n3d234a7471f67b013686dabd4dee7c1fa915c9928463616a94bc9297acf1abf8  /opt/embedded-esp32/.pio/build/esp32dev/bootloader.bin\n148b959cbff1c38aa8e1d5c0ba9d612c54997b945e56a63f41223eef650653a1  /opt/embedded-esp32/.pio/build/esp32dev/partitions.bin\n",
+  "regression": {
+    "passed": 2162,
+    "skipped": 6,
+    "seconds": 66.75,
+    "excluded": "Three CadQuery build/metadata/documentation test modules; printable geometry unchanged"
+  }
+}

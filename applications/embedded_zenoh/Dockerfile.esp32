@@ -1,0 +1,11 @@
+ARG TAG=latest
+FROM salsicha/cyberphysics:embedded_zenoh-${TAG}
+RUN apt-get update && apt-get install -y --no-install-recommends python3-venv && \
+    rm -rf /var/lib/apt/lists/* && \
+    python3 -m venv /opt/platformio && \
+    /opt/platformio/bin/pip install --no-cache-dir platformio==6.2.0
+ENV PATH=/opt/platformio/bin:$PATH
+COPY . /workspace/embedded_zenoh
+RUN python3 /workspace/embedded_zenoh/stage_esp32.py --destination /opt/embedded-esp32 && \
+    cd /opt/embedded-esp32 && pio run
+CMD ["bash"]

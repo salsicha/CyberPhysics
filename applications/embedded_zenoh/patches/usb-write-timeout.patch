@@ -1,0 +1,48 @@
+--- a/include/zenoh-pico/system/platform/rpi_pico.h
++++ b/include/zenoh-pico/system/platform/rpi_pico.h
+@@ -97,7 +97,7 @@
+ #if Z_FEATURE_LINK_SERIAL_USB == 1
+ void _z_usb_uart_init();
+ void _z_usb_uart_deinit();
+-void _z_usb_uart_write(const uint8_t *buf, int length);
++size_t _z_usb_uart_write(const uint8_t *buf, int length);
+ int _z_usb_uart_getc();
+ #endif
+ 
+--- a/src/system/rpi_pico/usb_uart.c
++++ b/src/system/rpi_pico/usb_uart.c
+@@ -205,9 +205,11 @@
+     tud_deinit(BOARD_TUD_RHPORT);
+ }
+ 
+-void _z_usb_uart_write(const uint8_t *buf, int length) {
++size_t _z_usb_uart_write(const uint8_t *buf, int length) {
++    z_clock_t started = z_clock_now();
++    int i = 0;
+     _z_mutex_lock(&_z_usb_uart_mutex);
+-    for (int i = 0; i < length;) {
++    while (i < length && tud_cdc_connected() && z_clock_elapsed_ms(&started) < 1000) {
+         int n = length - i;
+         int avail = (int)tud_cdc_write_available();
+         if (n > avail) {
+--- a/src/system/rpi_pico/usb_uart.c
++++ b/src/system/rpi_pico/usb_uart.c
+@@ -226,6 +226,7 @@
+         }
+     }
+     _z_mutex_unlock(&_z_usb_uart_mutex);
++    return (size_t)i;
+ }
+ 
+ int _z_usb_uart_getc() {
+--- a/src/link/transport/serial/uart_rpi_pico.c
++++ b/src/link/transport/serial/uart_rpi_pico.c
+@@ -143,7 +143,7 @@
+ static size_t _z_uart_rpi_pico_write(_z_sys_net_socket_t sock, const uint8_t *ptr, size_t len) {
+     if (sock._serial == NULL) {
+ #if Z_FEATURE_LINK_SERIAL_USB == 1
+-        _z_usb_uart_write(ptr, (int)len);
++        return _z_usb_uart_write(ptr, (int)len);
+ #endif
+     } else {
+         uart_write_blocking(sock._serial, ptr, len);

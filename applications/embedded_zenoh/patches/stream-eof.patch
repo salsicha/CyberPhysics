@@ -1,0 +1,35 @@
+--- a/src/transport/unicast/read.c
++++ b/src/transport/unicast/read.c
+@@ -39,6 +39,8 @@
+ 
+ static z_result_t _z_unicast_process_messages(_z_transport_unicast_t *ztu, _z_transport_peer_unicast_t *peer,
+                                               size_t to_read) {
++    // Stream EOF is distinct from a temporarily empty receive buffer.
++    if (to_read == SIZE_MAX) return _Z_ERR_CONNECTION_CLOSED;
+     // Wrap the main buffer to_read bytes
+     _z_zbuf_t zbuf;
+     if (peer->flow_state == _Z_FLOW_STATE_READY) {
+@@ -85,7 +87,10 @@
+     switch (ztu->_common._link->_cap._flow) {
+         case Z_LINK_CAP_FLOW_STREAM:
+             if (_z_zbuf_len(&ztu->_common._zbuf) < _Z_MSG_LEN_ENC_SIZE) {
+-                _z_link_socket_recv_zbuf(ztu->_common._link, &ztu->_common._zbuf, peer->_socket);
++                if (_z_link_socket_recv_zbuf(ztu->_common._link, &ztu->_common._zbuf, peer->_socket) == 0) {
++                    *to_read = SIZE_MAX;
++                    return true;
++                }
+                 if (_z_zbuf_len(&ztu->_common._zbuf) < _Z_MSG_LEN_ENC_SIZE) {
+                     _z_zbuf_compact(&ztu->_common._zbuf);
+                     return false;
+@@ -95,7 +100,10 @@
+             *to_read = _z_read_stream_size(&ztu->_common._zbuf);
+             // Read data
+             if (_z_zbuf_len(&ztu->_common._zbuf) < *to_read) {
+-                _z_link_socket_recv_zbuf(ztu->_common._link, &ztu->_common._zbuf, peer->_socket);
++                if (_z_link_socket_recv_zbuf(ztu->_common._link, &ztu->_common._zbuf, peer->_socket) == 0) {
++                    *to_read = SIZE_MAX;
++                    return true;
++                }
+                 if (_z_zbuf_len(&ztu->_common._zbuf) < *to_read) {
+                     _z_zbuf_set_rpos(&ztu->_common._zbuf, _z_zbuf_get_rpos(&ztu->_common._zbuf) - _Z_MSG_LEN_ENC_SIZE);
+                     _z_zbuf_compact(&ztu->_common._zbuf);

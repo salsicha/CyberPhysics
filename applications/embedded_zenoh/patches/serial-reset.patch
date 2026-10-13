@@ -1,0 +1,30 @@
+--- a/src/link/transport/upper/serial_protocol.c
++++ b/src/link/transport/upper/serial_protocol.c
+@@ -280,8 +280,11 @@
+ }
+ 
+ size_t _z_read_serial(const _z_sys_net_socket_t sock, uint8_t *ptr, size_t len) {
+-    uint8_t header;
+-    return _z_read_serial_internal(sock, &header, ptr, len);
++    uint8_t header = 0;
++    size_t size = _z_read_serial_internal(sock, &header, ptr, len);
++    /* Distinguish a reset/handshake from an idle read timeout (SIZE_MAX). */
++    if (size != SIZE_MAX && header != 0) return SIZE_MAX - 1;
++    return size;
+ }
+ 
+ size_t _z_send_serial(const _z_sys_net_socket_t sock, const uint8_t *ptr, size_t len) {
+--- a/src/transport/unicast/read.c
++++ b/src/transport/unicast/read.c
+@@ -116,6 +116,11 @@
+             *to_read = _z_link_socket_recv_zbuf(ztu->_common._link, &ztu->_common._zbuf, peer->_socket);
+             if (*to_read == SIZE_MAX) {
+                 return false;
++            }
++            /* A serial reset requests a fresh transport handshake. */
++            if (*to_read == SIZE_MAX - 1) {
++                *to_read = SIZE_MAX;
++                return true;
+             }
+             break;
+         default:

@@ -24,6 +24,10 @@ docker compose -f compositions/<stack>.yaml down --remove-orphans
 
 ## Examples
 
+`smolvla_workcell.yaml` runs the [learned SO-ARM100 contact workcell](../applications/smolvla/WORKCELL.md).
+`arduino.yaml` runs [native Zenoh MCU routers](../applications/embedded_zenoh/README.md)
+after flashing the new firmware; `arduino_xrce.yaml` preserves the legacy DDS/XRCE demo.
+
 ```bash
 docker compose -f compositions/marimo.yaml up
 docker compose -f compositions/racecarneo.yaml up

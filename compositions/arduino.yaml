@@ -1,45 +1,37 @@
-
-## Arduino and MicroROS
-
+# Native Zenoh replacement for the former micro-ROS DDS demos.
+# Reflash Pico/ESP32 with applications/embedded_zenoh first.
+# TCP/Ethernet: docker compose -f compositions/arduino.yaml up -d
+# Pico USB: add --profile usb. Flashing is an explicit, separate step.
 services:
-  # Device must be unplugged and replugged after flashing is complete before the agent can connect
-  arduino:
-    network_mode: "host"
-    image: salsicha/cyberphysics:arduino-latest
-    depends_on:
-      - uros
-    privileged: true
-    volumes:
-      - "/tmp/.X11-unix:/tmp/.X11-unix"
-    devices:
-      - /dev:/dev
-    command: >
-      bash -c "cd Sub && pio run -e pico --target upload --upload-port /dev/ttyUSB0"
-    restart: "no"
-  uros:
-    network_mode: "host"
-    image: salsicha/cyberphysics:ros2-latest
-    # The micro-ROS XRCE agent is DDS-specific. Keep this isolated graph on
-    # Fast DDS until an explicit MCU/ROS bridge migration is validated.
+  zenoh_router:
+    image: salsicha/cyberphysics:ros2-${CYBERPHYSICS_TAG:-latest}
+    network_mode: host
     environment:
-      RMW_IMPLEMENTATION: rmw_fastrtps_cpp
-    privileged: true
+      RMW_IMPLEMENTATION: rmw_zenoh_cpp
+      ZENOH_CONFIG_OVERRIDE: 'listen/endpoints=["tcp/0.0.0.0:${ZENOH_PORT:-7448}"];connect/endpoints=[];scouting/multicast/enabled=true;transport/link/tx/lease=10000;transport/link/tx/keep_alive=2'
+    command: ros2 run rmw_zenoh_cpp rmw_zenohd
+    stop_signal: SIGINT
+    restart: unless-stopped
+  serial_router:
+    profiles: [usb]
+    image: salsicha/cyberphysics:ros2-${CYBERPHYSICS_TAG:-latest}
+    network_mode: host
+    depends_on: [zenoh_router]
     devices:
-      - /dev:/dev
-    volumes:
-      - /dev/shm:/dev/shm
-    command: > 
-      ros2 run micro_ros_agent micro_ros_agent serial --dev /dev/ttyACM0 -b 115200
-    # command: > # WiFi:
-    #   ros2 run micro_ros_agent micro_ros_agent udp4 --port 8888 -v6
+      - ${ZENOH_SERIAL_DEVICE:-/dev/ttyACM0}:/dev/zenoh_mcu
+    environment:
+      RMW_IMPLEMENTATION: rmw_zenoh_cpp
+      ZENOH_CONFIG_OVERRIDE: 'listen/endpoints=["serial//dev/zenoh_mcu#baudrate=115200"];connect/endpoints=["tcp/127.0.0.1:${ZENOH_PORT:-7448}"];scouting/multicast/enabled=false;transport/link/tx/lease=10000;transport/link/tx/keep_alive=2'
+    command: ros2 run rmw_zenoh_cpp rmw_zenohd
+    stop_signal: SIGINT
+    restart: unless-stopped
   ros_sub:
-    network_mode: "host"
-    image: salsicha/cyberphysics:ros2-latest
+    profiles: [tools]
+    image: salsicha/cyberphysics:ros2-${CYBERPHYSICS_TAG:-latest}
+    network_mode: host
     environment:
-      RMW_IMPLEMENTATION: rmw_fastrtps_cpp
-    volumes:
-      - /dev/shm:/dev/shm
-    command: >
-      ros2 topic pub /micro_ros_arduino_subscriber std_msgs/msg/Int32 "data: 1" -1
-    # command: >
-    #   ros2 topic echo --qos-durability=transient_local /micro_ros_arduino_node_publisher std_msgs/msg/Int32
+      ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
+      RMW_IMPLEMENTATION: rmw_zenoh_cpp
+      ZENOH_ROUTER_CHECK_ATTEMPTS: "0"
+      ZENOH_CONFIG_OVERRIDE: 'mode="client";listen/endpoints=[];connect/endpoints=["tcp/127.0.0.1:${ZENOH_PORT:-7448}"];scouting/multicast/enabled=false'
+    command: [ros2, topic, pub, --once, /micro_ros_arduino_subscriber, std_msgs/msg/Int32, 'data: 1']

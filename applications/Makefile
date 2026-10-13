@@ -45,6 +45,10 @@ build_aerostack2:
 	APP=aerostack2 ./_build_it.sh
 build_arduino:
 	APP=arduino ./_build_it.sh
+build_embedded_zenoh: build_ros2
+	APP=embedded_zenoh ./_build_it.sh
+build_embedded_zenoh_esp32: build_embedded_zenoh
+	APP=embedded_zenoh TARGET=embedded_zenoh_esp32 DOCKERFILE=Dockerfile.esp32 ./_build_it.sh
 build_blackfly: build_ros2
 	APP=blackfly ./_build_it.sh
 build_ardupilot_sitl:
@@ -65,6 +69,8 @@ build_groot:
 	APP=groot ./_build_it.sh
 build_smolvla:
 	APP=smolvla ./_build_it.sh
+build_smolvla_workcell: build_smolvla
+	APP=smolvla TARGET=smolvla_workcell DOCKERFILE=Dockerfile.workcell ./_build_it.sh
 build_demnav: build_aerostack2
 	APP=demnav ./_build_it.sh
 build_matlab:

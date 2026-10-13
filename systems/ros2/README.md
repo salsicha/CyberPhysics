@@ -83,10 +83,13 @@ communicating nodes must use the same middleware. The retained Fast DDS image
 profiles and persistent 4 MiB host receive/send limits still serve this path.
 The default Zenoh TCP transport does not need the DDS UDP buffer preflight.
 
-`compositions/arduino.yaml` deliberately keeps its micro-ROS XRCE agent and
-paired ROS subscriber on Fast DDS. The agent's DDS implementation is not an
-RMW selection switch. Native Zenoh integration for microcontrollers requires
-a separate firmware/agent migration.
+`compositions/arduino.yaml` now uses native Zenoh for the MCU demos. Reflash the
+Pico 2 W or ESP32 with [the Pico-ROS/zenoh-pico firmware](../../applications/embedded_zenoh/README.md)
+to retain the same ROS topics without an XRCE/DDS agent. Existing micro-ROS
+firmware still requires `compositions/arduino_xrce.yaml`, whose agent and paired
+subscriber explicitly use Fast DDS. An RMW environment variable cannot change
+the micro-ROS agent's DDS implementation. This migration covers the example
+topics, not every micro-ROS API; physical-board validation is still pending.
 
 The pinned `osrf/space-ros:jazzy-2026.07.0` base originally hard-wired Cyclone
 DDS and introspection-only message dispatch. `applications/spaceros/enable_zenoh.sh`

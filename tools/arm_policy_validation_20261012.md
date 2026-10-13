@@ -1,7 +1,14 @@
 # Arm and end-effector policy validation — 12 October 2026
 
+**Follow-up:** a public trained SmolVLA checkpoint now runs in its matching
+SO-ARM100 MuJoCo workcell with actual contact grasps. The
+[new evaluation](vla_embedded_validation_20261012.md) records 140 rollouts and
+remaining collision/reliability failures. It is distinct from the SO101 Isaac
+scene. The results below describe the earlier workflows and remain historical
+evidence; the new workcell does not remove their checkpoint/access constraints.
+
 SmolVLA and PushT run on this computer's GPU. None of the available workflows
-currently demonstrates a complete VLA-controlled arm task with a trained
+at the time of this initial test demonstrated a complete VLA-controlled arm task with a trained
 checkpoint and validated grasp physics.
 
 The host has an NVIDIA RTX 4000 Ada Generation Laptop GPU, 12,282 MiB VRAM,

@@ -472,6 +472,7 @@ The repository contains several different kinds of policy examples:
 
 | Workflow | What it actually demonstrates |
 | --- | --- |
+| `smolvla_workcell.yaml` | Public fine-tuned SmolVLA in its matching SO-ARM100 MuJoCo workcell, with real jaw contacts. Separate embodiment; [measured results and limitations](../smolvla/WORKCELL.md). |
 | `so101_smolvla_isaac.yaml` | A SmolVLA adapter for rendered RGB, joint state and language. It needs a fine-tuned checkpoint with valid normalization; the public base is rejected for joint control. |
 | `so101_groot_isaac.yaml`, real mode | GR00T wiring for a fine-tuned SO101 checkpoint; requires its trained embodiment contract, gated backbone access and sufficient GPU memory. |
 | GR00T demo mode | A scripted, ground-truth-assisted placement baseline. It is not neural policy inference. |
