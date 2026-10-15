@@ -69,6 +69,8 @@ build_groot:
 	APP=groot ./_build_it.sh
 build_peract:
 	APP=peract ./_build_it.sh
+build_act3d: build_peract
+	APP=act3d ./_build_it.sh
 build_smolvla:
 	APP=smolvla ./_build_it.sh
 build_smolvla_workcell: build_smolvla

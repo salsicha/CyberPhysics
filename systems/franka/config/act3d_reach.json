@@ -1,0 +1,29 @@
+{
+  "task": "reach_colored_block",
+  "instructions": ["reach above the red block", "reach above the blue block"],
+  "seed": 123,
+  "episodes": 20,
+  "camera_resolution": [128, 128],
+  "workspace_bounds": [0.25, -0.30, 0.0, 0.75, 0.30, 0.50],
+  "spawn_bounds": [0.36, -0.22, 0.62, 0.22],
+  "block_size": 0.045,
+  "reach_height": 0.20,
+  "position_tolerance": 0.025,
+  "settle_steps": 30,
+  "max_motion_steps": 600,
+  "physics_hz": 60,
+  "model": {
+    "embedding_dim": 60,
+    "num_attn_heads": 4,
+    "num_ghost_point_cross_attn_layers": 2,
+    "num_query_cross_attn_layers": 2,
+    "num_vis_ins_attn_layers": 2,
+    "num_ghost_points": 1000,
+    "num_ghost_points_val": 10000,
+    "num_sampling_level": 3,
+    "fine_sampling_ball_diameter": 0.16,
+    "weight_tying": true,
+    "gp_emb_tying": true,
+    "regress_position_offset": false
+  }
+}

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Franka + rendered RGB-D + PerAct sparse-pose reaching in Isaac Sim.
+"""Shared Franka + rendered RGB-D sparse-pose reaching in Isaac Sim.
 
 Only collection labels and evaluation scoring inspect block poses. Runtime
 policy requests contain rendered RGB, depth-derived points, and proprioception.
@@ -29,7 +29,11 @@ def main():
     p.add_argument("--episodes", type=int, default=0)
     p.add_argument("--seed", type=int, default=9876)
     p.add_argument("--policy-url", default="http://127.0.0.1:5562")
-    p.add_argument("--headless", action=argparse.BooleanOptionalAction, default=os.environ.get("PERACT_HEADLESS", "true").lower() == "true")
+    p.add_argument("--policy-name", choices=["peract", "act3d"], default="peract")
+    p.add_argument("--paired-instructions", action="store_true",
+                   help="Evaluate both instructions on each held-out scene")
+    p.add_argument("--headless", action=argparse.BooleanOptionalAction,
+                   default=os.environ.get("FRANKA_HEADLESS", os.environ.get("PERACT_HEADLESS", "true")).lower() == "true")
     args = p.parse_args()
     if args.samples < 1 or args.episodes < 0:
         p.error("samples must be positive and episodes must be nonnegative")
@@ -56,10 +60,10 @@ def main():
 
     print("Initializing ROS telemetry", flush=True)
     rclpy.init()
-    node = rclpy.create_node("franka_peract_isaac")
+    node = rclpy.create_node(f"franka_{args.policy_name}_isaac")
     joint_pub = node.create_publisher(JointState, "/franka/joint_states", 5)
-    target_pub = node.create_publisher(PoseStamped, "/franka/peract/target", 5)
-    status_pub = node.create_publisher(String, "/franka/peract/status", 5)
+    target_pub = node.create_publisher(PoseStamped, f"/franka/{args.policy_name}/target", 5)
+    status_pub = node.create_publisher(String, f"/franka/{args.policy_name}/status", 5)
     stop = False
 
     def stopping(*_):
@@ -141,12 +145,17 @@ def main():
                 points = np.asarray(camera.get_world_points_from_image_coords(
                     np.column_stack((xx.ravel(), yy.ravel())), depth.ravel(), device="cpu")).reshape(h, w, 3).astype(np.float32)
                 prop = np.array([1., *robot.get_joint_positions()[-2:], 1.], dtype=np.float32)
-                return rgb, points, prop
+                # Act3D conditions on the measured current end-effector pose.
+                # Lula returns a rotation matrix; RLBench/Act3D uses XYZW.
+                from scipy.spatial.transform import Rotation
+                position, rotation = kinematics.compute_end_effector_pose()
+                gripper = np.r_[position, Rotation.from_matrix(rotation).as_quat(), prop[0]].astype(np.float32)
+                return rgb, points, prop, gripper
         raise RuntimeError("Rendered RGB-D camera failed to initialize")
 
-    def predict(rgb, points, prop, instruction):
+    def predict(rgb, points, prop, gripper, instruction):
         buf = io.BytesIO()
-        np.savez_compressed(buf, rgb=rgb, points=points, proprio=prop, instruction=instruction,
+        np.savez_compressed(buf, rgb=rgb, points=points, proprio=prop, gripper_pose=gripper, instruction=instruction,
                             config_digest=config_digest(config))
         request = urllib.request.Request(args.policy_url + "/predict", data=buf.getvalue(),
                                          headers={"Content-Type": "application/octet-stream"})
@@ -162,14 +171,15 @@ def main():
             robot.set_joint_positions(home)
             robot.set_joint_velocities(np.zeros(9))
             robot.get_articulation_controller().apply_action(ArticulationAction(joint_positions=home))
-            placements = sample_scene(rng, config)
+            if args.mode == "collect" or not args.paired_instructions or episode % 2 == 0:
+                placements = sample_scene(rng, config)
             for block, position in zip(blocks, placements):
                 block.set_world_pose(position=position, orientation=np.array([1., 0., 0., 0.]))
                 block.set_linear_velocity(np.zeros(3))
                 block.set_angular_velocity(np.zeros(3))
             for _ in range(20):
                 step()
-            rgb, points, prop = observation()
+            rgb, points, prop, gripper = observation()
             if episode == 0:
                 from PIL import Image
                 Image.fromarray(rgb).save(out / "camera.png")
@@ -177,7 +187,7 @@ def main():
                 for language_id in range(2):
                     target = blocks[language_id].get_world_pose()[0].copy()
                     target[2] = config["reach_height"]
-                    collected.append((rgb, points, prop, target, language_id))
+                    collected.append((rgb, points, prop, target, language_id, gripper))
                 if episode % 32 == 0:
                     print(f"Collected {episode}/{count} scenes", flush=True)
                 continue
@@ -186,7 +196,7 @@ def main():
             # This pose is only used by the scorer after the policy chooses.
             truth = blocks[language_id].get_world_pose()[0].copy()
             truth[2] = config["reach_height"]
-            future = executor.submit(predict, rgb, points, prop, instruction)
+            future = executor.submit(predict, rgb, points, prop, gripper, instruction)
             while not future.done():
                 step()
             action = future.result()
@@ -250,8 +260,9 @@ def main():
             print(json.dumps(row), flush=True)
             status_pub.publish(String(data=json.dumps(row)))
             (out / "report.json").write_text(json.dumps({"task": config["task"], "seed": args.seed,
-                "mode": "learned_peract", "policy_used_ground_truth": False, "episodes": rows,
+                "mode": f"learned_{args.policy_name}", "policy_used_ground_truth": False, "episodes": rows,
                 "executor": "lula_ik_minimum_jerk", "config_digest": config_digest(config),
+                "paired_instructions": args.paired_instructions,
                 "joint_control": control,
                 "requested_episodes": count, "completed": len(rows) == count,
                 "successes": sum(r["success"] for r in rows), "total": len(rows)}, indent=2))
@@ -259,9 +270,10 @@ def main():
             np.savez_compressed(out / "dataset.npz", rgb=np.stack([r[0] for r in collected]),
                 points=np.stack([r[1] for r in collected]), proprio=np.stack([r[2] for r in collected]),
                 targets=np.stack([r[3] for r in collected]), language_ids=np.array([r[4] for r in collected]),
+                gripper_pose=np.stack([r[5] for r in collected]),
                 seed=args.seed, config_digest=config_digest(config))
         elif sum(r["success"] for r in rows) / len(rows) < 0.8:
-            raise RuntimeError("PerAct reaching acceptance failed: success below 80%")
+            raise RuntimeError(f"{args.policy_name} reaching acceptance failed: success below 80%")
     finally:
         executor.shutdown(wait=True, cancel_futures=True)
         node.destroy_node()

@@ -1,0 +1,137 @@
+# Act3D predicts sparse reaching poses; Isaac executes them with Franka IK and joint trajectories.
+# Run: ./start.sh franka_act3d_isaac --profile sim
+name: franka_act3d_isaac
+x-isaac: &isaac
+  image: salsicha/cyberphysics:isaac-${CYBERPHYSICS_TAG:-latest}
+  env_file: [../systems/ros2/middleware.env]
+  network_mode: host
+  ipc: host
+  gpus: all
+  environment:
+    ACCEPT_EULA: Y
+    PRIVACY_CONSENT: ${PRIVACY_CONSENT:-Y}
+    NVIDIA_DRIVER_CAPABILITIES: graphics,utility,compute
+    DISPLAY: ${DISPLAY:-:0}
+    XAUTHORITY: /isaac-sim/.xauth/Xauthority
+    FRANKA_HEADLESS: ${ACT3D_HEADLESS:-false}
+    ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
+    PYTHONDONTWRITEBYTECODE: "1"
+  volumes:
+    - /tmp/.X11-unix:/tmp/.X11-unix:ro
+    - act3d_xauth:/isaac-sim/.xauth:ro
+    - act3d_isaac_cache:/isaac-sim/.cache
+    - act3d_kit_cache:/isaac-sim/kit/cache
+    - ../applications/act3d/scripts:/workspace/act3d_scripts:ro
+    - ../applications/peract/scripts:/workspace/peract_scripts:ro
+    - ../systems:/workspace/systems:ro
+    - ${ACT3D_RESULTS_DIR:-../generated/act3d}:/workspace/results
+  entrypoint: [/workspace/applications/isaac/scripts/with_ros.sh]
+
+services:
+  init:
+    profiles: [sim, collect, train]
+    image: salsicha/cyberphysics:isaac-${CYBERPHYSICS_TAG:-latest}
+    network_mode: none
+    user: "0:0"
+    volumes:
+      - ${XAUTHORITY:-/tmp/.Xauthority}:/host.Xauthority:ro
+      - act3d_xauth:/xauth
+      - act3d_isaac_cache:/cache
+      - act3d_kit_cache:/kit
+      - act3d_training_cache:/training-cache
+      - ${ACT3D_RESULTS_DIR:-../generated/act3d}:/results
+    entrypoint: [/bin/bash, -ec]
+    command:
+      - |
+        if [ -f /host.Xauthority ]; then cp /host.Xauthority /xauth/Xauthority; chmod 0600 /xauth/Xauthority; else rm -f /xauth/Xauthority; fi
+        chown -R 1234:1234 /xauth
+        mkdir -p /results/training /results/trained /results/evaluation
+        chown 1234:1234 /cache /kit /training-cache /results /results/training /results/trained /results/evaluation
+    restart: "no"
+
+  act3d_policy:
+    profiles: [sim]
+    image: salsicha/cyberphysics:act3d-${CYBERPHYSICS_TAG:-latest}
+    build:
+      context: ../applications/act3d
+      args: {TAG: "${CYBERPHYSICS_TAG:-latest}"}
+    network_mode: host
+    gpus: all
+    user: "1234:1234"
+    volumes:
+      - ../applications/act3d/scripts:/workspace/act3d_scripts:ro
+      - ${ACT3D_MODEL_DIR:-../generated/act3d/trained}:/workspace/models:ro
+    command: >
+      python /workspace/act3d_scripts/policy_server.py
+      --checkpoint /workspace/models/act3d_reach.pt
+      --port ${ACT3D_PORT:-5563}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:${ACT3D_PORT:-5563}/health', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      start_period: 60s
+      retries: 5
+
+  isaacsim:
+    <<: *isaac
+    profiles: [sim]
+    depends_on:
+      init: {condition: service_completed_successfully}
+      act3d_policy: {condition: service_healthy}
+    command: >
+      ./python.sh /workspace/peract_scripts/isaac_franka.py --policy-name act3d
+      --config /workspace/systems/franka/config/act3d_reach.json
+      --output /workspace/results/evaluation
+      --paired-instructions
+      --seed ${ACT3D_SEED:-9876}
+      --episodes ${ACT3D_EPISODES:-20}
+      --policy-url http://127.0.0.1:${ACT3D_PORT:-5563}
+
+  collect:
+    <<: *isaac
+    profiles: [collect]
+    depends_on:
+      init: {condition: service_completed_successfully}
+    command: >
+      ./python.sh /workspace/peract_scripts/isaac_franka.py --policy-name act3d
+      --config /workspace/systems/franka/config/act3d_reach.json
+      --mode collect --headless --seed 123 --samples ${ACT3D_TRAIN_SCENES:-256}
+      --output /workspace/results/training
+
+  train:
+    profiles: [train]
+    image: salsicha/cyberphysics:act3d-${CYBERPHYSICS_TAG:-latest}
+    build:
+      context: ../applications/act3d
+      args: {TAG: "${CYBERPHYSICS_TAG:-latest}"}
+    user: "1234:1234"
+    gpus: all
+    depends_on:
+      init: {condition: service_completed_successfully}
+    volumes:
+      - ../applications/act3d/scripts:/workspace/act3d_scripts:ro
+      - ../systems:/workspace/systems:ro
+      - ${ACT3D_RESULTS_DIR:-../generated/act3d}:/workspace/results
+      - act3d_training_cache:/workspace/cache
+    # Two phases match the validated recipe: initial learning, then refinement
+    # from those weights with a fresh optimizer. Retain both for provenance.
+    entrypoint: [/bin/sh, -ec]
+    command:
+      - |
+        python /workspace/act3d_scripts/train.py \
+          --config /workspace/systems/franka/config/act3d_reach.json \
+          --dataset /workspace/results/training/dataset.npz \
+          --output /workspace/results/trained/act3d_initial.pt \
+          --steps ${ACT3D_TRAIN_STEPS:-6000}
+        python /workspace/act3d_scripts/train.py \
+          --config /workspace/systems/franka/config/act3d_reach.json \
+          --dataset /workspace/results/training/dataset.npz \
+          --initialize-from /workspace/results/trained/act3d_initial.pt \
+          --output /workspace/results/trained/act3d_reach.pt \
+          --steps ${ACT3D_REFINE_STEPS:-6000}
+
+volumes:
+  act3d_xauth:
+  act3d_isaac_cache:
+  act3d_kit_cache:
+  act3d_training_cache:

@@ -13,7 +13,7 @@
 #   isaac, groot                 CUDA/Isaac images of 20-40 GB
 #   turret_sim                   PyTorch/Ultralytics image of about 10 GB
 #   nvblox, depthanything        amd64 skipped; arm64 built in jetson-gpu
-#   smolvla, peract, lerobot (so101) CUDA PyTorch/LeRobot stacks
+#   smolvla, peract, act3d, lerobot (so101) CUDA PyTorch/LeRobot stacks
 #   matlab                        needs a MathWorks download and license
 #   vinsmono                      built and smoke-tested by ci.yml
 #

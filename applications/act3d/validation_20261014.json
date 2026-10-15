@@ -1,0 +1,241 @@
+{
+  "date": "2026-10-14",
+  "hardware": "NVIDIA RTX 4000 Ada Generation Laptop GPU (12 GiB), 32 GiB host RAM",
+  "isaac_sim": "6.0.1",
+  "torch": "2.11.0+cu126",
+  "upstream_ref": "5004650a9771e7618f24f36a876bcb38e0fc068a",
+  "clip_text_revision": "3d74acf9a28c67741b2f4f2ea7635f0aaf6f0268",
+  "checkpoint_sha256": "00e772f32a9b619adcb8d12bbc59691018a552d3e324763c4b72810d0ca648a9",
+  "initial_checkpoint_sha256": "d439eda8d479ffc0b7ce8c35a4668614fbd1dc26589e1b65d1c70ac6c2c6f70e",
+  "dataset_sha256": "c3a55769dcc31c95a4b87bc788160b3904524efef7c52e3d15bdc7ea46ed00e1",
+  "config_digest": "f94ded839a3b17ffb193b53596b84927663dc248804071b15b5feab01c29173c",
+  "training": {
+    "scenes": 256,
+    "demonstrations": 512,
+    "seed": 123,
+    "phases": [
+      6000,
+      6000
+    ],
+    "fresh_optimizer_each_phase": true
+  },
+  "evaluation": {
+    "seed": 9876,
+    "scenes": 10,
+    "episodes": 20,
+    "successes": 20,
+    "completed": true,
+    "paired_instructions": true,
+    "position_tolerance_m": 0.025,
+    "mean_task_error_m": 0.01428051097621457,
+    "max_task_error_m": 0.021690419486378894,
+    "mean_prediction_error_m": 0.00988780814561081,
+    "warm_inference_median_ms": 48.727777786552906,
+    "warm_inference_mean_ms": 55.02378061952952,
+    "first_inference_ms": 1090.5296690762043,
+    "peak_pytorch_allocated_mib": 297.451171875,
+    "policy_used_ground_truth": false,
+    "raw_report_sha256": "c6d0b4cb9748a63edafc469d377d5b55f3a730a878e9845df2f8c28ef85e06b0"
+  },
+  "http_checks": {
+    "wrong_config": {
+      "status": 400,
+      "error": "Simulator and checkpoint configurations differ"
+    },
+    "unknown_instruction": {
+      "status": 400,
+      "error": "Instruction is not part of this task's trained vocabulary"
+    },
+    "bad_depth_scale": {
+      "status": 400,
+      "error": "Too few metric world-space points inside the workspace"
+    },
+    "reach above the red block": {
+      "status": 200,
+      "error_m": 0.007276866299208101
+    },
+    "reach above the blue block": {
+      "status": 200,
+      "error_m": 0.007856763237298656
+    },
+    "same_observation_target_separation_m": 0.3055299256962256
+  },
+  "peract_regression": {
+    "successes": 4,
+    "episodes": 4,
+    "completed": true,
+    "mean_task_error_m": 0.010020328982137613
+  },
+  "unit_tests": {
+    "passed": 21,
+    "command": "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest -q tests/test_act3d_contracts.py tests/test_peract_contracts.py tests/test_derived_image_targets.py"
+  },
+  "episodes": [
+    {
+      "episode": 0,
+      "instruction": "reach above the red block",
+      "success": true,
+      "prediction_error_m": 0.008629647534766489,
+      "task_error_m": 0.012858053058950925,
+      "inference_ms": 1090.5296690762043
+    },
+    {
+      "episode": 1,
+      "instruction": "reach above the blue block",
+      "success": true,
+      "prediction_error_m": 0.014415347896783611,
+      "task_error_m": 0.01627548998917713,
+      "inference_ms": 37.73640398867428
+    },
+    {
+      "episode": 2,
+      "instruction": "reach above the red block",
+      "success": true,
+      "prediction_error_m": 0.007639117281826207,
+      "task_error_m": 0.012973161903838118,
+      "inference_ms": 57.77033302001655
+    },
+    {
+      "episode": 3,
+      "instruction": "reach above the blue block",
+      "success": true,
+      "prediction_error_m": 0.009323291637144107,
+      "task_error_m": 0.01061008894262361,
+      "inference_ms": 49.84809295274317
+    },
+    {
+      "episode": 4,
+      "instruction": "reach above the red block",
+      "success": true,
+      "prediction_error_m": 0.010149500923691988,
+      "task_error_m": 0.015206546972684358,
+      "inference_ms": 42.93254599906504
+    },
+    {
+      "episode": 5,
+      "instruction": "reach above the blue block",
+      "success": true,
+      "prediction_error_m": 0.007852480501214554,
+      "task_error_m": 0.010948566701841,
+      "inference_ms": 29.918686021119356
+    },
+    {
+      "episode": 6,
+      "instruction": "reach above the red block",
+      "success": true,
+      "prediction_error_m": 0.00766553844663898,
+      "task_error_m": 0.011711667413117506,
+      "inference_ms": 39.385786978527904
+    },
+    {
+      "episode": 7,
+      "instruction": "reach above the blue block",
+      "success": true,
+      "prediction_error_m": 0.012735935451300558,
+      "task_error_m": 0.018251899976152872,
+      "inference_ms": 46.71086883172393
+    },
+    {
+      "episode": 8,
+      "instruction": "reach above the red block",
+      "success": true,
+      "prediction_error_m": 0.014465877547835933,
+      "task_error_m": 0.018255113239965152,
+      "inference_ms": 58.25771205127239
+    },
+    {
+      "episode": 9,
+      "instruction": "reach above the blue block",
+      "success": true,
+      "prediction_error_m": 0.008700278777911616,
+      "task_error_m": 0.01357738410042253,
+      "inference_ms": 36.00911796092987
+    },
+    {
+      "episode": 10,
+      "instruction": "reach above the red block",
+      "success": true,
+      "prediction_error_m": 0.010497572246787263,
+      "task_error_m": 0.015031734446050549,
+      "inference_ms": 37.3771651647985
+    },
+    {
+      "episode": 11,
+      "instruction": "reach above the blue block",
+      "success": true,
+      "prediction_error_m": 0.017182468978341324,
+      "task_error_m": 0.021690419486378894,
+      "inference_ms": 31.306748976930976
+    },
+    {
+      "episode": 12,
+      "instruction": "reach above the red block",
+      "success": true,
+      "prediction_error_m": 0.00852081921012746,
+      "task_error_m": 0.014953802486914181,
+      "inference_ms": 57.66710499301553
+    },
+    {
+      "episode": 13,
+      "instruction": "reach above the blue block",
+      "success": true,
+      "prediction_error_m": 0.012850805407769122,
+      "task_error_m": 0.015798345983382846,
+      "inference_ms": 48.727777786552906
+    },
+    {
+      "episode": 14,
+      "instruction": "reach above the red block",
+      "success": true,
+      "prediction_error_m": 0.006482878783819645,
+      "task_error_m": 0.014156275340020097,
+      "inference_ms": 56.88396096229553
+    },
+    {
+      "episode": 15,
+      "instruction": "reach above the blue block",
+      "success": true,
+      "prediction_error_m": 0.006459270710583513,
+      "task_error_m": 0.011523351492251343,
+      "inference_ms": 48.429460963234305
+    },
+    {
+      "episode": 16,
+      "instruction": "reach above the red block",
+      "success": true,
+      "prediction_error_m": 0.008322583576933688,
+      "task_error_m": 0.01167425484189515,
+      "inference_ms": 184.29907504469156
+    },
+    {
+      "episode": 17,
+      "instruction": "reach above the blue block",
+      "success": true,
+      "prediction_error_m": 0.007389961846859363,
+      "task_error_m": 0.01155631043007227,
+      "inference_ms": 49.90108893252909
+    },
+    {
+      "episode": 18,
+      "instruction": "reach above the red block",
+      "success": true,
+      "prediction_error_m": 0.009157503188799269,
+      "task_error_m": 0.012689820240574374,
+      "inference_ms": 59.057901147753
+    },
+    {
+      "episode": 19,
+      "instruction": "reach above the blue block",
+      "success": true,
+      "prediction_error_m": 0.0093152829630815,
+      "task_error_m": 0.015867932477978516,
+      "inference_ms": 73.23199999518692
+    }
+  ],
+  "limitations": [
+    "Simulation-only colored-block reaching; no grasping or collision-aware planning.",
+    "Two fixed trained instructions, one camera geometry, 10 held-out scenes; not the RLBench benchmark.",
+    "Timing includes GPU contention with rendering; allocated memory is PyTorch allocation, not total process VRAM.",
+    "Initial 6000-step checkpoint failed; refinement was required. Initial evaluation was stopped after seven misses to relieve host memory pressure."
+  ]
+}

@@ -64,8 +64,9 @@ docker compose -f compositions/racecarneo.yaml up
 
 That stack runs the headless MIT RACECAR Neo simulator, publishes ROS 2 camera/lidar/IMU/odometry topics, estimates metric monocular depth with Depth Anything, builds nvblox TSDF/ESDF slices, runs Nav2, and serves a NiceGUI waypoint interface at `http://localhost:8080`.
 
-For a language-conditioned arm demo, see [PerAct with Franka in Isaac](applications/peract/README.md).
-It follows the same application/system/composition split and includes local
+For language-conditioned arm demos, see [PerAct](applications/peract/README.md)
+and [Act3D with Franka in Isaac](applications/act3d/README.md).
+They follow the same application/system/composition split and include local
 data collection, training and evaluation profiles.
 
 ## Observe ROS Data
