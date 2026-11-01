@@ -12,26 +12,40 @@
 #   docker compose -f compositions/rangefinder.yaml run --rm rangefinder_sim
 #   ros2 topic echo /rangefinder_sim/range
 
+# Open-file cap on every ROS container (compositions/aerodrone_hardware.yaml
+# has why).
+x-nofile: &nofile
+  nofile:
+    soft: 1024
+    hard: 524288
+
 services:
   rangefinder:
     env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:rangefinder-${CYBERPHYSICS_TAG:-latest}
     container_name: rangefinder
+    ulimits: *nofile
     network_mode: host
     ipc: host
     restart: unless-stopped
     environment:
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
-    # Only the sensor's serial port, not privileged. A USB-UART adapter that
-    # re-enumerates under another name needs a container restart; use the
-    # stable /dev/serial/by-id/ path.
-    devices:
-      - ${RANGEFINDER_DEVICE:-/dev/ttyUSB0}:/dev/rangefinder
+    # Not privileged: the host's /dev read-only at /host/dev and the USB
+    # serial device cgroup rules (ttyUSB* major 188, ttyACM* 166), as in
+    # compositions/aerodrone_hardware.yaml. With `devices:` Docker refuses
+    # to start the container while the adapter is unplugged; this way the
+    # node retries every second until it appears, reopens it after an
+    # unplug, and a stable /dev/serial/by-id/ path keeps working when the
+    # adapter re-enumerates.
+    device_cgroup_rules:
+      - 'c 188:* rmw'
+      - 'c 166:* rmw'
     volumes:
+      - /dev:/host/dev:ro
       - /dev/shm:/dev/shm
     command: >
       python3 /scripts/rangefinder_node.py --ros-args
-        -p port:=/dev/rangefinder
+        -p port:=/host${RANGEFINDER_DEVICE:-/dev/ttyUSB0}
         -p baud_rate:=${RANGEFINDER_BAUD:-115200}
         -p model:=${RANGEFINDER_MODEL:-tfmini_s}
         -p topic:=${RANGEFINDER_TOPIC:-/aerodrone/rangefinder}
@@ -42,6 +56,7 @@ services:
     profiles: [sim]
     image: salsicha/cyberphysics:rangefinder-${CYBERPHYSICS_TAG:-latest}
     container_name: rangefinder_sim
+    ulimits: *nofile
     network_mode: host
     ipc: host
     environment:

@@ -115,3 +115,37 @@ def test_candidate_tiles_centered_and_bounded(tmp_path):
     candidates = cache.candidate_tiles(*ORIGIN, 250.0, 9)
     assert 1 <= len(candidates) <= 9
     assert origin_tile() == candidates[0]
+
+
+class FlakyCache:
+    """One tile's download fails `failures` times, then works; the real
+    cache holds a failed tile back (failed_until) until it is cleared."""
+
+    def __init__(self, failures):
+        self.failures = failures
+        self.failed_until = {}
+        self.calls = []
+
+    def get_features(self, x, y, allow_download=True):
+        self.calls.append((x, y))
+        if (x, y) == (2, 2):
+            if (x, y) in self.failed_until:
+                return None
+            if self.failures:
+                self.failures -= 1
+                self.failed_until[(x, y)] = 1e9
+                return None
+        return 'features'
+
+
+@pytest.mark.parametrize('failures,missing', [(0, []), (1, []), (3, []), (4, [(2, 2)])])
+def test_seeding_retries_failed_tiles(failures, missing):
+    from wildnav_pkg.seed_cache import seed
+    cache = FlakyCache(failures)
+    tiles = [(1, 1), (2, 2), (3, 3)]
+    sleeps = []
+    assert seed(cache, tiles, retries=3, retry_delay_s=2.0, sleep=sleeps.append) == missing
+    # Every tile is fetched once; only the failed one again, after a pause.
+    assert cache.calls.count((1, 1)) == cache.calls.count((3, 3)) == 1
+    assert cache.calls.count((2, 2)) == min(failures, 3) + 1
+    assert sleeps == [2.0] * min(failures, 3)

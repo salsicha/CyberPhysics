@@ -32,8 +32,9 @@ one ArduPilot does not open (`SERIALx_PROTOCOL = -1`) and set
 the same sensor as an ArduPilot rangefinder (`RNGFND1_TYPE`): only one
 reader can own the port.
 
-In the aircraft stack (`compositions/aerodrone_hardware.yaml`) the
-container does not get the port through `devices:`, which Docker refuses
+In the aircraft stack (`compositions/aerodrone_hardware.yaml`) and the
+standalone `compositions/rangefinder.yaml` the container does not get the
+port through `devices:`, which Docker refuses
 when the adapter is missing (and `docker compose up` then stops with most
 of the stack not started). It sees the host's `/dev` read-only at
 `/host/dev` and may open only USB serial devices (`ttyUSB*`, `ttyACM*`,
@@ -77,7 +78,7 @@ ros2 run tf2_ros static_transform_publisher --z -0.05 --pitch 1.5708 \
 
 | Parameter | Default | |
 |---|---|---|
-| `port` | `/dev/ttyUSB0` | serial device (`/dev/rangefinder` in `compositions/rangefinder.yaml`, `/host$RANGEFINDER_DEVICE` in `aerodrone_hardware.yaml`) |
+| `port` | `/dev/ttyUSB0` | serial device (`/host$RANGEFINDER_DEVICE` in `compositions/rangefinder.yaml` and `aerodrone_hardware.yaml`) |
 | `baud_rate` | `115200` | |
 | `model` | `tfmini_s` | `tfmini_s` or `tf_luna`: range limits and FOV |
 | `topic` | `/aerodrone/rangefinder` | |

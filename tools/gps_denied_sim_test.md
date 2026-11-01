@@ -251,6 +251,9 @@ rebuilt wildnav image's fusion, which sent velocities): both fail.
 - **Seeding.** One run never started: a satellite tile failed to download
   (120 of 121), `terrain_assets` refused the holed orthophoto and the
   wrapper exited 2. `GPS_DENIED_KEEP_VOLUMES=true` reuses a seeded cache.
+  The seeder now tries a failed tile three more times, 2 s apart
+  (`wildnav_pkg.seed_cache --retries`, `--retry-delay-s`), and names the
+  tiles it could not fetch.
 - Recordings are 220-300 kB compressed, stack logs 25-210 kB; a run holds
   the host for 8 (Gazebo) or 35 (Isaac) minutes.
 

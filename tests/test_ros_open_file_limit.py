@@ -23,7 +23,8 @@ JAZZY_IMAGES = {'ros2', 'rangefinder', 'pantiltros', 'realsense', 'spaceros', 'r
 IMAGE = re.compile(r'salsicha/cyberphysics:([a-z0-9_]+)-')
 # The aircraft's BlueOS stacks and the tracker are included by aerodrone_hardware.yaml
 HARDWARE = sorted([*REPO.glob('compositions/*_hardware.yaml'), *REPO.glob('compositions/*_uno_q.yaml'),
-                   *REPO.glob('compositions/blueos_*.yaml'), REPO / 'compositions/aerodrone_tracking.yaml'])
+                   *REPO.glob('compositions/blueos_*.yaml'), REPO / 'compositions/aerodrone_tracking.yaml',
+                   REPO / 'compositions/rangefinder.yaml'])
 
 
 def jazzy_services(path):
@@ -45,3 +46,13 @@ def test_jazzy_services_cap_the_open_file_limit(path):
         assert nofile, f'{path.name}: {name} has no ulimits.nofile'
         # The bitmap is hard-limit bits: 524288 is 64 KiB
         assert 1024 <= nofile['soft'] <= nofile['hard'] <= 1 << 20, f'{path.name}: {name}'
+
+
+def test_standalone_rangefinder_starts_without_its_adapter():
+    """Like the aircraft's: the host's /dev and USB serial cgroup rules,
+    not `devices:`, which Docker refuses while the adapter is unplugged."""
+    service = yaml.safe_load((REPO / 'compositions/rangefinder.yaml').read_text())['services']['rangefinder']
+    assert 'devices' not in service
+    assert '/dev:/host/dev:ro' in service['volumes']
+    assert set(service['device_cgroup_rules']) == {'c 188:* rmw', 'c 166:* rmw'}
+    assert '-p port:=/host${RANGEFINDER_DEVICE:-/dev/ttyUSB0}' in service['command']

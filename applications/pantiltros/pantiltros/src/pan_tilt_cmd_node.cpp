@@ -1,3 +1,5 @@
+// From adityakamath/pan_tilt_ros (Apache-2.0, ../LICENSE); modified in the
+// CyberPhysics repository (THIRD_PARTY_NOTICES.md; git history has the changes).
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joy.hpp"
 #include "sensor_msgs/msg/joint_state.hpp"

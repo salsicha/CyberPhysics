@@ -1,3 +1,5 @@
+# From adityakamath/pan_tilt_ros (Apache-2.0, ../LICENSE); modified in the
+# CyberPhysics repository (THIRD_PARTY_NOTICES.md; git history has the changes).
 pan_tilt_ctrl_node:
   ros__parameters:
     joint_ids: [12, 13]

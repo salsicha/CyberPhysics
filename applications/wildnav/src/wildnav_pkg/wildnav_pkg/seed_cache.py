@@ -1,6 +1,27 @@
 import argparse
+import time
 
 from wildnav_pkg.satellite_cache import SatelliteTileCache
+
+
+def seed(cache, tiles, retries=3, retry_delay_s=2.0, sleep=time.sleep):
+    """Fetch every tile's image and features; tiles that fail are tried
+    again up to `retries` more times, retry_delay_s apart. A single failed
+    download (about one seeding in three for the simulated site's 121
+    tiles) otherwise left a hole that the terrain builder refuses
+    (tools/gps_denied_sim_test.md, "Seeding"). Returns the tiles still
+    missing."""
+    missing = list(tiles)
+    for attempt in range(retries + 1):
+        if attempt:
+            sleep(retry_delay_s)
+            # The cache holds a failed tile back for a minute.
+            cache.failed_until.clear()
+        missing = [tile for tile in missing
+                   if cache.get_features(*tile, allow_download=True) is None]
+        if not missing:
+            break
+    return missing
 
 
 def main():
@@ -26,6 +47,9 @@ def main():
     parser.add_argument('--feature-backend', default='SIFT')
     parser.add_argument('--max-features', type=int, default=1500)
     parser.add_argument('--request-timeout', type=float, default=30.0)
+    parser.add_argument('--retries', type=int, default=3,
+                        help='further attempts for tiles that failed')
+    parser.add_argument('--retry-delay-s', type=float, default=2.0)
     args = parser.parse_args()
 
     cache = SatelliteTileCache(
@@ -41,10 +65,11 @@ def main():
     tiles = cache.candidate_tiles(
         args.lat, args.lon, args.search_radius_m, args.max_tiles
     )
-    seeded = 0
-    for x, y in tiles:
-        if cache.get_features(x, y, allow_download=True) is not None:
-            seeded += 1
+    missing = seed(cache, tiles, args.retries, args.retry_delay_s)
+    seeded = len(tiles) - len(missing)
+    if missing:
+        print(f'Could not seed {len(missing)} WildNav tiles after '
+              f'{args.retries} retries: {missing}')
     if seeded == 0:
         raise RuntimeError('failed to seed any WildNav satellite tiles')
     print(
