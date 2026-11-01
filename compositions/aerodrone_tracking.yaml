@@ -44,6 +44,10 @@
 
 services:
   tracker:
+    ulimits:
+      nofile:
+        soft: 1024
+        hard: 524288
     # Geolocates the selected track on the DemNav DEM in the camera pose at
     # the image stamp, filters it and flies the centered or slant mode
     # through Aerostack2's FollowReference behaviour

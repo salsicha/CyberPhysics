@@ -2,6 +2,10 @@
 
 services:
   boat_mavros:
+    ulimits:
+      nofile:
+        soft: 1024
+        hard: 524288
     env_file: [../systems/ros2/middleware.env]
     # MAVLink from BlueOS's router through its internal TCP server (the
     # "Internal Link" endpoint, 127.0.0.1:5777): no BlueOS endpoint to add,
@@ -26,6 +30,10 @@ services:
         fcu_url:=${BLUEOS_FCU_URL:-tcp://127.0.0.1:5777}
 
   boat_bridge:
+    ulimits:
+      nofile:
+        soft: 1024
+        hard: 524288
     env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:boat-${CYBERPHYSICS_TAG:-arm64}
     container_name: boat_bridge
@@ -48,6 +56,10 @@ services:
         -p namespace:=${BOAT_NAMESPACE:-boat0}
 
   boat_message_rates:
+    ulimits:
+      nofile:
+        soft: 1024
+        hard: 524288
     env_file: [../systems/ros2/middleware.env]
     # Asks ArduRover for the telemetry rates the bridge needs
     # (systems/boat/config/message_rates.yaml; its own stream rates gave
@@ -75,6 +87,10 @@ services:
         --namespace /mavros --rates /workspace/config/message_rates.yaml
 
   boat_rosbridge:
+    ulimits:
+      nofile:
+        soft: 1024
+        hard: 524288
     env_file: [../systems/ros2/middleware.env]
     # Port 9092: BlueOS's Cable Guy holds 9090 on the host network. Host
     # IPC and /dev/shm, or Fast DDS's shared-memory transport delivers it

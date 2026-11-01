@@ -4,8 +4,8 @@ Docker on some hosts (the UNO Q's Debian 13 Docker 26, or any host whose
 containerd runs with LimitNOFILE=infinity) gives containers an open-file limit
 of about 2^30. LTTng-UST, which every Jazzy process loads through tracetools,
 sizes a descriptor bitmap by that limit and zeroes it: 128 MiB of RAM per
-node. The Humble images (aerostack2 and those built on it) do not link
-LTTng-UST.
+node. Every ROS image here is Jazzy, the aerostack2 family included since
+the native Zenoh migration.
 """
 import re
 
@@ -15,10 +15,15 @@ import yaml
 from conftest import REPO
 
 # Images built on ROS 2 Jazzy (or Space ROS, which is Jazzy-based)
+# Every ROS image here is Jazzy: the aerostack2 family (aerostack2 and the
+# images built FROM it) moved from Humble with the native Zenoh migration
 JAZZY_IMAGES = {'ros2', 'rangefinder', 'pantiltros', 'realsense', 'spaceros', 'racecarneo',
-                'depthanything', 'nvblox', 'nicegui', 'so101', 'unoq'}
+                'depthanything', 'nvblox', 'nicegui', 'so101', 'unoq', 'aerostack2', 'demnav',
+                'wildnav', 'oak1', 'boat', 'submarine', 'navigator'}
 IMAGE = re.compile(r'salsicha/cyberphysics:([a-z0-9_]+)-')
-HARDWARE = sorted([*REPO.glob('compositions/*_hardware.yaml'), *REPO.glob('compositions/*_uno_q.yaml')])
+# The aircraft's BlueOS stacks and the tracker are included by aerodrone_hardware.yaml
+HARDWARE = sorted([*REPO.glob('compositions/*_hardware.yaml'), *REPO.glob('compositions/*_uno_q.yaml'),
+                   *REPO.glob('compositions/blueos_*.yaml'), REPO / 'compositions/aerodrone_tracking.yaml'])
 
 
 def jazzy_services(path):

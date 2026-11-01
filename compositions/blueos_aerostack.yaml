@@ -16,6 +16,10 @@ include:
 
 services:
   aerostack:
+    ulimits:
+      nofile:
+        soft: 1024
+        hard: 524288
     env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-arm64}
     container_name: aerostack
@@ -39,6 +43,10 @@ services:
         takeoff_altitude:=${TAKEOFF_ALTITUDE:-2.0}
 
   aerodrone_message_rates:
+    ulimits:
+      nofile:
+        soft: 1024
+        hard: 524288
     env_file: [../systems/ros2/middleware.env]
     # The readiness gate asks ArduCopter for its telemetry rates once and exits;
     # an autopilot reboot mid-session forgets them. This keeps the same
@@ -68,6 +76,10 @@ services:
         --rates /workspace/systems/aerodrone/config/message_rates.yaml
 
   behavior_tree:
+    ulimits:
+      nofile:
+        soft: 1024
+        hard: 524288
     env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-arm64}
     container_name: aerostack_behavior_tree
@@ -105,6 +117,10 @@ services:
           use_sim_time:=false
 
   aerostack_gui:
+    ulimits:
+      nofile:
+        soft: 1024
+        hard: 524288
     env_file: [../systems/ros2/middleware.env]
     # The map-goal and object-tracking page (applications/aerostack2/README.md,
     # "Map mission" and "Object tracking UI") on port 8080, served from the

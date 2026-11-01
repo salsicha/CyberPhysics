@@ -10,6 +10,10 @@
 
 services:
   mavros:
+    ulimits:
+      nofile:
+        soft: 1024
+        hard: 524288
     env_file: [../systems/ros2/middleware.env]
     # MAVLink from BlueOS's router through its internal TCP server (the
     # "Internal Link" endpoint, 127.0.0.1:5777): no BlueOS endpoint to add,
@@ -34,6 +38,10 @@ services:
         fcu_url:=${BLUEOS_FCU_URL:-tcp://127.0.0.1:5777}
 
   navigation_bridge:
+    ulimits:
+      nofile:
+        soft: 1024
+        hard: 524288
     env_file: [../systems/ros2/middleware.env]
     # Relays the ArduPilot EKF origin to /navigation/origin, the anchor of
     # every local navigation output. By default (GPS_INPUT_CORRECTIONS=true;
@@ -64,6 +72,10 @@ services:
         -p autopilot_corrections_topic:=${NAVIGATION_TOPIC_PREFIX:-/navigation}/autopilot_corrections_active
 
   oak1:
+    ulimits:
+      nofile:
+        soft: 1024
+        hard: 524288
     env_file: [../systems/ros2/middleware.env]
     # MegaDepth for DemNav and stills for WildNav, and the object-tracking
     # detector (systems/aerodrone/tracking.md): YOLO and DepthAI's
@@ -106,6 +118,10 @@ services:
         -p tracking_rate_hz:=${OAK1_TRACKING_RATE_HZ:-5.0}
 
   demnav:
+    ulimits:
+      nofile:
+        soft: 1024
+        hard: 524288
     env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:demnav-${CYBERPHYSICS_TAG:-arm64}
     container_name: ${DEMNAV_CONTAINER:-demnav}
@@ -146,6 +162,10 @@ services:
         rangefinder_timeout_s:=0.5
 
   wildnav:
+    ulimits:
+      nofile:
+        soft: 1024
+        hard: 524288
     env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:wildnav-${CYBERPHYSICS_TAG:-arm64}
     container_name: ${WILDNAV_CONTAINER:-wildnav}
@@ -194,6 +214,10 @@ services:
         minimum_wildnav_confidence:=${WILDNAV_FUSION_CONFIDENCE:-0.20}
 
   rosbridge:
+    ulimits:
+      nofile:
+        soft: 1024
+        hard: 524288
     env_file: [../systems/ros2/middleware.env]
     # Port 9092, not rosbridge's default 9090: BlueOS's network manager
     # (Cable Guy) listens on 0.0.0.0:9090 on the host network, where

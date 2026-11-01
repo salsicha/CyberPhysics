@@ -2,6 +2,10 @@
 
 services:
   submarine_mavros:
+    ulimits:
+      nofile:
+        soft: 1024
+        hard: 524288
     env_file: [../systems/ros2/middleware.env]
     # MAVLink from BlueOS's router through its internal TCP server (the
     # "Internal Link" endpoint, 127.0.0.1:5777): no BlueOS endpoint to add,
@@ -26,6 +30,10 @@ services:
         fcu_url:=${BLUEOS_FCU_URL:-tcp://127.0.0.1:5777}
 
   submarine_bridge:
+    ulimits:
+      nofile:
+        soft: 1024
+        hard: 524288
     env_file: [../systems/ros2/middleware.env]
     # /sub0/sensor_measurements/*. The pressure is the external depth
     # sensor's SCALED_PRESSURE2, decoded from MAVROS's raw MAVLink stream;
@@ -52,6 +60,10 @@ services:
         -p namespace:=${SUBMARINE_NAMESPACE:-sub0}
 
   submarine_message_rates:
+    ulimits:
+      nofile:
+        soft: 1024
+        hard: 524288
     env_file: [../systems/ros2/middleware.env]
     # Asks ArduSub for the telemetry rates the bridge needs
     # (systems/submarine/config/message_rates.yaml; its default streams
@@ -80,6 +92,10 @@ services:
         --namespace /mavros --rates /workspace/config/message_rates.yaml
 
   submarine_rosbridge:
+    ulimits:
+      nofile:
+        soft: 1024
+        hard: 524288
     env_file: [../systems/ros2/middleware.env]
     # Port 9092: BlueOS's Cable Guy holds 9090 on the host network. Host
     # IPC and /dev/shm, or Fast DDS's shared-memory transport delivers it

@@ -11,6 +11,10 @@ include:
 
 services:
   airplane_bridge:
+    ulimits:
+      nofile:
+        soft: 1024
+        hard: 524288
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-arm64}
     container_name: airplane_bridge
     network_mode: host
@@ -33,6 +37,10 @@ services:
         -p namespace:=${VEHICLE_NAMESPACE:-plane0}
 
   airplane_message_rates:
+    ulimits:
+      nofile:
+        soft: 1024
+        hard: 524288
     env_file: [../systems/ros2/middleware.env]
     # Asks ArduPlane for the telemetry rates the bridge and the navigation
     # need (systems/airplane/config/message_rates.yaml; its own stream rates
