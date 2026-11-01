@@ -25,7 +25,11 @@ Safety: objects only, never people; operator-confirmed only
   person's (PERSON_CLASSES) and known, and the target never detected as a
   person since it was selected (the detector may call a standing person a
   motorcycle from one height and a pedestrian from another:
-  ``target_person_seen``, sticky); no person anywhere in the camera's
+  ``target_person_seen``, sticky), and no person geolocated within
+  ``fire_person_radius_m`` (2 m) of the target in the last
+  ``fire_person_memory_s`` (30 s), whatever its id or class then (the
+  detector renumbers a person it keeps losing; an operator may select
+  the new id); no person anywhere in the camera's
   view: none in the latest detection frame, which must be recent
   (``fire_detection_timeout_s``), nor in any frame of the last
   ``fire_person_clear_s``; the target placed in the latest frames; the
@@ -379,6 +383,11 @@ class LauncherConfig:
     fire_max_target_speed_mps: float = 0.5
     fire_detection_timeout_s: float = 0.8
     fire_person_clear_s: float = 3.0
+    # Where people were: a target within fire_person_radius_m of a person
+    # geolocated in the last fire_person_memory_s is never fired at,
+    # whatever its id or class now (module doc, "Never at people").
+    fire_person_memory_s: float = 30.0
+    fire_person_radius_m: float = 2.0
     fire_min_interval_s: float = 2.0
     # The clip holds six darts; reload sets the count (0 at start).
     launcher_capacity: int = 6
@@ -399,7 +408,8 @@ class LauncherConfig:
                      'launcher_joint_state_timeout_s', 'launcher_ready_timeout_s'):
             if not numbers[name] > 0.0:
                 raise ValueError(f'{name} must be positive')
-        for name in ('fire_person_clear_s', 'fire_min_interval_s'):
+        for name in ('fire_person_clear_s', 'fire_person_memory_s', 'fire_person_radius_m',
+                     'fire_min_interval_s'):
             if numbers[name] < 0.0:
                 raise ValueError(f'{name} must not be negative')
         if not 0 <= self.launcher_darts <= self.launcher_capacity:
@@ -461,6 +471,8 @@ class FireControl:
         self.frame_persons = ()
         self.person_time = None
         self.person_label = ''
+        # People's ground positions: [(time, east, north)], oldest first.
+        self.person_places = []
 
     # --- inputs ---------------------------------------------------------------
     def on_joint_state(self, stamp, rack, trigger):
@@ -494,6 +506,33 @@ class FireControl:
         if self.cycle.running:
             return self.abort(now, f'a person appeared ({describe(persons)})')
         return ''
+
+    def on_person_place(self, now, position):
+        """A person's (or unclassified object's) ground position in the
+        navigation frame, geolocated from a detection frame at now."""
+        if position is None or len(position) < 2 or not _finite(now, *position[:2]):
+            return
+        memory = self.config.fire_person_memory_s
+        self.person_places = [place for place in self.person_places
+                              if -10.0 <= now - place[0] <= memory][-1999:]
+        self.person_places.append((float(now), float(position[0]), float(position[1])))
+
+    def person_near(self, now, target):
+        """(metres, seconds ago) of the nearest person geolocated within
+        fire_person_radius_m of target in the last fire_person_memory_s
+        (a clock gone back over 10 s forgets them), or None."""
+        if target is None or len(target) < 2 or not _finite(*target[:2]):
+            return None
+        config = self.config
+        near = None
+        for seen, east, north in self.person_places:
+            age = now - seen
+            if not -10.0 <= age <= config.fire_person_memory_s:
+                continue
+            metres = math.hypot(east - target[0], north - target[1])
+            if metres <= config.fire_person_radius_m and (near is None or metres < near[0]):
+                near = (metres, max(0.0, age))
+        return near
 
     # --- state ------------------------------------------------------------------
     def position(self, now):
@@ -570,6 +609,11 @@ class FireControl:
             fail('not_person', f'never at people: the target is a {s.target_class}')
         elif s.target_person_seen:
             fail('not_person', 'never at people: the target was detected as a person')
+        else:
+            near = self.person_near(now, s.target)
+            if near is not None:
+                fail('not_person', f'never at people: a person was {near[0]:.1f} m from '
+                                   f'the target {near[1]:.0f} s ago')
         person = self.person_block(now)
         if person:
             fail('no_person', person)

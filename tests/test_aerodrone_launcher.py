@@ -435,6 +435,53 @@ def test_any_person_anywhere_in_view_refuses(cls):
     assert rig.fc.refusal(3.62, '7', rig.s) == ''
 
 
+def test_a_target_where_a_person_was_is_never_fired_at():
+    """A person geolocated within fire_person_radius_m (2 m) of the target
+    in the last fire_person_memory_s (30 s) refuses, whatever ids and
+    classes the frames carry now."""
+    rig = armed_rig()
+    rig.fc.on_person_place(0.5, (0.3 + 1.2, 0.0, 0.0))  # 1.2 m from the target
+    rig.run(0.52, 4.0)  # car-only frames: the 3 s clear time has passed
+    assert_refused_alone(rig, 4.0, 'not_person',
+                         'never at people: a person was 1.2 m from the target 4 s ago')
+    rig.run(4.02, 30.4)
+    assert_refused_alone(rig, 30.4, 'not_person', 'never at people: a person was 1.2 m')
+    rig.run(30.42, 30.6)  # 30 s on
+    assert rig.fc.refusal(30.6, '7', rig.s) == ''
+    rig.fc.on_person_place(30.6, (0.3, 2.1, 0.0))  # 2.1 m away
+    assert rig.fc.refusal(30.6, '7', rig.s) == ''
+    rig.fc.on_person_place(30.6, (0.3, 1.9, 0.0))
+    assert rig.fc.refusal(30.6, '7', rig.s).startswith('never at people: a person was 1.9 m')
+    # A simulation reset (the clock 90 s back) forgets them.
+    rig.run(-60.0, -59.0)
+    assert rig.fc.person_near(-59.0, rig.s.target) is None
+    for bad in ((math.nan, 0.0), None, (1.0,)):
+        rig.fc.on_person_place(-59.0, bad)
+    assert rig.fc.person_near(-59.0, rig.s.target) is None
+
+
+def test_the_node_remembers_where_people_were():
+    """A person seen once 1 m from the car keeps the car unfired at after
+    the 3 s person-clear time, and a reselection of the car does not
+    forget it."""
+    node, t = tracking_node()
+    track_id, cls, (u, v) = CAR_BELOW
+    t = round(t + 0.1, 6)
+    node_step(node, t, [CAR_BELOW, ('31', 'pedestrian', (u + 554.3 / 16.92, v))])
+    for k in range(1, 40):
+        t = round(t + 0.1, 6)
+        node_step(node, t, [CAR_BELOW])
+    refusal = node.launcher.refusal(t, '7', node._situation(t))
+    assert refusal.startswith('never at people: a person was 1.0 m from the target'), refusal
+    node._on_command(NS(data=json.dumps({'action': 'track', 'target_id': '7',
+                                         'mode': 'centered', 'altitude_agl_m': 17})))
+    for k in range(1, 10):
+        t = round(t + 0.1, 6)
+        node_step(node, t, [CAR_BELOW])
+    assert node.launcher.refusal(t, '7', node._situation(t)).startswith(
+        'never at people: a person was')
+
+
 def test_a_simulation_reset_does_not_hold_a_person_forever():
     rig = armed_rig()
     rig.frame(100.0, [('7', 'car'), ('9', 'person')])

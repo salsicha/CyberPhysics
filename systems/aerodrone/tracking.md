@@ -216,7 +216,13 @@ hold, in this order):
    target's own track as a person (or without a class) marks it for good,
    until another target is selected (`"target_person_seen"`). The tracker
    keeps following its id across such a change of kind only where the
-   target is (within `handover_max_m` and the filter's gate);
+   target is (within `handover_max_m` and the filter's gate). Nor is a
+   target fired at within `fire_person_radius_m` (2 m) of where a person
+   (or an unclassified detection) was geolocated in the last
+   `fire_person_memory_s` (30 s), whatever its id and class: the detector
+   renumbers a person it keeps losing, every second or two from a swaying
+   aircraft in the HIL fire scenario, and a new selection starts a new
+   target;
 4. no person anywhere in the camera's view: none in the latest
    `/tracking/detections` frame, which must be at most
    `fire_detection_timeout_s` (0.8 s) old, and none in any frame of the

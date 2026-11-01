@@ -869,6 +869,15 @@ class Tracker:
         now = self.now()
         image_time = self._image_time(msg.header.stamp, now)
         items = [(item.id, detection_class(item)) for item in msg.detections]
+        # Where the people are, remembered for the fire gates
+        # (launcher_core.FireControl.person_near).
+        pose = self.poses.at(stamp_ns(msg.header.stamp))
+        if pose is not None and self.intrinsics is not None and image_time is not None:
+            for item in msg.detections:
+                if lc.person_like(detection_class(item)):
+                    geo = self._geolocate(item, pose, now)
+                    if geo is not None:
+                        self.launcher.on_person_place(now, geo.position)
         if self.launcher.on_detections(now, image_time, items):
             # A person appeared during a fire cycle: stopped, now safe.
             self.node.get_logger().warn(self.launcher.notice[0])

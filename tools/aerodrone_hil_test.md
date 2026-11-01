@@ -442,6 +442,20 @@ would have passed it and the "no person in view" gate. Fixed:
   `tests/test_aerodrone_launcher.py`, `systems/aerodrone/tracking.md`.
 - `tools/tracking_sim_test.py`: the fire steps re-pick a target lost under
   a new id, as the follow steps do.
+- `launcher_core` (a later fix): a target within `fire_person_radius_m`
+  (2 m) of where a person was geolocated in the last `fire_person_memory_s`
+  (30 s) is never fired at, whatever its id and class.
+  - In the HIL fire run with the first MAVROS time-sync settings
+    (`fire_timesync`), the detector again labelled the person a motorcycle;
+    the target was marked at once (`target_person_seen`).
+  - The swaying aircraft then moved the person across the image, and the
+    detector renumbered them about 80 times in two minutes. The tracker
+    followed through the handovers.
+  - The scenario's re-pick, like an operator's new selection, started a
+    new target without the mark.
+
+  Every refusal there was right ("never at people"), but a new selection
+  should not forget where a person was.
 
 With both, the all-local fire scenario passes every step for the first
 time (`control_fire_person_mark`):
