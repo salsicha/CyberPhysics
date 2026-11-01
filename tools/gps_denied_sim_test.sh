@@ -17,7 +17,8 @@
 #                              in applications/aerostack2/config/mount_tamalpais.env)
 #   GPS_DENIED_OUTPUT          run directory (default generated/gps_denied_sim/<stack>)
 #   GPS_DENIED_PROJECT         compose project name (default gps_denied_<stack>)
-#   GPS_DENIED_COMPOSE_OVERRIDE  extra compose file layered on the stack, e.g.
+#   GPS_DENIED_COMPOSE_OVERRIDE  extra compose files layered on the stack,
+#                              separated by spaces, e.g.
 #                              tools/gps_denied_sim_control.yaml (control run)
 #   GPS_DENIED_TIMEOUT_S       overall wall-clock limit (default gazebo 1800,
 #                              isaac 3300)
@@ -53,9 +54,11 @@ for name in recording.jsonl recording.jsonl.gz denial_events.jsonl score.json \
     rm -f "${GPS_DENIED_OUTPUT:?}/$name"
 done
 
-COMPOSE=(docker compose -p "$project" -f "$composition"
-         ${GPS_DENIED_COMPOSE_OVERRIDE:+-f "$GPS_DENIED_COMPOSE_OVERRIDE"}
-         --profile validation --profile denial)
+COMPOSE=(docker compose -p "$project" -f "$composition")
+for override in ${GPS_DENIED_COMPOSE_OVERRIDE:-}; do
+    COMPOSE+=(-f "$override")
+done
+COMPOSE+=(--profile validation --profile denial)
 down_args=(--remove-orphans)
 [ "${GPS_DENIED_KEEP_VOLUMES:-false}" = true ] || down_args+=(-v)
 torn_down=false

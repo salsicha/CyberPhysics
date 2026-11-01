@@ -18,8 +18,15 @@ run all on the workstation the same day; details in "Results"):
   disarmed after 21 min 26 s; the control: 0.04 m, 19 min 9 s), though
   ArduPilot's height drifted about 1 m low during the cruise. A first run
   flew all 40 GoTos but climbed in Land after repeated ArduPilot EKF
-  warnings on the workstation's SITL that did not recur; causes not
-  established.
+  warnings on the workstation's SITL. Not the companion's late GPS_INPUT
+  corrections (ruled out: "6. The missions' height"): a later HIL run that
+  sent none did it again, and SITL's log showed the simulated vehicle's
+  attitude loop oscillating from the take-off, which biases ArduPilot's
+  vertical velocity by up to 2 m/s. Three re-runs with the hardened bridge
+  (late, bursty corrections; GPS 2 only in source set 2) all oscillated:
+  one landed normally, one tipped over at touchdown, one (without
+  corrections) timed out; why HIL runs fall into it and all-local runs do
+  not is not established.
 - **GPS-denied: fails in HIL** (fused 11.7 / 91.9 / 135.8 m median / p95 /
   max while denied; the control 7.1 / 11.5 / 12.7 m, the documented
   baseline 6.6 / 10.9 / 12.7 m). The Pi throttles at 85 °C to 1.5-1.9 GHz,
@@ -276,8 +283,9 @@ limit. None of this recurred in run 2, in any other HIL run, in the
 controls, or in a take-off-and-land and a GoTo-then-land check over HIL;
 nothing on the Pi's side differed between the runs (same images, the same
 commands, MAVLink round trip 19 / 99 ms against 22 / 101 ms median / p95).
-The cause is not established; the workstation, which runs SITL and Gazebo,
-was shared with another project's simulator throughout.
+It came back in a later HIL run that sent no GPS_INPUT at all, whose SITL
+log shows the mechanism, an attitude oscillation of the simulated vehicle
+from the take-off: "6. The missions' height and the GPS_INPUT corrections".
 
 ### 2. GPS-denied
 
@@ -465,9 +473,221 @@ the camera stamp, corrected by the measured clock offset; 60 s windows):
   +24 ms over the runs (±2 ms, the exchange's half round trip), drifting a
   few milliseconds within a run.
 
+### 6. The missions' height and the GPS_INPUT corrections (2026-11-01)
+
+Run 1 climbed in Land from 13 m to 306 m with ArduPilot's vertical speed at
+-2.1 m/s while the vehicle rose at 0.4 m/s, after 8 vibration-compensation,
+8 GPS-glitch and 2 EKF yaw-reset messages; run 2's height ran 1 m low at
+cruise. Only MAVLink from the Pi reaches SITL, and it carries the
+navigation bridge's GPS_INPUT corrections, which on the throttled Pi were
+built from camera frames 0.3 s to several seconds old. They are not the
+cause. The same signature came back in a later HIL run (gi1) that sent no
+corrections at all, and its SITL log shows the mechanism: an attitude
+oscillation of the simulated vehicle from the take-off. Run 1's own SITL
+log was not kept (the runner keeps it now), so for run 1 that rests on the
+matching signature.
+
+**GPS_INPUT cannot reach the vertical estimate** (ArduCopter 4.6.3, commit
+`3fc7011a` of the `Plane-4.6.3` tree in the SITL images; details and the
+source in `tools/gps_denied_sitl_test.md`, "Late and bursty corrections"):
+
+- with GPS 1 healthy the bridge keeps `GPS2_TYPE=0`, and `AP_GPS::handle_msg`
+  hands GPS_INPUT only to the drivers of enabled instances: ArduPilot
+  discards it. Run 2's bridge log shows `GPS2_TYPE=0` at the start, no
+  `GPS2_TYPE=14` and no source-set switch all flight, 80 corrections sent
+  (run 1's logs were overwritten by run 2's; same code, same scenario);
+- with GPS 2 enabled the bridge's GPS_INPUT carries horizontal position
+  only (altitude, velocity and their accuracies flagged absent) and source
+  set 2 takes height from the barometer and fuses no velocity;
+- standalone SITL (`tools/gps_input_sitl_study.py`), every ingredient
+  separately: corrections 0.5-5 s late, released every 3 or 8 s, stamped
+  at capture, when sent or not at all, claiming zero or true velocity,
+  zero or true altitude, with GPS 1 healthy or lost and `GPS2_TYPE` 0 or 14.
+  None moved the vertical estimate (vertical velocity error at most
+  0.18 m/s, height 0.41 m; every landing descended at 0.5 m/s); lateness
+  cost horizontal position (lateness times speed) and 8 s gaps the EKF
+  failsafe. Vibration compensation and a GPS glitch appeared only when
+  GPS 2 was enabled before ArduPilot ran source set 2 and claimed a (zero)
+  vertical velocity: GPS 2 fused in source set 1;
+- the Gazebo stack, all on the workstation with the HIL middleware, with
+  `tools/gps_input_delay.yaml` making the corrections late and bursty
+  (table below): the mission with every GPS_INPUT reaching ArduPilot
+  0.3-2.3 s late, in bursts every 8 s, flew all 20 waypoints within 0.09 m
+  and landed (vertical velocity error 0.013 m/s p95), as the control does;
+- **HIL run gi1 sent none**: an FC-check bug in the first version of the
+  fix (below) kept forwarding off for the whole flight, so no GPS_INPUT
+  left the Pi, and the run 1 signature came back (yaw resets, vibration
+  compensation, GPS glitches, lane switches; ArduPilot's height 1.4 / 2.8 m
+  off, median / p95, its vertical velocity 2.3 m/s off in median all
+  flight), and the vehicle, stuck at the fifth waypoint, timed out after
+  4 of 20.
+
+**What it is.** ArduPilot SITL's dataflash log, which the runner now keeps
+(`sitl/` in the run directory; `tools/sitl_log_summary.py` summarises one,
+with pymavlink), shows it in gi1. Gazebo's truth, SITL's GPS 1 and its
+barometer agree with each other; the EKF does not. From six
+seconds after arming, three metres into the take-off, the roll and pitch
+rate loop diverged (rate doubling every 0.4 s) into a limit cycle that
+lasted the whole flight: roll and pitch 21-26 deg standard deviation about
+level, rates 150-250 deg/s, motor outputs swinging by 300 PWM (standard
+deviation) between their limits, throttle 0.38 instead of 0.24. Holding
+height while tilting back and forth needs more thrust, so the IMU's mean
+vertical specific force was 11.6-11.8 m/s^2 instead of 9.81 (Gazebo's own
+IMU sensor read the same, 11.77). EKF3 put that in its accelerometer bias
+state until it saturated at `EK3_ACC_BIAS_LIM`, 1 m/s^2
+(`AP_NavEKF3_core.cpp`), about 3 minutes into the flight, and the rest into
+its vertical velocity, 2.2-2.4 m/s downward, held against the barometer by
+a standing innovation: hence "Vibration compensation ON" (ArduCopter's
+`ekf_check.cpp`: vertical velocity and position innovations both positive
+with a filtered velocity variance over 1), "GPS Glitch" and the GSF's
+emergency yaw resets. In Land (Aerostack2 descends in GUIDED at 0.5 m/s)
+a vehicle that believes it is already descending at more than 2 m/s
+throttles up, and climbs: run 1.
+A smaller oscillation would leave the bias state room to absorb it and a
+smaller height offset (run 2's metre); without its log that is the likely
+reading, not established. All-local runs show none of it: roll and pitch
+2-5 deg, motor outputs within about 50 PWM, the IMU at 9.81-9.84 m/s^2 and
+the EKF's vertical velocity within 0.02-0.04 m/s of the truth (p95; every
+Gazebo run below with a SITL log, the all-local mission included).
+
+**Why the HIL runs, not established.** Every HIL mission run with the
+runner since its SITL logs are kept oscillated from the take-off (gi1, gi2,
+gi3 below: roll-rate standard deviation 110-210 deg/s); none of the nine
+all-local Gazebo flights of the same day with SITL logs did (0.4-6 deg/s:
+the runs in the table below with logs, the all-local mission included).
+SITL's parameters were identical (the dataflash parameter lists differ only
+in counters), the Pi sends the same velocity set-points (`GUIP` type 4) at
+the take-off as the all-local stack, and the simulator side's configuration
+differs only by the open-file cap and the OAK-1 stand-in. Measured during
+gi1 and an all-local mission with a passive gz-transport listener in the
+Gazebo container, the motor commands reached Gazebo 0.4 ms after the
+backend sent them (median; p99 20 ms, max 100 ms) and Gazebo's IMU came at
+197-198 Hz, identically in both. An all-local run with the HIL's open-file
+cap on the simulator services did not oscillate. One five-minute HIL flight
+did not either (H1, run by a scratch driver with an instrumented copy of
+`gazebo_ardupilot_backend.py` that does a little more work per frame): from
+the same commands it stayed level where gi1, gi2 and gi3 diverged about one
+second after lift-off. The loop SITL closes through Gazebo is the suspect:
+`gazebo_ardupilot_backend.py` answers each of SITL's 400 Hz servo frames
+with the latest of three ROS topics, Gazebo's pose (100 Hz, whose stamp
+sets SITL's clock, so SITL's physics advances in 10 ms steps; 3 of 4 frames
+repeat it), its IMU (200 Hz, typically 5 ms newer than the pose) and its
+twist, and the phase between those free-running clocks and the backend's
+timer, which the workstation's load shifts, may decide whether the rate
+loop is stable at lift-off. HIL's looser hover in the fire scenario
+(0.64 m against 0.18 m) and its slant tracking may share it; their logs
+were not kept.
+
+Corrections, late and bursty, in the Gazebo stack (`gps_denied_sim_test.sh
+gazebo` with the HIL control middleware; errors while GPS 1 was denied,
+median / p95 / max, in metres; ArduPilot's vertical velocity and height
+against the truth from SITL's log):
+
+| Run | Bridge | Corrections | Result | Fused | Autopilot | Vertical velocity error p95 / max | Height error max |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| control (11-01, `control gps_denied`) | before | on time | pass | 7.1 / 11.5 / 12.7 | 7.1 / 11.5 / 12.7 | | |
+| B1 | before | 0.3-1.0 s late to the bridge | pass | 9.2 / 14.4 / 17.1 | 9.2 / 14.4 / 17.1 | 0.05 / 0.27 m/s | 0.04 m |
+| B2 | before | 0.3-2.3 s late, released every 8 s | fail: none reached ArduPilot (all over 1 s), EKF variance failsafe and LAND 11 s into the denial | 0.7 / 2.9 / 3.2 (until it stopped) | 80.6 / 129.8 / 131.2 | 0.02 / 0.03 m/s | 0.09 m |
+| A0 (without `GPS2_DELAY_MS`) | after | on time | pass | 7.3 / 11.9 / 13.0 | 7.3 / 11.9 / 13.1 | 0.04 / 0.07 m/s | 0.04 m |
+| U1 (A0 with the HIL's open-file cap) | after | on time | pass | 6.5 / 10.9 / 12.8 | 6.5 / 11.0 / 12.8 | 0.03 / 0.08 m/s | 0.04 m |
+| acceptance (`control gps_denied`, final code) | after | on time | pass | 7.0 / 11.0 / 12.6 | 7.0 / 10.9 / 12.7 | | |
+| A0f (final code, through the delay layer) | after | on time | pass | 7.0 / 10.9 / 15.7 | 7.0 / 10.9 / 15.8 | 0.03 / 0.18 m/s | 0.04 m |
+| A1 | after | 0.3-1.0 s late to the bridge (as B1) | pass; 9 % dropped as over 1 s, bursts collapsed to their newest, never suspended | 7.9 / 13.2 / 15.6 | 7.9 / 13.2 / 15.5 | 0.05 / 0.13 m/s | 0.05 m |
+| Mission, all-local (`control mission` with the delay layer) | before | every GPS_INPUT 0.3-2.3 s late to MAVROS, every 8 s (GPS 1 healthy) | pass: 20 / 20 waypoints, 0.03 / 0.09 m in 3D, landed and disarmed after 19 min 23 s | | | 0.013 / 0.50 m/s (touchdown) | 0.24 m |
+
+With the bridge forwarding up to 1 s late corrections the Gazebo stack
+passes, before (B1) and after (A1, slightly better) the gate; later ones the
+bridge already dropped, and HIL-like bursts of 8 s left ArduPilot without
+corrections and its EKF failsafe landed it (B2), the same outcome as no
+corrections at all (a first B2 attempt whose injector failed: 79.3 / 131.1
+/ 132.5 m, LAND). Nowhere did late corrections touch the vertical. The
+GPS-denied acceptance passes with the final code against the committed
+baselines (Zenoh 6.6 / 10.9 / 12.7 m, the same day's control 7.1 / 11.5 /
+12.7 m): corrections 4.1 / 7.1 / 9.0 m, DemNav 445 and WildNav 32 fixes
+while denied (control 454 and 31). In a healthy pipeline the gate drops
+nothing as stale: corrections reached the bridge 5-23 ms after their stamp
+at least, 23-45 ms in median and at most 0.12 s; it held back 3-4 % that
+came within 0.2 s of the previous one and 4-5 with the same stamp as the
+last sent (two fixes accepted on one odometry sample).
+
+**Fixed in the bridge anyway** (`ardupilot_navigation_bridge.py`, tested in
+`tests/test_navigation_ardupilot_bridge.py`):
+
+- GPS 2 exists only while source set 2 runs: the bridge asks for set 2 and
+  sets `GPS2_TYPE=14` once ArduPilot accepted it, and on recovery sets
+  `GPS2_TYPE=0` and asks for set 1 once that is confirmed. Before, both
+  requests left in the same callback; in the HIL and control GPS-denied
+  runs ArduPilot confirmed `GPS2_TYPE=14` 5-9 ms before set 2, so GPS 2
+  existed in set 1 only briefly, but a lagging companion or a refused or
+  lost command would stretch that window, and three seconds of it gave
+  "GPS Glitch" and the EKF failsafe in SITL;
+- a correction gate (`CorrectionGate`): corrections more than 1 s old at
+  the bridge (`max_correction_age_s`, as before) or stamped more than 0.5 s
+  ahead are dropped, as is one not newer than the last sent; at most one
+  goes out per 0.2 s (the newest of a burst); when 5 of the last 10 arrive
+  stale forwarding stops (`GPS_INPUT corrections SUSPENDED: ... the
+  companion is lagging`) until 5 arrive in time in a row, so a slow
+  companion makes ArduPilot dead-reckon and, with GPS 1 lost, land through
+  its EKF failsafe, rather than feed it a sporadic, misdated stream;
+- `GPS2_DELAY_MS=20` (`arducopter_gps_input.params`): ArduPilot dates a
+  GPS_INPUT by its GPS time plus the transport delay of the fastest
+  recent message, less this lag (the MAV driver's 200 ms when 0); the
+  bridge's stamp is the odometry sample the fusion propagated the fix to,
+  and the shortest stamp-to-bridge age measured in the Gazebo stack is
+  5-23 ms (median 23-46 ms, at most 0.22 s). ArduPilot hides the parameter
+  while `GPS2_TYPE=0`, so the bridge cannot check it through MAVROS: the
+  first version required it, and in gi1 waited for it all flight;
+- every 20 corrections the bridge logs their age on arrival (min, median,
+  p95, max) and what it dropped.
+
+**HIL re-runs** (`tools/aerodrone_hil_test.sh mission`, 2026-11-01, the
+Pi and set-up as in "Results"; SITL logs in `generated/aerodrone_hil/
+mission_gi*/sitl`, summarised by `tools/sitl_log_summary.py`; the mission
+scores re-run with the crash check below):
+
+| | gi1 | gi2 | gi3 |
+| --- | --- | --- | --- |
+| Bridge | first version of the fix: its FC check waited all flight for `GPS2_DELAY_MS`, so no GPS_INPUT was sent | final | final |
+| Corrections sent; age at the bridge (min / median / p95 / max of the logged windows) | none | 100: 10-16 / 30-42 / 72-97 / 200 ms; nothing dropped as stale, never suspended, `GPS2_TYPE` stayed 0 | 120: 14-26 / 37-48 / 66-83 / 94 ms; the same |
+| Attitude loop from the take-off: roll-rate / motor-output standard deviation | 206 deg/s / 305 PWM | 156 / 283 | 126 / 262 |
+| ArduPilot's vertical velocity error, median / p95 | 2.29 / 2.59 m/s | 0.64 / 1.10 | 0.23 / 0.55 |
+| ArduPilot's height error, median / p95 | 1.42 / 2.76 m | 0.94 / 1.43 | 0.34 / 0.46 |
+| Warnings | vibration compensation 3, GPS glitch 3, emergency yaw reset 2, lane switch 2 | none until touchdown | none |
+| Mission | timed out at 40 min, 4 / 20 waypoints (stuck at the fifth) | tree SUCCESS, 20 / 20 (3D 1.61 / 2.58 m), but the vehicle tipped over at touchdown: "Crash: Disarming: AngErr=150>30", 20 min 34 s after arming | tree SUCCESS, 20 / 20 (3D 0.62 / 1.10 m), **landed and disarmed** after 20 min 30 s |
+| MAVLink round trip, median / p95 | | 28 / 111 ms | 29 / 119 ms |
+
+So with the fix the companion's corrections reached the bridge 10-50 ms after
+their stamp (100 ms at p95 at most, 200 ms once) on the throttled Pi, well
+inside the 1 s bound, and ArduPilot ignored them all with GPS 1 healthy, as
+it must. The landing failed in two of three HIL runs anyway, from the
+oscillation, whose size decided the outcome: the EKF absorbs a small one in
+its bias state (gi3), a larger one leaves about a metre of height error
+(gi2, and most likely run 2) and in gi2 a tip-over at touchdown, a larger
+one still saturates the bias state and leaves 2 m/s (gi1, and most likely
+run 1). `tools/aerodrone_hil_mission_score.py` used to count gi2 as landed
+(disarmed on the ground); it now counts ArduPilot's warnings, and a
+`Crash:` text means no landing (`tests/test_aerodrone_hil.py`).
+
 ## Findings, fixes and limits of these runs
 
 Fixed in the repository:
+
+- `applications/aerostack2/scripts/ardupilot_navigation_bridge.py`: GPS 2
+  exists only while EKF source set 2 runs (configured after ArduPilot
+  accepts set 2, removed before set 1 is asked for); a correction gate
+  drops stale, future and out-of-order corrections, sends at most one per
+  0.2 s and stops forwarding while the companion lags; `GPS2_DELAY_MS=20`;
+  corrections' ages logged ("6. The missions' height").
+- `tools/aerodrone_hil_test.sh` keeps ArduPilot SITL's dataflash log and
+  console (`sitl/`), and makes the Pi's `generated/aerodrone_hil` as the SSH
+  user (a bind mount had created it as root after it was deleted).
+- `tools/aerodrone_hil_mission_score.py` counts ArduPilot's warnings and
+  no longer counts a vehicle its crash check disarmed as landed.
+- `tools/gps_denied_sim_test.sh` takes several override files;
+  `tools/gps_input_delay.yaml` and `tools/gps_input_delay_injector.py` make
+  the corrections late and bursty for tests; `tools/gps_input_sitl_study.py`
+  is the standalone SITL study; `tools/sitl_log_summary.py` summarises a
+  SITL log (EKF against the simulator, the attitude loop, warnings).
 
 - `tools/tracking_sim_test.yaml`: its two ROS services (the test driver and
   the truth boxes) did not load `systems/ros2/middleware.env`, so they
@@ -519,13 +739,12 @@ What failed and why:
 - The fire scenario's car shot in HIL: refused by the 1 m bore gate (1.1 m),
   the hold looser than all-local (0.64 m against 0.18 m); and the person-in-
   view step refused for motion (2 m/s) instead of the person gate.
-- The HIL missions' height: run 1's ArduPilot SITL EKF warnings, biased
-  vertical velocity and climb in Land, and run 2's 1 m height drift at
-  cruise, neither seen in the control mission, the other runs or the landing
-  checks; causes not established ("1. Mission"). SITL runs on the
-  workstation in both cases: whatever reaches it from the Pi is MAVLink
-  (set-points, message intervals, TIMESYNC, GPS_INPUT ignored while GPS 2
-  is disabled).
+- The HIL missions' height: run 1's EKF warnings, biased vertical velocity
+  and climb in Land are an attitude oscillation of the simulated vehicle
+  (seen in SITL's log of a later HIL run that sent no GPS_INPUT), not the
+  GPS_INPUT corrections; run 2's 1 m drift is likely a milder case. What
+  starts the oscillation in HIL runs and not all-local is not established
+  ("6. The missions' height and the GPS_INPUT corrections").
 
 Not done:
 

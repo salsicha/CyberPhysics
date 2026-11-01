@@ -1,0 +1,50 @@
+# Late and bursty GPS-denied corrections, for tests: a layer over
+# compositions/aerostack2_sim.yaml (Gazebo) that puts
+# tools/gps_input_delay_injector.py on both sides of the navigation bridge
+# and delays one of them, as a slow companion computer does
+# (tools/aerodrone_hil_test.md, "6. The missions' height and the GPS_INPUT
+# corrections"). For example, with the HIL control's middleware:
+#
+#   GPS_INPUT_DELAY_S=0.3 GPS_INPUT_JITTER_S=2 GPS_INPUT_BURST_S=8 \
+#   GPS_DENIED_COMPOSE_OVERRIDE="tools/aerodrone_hil_control.yaml tools/gps_input_delay.yaml" \
+#       tools/gps_denied_sim_test.sh gazebo
+#
+# GPS_INPUT_DELAY_STAGE: before_bridge (default: /navigation/correction_fix
+# reaches the bridge late) or after_bridge (the bridge's GPS_INPUT reaches
+# MAVROS late). GPS_INPUT_DELAY_S, GPS_INPUT_JITTER_S (uniform, added),
+# GPS_INPUT_BURST_S (hold and release together every so many seconds),
+# GPS_INPUT_DROP (share never released). The bridge's topics are remapped
+# through the injector; NAVIGATION_BRIDGE_ARGS adds bridge parameters
+# (e.g. "-p max_correction_age_s:=2.0").
+services:
+  navigation_bridge:
+    command: >
+      python3 /workspace/applications/aerostack2/scripts/ardupilot_navigation_bridge.py
+        --ros-args -p mavros_namespace:=/mavros
+        -p gps_input_enabled:=${GPS_INPUT_CORRECTIONS:-true}
+        -r /navigation/correction_fix:=/navigation/correction_fix_in
+        -r /mavros/gps_input/gps_input:=/navigation/gps_input_out
+        ${NAVIGATION_BRIDGE_ARGS:-}
+
+  gps_input_delay:
+    env_file: [../systems/ros2/middleware.env]
+    image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
+    network_mode: host
+    ipc: host
+    stop_signal: SIGINT
+    ulimits:
+      nofile:
+        soft: 1024
+        hard: 524288
+    depends_on: [navigation_bridge]
+    environment:
+      ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
+    volumes:
+      - ../tools:/workspace/tools:ro
+    command: >
+      python3 /workspace/tools/gps_input_delay_injector.py --ros-args
+        -p stage:=${GPS_INPUT_DELAY_STAGE:-before_bridge}
+        -p delay_s:=${GPS_INPUT_DELAY_S:-0.0}
+        -p jitter_s:=${GPS_INPUT_JITTER_S:-0.0}
+        -p burst_s:=${GPS_INPUT_BURST_S:-0.0}
+        -p drop:=${GPS_INPUT_DROP:-0.0}

@@ -53,7 +53,8 @@
 #   and the GPS-denied test's GPS_DENIAL_* and the tracking test's
 #   TRACKING_TEST_* variables.
 # Writes, in the run directory: stack.log (workstation), pi/ (pi_stack.log,
-# resources.jsonl, probe_pi.json, the mission tree's log), probe_sim.json,
+# resources.jsonl, probe_pi.json, the mission tree's log), sitl/ (ArduPilot
+# SITL's dataflash log, gzipped, and console), probe_sim.json,
 # clock.json, sockets_*.txt, the scenario's recording and score, and
 # hil_summary.json.
 # Exit status: 0 pass, 1 a check failed, 2 no usable run, 3 (mission,
@@ -63,6 +64,18 @@ cd "$(dirname "$0")/.."
 
 scenario="${1:-}"
 hil_env=applications/aerostack2/config/aerodrone_hil.env
+# ArduPilot SITL's dataflash log (EKF, IMU, GPS, baro and the simulator's
+# truth, SIM2) and console, from the running container to <run>/sitl before
+# teardown: what an autopilot anomaly is diagnosed from.
+keep_sitl_logs() {  # <container id> <run directory>
+    [ -n "$1" ] || return 0
+    rm -rf "${2:?}/sitl"
+    mkdir -p "$2/sitl"
+    docker cp "$1:/ardupilot/logs" "$2/sitl/logs" > /dev/null 2>&1
+    docker cp "$1:/tmp/ArduCopter.log" "$2/sitl/ArduCopter.log" > /dev/null 2>&1
+    gzip -f "$2"/sitl/logs/*.BIN 2> /dev/null
+    return 0
+}
 env_value() { sed -n "s/^$1=//p" "$hil_env" | tail -1; }
 usage="usage: $0 <mission|gps_denied|tracking|fire> | control <mission|gps_denied|tracking|fire>"
 if [ "$scenario" = control ]; then
@@ -91,6 +104,8 @@ if [ "$scenario" = control ]; then
             CONTROL=(docker compose -p hil_control_mission -f compositions/aerostack2_sim.yaml
                      -f tools/aerodrone_hil_control.yaml --profile validation)
             control_down() {
+                keep_sitl_logs "$("${CONTROL[@]}" ps -q navigator_sitl 2> /dev/null)" \
+                    "$GPS_DENIED_OUTPUT"
                 "${CONTROL[@]}" --profile denial logs --no-color --timestamps \
                     > "$GPS_DENIED_OUTPUT/stack.log" 2>&1
                 "${CONTROL[@]}" --profile denial down -v --remove-orphans > /dev/null 2>&1
@@ -205,7 +220,7 @@ for name in recording.jsonl recording.jsonl.gz denial_events.jsonl score.json mi
             sockets_pi.txt hil_summary.json; do
     rm -f "${out:?}/$name"
 done
-rm -rf "${out:?}/pi" "${out:?}/page"
+rm -rf "${out:?}/pi" "${out:?}/page" "${out:?}/sitl"
 mkdir -p "$out/pi" "$out/page"
 
 # Only the outcome of the runs in progress (no hil_ project may be up).
@@ -237,9 +252,10 @@ if [ "${HIL_SYNC:-true}" = true ]; then
 fi
 
 # The Pi's run directory (root-owned files from earlier containers: removed
-# in a container).
-pi_sh "docker run --rm -v '$pi_repo/generated:/g' --entrypoint rm $pi_image \
--rf /g/aerodrone_hil/run_$scenario && mkdir -p '$pi_run'"
+# in a container). generated/aerodrone_hil is made first, as the SSH user:
+# a bind mount of a missing directory would create it owned by root.
+pi_sh "mkdir -p generated/aerodrone_hil && docker run --rm -v '$pi_repo/generated:/g' \
+--entrypoint rm $pi_image -rf /g/aerodrone_hil/run_$scenario && mkdir -p '$pi_run'"
 
 # The Pi's clock minus this host's: the smallest-round-trip exchange of 40
 # over one SSH session (the Pi and this host both keep NTP time).
@@ -286,6 +302,7 @@ teardown() {
 $pi_compose $all_pi_profiles down -v --remove-orphans > /dev/null 2>&1; \
 [ -f '$pi_run/sampler.pid' ] && kill \$(cat '$pi_run/sampler.pid'); true"
     "${SSH[@]}" "tar -C '$pi_repo/$pi_run' -cf - ." | tar -C "$out/pi" -xf -
+    keep_sitl_logs "$("${SIM[@]}" ps -q navigator_sitl 2> /dev/null)" "$out"
     "${SIM[@]}" "${all_sim_profiles[@]}" logs --no-color --timestamps > "$out/stack.log" 2>&1
     "${SIM[@]}" "${all_sim_profiles[@]}" down "${down_args[@]}" > /dev/null 2>&1
     left="$(leftovers | tr '\n' ' ')"

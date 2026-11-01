@@ -120,22 +120,37 @@ navigation fusion and the ArduPilot navigation bridge together:
    WildNav match, halved and sent with that variance, passed the EKF's gate
    and pulled it 50 m in this test).
 3. **GPS 2 = GPS_INPUT.** The bridge sends each one through the MAVROS
-   gps_input plugin with fix type 3D, GPS week/ms from the stamp, honest
-   horizontal accuracy (fix sigma, HDOP = sigma / 5 m), 6 satellites (the
-   EKF's alignment minimum, below any real receiver so GPS 1 always wins),
-   and altitude, velocity and vertical accuracy flagged absent (visual fixes
-   carry the prior's altitude; height stays on the barometer).
+   gps_input plugin with fix type 3D, GPS week/ms from the stamp (the
+   odometry sample the correction was propagated to), honest horizontal
+   accuracy (fix sigma, HDOP = sigma / 5 m), 6 satellites (the EKF's
+   alignment minimum, below any real receiver so GPS 1 always wins), and
+   altitude, velocity and vertical accuracy flagged absent (visual fixes
+   carry the prior's altitude; height stays on the barometer). Its
+   correction gate keeps late and bursty corrections out ("Late and bursty
+   corrections" below): one more than 1 s old when it reaches the bridge
+   (`max_correction_age_s`) or stamped more than 0.5 s ahead is dropped, as
+   is one not newer than the last sent; at most one goes out per 0.2 s
+   (`min_send_interval_s`), the newest of a burst; and when 5 of the last
+   10 arrived stale forwarding stops until 5 arrive in time in a row
+   (`GPS_INPUT corrections SUSPENDED` in the bridge's log). `GPS2_DELAY_MS`
+   is 20 ms, the measured shortest time from a stamp to the autopilot.
 4. **EKF source sets.** GPS_INPUT without velocity is fused as zero velocity
    while GPS is a velocity source. With GPS 1 lost the bridge selects EKF
    source set 2 (GPS position only, no velocity, baro height, compass yaw)
    and returns to set 1 after GPS 1 has held a 3D fix for 10 s.
    `EK3_SRC_OPTIONS=0` is required: the default "fuse all velocities"
-   keeps fusing set 1's GPS velocity.
+   keeps fusing set 1's GPS velocity. GPS 2 exists only while set 2 runs:
+   the bridge configures it (`GPS2_TYPE=14`) once ArduPilot has accepted
+   set 2, and on recovery removes it and asks for set 1 once that is
+   confirmed. In set 1 a GPS 2 that became primary (GPS_AUTO_SWITCH picks
+   it while GPS 1 has no fix) is fused with the zero velocity it does not
+   carry; three seconds of that ended in "GPS Glitch or Compass error" and
+   the EKF failsafe here.
 5. **Arming.** A configured GPS 2 without a fix fails the "GPS 2: Bad fix"
    pre-arm check. `arducopter_gps_input.params` therefore leaves
    `GPS2_TYPE=0`; the bridge sets `GPS2_TYPE=14` when GPS 1 is lost in flight
-   and back to 0 on disarm, so pre-arm GPS checks stay enabled. If the bridge
-   dies with GPS 2 configured, the next arming is refused until
+   (armed) and back to 0 on disarm, so pre-arm GPS checks stay enabled. If
+   the bridge dies with GPS 2 configured, the next arming is refused until
    `GPS2_TYPE` is reset (fail-safe).
 6. While forwarding is active, the fusion node stops applying its own
    offsets (the EKF already absorbs the corrections).
@@ -376,6 +391,77 @@ inliers and confidence 0.15-0.30 at 150 m AGL over the synthetic tiles,
 several 100-750 m off and rejected by its jump gate, the fusion
 confidence gate or, for one 225 m off at confidence 0.22, the fusion's
 consistency gate), so DemNav supplied almost every correction.
+
+### Late and bursty corrections
+
+On the Raspberry Pi 5 of the hardware-in-the-loop test the companion's
+corrections came 0.3 s to several seconds after the camera frame, in
+bursts (`tools/aerodrone_hil_test.md`). What ArduPilot does with a
+GPS_INPUT's time and fields (ArduCopter 4.6.3, commit `3fc7011a` of the
+pinned tree, as built in the SITL images):
+
+- `GCS_Common.cpp` hands GPS_INPUT to `AP_GPS::handle_msg` (`AP_GPS.cpp`),
+  which passes a message only to the drivers of instances whose
+  `GPSn_TYPE` is not 0: while `GPS2_TYPE=0` (GPS 1 healthy) every
+  GPS_INPUT is discarded.
+- `AP_GPS_MAV::handle_msg` (`AP_GPS_MAV.cpp`) keeps only what the ignore
+  flags let through (with the bridge's flags the altitude stays 0, the
+  velocity (0, 0, 0) and `have_vertical_velocity` false) and maps
+  `time_week`/`time_week_ms` to its own clock with `JitterCorrection`
+  (2 s maximum lag, converging over 100 messages on the least delayed one);
+  `AP_GPS::update_instance` makes that the message time.
+- EKF3's `readGpsData` (`AP_NavEKF3_Measurements.cpp`) dates the sample
+  that time minus `GPS2_DELAY_MS` (the MAV backend's 200 ms when 0,
+  `AP_GPS::get_lag`; range 0-250), clamps it into its delay buffer
+  (`AP_NavEKF3_core.cpp`: sized at start-up from the largest sensor delay,
+  the GPS's capped at 250 ms) and ignores a sample less than 50 ms after
+  the previous one (`sensorIntervalMin_ms`). A correction more than about
+  250 ms late is fused as if 250 ms old.
+
+Standalone SITL (`tools/gps_input_sitl_study.py`: the navigator image's
+ArduCopter 4.6.3, built-in quad, the Aerodrone parameter files; GUIDED legs
+of 200 m at 40 m and 5 m/s; GPS_INPUT at 2 Hz from SIM_STATE truth plus 3 m
+noise, sent at 30 m accuracy; GPS 1 denied after 40 s of cruise for the
+rest of the flight, then a GUIDED descent at 0.5 m/s, Aerostack2's land;
+ArduPilot's LOCAL_POSITION_NED against SIM_STATE). Errors while denied,
+median / max horizontal, p95 / max of the vertical velocity, max of the
+height:
+
+| GPS_INPUT | Horizontal (m) | Vertical velocity (m/s) | Height (m) | Outcome |
+| --- | --- | --- | --- | --- |
+| on time, the bridge's fields | 2.2 / 5.6 | 0.03 / 0.06 | 0.20 | lands |
+| 0.5 / 1 / 2 / 4 s late (stamped at capture) | 3.8 / 10.2, 6.1 / 10.5, 12.4 / 18.2, 16.8 / 53.8 | 0.03-0.04 / 0.07-0.09; 4 s: 0.12 / 0.18 | 0.20-0.22; 4 s: 0.41 | lands |
+| 1 / 2 s late, stamped when sent | 6.1 / 10.4, 12.4 / 19.7 | 0.03-0.04 / 0.06-0.08 | 0.19-0.21 | lands |
+| 0.3-2.3 s late, no GPS time (week 0) | 8.2 / 11.2 | 0.03 / 0.07 | 0.19 | lands |
+| 0.3-0.8 s late, released every 3 s | 5.9 / 15.5 | 0.02 / 0.05 | 0.16 | lands |
+| released every 8 s (0.3-0.8 or 0.3-2.3 s late) | 6.2-7.0 / 45.7-54.2 | 0.06 / 0.06 | 0.26 | EKF variance failsafe, LAND, lands |
+| zero velocity claimed (not flagged absent) | 2.8 / 5.7 | 0.03 / 0.06 | 0.20 | lands |
+| true velocity claimed, 1 s late | 6.1 / 10.5 | 0.03 / 0.07 | 0.20 | lands |
+| altitude 0 claimed | 2.7 / 5.7 | 0.03 / 0.07 | 0.20 | lands |
+| true altitude and vertical accuracy, 2 s late | 12.3 / 18.1 | 0.04 / 0.09 | 0.22 | lands |
+| GPS 1 restored after 100 s: on time / 2 s late, every 3 s / 1-3 s late with altitude 0 and zero velocity claimed | 1.7 / 3.7, 11.7 / 18.9, 13.0 / 22.4 | 0.02-0.04 / 0.04-0.05 | 0.15-0.16 | set 1 again, lands |
+| GPS 2 configured 3 s before set 2 is selected | 4.2 / 15.2 | 0.03 / 0.07 | 0.27 | "GPS Glitch or Compass error", EKF failsafe, LAND |
+| the same with zero velocity claimed (vertical too) | 3.9 / 28.6 | 0.06 / 0.08 | 0.23 | "GPS Glitch", "Vibration compensation ON" (4), EKF lane switch |
+| set 2 selected 2 s before GPS 2 is configured | 2.1 / 5.6 | 0.03 / 0.06 | 0.20 | lands |
+| GPS 1 never lost (`GPS2_TYPE=0`): 0.3-3.3 s late every 8 s; 2-5 s late every 8 s, stamped when sent, altitude 0 and zero velocity claimed; the same with `GPS2_TYPE=14` | 0.19-0.20 max at cruise (0.19 without GPS_INPUT) | 0.003-0.004 / 0.036-0.037 at cruise (0.004 / 0.032) | 0.10-0.11 | lands in 81 s, as without |
+
+So lateness and gaps cost horizontal position, about the lateness times the
+speed, and gaps of 8 s trip the EKF failsafe as no corrections do; honest
+and send-time stamps gave the same errors (ArduPilot clamps both). Nothing
+reached the vertical estimate: in source set 2 height comes from the
+barometer and no velocity is fused, and while GPS 1 is healthy ArduPilot
+discards GPS_INPUT (with `GPS2_TYPE=14` it still uses GPS 1). The only
+vertical effect came from fusing GPS 2 in source set 1, with velocity, which
+the bridge's flags and its order of source set and `GPS2_TYPE` now rule
+out. The bridge's gate (item 3 above, `CorrectionGate` in
+`ardupilot_navigation_bridge.py`) bounds the lateness it forwards to 1 s
+(at most about 0.75 s misdated, 4 m at 5 m/s, against the 20-100 m the
+corrections are sent with; the knee of the table above), collapses bursts
+and stops forwarding while the pipeline lags, so that a slow companion makes
+ArduPilot dead-reckon and, with GPS 1 lost, land through its EKF failsafe
+instead of fusing positions that are seconds old. The Gazebo runs with
+`tools/gps_input_delay.yaml` and the hardware-in-the-loop re-runs are in
+`tools/aerodrone_hil_test.md`.
 
 ## Pass criteria
 

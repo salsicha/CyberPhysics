@@ -466,6 +466,24 @@ def test_mission_score_closest_approaches_timing_and_result():
     assert result['landed_and_disarmed'] and result['pass']
 
 
+def test_mission_score_counts_autopilot_warnings_and_a_crash_is_no_landing():
+    lines = ['[9.0]: WildernessMission  RUNNING -> SUCCESS']
+    rows = mission_rows() + [
+        {'k': 'text', 'rx': 5.0, 'text': 'GPS Glitch or Compass error'},   # before arming
+        {'k': 'text', 'rx': 40.0, 'text': 'Vibration compensation ON'},
+        {'k': 'text', 'rx': 41.0, 'text': 'EKF3 IMU0 emergency yaw reset'}]
+    result = mission.score_mission(rows, lines, tree_exit=0)
+    assert result['pass'] and result['landed_and_disarmed']
+    assert result['autopilot_warnings']['Vibration compensation ON'] == 1
+    assert result['autopilot_warnings']['emergency yaw reset'] == 1
+    assert result['autopilot_warnings']['GPS Glitch'] == 0
+    # HIL 2026-11-01: an oscillating vehicle tipped over at touchdown and
+    # ArduPilot's crash check disarmed it, on the ground.
+    rows.append({'k': 'text', 'rx': 99.9, 'text': 'Crash: Disarming: AngErr=150>30, Accel=0.4<3.0'})
+    result = mission.score_mission(rows, lines, tree_exit=0)
+    assert not result['landed_and_disarmed'] and not result['pass']
+
+
 def test_mission_score_fails_a_missed_waypoint_or_a_failed_tree():
     assert not mission.score_mission(mission_rows(offset=(8.0, 0.0)), [], tree_exit=0)['pass']
     assert not mission.score_mission(mission_rows(), ['[9.0]: Root  RUNNING -> FAILURE'],

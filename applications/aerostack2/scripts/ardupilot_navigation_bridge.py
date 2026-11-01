@@ -38,10 +38,50 @@
    A configured GPS 2 without a fix fails ArduPilot's "GPS 2: Bad fix"
    pre-arm check, and visual fixes only exist in flight. With
    ``manage_gps2_type`` (default) the bridge therefore sets GPS2_TYPE=14
-   only when the primary GPS is lost, and back to 0 whenever the vehicle is
-   disarmed, so the pre-arm GPS checks stay enabled. (If the bridge dies
-   while GPS 2 is configured, the next arming attempt is refused with
-   "GPS 2: Bad fix" until GPS2_TYPE is reset: a fail-safe outcome.)
+   only when the primary GPS is lost in flight, and back to 0 whenever the
+   vehicle is disarmed, so the pre-arm GPS checks stay enabled. (If the
+   bridge dies while GPS 2 is configured, the next arming attempt is
+   refused with "GPS 2: Bad fix" until GPS2_TYPE is reset: a fail-safe
+   outcome.) GPS 2 exists only while ArduPilot runs source set 2: on GPS 1
+   loss the bridge asks for set 2 and configures GPS 2 once ArduPilot has
+   accepted it; on recovery it removes GPS 2 and, once that is done, asks
+   for set 1. In set 1 (GPS velocity fused) a GPS_INPUT GPS 2 that became
+   primary (GPS_AUTO_SWITCH picks it whenever GPS 1 has no fix) is fused
+   with the zero velocity it does not carry: in ArduCopter 4.6.3 SITL three
+   seconds of that gave "GPS Glitch or Compass error" and the EKF failsafe
+   (LAND), with a vertical velocity "Vibration compensation ON" too. A slow
+   link or companion makes that window as long as its lag, so the order is
+   enforced rather than left to the order MAVROS delivers two requests in.
+
+   Late and bursty corrections. A correction is stamped with the odometry
+   sample its position is valid at (the fusion propagates the camera fix to
+   it), and ArduPilot dates GPS_INPUT by that stamp: its MAV driver
+   corrects the GPS time for transport jitter (assuming the fastest message
+   was the least delayed, at most 2 s) and the EKF subtracts GPS2_DELAY_MS,
+   then clamps the time to its delay buffer, which ends 250 ms in the past
+   at most. A correction more than that late is fused as if 250 ms old: its
+   lateness times the speed becomes position error (ArduCopter 4.6.3 SITL,
+   GPS-denied at 5 m/s: 0.5 / 1 / 2 / 4 s late gave 3.8 / 6.1 / 12.4 / 16.8
+   m median error against 2.2 m on time; bursts with 8 s gaps tripped the
+   EKF failsafe). It never reaches the vertical: source set 2 takes height
+   from the barometer and no velocity, and the bridge flags altitude and
+   velocity absent (tools/gps_denied_sitl_test.md, "Late and bursty
+   corrections"). The bridge therefore gates what it forwards
+   (``CorrectionGate``): a correction more than ``max_correction_age_s``
+   (1 s: at most about 0.75 s misdated, 4 m at 5 m/s, against the 20-100 m
+   accuracy the corrections are sent with) old when it reaches the bridge,
+   or stamped more than ``max_future_s`` ahead, is dropped, as is one not
+   newer than the last sent (ArduPilot ignores a GPS sample less than 50 ms
+   after the previous one anyway); at most one goes out per
+   ``min_send_interval_s``, the newest of a burst; and when
+   ``lag_suspend_count`` of the last ``lag_window`` corrections arrived
+   stale the companion is lagging and forwarding stops until
+   ``lag_resume_count`` arrive in time in a row. Without corrections
+   ArduPilot dead-reckons and, with GPS 1 lost, its EKF failsafe lands the
+   aircraft after about 8 s: the designed degradation, rather than
+   positions that are seconds old. GPS2_DELAY_MS
+   (arducopter_gps_input.params) is the measured shortest time from a
+   correction's stamp to the autopilot.
 
    Flight-controller check. Forwarding needs the EKF source set 2 and GPS
    configuration of arducopter_gps_input.params ON THE AUTOPILOT, and the
@@ -68,6 +108,7 @@ measured limits are recorded in tools/gps_denied_sitl_test.md.
 """
 from __future__ import annotations
 
+import collections
 import math
 
 import rclpy
@@ -105,6 +146,13 @@ HORIZONTAL_ONLY = (IGNORE_ALT | IGNORE_VDOP | IGNORE_VEL_HORIZ | IGNORE_VEL_VERT
                    | IGNORE_SPEED_ACCURACY | IGNORE_VERTICAL_ACCURACY)
 
 GPS_FIX_TYPE_3D_FIX = 3
+# GPS2_DELAY_MS of arducopter_gps_input.params: the measured shortest time
+# from a correction's stamp to the autopilot (ArduPilot dates GPS 2 samples
+# by it; see the module docstring).
+GPS2_DELAY_MS = 20
+# In arducopter_gps_input.params but not checked through MAVROS (see
+# required_fc_params).
+UNCHECKED_FC_PARAMS = {'GPS2_DELAY_MS': GPS2_DELAY_MS}
 GPS_EPOCH_UNIX_S = 315964800       # 1980-01-06T00:00:00Z
 GPS_LEAP_SECONDS = 18              # GPS - UTC since 2017-01-01
 SECONDS_PER_WEEK = 604800
@@ -172,7 +220,9 @@ def required_fc_params(denied_set=2, gps2_type_param='GPS2_TYPE'):
 
     GPS2_TYPE is the one the bridge manages at runtime (0 on the ground, 14
     while GPS 1 is lost in flight), so both are accepted; anything else is
-    a real second receiver."""
+    a real second receiver. GPS2_DELAY_MS (UNCHECKED_FC_PARAMS) is in the
+    file but not checked: ArduPilot hides GPS 2's other parameters from its
+    parameter list while GPS2_TYPE is 0, so MAVROS never has it."""
     source = f'EK3_SRC{int(denied_set)}_'
     return {
         str(gps2_type_param): (GPS_TYPE_NONE, GPS_TYPE_MAV),
@@ -250,6 +300,110 @@ class SourceSetSwitch:
         return None
 
 
+class CorrectionGate:
+    """Which accepted corrections reach ArduPilot, and when.
+
+    ``offer(stamp_ns, now_ns, item)`` judges a correction as it reaches the
+    bridge; ``poll(now_ns)`` releases a held one. Both return the
+    ``(item, age_s)`` to send now. A correction is
+
+    - stale, and dropped, when it is more than ``max_age_s`` old (its stamp
+      against the bridge's clock) or stamped more than ``max_future_s``
+      ahead;
+    - dropped when it is not newer than the last one sent (a burst
+      delivered out of order, a repeat);
+    - sent at once when ``min_interval_s`` has passed since the last one,
+      else held, replacing any older held one (a burst collapses to its
+      newest), and sent by ``poll`` when the interval has passed if it is
+      still fresh.
+
+    Lag: when ``suspend_count`` of the last ``window`` corrections were
+    stale the pipeline is lagging and nothing is sent until
+    ``resume_count`` fresh ones arrive in a row (the last of them is sent).
+    ``events`` collects ('suspended' | 'resumed', stale, window) for the
+    caller to log; ``counts`` the outcomes, ``ages`` the ages of the
+    arrivals (sent or not) since the caller last cleared it.
+    """
+
+    def __init__(self, max_age_s=1.0, min_interval_s=0.2, window=10,
+                 suspend_count=5, resume_count=5, max_future_s=0.5):
+        self.max_age_s = float(max_age_s)
+        self.min_interval_s = float(min_interval_s)
+        self.max_future_s = float(max_future_s)
+        self.suspend_count = max(1, int(suspend_count))
+        self.resume_count = max(1, int(resume_count))
+        self.recent = collections.deque(maxlen=max(1, int(window)))
+        self.fresh_run = 0
+        self.suspended = False
+        self.pending = None          # (stamp_ns, item)
+        self.last_sent_stamp = None
+        self.last_sent_ns = None
+        self.counts = collections.Counter()
+        self.ages = []
+        self.events = []
+
+    def _age_s(self, stamp_ns, now_ns):
+        return (int(now_ns) - int(stamp_ns)) / 1e9
+
+    def _fresh(self, age_s):
+        return -self.max_future_s <= age_s <= self.max_age_s
+
+    def _send(self, stamp_ns, now_ns, item):
+        age_s = self._age_s(stamp_ns, now_ns)
+        self.last_sent_stamp = int(stamp_ns)
+        self.last_sent_ns = int(now_ns)
+        self.pending = None
+        self.counts['sent'] += 1
+        return [(item, age_s)]
+
+    def offer(self, stamp_ns, now_ns, item):
+        age_s = self._age_s(stamp_ns, now_ns)
+        self.ages.append(age_s)
+        stale = not self._fresh(age_s)
+        self.recent.append(stale)
+        if stale:
+            self.counts['stale'] += 1
+            self.fresh_run = 0
+            if not self.suspended and sum(self.recent) >= self.suspend_count:
+                self.suspended = True
+                self.pending = None
+                self.events.append(('suspended', sum(self.recent), len(self.recent)))
+            return self.poll(now_ns)
+        self.fresh_run += 1
+        if self.suspended:
+            if self.fresh_run < self.resume_count:
+                self.counts['suspended'] += 1
+                return []
+            self.suspended = False
+            self.recent.clear()
+            self.events.append(('resumed', self.fresh_run, self.resume_count))
+        newest = max([s for s in (self.last_sent_stamp,
+                                  self.pending[0] if self.pending else None)
+                      if s is not None], default=None)
+        if newest is not None and int(stamp_ns) <= newest:
+            self.counts['out_of_order'] += 1
+            return self.poll(now_ns)
+        if (self.last_sent_ns is None
+                or (int(now_ns) - self.last_sent_ns) / 1e9 >= self.min_interval_s):
+            return self._send(stamp_ns, now_ns, item)
+        if self.pending is not None:
+            self.counts['superseded'] += 1
+        self.pending = (int(stamp_ns), item)
+        return []
+
+    def poll(self, now_ns):
+        if self.pending is None or self.suspended:
+            return []
+        if (int(now_ns) - self.last_sent_ns) / 1e9 < self.min_interval_s:
+            return []
+        stamp_ns, item = self.pending
+        if not self._fresh(self._age_s(stamp_ns, now_ns)):
+            self.pending = None
+            self.counts['stale'] += 1
+            return []
+        return self._send(stamp_ns, now_ns, item)
+
+
 class ArduPilotNavigationBridge(Node):
     def __init__(self):
         super().__init__('ardupilot_navigation_bridge')
@@ -262,7 +416,13 @@ class ArduPilotNavigationBridge(Node):
             'autopilot_corrections_topic': '/navigation/autopilot_corrections_active',
             'gps_id': 1,
             'satellites_visible': 6,
+            # Correction gate (CorrectionGate).
             'max_correction_age_s': 1.0,
+            'max_future_s': 0.5,
+            'min_send_interval_s': 0.2,
+            'lag_window': 10,
+            'lag_suspend_count': 5,
+            'lag_resume_count': 5,
             'min_horizontal_accuracy_m': 0.5,
             'source_switching': True,
             'gps_loss_s': 1.0,
@@ -300,9 +460,16 @@ class ArduPilotNavigationBridge(Node):
             Bool, self.get_parameter('autopilot_corrections_topic').value, latched)
         self.active_pub.publish(Bool(data=False))
         self.sent = 0
+        self.gate = None
         self.switch = None
         self.armed = None
+        # GPS2_TYPE as ArduPilot last confirmed it (None: unknown), and the
+        # value of a request MAVROS has not answered yet (one at a time).
         self.gps2_type = None
+        self.gps2_pending = None
+        self.gps2_pending_since = None
+        # The source set ArduPilot last accepted (it boots on set 1).
+        self.source_set = int(self.get_parameter('nominal_source_set').value)
         self.manage_gps2 = self.enabled and bool(
             self.get_parameter('manage_gps2_type').value)
         if self.enabled:
@@ -320,9 +487,17 @@ class ArduPilotNavigationBridge(Node):
                 ParamSetV2, f'{mavros}/param/set')
             self.gps_input_pub = self.create_publisher(
                 GPSINPUT, f'{mavros}/gps_input/gps_input', 10)
+            self.gate = CorrectionGate(
+                self.get_parameter('max_correction_age_s').value,
+                self.get_parameter('min_send_interval_s').value,
+                self.get_parameter('lag_window').value,
+                self.get_parameter('lag_suspend_count').value,
+                self.get_parameter('lag_resume_count').value,
+                self.get_parameter('max_future_s').value)
             self.create_subscription(
                 NavSatFix, self.get_parameter('correction_topic').value,
                 self._on_correction, 10)
+            self.create_timer(0.05, self._release_correction)
             if bool(self.get_parameter('source_switching').value):
                 self.switch = SourceSetSwitch(
                     self.get_parameter('gps_loss_s').value,
@@ -437,12 +612,6 @@ class ArduPilotNavigationBridge(Node):
     def _on_correction(self, fix):
         if not self.forwarding:
             return
-        now_ns = self.get_clock().now().nanoseconds
-        age_s = (now_ns - stamp_ns(fix.header.stamp)) / 1e9
-        if not -0.5 <= age_s <= float(self.get_parameter('max_correction_age_s').value):
-            self.get_logger().warning(
-                f'Dropped correction {age_s:.2f} s old', throttle_duration_sec=5.0)
-            return
         fields = gps_input_fields(
             fix, self.get_parameter('gps_id').value,
             self.get_parameter('satellites_visible').value,
@@ -451,17 +620,56 @@ class ArduPilotNavigationBridge(Node):
             self.get_logger().warning('Dropped correction without a usable '
                                       'horizontal position/covariance')
             return
-        msg = GPSINPUT()
-        msg.header.stamp = fix.header.stamp
-        msg.header.frame_id = 'map'
-        for name, value in fields.items():
-            setattr(msg, name, value)
-        self.gps_input_pub.publish(msg)
-        self.sent += 1
-        if self.sent == 1 or self.sent % 20 == 0:
-            self.get_logger().info(
-                f'Sent {self.sent} GPS_INPUT corrections '
-                f"(last horizontal accuracy {fields['horiz_accuracy']:.1f} m)")
+        now_ns = self.get_clock().now().nanoseconds
+        stale_before = self.gate.counts['stale']
+        out = self.gate.offer(stamp_ns(fix.header.stamp), now_ns, (fix, fields))
+        if self.gate.counts['stale'] > stale_before:
+            age_s = (now_ns - stamp_ns(fix.header.stamp)) / 1e9
+            self.get_logger().warning(
+                f'Dropped correction {age_s:.2f} s old (max_correction_age_s '
+                f'{self.gate.max_age_s:g})', throttle_duration_sec=5.0)
+        self._send_corrections(out)
+
+    def _release_correction(self):
+        if self.forwarding and self.gate is not None:
+            self._send_corrections(self.gate.poll(self.get_clock().now().nanoseconds))
+
+    def _send_corrections(self, out):
+        for kind, count, size in self.gate.events:
+            if kind == 'suspended':
+                self.get_logger().error(
+                    f'GPS_INPUT corrections SUSPENDED: {count} of the last '
+                    f'{size} reached the bridge more than '
+                    f'{self.gate.max_age_s:g} s late (the companion is '
+                    'lagging); none are sent until '
+                    f'{self.gate.resume_count} arrive in time in a row. With '
+                    'GPS 1 lost ArduPilot dead-reckons and its EKF failsafe '
+                    'lands the aircraft after about 8 s without corrections.')
+            else:
+                self.get_logger().warn(
+                    f'GPS_INPUT corrections resumed: {count} in time in a row')
+        self.gate.events.clear()
+        for (fix, fields), _age_s in out:
+            msg = GPSINPUT()
+            msg.header.stamp = fix.header.stamp
+            msg.header.frame_id = 'map'
+            for name, value in fields.items():
+                setattr(msg, name, value)
+            self.gps_input_pub.publish(msg)
+            self.sent += 1
+            if self.sent == 1 or self.sent % 20 == 0:
+                ages = sorted(self.gate.ages) or [math.nan]
+                self.gate.ages.clear()
+                counts = self.gate.counts
+                self.get_logger().info(
+                    f'Sent {self.sent} GPS_INPUT corrections (last horizontal '
+                    f"accuracy {fields['horiz_accuracy']:.1f} m; age at the "
+                    f'bridge of the {len(ages)} arrivals since the last report: '
+                    f'min {ages[0]:.3f}, median {ages[len(ages) // 2]:.3f}, '
+                    f'p95 {ages[int(0.95 * (len(ages) - 1))]:.3f}, max {ages[-1]:.3f} s; '
+                    f"dropped stale {counts['stale']}, out of order "
+                    f"{counts['out_of_order']}, superseded {counts['superseded']}, "
+                    f"while suspended {counts['suspended']})")
 
     def _on_state(self, msg):
         if not msg.connected:
@@ -476,6 +684,14 @@ class ArduPilotNavigationBridge(Node):
         self.armed = armed
 
     def _set_gps2_type(self, value):
+        """Ask MAVROS to set GPS2_TYPE, one request at a time; the answer
+        updates ``gps2_type`` (a request MAVROS never answers is given up
+        after 10 s)."""
+        now_s = self.get_clock().now().nanoseconds / 1e9
+        if self.gps2_pending is not None:
+            if now_s - self.gps2_pending_since < 10.0:
+                return
+            self.gps2_pending = None
         if self.gps2_type == value or not self.param_client.service_is_ready():
             return
         request = ParamSetV2.Request()
@@ -486,9 +702,12 @@ class ArduPilotNavigationBridge(Node):
         future = self.param_client.call_async(request)
         future.add_done_callback(
             lambda done, wanted=value: self._gps2_type_done(done, wanted))
-        self.gps2_type = value
+        self.gps2_pending = value
+        self.gps2_pending_since = now_s
 
     def _gps2_type_done(self, future, value):
+        if self.gps2_pending == value:
+            self.gps2_pending = None
         response = future.result()
         if response is None or not response.success:
             self.get_logger().error(
@@ -496,6 +715,7 @@ class ArduPilotNavigationBridge(Node):
                 f'={value}; will retry')
             self.gps2_type = None
             return
+        self.gps2_type = value
         self.get_logger().warn(
             f"{self.get_parameter('gps2_type_param').value}={value} "
             f"({'GPS 2 = GPS_INPUT corrections' if value else 'GPS 2 disabled'})")
@@ -506,29 +726,47 @@ class ArduPilotNavigationBridge(Node):
         requested = self.switch.update(
             msg.fix_type >= GPS_FIX_TYPE_3D_FIX,
             self.get_clock().now().nanoseconds / 1e9)
-        if requested is None or not self.command_client.service_is_ready():
-            return
-        if self.manage_gps2 and requested == self.switch.denied_set:
-            # GPS 2 must exist before ArduPilot can switch to it.
+        if requested == self.switch.denied_set:
+            # Source set 2 first; GPS 2 follows once ArduPilot runs it.
+            self._request_source_set(requested)
+        elif requested == self.switch.nominal_set:
+            gps2_maybe_on = self.gps2_type != GPS_TYPE_NONE or self.gps2_pending not in (
+                None, GPS_TYPE_NONE)
+            if self.manage_gps2 and gps2_maybe_on:
+                # GPS 2 goes first: set 1 is asked for on a later message,
+                # once GPS2_TYPE=0 is confirmed (the switch asks again).
+                self._set_gps2_type(GPS_TYPE_NONE)
+            else:
+                self._request_source_set(requested)
+        if (self.manage_gps2 and self.armed
+                and self.switch.current == self.switch.denied_set
+                and self.source_set == self.switch.denied_set
+                and self.gps2_type != GPS_TYPE_MAV):
             self._set_gps2_type(GPS_TYPE_MAV)
+
+    def _request_source_set(self, value):
+        if not self.command_client.service_is_ready():
+            return
         request = CommandLong.Request()
         request.command = MAV_CMD_SET_EKF_SOURCE_SET
-        request.param1 = float(requested)
+        request.param1 = float(value)
         future = self.command_client.call_async(request)
+        previous = self.switch.current
         future.add_done_callback(
-            lambda done, value=requested: self._source_set_done(done, value))
+            lambda done, value=value, previous=previous:
+            self._source_set_done(done, value, previous))
         # Assume success until told otherwise so the request is not spammed.
-        self.switch.current = requested
+        self.switch.current = value
 
-    def _source_set_done(self, future, value):
+    def _source_set_done(self, future, value, previous):
         response = future.result()
         if response is None or not response.success:
             self.get_logger().error(f'ArduPilot rejected EKF source set {value}')
             # Retry on the next GPS status message.
-            self.switch.current = (self.switch.nominal_set
-                                   if value == self.switch.denied_set
-                                   else self.switch.denied_set)
+            if self.switch.current == value:
+                self.switch.current = previous
             return
+        self.source_set = value
         self.get_logger().warn(
             f'EKF source set {value} '
             f"({'GPS-denied: GPS 2 position only' if value == self.switch.denied_set else 'nominal GPS'})")

@@ -12,6 +12,10 @@ runs from its setpoint to the next one (the last: to the landing's disarm).
 
   python3 tools/aerodrone_hil_mission_score.py RUN_DIR [--tree-log FILE] [--tree-exit N]
 
+ArduPilot's warnings after arming are counted from the recorded status
+texts; a "Crash:" text (ArduCopter's crash check disarming a vehicle that
+tipped over, as an oscillating one did at touchdown) means it did not land.
+
 Writes nothing; prints the score as JSON. Exit status: 0 the tree succeeded,
 every waypoint was reached within --reach-m and the vehicle landed and
 disarmed; 1 otherwise; 2 unusable recording.
@@ -36,6 +40,9 @@ from gps_denied_sim_scorer import (
 TRANSITION = re.compile(r'\]:\s+(\S+)\s+(IDLE|RUNNING|SUCCESS|FAILURE)\s*->\s*'
                         r'(IDLE|RUNNING|SUCCESS|FAILURE)\b')
 ANSI = re.compile(r'\x1b\[[0-9;]*m')
+# ArduPilot status texts worth counting once armed (substrings).
+WARNINGS = ('Crash', 'Vibration compensation ON', 'GPS Glitch', 'emergency yaw reset',
+            'EKF variance', 'EKF Failsafe', 'lane switch')
 
 
 class Unusable(Exception):
@@ -112,7 +119,11 @@ def score_mission(rows, tree_lines=(), tree_exit=None, reach_m=3.0):
                                if reached is not None else None),
             'window_s': round(stop - start, 1)})
     final = [r for r in truth if disarmed_at is not None and r['rx'] >= disarmed_at][:20]
-    landed = bool(final) and max(abs(r['u'] - u_home) for r in final) < 1.5
+    texts = [t.get('text', '') for t in by_kind.get('text', [])
+             if armed_at is not None and t.get('rx', 0.0) >= armed_at]
+    warnings = {w: sum(1 for t in texts if w.lower() in t.lower()) for w in WARNINGS}
+    landed = (bool(final) and max(abs(r['u'] - u_home) for r in final) < 1.5
+              and not warnings['Crash'])
     counts, last = tree_transitions(tree_lines)
     horizontal = [w['closest_horizontal_m'] for w in waypoints if w['closest_horizontal_m'] is not None]
     three_d = [w['closest_3d_m'] for w in waypoints if w['closest_3d_m'] is not None]
@@ -131,6 +142,7 @@ def score_mission(rows, tree_lines=(), tree_exit=None, reach_m=3.0):
         'armed_to_disarmed_sim_s': (round(clock(disarmed_at) - clock(armed_at), 1)
                                     if armed_at is not None and disarmed_at is not None else None),
         'landed_and_disarmed': landed,
+        'autopilot_warnings': warnings,
         'per_waypoint': waypoints,
     }
     ok = (tree_exit in (0, None) and (last is None or last[1] == 'SUCCESS') and

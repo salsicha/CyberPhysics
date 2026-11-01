@@ -30,7 +30,8 @@ failed, 2 no usable run (stack did not come up, no denial, no recording), 3
 score passed but the navigation validation failed or did not finish.
 
 Variables: `ROS_DOMAIN_ID` (0), `GPS_DENIED_PROJECT` (compose project name,
-`gps_denied_<stack>`), `GPS_DENIED_COMPOSE_OVERRIDE` (an extra compose file),
+`gps_denied_<stack>`), `GPS_DENIED_COMPOSE_OVERRIDE` (extra compose files,
+separated by spaces),
 `GPS_DENIED_OUTPUT` (`generated/gps_denied_sim/<stack>`),
 `GPS_DENIED_TIMEOUT_S` (wall clock: gazebo 1800, isaac 3300),
 `GPS_DENIED_KEEP_VOLUMES`, `NAVSIM_REQUIRE_VALID` (`demnav wildnav`) and
@@ -43,6 +44,25 @@ networking, fixed SITL/MAVROS ports and the GPU: run one at a time per host.
 The run directory holds `recording.jsonl.gz` (the recorder's samples),
 `denial_events.jsonl` (the denier's steps), `score.json` (the summary),
 `validation.log`, `stack.log.gz` (every container's log) and `up.log`.
+
+Late and bursty corrections (Gazebo): `tools/gps_input_delay.yaml` puts
+`tools/gps_input_delay_injector.py` on both sides of the navigation bridge
+and delays one of them, as a slow companion computer does: before the
+bridge (`/navigation/correction_fix` arrives late) or after it (GPS_INPUT
+reaches MAVROS late), with `GPS_INPUT_DELAY_S`, `GPS_INPUT_JITTER_S`,
+`GPS_INPUT_BURST_S` and `GPS_INPUT_DROP`. For example, isolated from other
+Zenoh graphs on the host as the hardware-in-the-loop control is (export
+the Zenoh settings of `applications/aerostack2/config/aerodrone_hil.env`):
+
+```bash
+GPS_INPUT_DELAY_S=0.3 GPS_INPUT_JITTER_S=0.7 \
+GPS_DENIED_COMPOSE_OVERRIDE="tools/aerodrone_hil_control.yaml tools/gps_input_delay.yaml" \
+    tools/gps_denied_sim_test.sh gazebo
+```
+
+Its runs, before and after the bridge's correction gate, are in
+`tools/aerodrone_hil_test.md` ("6. The missions' height and the GPS_INPUT
+corrections").
 
 ## The `denial` profile
 

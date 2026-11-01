@@ -236,8 +236,14 @@ def active_flags(bridge):
 
 def test_required_fc_params_match_the_gps_input_parameter_file(module):
     required = module.required_fc_params()
-    assert set(required) == set(gps_input_param_file())
-    for name, value in gps_input_param_file().items():
+    in_file = gps_input_param_file()
+    # GPS2_DELAY_MS is applied from the file but ArduPilot does not list it
+    # while GPS2_TYPE=0, so the bridge cannot check it.
+    assert module.UNCHECKED_FC_PARAMS == {'GPS2_DELAY_MS': in_file['GPS2_DELAY_MS']}
+    assert set(required) == set(in_file) - set(module.UNCHECKED_FC_PARAMS)
+    for name, value in in_file.items():
+        if name in module.UNCHECKED_FC_PARAMS:
+            continue
         if name == 'GPS2_TYPE':
             # Managed by the bridge at runtime: 0 on the ground, 14 in flight.
             assert value == 0 and required[name] == (0, 14)
@@ -364,6 +370,13 @@ def _requests(client):
     return [call.args[0] for call in client.call_async.call_args_list]
 
 
+def _answer(client, success=True, index=-1):
+    """MAVROS answers the client's call number `index`."""
+    future = client.call_async.return_value
+    future.add_done_callback.call_args_list[index].args[0](
+        NS(result=lambda: NS(success=success)))
+
+
 def test_gps2_exists_only_while_gps1_is_lost_in_flight(module):
     """GPS2_TYPE=14 with no fix blocks arming (GPS 2: Bad fix), so the bridge
     configures GPS 2 only when the primary GPS is lost and removes it on the
@@ -378,8 +391,7 @@ def test_gps2_exists_only_while_gps1_is_lost_in_flight(module):
     gps1 = bridge.callbacks['/mavros/gpsstatus/gps1/raw']
     state(Message(connected=True, armed=False))
     assert [(r.param_id, r.value.integer_value) for r in _requests(params)] == [('GPS2_TYPE', 0)]
-    params.call_async.return_value.add_done_callback.call_args.args[0](
-        NS(result=lambda: NS(success=True)))
+    _answer(params)
     state(Message(connected=True, armed=True))
     t0 = bridge.now_ns
     gps1(Message(fix_type=3))
@@ -387,15 +399,233 @@ def test_gps2_exists_only_while_gps1_is_lost_in_flight(module):
     gps1(Message(fix_type=1))
     bridge.now_ns = t0 + 4 * 10**9
     gps1(Message(fix_type=1))
-    assert _requests(params)[-1].value.integer_value == 14
     assert _requests(command)[-1].command == 42007
     assert _requests(command)[-1].param1 == 2.0
-    # Recovery: back to the nominal source set after gps_recovery_s.
+    _answer(command)
+    gps1(Message(fix_type=1))
+    assert _requests(params)[-1].value.integer_value == 14
+    _answer(params)
+    # Recovery: GPS 2 off, then the nominal source set, after gps_recovery_s.
     bridge.now_ns = t0 + 5 * 10**9
     gps1(Message(fix_type=3))
     bridge.now_ns = t0 + 16 * 10**9
     gps1(Message(fix_type=3))
+    assert _requests(params)[-1].value.integer_value == 0
+    assert _requests(command)[-1].param1 == 2.0
+    _answer(params)
+    gps1(Message(fix_type=3))
     assert _requests(command)[-1].param1 == 1.0
-    # Landing and disarming removes GPS 2 again.
+    _answer(command)
+    # Landing and disarming leaves GPS 2 off.
     state(Message(connected=True, armed=False))
     assert _requests(params)[-1].value.integer_value == 0
+
+
+def test_gps2_is_never_configured_while_source_set_1_runs(module):
+    """In source set 1 ArduPilot fuses GPS velocity, and GPS_INPUT GPS 2
+    carries none (fused as zero: GPS Glitch, EKF failsafe in SITL). So GPS 2
+    is configured only after ArduPilot accepted set 2, and set 1 is asked for
+    only after GPS 2 is confirmed off, whatever order the answers come in."""
+    bridge = make_bridge(module, gps_input_enabled=True)
+    answer_fc_check(bridge)
+    params = bridge.clients['/mavros/param/set']
+    command = bridge.clients['/mavros/cmd/command']
+    params.service_is_ready.return_value = True
+    command.service_is_ready.return_value = True
+    state = bridge.callbacks['/mavros/state']
+    gps1 = bridge.callbacks['/mavros/gpsstatus/gps1/raw']
+    state(Message(connected=True, armed=False))
+    _answer(params)
+    state(Message(connected=True, armed=True))
+    t0 = bridge.now_ns
+    gps1(Message(fix_type=3))
+    for step in range(2, 12):          # GPS 1 lost; set 2 not answered yet
+        bridge.now_ns = t0 + step * 10**9
+        gps1(Message(fix_type=0))
+    assert all(r.value.integer_value == 0 for r in _requests(params))
+    _answer(command, success=False)    # ArduPilot refuses: still set 1
+    bridge.now_ns = t0 + 12 * 10**9
+    gps1(Message(fix_type=0))
+    assert all(r.value.integer_value == 0 for r in _requests(params))
+    assert _requests(command)[-1].param1 == 2.0   # asked again
+    _answer(command)
+    gps1(Message(fix_type=0))
+    assert _requests(params)[-1].value.integer_value == 14
+    # GPS 1 back: GPS 2 off first; while that is unanswered no set 1.
+    for step in range(13, 30):
+        bridge.now_ns = t0 + step * 10**9
+        gps1(Message(fix_type=3))
+    assert all(r.param1 == 2.0 for r in _requests(command))
+    _answer(params)                     # GPS2_TYPE=14 confirmed late
+    gps1(Message(fix_type=3))
+    assert _requests(params)[-1].value.integer_value == 0
+    assert all(r.param1 == 2.0 for r in _requests(command))
+    _answer(params)                     # GPS2_TYPE=0 confirmed
+    gps1(Message(fix_type=3))
+    assert _requests(command)[-1].param1 == 1.0
+
+
+def test_gps2_is_not_configured_on_the_ground(module):
+    """GPS 1 lost on the ground after a fix: source set 2, but no GPS 2
+    (it would fail the pre-arm checks) until the vehicle is armed."""
+    bridge = make_bridge(module, gps_input_enabled=True)
+    answer_fc_check(bridge)
+    params = bridge.clients['/mavros/param/set']
+    command = bridge.clients['/mavros/cmd/command']
+    params.service_is_ready.return_value = True
+    command.service_is_ready.return_value = True
+    state = bridge.callbacks['/mavros/state']
+    gps1 = bridge.callbacks['/mavros/gpsstatus/gps1/raw']
+    state(Message(connected=True, armed=False))
+    _answer(params)
+    t0 = bridge.now_ns
+    gps1(Message(fix_type=3))
+    bridge.now_ns = t0 + 3 * 10**9
+    gps1(Message(fix_type=0))
+    bridge.now_ns = t0 + 5 * 10**9
+    gps1(Message(fix_type=0))
+    assert _requests(command)[-1].param1 == 2.0
+    _answer(command)
+    gps1(Message(fix_type=0))
+    assert [r.value.integer_value for r in _requests(params)] == [0]
+    state(Message(connected=True, armed=True))
+    gps1(Message(fix_type=0))
+    assert _requests(params)[-1].value.integer_value == 14
+
+
+# Late and bursty corrections ---------------------------------------------
+S = 10**9
+
+
+def test_gate_drops_stale_and_future_corrections(module):
+    gate = module.CorrectionGate(max_age_s=0.5, min_interval_s=0.0, max_future_s=0.5)
+    now = 1000 * S
+    assert gate.offer(now - int(0.6 * S), now, 'late') == []
+    assert gate.offer(now + int(0.6 * S), now, 'future') == []
+    assert gate.offer(now - int(0.4 * S), now, 'fresh') == [('fresh', 0.4)]
+    assert gate.offer(now + int(0.1 * S), now, 'ahead') == [('ahead', -0.1)]
+    assert gate.counts['stale'] == 2 and gate.counts['sent'] == 2
+
+
+def test_gate_never_sends_a_correction_older_than_the_last_sent(module):
+    gate = module.CorrectionGate(max_age_s=0.5, min_interval_s=0.0)
+    now = 1000 * S
+    assert gate.offer(now - int(0.1 * S), now, 'b')
+    assert gate.offer(now - int(0.2 * S), now + S // 100, 'a') == []
+    assert gate.offer(now - int(0.1 * S), now + S // 100, 'b again') == []
+    assert gate.counts['out_of_order'] == 2
+
+
+def test_gate_rate_limits_and_a_burst_collapses_to_its_newest(module):
+    gate = module.CorrectionGate(max_age_s=0.5, min_interval_s=0.2)
+    now = 1000 * S
+    assert [i for i, _ in gate.offer(now - S // 10, now, 0)] == [0]
+    # A burst: four corrections within 30 ms, all fresh.
+    for k in range(1, 5):
+        t = now + k * S // 100
+        assert gate.offer(t - S // 10, t, k) == []
+    assert gate.poll(now + int(0.1 * S)) == []          # interval not over
+    sent = gate.poll(now + int(0.21 * S))
+    assert [i for i, _ in sent] == [4]                  # only the newest
+    assert gate.counts['superseded'] == 3
+    assert gate.poll(now + S) == []
+
+
+def test_gate_drops_a_held_correction_that_went_stale(module):
+    gate = module.CorrectionGate(max_age_s=0.3, min_interval_s=0.2)
+    now = 1000 * S
+    gate.offer(now - int(0.3 * S), now, 'first')
+    assert gate.offer(now - int(0.25 * S), now + S // 100, 'held') == []
+    assert gate.poll(now + int(0.2 * S)) == []          # 0.45 s old by then
+    assert gate.pending is None and gate.counts['stale'] == 1
+
+
+def test_gate_suspends_forwarding_while_the_pipeline_lags(module):
+    gate = module.CorrectionGate(max_age_s=0.5, min_interval_s=0.0, window=10,
+                                 suspend_count=5, resume_count=5)
+    now = 1000 * S
+    sent = []
+    # Every other correction late: the 5th late one in the window suspends.
+    for k in range(10):
+        t = now + k * S
+        age = 2.0 if k % 2 else 0.1
+        sent += gate.offer(t - int(age * S), t, k)
+    assert gate.suspended
+    assert [i for i, _ in sent] == [0, 2, 4, 6, 8]
+    assert gate.events == [('suspended', 5, 10)]
+    # Fresh ones are held back until five arrive in time in a row.
+    sent = []
+    for k in range(10, 16):
+        t = now + k * S
+        sent += gate.offer(t - S // 10, t, k)
+    assert [i for i, _ in sent] == [14, 15]
+    assert not gate.suspended and gate.events[-1][0] == 'resumed'
+    assert gate.counts['suspended'] == 4
+
+
+def test_gate_late_burst_from_a_stalled_companion_reaches_nothing(module):
+    """HIL-like: corrections every 0.5 s released together after 8 s."""
+    gate = module.CorrectionGate()
+    stamps = [1000 * S + k * S // 2 for k in range(16)]
+    release = 1000 * S + 8 * S
+    sent = []
+    for stamp in stamps:
+        sent += gate.offer(stamp, release, stamp)
+        sent += gate.poll(release)
+    # Only the last two (1.0 and 0.5 s old) would pass the age bound; by
+    # then the pipeline is lagging (5 of the last 10 stale): nothing is sent.
+    assert sent == []
+    assert gate.suspended
+
+
+def _forwarding_bridge(module, **params):
+    bridge = make_bridge(module, gps_input_enabled=True, **params)
+    answer_fc_check(bridge)
+    return bridge, bridge.publishers['/mavros/gps_input/gps_input'], \
+        bridge.callbacks['/navigation/correction_fix']
+
+
+def test_bridge_sends_only_fresh_corrections_with_their_own_stamp(module):
+    bridge, out, callback = _forwarding_bridge(module)
+    now = bridge.now_ns / 1e9
+    callback(fix(stamp_s=now - 1.2))
+    callback(fix(stamp_s=now + 0.8))
+    out.publish.assert_not_called()
+    callback(fix(stamp_s=now - 0.12, variance=400.0))
+    sent = out.publish.call_args.args[0]
+    week, week_ms = module.gps_week_ms(int((now - 0.12) * 1e9))
+    assert (sent.time_week, sent.time_week_ms) == (week, week_ms)
+    assert sent.header.stamp == fix(stamp_s=now - 0.12).header.stamp
+    # Honest about what a camera fix is: horizontal position only.
+    assert sent.ignore_flags == module.HORIZONTAL_ONLY
+    assert (sent.vn, sent.ve, sent.vd, sent.vert_accuracy, sent.speed_accuracy) == (0, 0, 0, 0, 0)
+    assert sent.horiz_accuracy == pytest.approx(20.0)
+
+
+def test_bridge_rate_limits_and_releases_the_newest_on_its_timer(module):
+    bridge, out, callback = _forwarding_bridge(module)
+    release = bridge.timers[-1]
+    t0 = bridge.now_ns
+    callback(fix(stamp_s=t0 / 1e9 - 0.05, lat=37.90))
+    for k, lat in enumerate((37.91, 37.92, 37.93)):
+        bridge.now_ns = t0 + (k + 1) * S // 50
+        callback(fix(stamp_s=bridge.now_ns / 1e9 - 0.05, lat=lat))
+    assert out.publish.call_count == 1
+    bridge.now_ns = t0 + int(0.25 * S)
+    release()
+    assert out.publish.call_count == 2
+    assert out.publish.call_args.args[0].lat == 379300000
+
+
+def test_bridge_logs_and_suspends_a_lagging_pipeline(module):
+    bridge, out, callback = _forwarding_bridge(module)
+    for k in range(6):
+        bridge.now_ns += S
+        callback(fix(stamp_s=bridge.now_ns / 1e9 - 3.0))
+    out.publish.assert_not_called()
+    message = bridge.logger.error.call_args.args[0]
+    assert 'SUSPENDED' in message and 'lagging' in message
+    for k in range(5):
+        bridge.now_ns += S
+        callback(fix(stamp_s=bridge.now_ns / 1e9 - 0.1))
+    assert out.publish.call_count == 1

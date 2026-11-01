@@ -13,6 +13,16 @@
 # flight. The bridge sets GPS2_TYPE=14 while GPS 1 is lost in flight and back
 # to 0 when disarmed.
 GPS2_TYPE,0
+# GPS 2's lag: the shortest time from a correction's stamp (the odometry
+# sample the fusion propagated it to) to the autopilot. ArduPilot's MAV
+# driver maps GPS_INPUT's GPS time to its own clock assuming the fastest of
+# the last 100 messages was this late, and EKF3 dates each sample that much
+# earlier (0 would mean the driver's 200 ms). Measured 5-23 ms to the bridge
+# plus a few ms to SITL in the Gazebo stack (tools/aerodrone_hil_test.md,
+# "6. The missions' height and the GPS_INPUT corrections"). ArduPilot does
+# not list GPS2_* parameters while GPS2_TYPE=0, so the bridge cannot check
+# this one; it applies all the same.
+GPS2_DELAY_MS,20
 # GPS 1 stays primary whenever it has a 3D fix.
 GPS_AUTO_SWITCH,4
 GPS_PRIMARY,0
