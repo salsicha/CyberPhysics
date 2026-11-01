@@ -104,7 +104,21 @@ aircraft's transport (`tcp://127.0.0.1:5777`, BlueOS's router). Over Wi-Fi a
 lost segment delays what follows it by a retransmission instead of dropping
 it; the measured round trips are below.
 
-### ROS link (native Zenoh over Wi-Fi only)
+### The link (wired since 2026-11-01)
+
+Every HIL session runs between the two hosts' addresses in
+`aerodrone_hil.env`. The results below up to section 7 ran over Wi-Fi
+(192.168.1.116 and 192.168.1.193). Since 2026-11-01 the link is the wired
+LAN: the workstation's gigabit USB 3 adapter (Realtek RTL8156, a static
+10.0.0.18) and the Pi's eth0 (10.0.0.2, beside BlueOS's own 192.168.2.2),
+both at 1 Gb/s full duplex. The round trip is 0.27 / 0.48 ms (average /
+max, no loss), against 10.6 / 46 ms over the Wi-Fi. The other project's
+traffic on that LAN took about 12 % of the link, with no drops. SSH, rsync
+and the cache copies still reach the Pi over Wi-Fi (`HIL_PI_SSH`), where
+its host key is known. The old 100 Mb/s adapter lost 7-25 % with spikes
+of 1 s under that traffic, which is why the Wi-Fi was used before.
+
+### ROS link (native Zenoh over the HIL link only)
 
 The stacks run native Zenoh (`systems/ros2/README.md`), not Fast DDS, so
 the link is configured in Zenoh terms (`aerodrone_hil.env`,
@@ -547,6 +561,22 @@ ahead) came closer but did not pass:
 | Car shot | refused: not hovering, 1.5 m/s | refused: not hovering, 0.5 m/s (at most 0.5) | fired, 0.11 m from its centre |
 | Person step | refused, but by the tracking gate | refused: "never at people" | refused: "never at people" |
 | Person-in-view step | refused, but not hovering | refused: "a person was in view 0.5 s ago" | refused: "a person is in view" |
+
+Over the wired link (`fire_wired2`; round trip 0.27 ms instead of 10-80
+ms) the hover was no better:
+- tilt 11.0 / 14.8 deg (median / p95);
+- the halted car's estimated speed 0.52 m/s;
+- the estimate's error and the aircraft's offset 0.3 m and 0.5 m
+  (standard deviation);
+- both car shots refused "not hovering"; the person step refused "never
+  at people".
+
+So the network's latency was not the cause. The camera's age at the
+tracker remains: 0.18-0.27 s here against 0.14 s all-local, and the real
+OAK-1's detections arrive 0.16 s after capture (p95 0.31 s,
+`applications/oak1/README.md`). The aircraft's hover over a still target
+may therefore rock the same way. That is to check, all-local with the
+camera delayed, before tuning the tracker.
 
 The person-in-view refusal is the person gate's, in its wording between
 the frames that show the walking person; the scenario now accepts either
@@ -1282,7 +1312,9 @@ Found and not changed (reported):
   Zenoh graph's peers on the same host (MAVROS lost its heartbeat here);
   `tools/aerodrone_hil_control.yaml` isolates a run.
 - The wired 10.0.0.0/24 path: 7-25 % loss with spikes up to 1 s, and the
-  workstation's USB adapter saturated by another project; not used.
+  workstation's USB adapter saturated by another project; not used then.
+  With a gigabit adapter (2026-11-01) it is 0.27 ms without loss, and HIL
+  runs over it ("The link").
 
 What failed and why:
 

@@ -32,7 +32,7 @@
 #   generated/aerodrone_hil/control_<scenario>.
 # Hold the host's simulator lock around it if the host is shared.
 # Environment:
-#   HIL_PI             ssh destination of the Pi (default pi@<HIL_PI_HOST>,
+#   HIL_PI             ssh destination of the Pi (default HIL_PI_SSH, else pi@<HIL_PI_HOST>,
 #                      applications/aerostack2/config/aerodrone_hil.env)
 #   HIL_PI_REPO        the repository copy on the Pi (default /home/pi/cyberphysics)
 #   HIL_SYNC           true (default): rsync the files the Pi's stack mounts
@@ -151,7 +151,8 @@ esac
 pi_host="$(env_value HIL_PI_HOST)"
 sim_host="$(env_value HIL_SIM_HOST)"
 port="$(env_value HIL_ZENOH_PORT)"
-pi="${HIL_PI:-pi@$pi_host}"
+pi="${HIL_PI:-$(env_value HIL_PI_SSH)}"
+pi="${pi:-pi@$pi_host}"
 pi_repo="${HIL_PI_REPO:-/home/pi/cyberphysics}"
 timeout_s="${HIL_TIMEOUT_S:-2400}"
 probe_s="${HIL_PROBE_S:-60}"

@@ -57,7 +57,7 @@ services:
       # a peer on the Pi must not learn this router's Wi-Fi address and
       # open its own session across.
       ZENOH_CONFIG_OVERRIDE: >-
-        listen/endpoints=["tcp/127.0.0.1:${HIL_ZENOH_PORT:-7468}","tcp/${HIL_SIM_HOST:-192.168.1.116}:${HIL_ZENOH_PORT:-7468}"];connect/endpoints=[];scouting/multicast/enabled=false;scouting/gossip/target={router:["peer"],peer:["router"]}
+        listen/endpoints=["tcp/127.0.0.1:${HIL_ZENOH_PORT:-7468}","tcp/${HIL_SIM_HOST:-10.0.0.18}:${HIL_ZENOH_PORT:-7468}"];connect/endpoints=[];scouting/multicast/enabled=false;scouting/gossip/target={router:["peer"],peer:["router"]}
     command: ros2 run rmw_zenoh_cpp rmw_zenohd
 
   hil_oak1_standin:

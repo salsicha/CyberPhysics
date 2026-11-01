@@ -79,10 +79,13 @@ def ros_services(services):
 
 
 # --- the shared env file ----------------------------------------------------
-def test_env_pins_every_link_to_the_wifi_addresses():
+def test_env_pins_every_link_to_one_lan():
+    """Both hosts on one /24 (the wired LAN; the Wi-Fi works as well), the
+    Pi reached over SSH where its host key is known."""
     env = env_values()
     sim, pi, port = env['HIL_SIM_HOST'], env['HIL_PI_HOST'], env['HIL_ZENOH_PORT']
-    assert sim != pi and not sim.startswith('10.') and not pi.startswith('10.')
+    assert sim != pi and sim.rsplit('.', 1)[0] == pi.rsplit('.', 1)[0]
+    assert env['HIL_PI_SSH'].startswith('pi@')
     assert env['ROS_DOMAIN_ID'] == '68'
     assert port not in ('7447', '7448', '7449')  # BlueOS's; another project's here
     zenoh = env['ZENOH_CONFIG_OVERRIDE']
@@ -98,12 +101,19 @@ def test_env_pins_every_link_to_the_wifi_addresses():
     assert env['TRACKING_USE_SIM_TIME'] == 'false'
 
 
-def test_layers_name_no_wired_or_wildcard_address():
+def test_layers_name_only_the_env_files_addresses():
+    """No wildcard listener, and the layers' fallbacks are the env file's
+    hosts (the BlueOS tether's 192.168.2.x is never named)."""
+    env = env_values()
+    hosts = {env['HIL_SIM_HOST'], env['HIL_PI_HOST']}
     for path in ('tools/aerodrone_hil_sim.yaml', 'tools/aerodrone_hil_pi.yaml',
                  'tools/aerodrone_hil_test.yaml', 'applications/aerostack2/config/aerodrone_hil.env'):
         text = '\n'.join(line.split('#', 1)[0] for line in (REPO / path).read_text().splitlines())
-        assert '10.0.0.' not in text, path
-        assert '0.0.0.0' not in text, path
+        assert '0.0.0.0' not in text and '192.168.2.' not in text, path
+        for name, fallback in re.findall(r'\$\{(HIL_SIM_HOST|HIL_PI_HOST):-([^}]*)\}', text):
+            assert fallback == env[name], (path, name)
+        assert set(re.findall(r'\b\d+\.\d+\.\d+\.\d+\b', text)) - hosts <= {
+            '127.0.0.1', '192.168.1.193'}, path
 
 
 def test_hil_layers_are_plain_yaml_layers():
