@@ -7,8 +7,9 @@ device.
 
 Tracking publishes <tracking_topic_prefix>/detections (the on-device
 ObjectTracker's tracklets with their IDs), /image/compressed (the frame
-they come from, JPEG-encoded on the camera) and /camera_info, stamped with
-the frame's capture time.
+they come from, JPEG-encoded on the camera) and /camera_info. Every topic,
+the depth, the image and the stills too, is stamped with its frame's
+capture time (the device clock converted to ROS time).
 
 MegaDepth and the detector share the Myriad X's two neural compute
 engines: MegaDepth alone runs about 4.6 Hz, and every detector inference
@@ -416,7 +417,7 @@ class MegaDepthNode(Node):
         highres_packet = self.highres_queue.tryGet()
         if highres_packet is not None:
             highres_frame = highres_packet.getCvFrame()
-            highres_stamp = self.get_clock().now().to_msg()
+            highres_stamp = self._capture_stamp(highres_packet)
             highres_msg = self.bridge.cv2_to_imgmsg(
                 highres_frame, encoding='bgr8')
             highres_msg.header.stamp = highres_stamp
@@ -443,7 +444,7 @@ class MegaDepthNode(Node):
         # Keep invalid pixels NaN so downstream isfinite masks (demnav) work.
         relative_depth[~np.isfinite(relative_depth)] = np.nan
 
-        stamp = self.get_clock().now().to_msg()
+        stamp = self._capture_stamp(camera_packet)
         image_msg = self.bridge.cv2_to_imgmsg(frame, encoding='bgr8')
         image_msg.header.stamp = stamp
         image_msg.header.frame_id = self.frame_id
@@ -456,6 +457,21 @@ class MegaDepthNode(Node):
         self.image_pub.publish(image_msg)
         self.depth_pub.publish(depth_msg)
         self.camera_info_pub.publish(self.camera_info)
+
+    def _capture_stamp(self, packet):
+        """The ROS stamp of a packet's capture: now, less the frame's age
+        on DepthAI's host-synchronised clock (tm.capture_time_ns, as the
+        detections). DemNav and WildNav look the aircraft's attitude up at
+        this stamp; a depth frame reaches the host about 0.5 s after its
+        capture, and stamped on arrival it was placed with the attitude of
+        then (applications/oak1/README.md; the hardware-in-the-loop test
+        lost GPS-denied navigation to stamps 0.1-0.3 s late)."""
+        now = self.get_clock().now()
+        stamp = now.to_msg()
+        tm.set_stamp(stamp, tm.capture_time_ns(
+            now.nanoseconds, dai.Clock.now().total_seconds(),
+            packet.getTimestamp().total_seconds()))
+        return stamp
 
     def _poll_tracking(self):
         self._store_packet(self.tracklets_queue, self.tracklet_packets)

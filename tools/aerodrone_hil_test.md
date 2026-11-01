@@ -1175,12 +1175,16 @@ ahead.
     MAVROS's log. Only if it never converges, give the aircraft a
     `link_config_yaml` sized from the measured round trips. The aircraft's
     default is unchanged.
-- **The OAK-1 node stamps depth and stills on arrival at the host.** Depth
-  is 0.5 s old by then (`applications/oak1/README.md`). The stand-in stamps
-  at capture, which DemNav and WildNav assume. These runs show what a
-  0.1-0.3 s stamp error costs. On the aircraft, depth fixes would take the
-  attitude 0.5 s after the frame. The tracking path already stamps capture
-  time (`tracking_messages.capture_time_ns`). Not changed here.
+- **The OAK-1 node stamped depth and stills on arrival at the host**
+  (fixed). Depth is 0.5 s old by then (`applications/oak1/README.md`). The
+  stand-in stamps at capture, which DemNav and WildNav assume, and these
+  runs show what a 0.1-0.3 s stamp error costs: on the aircraft, depth
+  fixes would have taken the attitude 0.5 s after the frame.
+  `megadepth_ros.py` now stamps the depth, its image and the stills with
+  the frame's capture time, as the tracking path did
+  (`tracking_messages.capture_time_ns`; `tests/test_oak1_device_wait.py`).
+  Not yet checked on the camera: the stamps against the flight
+  controller's attitude, as the README's checklist asks.
 
 ## Findings, fixes and limits of these runs
 

@@ -111,3 +111,62 @@ def test_the_node_no_longer_exits_on_a_missing_camera():
     init = source[source.index('class MegaDepthNode'):]
     assert 'self.device = open_device(' in init
     assert 'dai.Device(pipeline)' not in init
+
+
+class Packet:
+    def __init__(self, capture_s, frame=None, layer=None):
+        self.capture_s, self.frame, self.layer = capture_s, frame, layer
+
+    def getTimestamp(self):
+        return MagicMock(total_seconds=lambda: self.capture_s)
+
+    def getCvFrame(self):
+        return self.frame
+
+    def getFirstLayerFp16(self):
+        return self.layer
+
+
+class Queue:
+    def __init__(self, *packets):
+        self.packets = list(packets)
+
+    def tryGet(self):
+        return self.packets.pop(0) if self.packets else None
+
+
+def test_depth_image_and_stills_carry_the_capture_time(megadepth):
+    """Stamped on arrival, a depth frame 0.5 s old was placed by DemNav and
+    WildNav with the attitude of 0.5 s later: every topic carries its
+    frame's capture time, the device clock's age taken off ROS now."""
+    import numpy as np
+    from types import SimpleNamespace as NS
+    node = megadepth.MegaDepthNode.__new__(megadepth.MegaDepthNode)
+    ros_now_ns = 1_800_000_000_250_000_000
+    node.get_clock = lambda: NS(now=lambda: NS(nanoseconds=ros_now_ns,
+                                               to_msg=lambda: NS(sec=0, nanosec=0)))
+    megadepth.dai.Clock.now.return_value.total_seconds.return_value = 100.75
+    published = {}
+    for name in ('image_pub', 'depth_pub', 'camera_info_pub', 'highres_image_pub',
+                 'highres_camera_info_pub'):
+        setattr(node, name, NS(publish=lambda msg, name=name: published.setdefault(name, msg)))
+    node.bridge = NS(cv2_to_imgmsg=lambda frame, encoding: NS(header=NS(stamp=None,
+                                                                        frame_id='')))
+    node.frame_id = 'oak1'
+    node.camera_info = NS(header=None)
+    node.highres_camera_info = NS(header=None)
+    node.width = node.height = 2
+    node.tracking = None
+    node.highres_period, node.last_highres_request = 1e9, megadepth.time.monotonic()
+    node.camera_packets, node.depth_packets = {}, {}
+    node.highres_queue = Queue(Packet(99.5, frame='still'))     # 1.25 s old
+    node._store_packet = lambda queue, packets: None
+    node.camera_queue = node.depth_queue = None
+    node.camera_packets[7] = Packet(100.25, frame='frame')      # 0.5 s old
+    node.depth_packets[7] = Packet(100.25, layer=np.zeros(4, np.float16))
+    node._poll()
+    stamp = published['depth_pub'].header.stamp
+    assert stamp.sec * 1_000_000_000 + stamp.nanosec == ros_now_ns - 500_000_000
+    assert published['image_pub'].header.stamp is stamp
+    still = published['highres_image_pub'].header.stamp
+    assert still.sec * 1_000_000_000 + still.nanosec == ros_now_ns - 1_250_000_000

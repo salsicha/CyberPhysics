@@ -97,7 +97,13 @@ MegaDepth's rate, the stills at 0.26 Hz instead of 0.5 Hz, and a depth frame
 left the camera 1.3 s after its capture. With one queued frame the stills
 keep their rate and depth frames are 0.5 s old (measured on an OAK-1, below);
 MegaDepth's own rate is unchanged or better (4.0-4.6 Hz before, 4.6 Hz
-after). Its topics are still stamped when the host receives them.
+after). Its topics, the stills' too, are stamped with the frame's capture
+time (the device clock converted to ROS time, as the detections): DemNav
+and WildNav look the aircraft's attitude up at the stamp, and a depth frame
+stamped on its arrival 0.5 s later was placed with the attitude of then.
+Stamps that late cost metres of fix error at a few hundred metres above
+ground (`tools/aerodrone_hil_test.md`, section 7, where MAVROS's late
+stamps did the same).
 
 With no OAK-1 connected the node waits for one instead of exiting: it logs
 `Waiting for an OAK-1 on USB or the network (...)` once and then every
