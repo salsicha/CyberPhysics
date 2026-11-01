@@ -22,7 +22,10 @@ Safety: objects only, never people; operator-confirmed only
   status's ``fire_block``), unless every gate holds: the launcher fitted,
   armed (``launcher_arm``; latched, off at start) and the bridge ready; the
   tracker tracking that target in centered mode; the target's class not a
-  person's (PERSON_CLASSES) and known; no person anywhere in the camera's
+  person's (PERSON_CLASSES) and known, and the target never detected as a
+  person since it was selected (the detector may call a standing person a
+  motorcycle from one height and a pedestrian from another:
+  ``target_person_seen``, sticky); no person anywhere in the camera's
   view: none in the latest detection frame, which must be recent
   (``fire_detection_timeout_s``), nor in any frame of the last
   ``fire_person_clear_s``; the target placed in the latest frames; the
@@ -413,6 +416,7 @@ class Situation:
     mode: str = None               # centered or slant
     target_id: str = None          # the tracked target's id
     target_class: str = None       # its kind of object, as first seen
+    target_person_seen: bool = False  # detected as a person since selected
     target_seen_s: float = None    # since it was last placed
     target_speed_mps: float = None
     agl_m: float = None            # the aircraft's height above ground
@@ -564,6 +568,8 @@ class FireControl:
             fail('not_person', "the target's class is not known")
         elif person_like(s.target_class):
             fail('not_person', f'never at people: the target is a {s.target_class}')
+        elif s.target_person_seen:
+            fail('not_person', 'never at people: the target was detected as a person')
         person = self.person_block(now)
         if person:
             fail('no_person', person)
@@ -804,6 +810,7 @@ class FireControl:
             'darts': self.darts,
             'shots': self.shots,
             'target_class': s.target_class,
+            'target_person_seen': bool(s.target_person_seen),
             'fire_block': failed[0][1] if failed else '',
             'fire_checks': {name: name not in names for name in GATES},
             'last_fire': None if self.last_fire is None else dict(self.last_fire),

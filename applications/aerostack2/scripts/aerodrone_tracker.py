@@ -476,14 +476,21 @@ class Tracker:
             target_id = core.command.target_id
             detection = next((item for item in msg.detections
                               if item.id == target_id), None)
+            other_kind = None
             if detection is not None and core.target_class and not tc.same_kind(
                     detection_class(detection), core.target_class):
-                # The id now marks another kind of object (the detector's
-                # tracker moved it, e.g. from a car onto a person beside
-                # it): not the target.
-                detection = None
+                # The id now marks another kind of object: the detector's
+                # tracker moved it (e.g. from a car onto a person beside
+                # it), or the detector reads the target differently from
+                # this height (a standing person: a motorcycle from 30 m, a
+                # pedestrian from 18 m). Followed only where the target is
+                # (core.same_place, below). Seen as a person, the target is
+                # never fired at again (core.target_person_seen).
+                other_kind, detection = detection, None
+                if lc.person_like(detection_class(other_kind)):
+                    core.target_person_seen = True
             now = self.now()
-            if detection is None and not core.handover_open(now):
+            if detection is None and other_kind is None and not core.handover_open(now):
                 return
             before = core.state
             reason = ''
@@ -496,13 +503,20 @@ class Tracker:
             elif t is None:
                 reason = 'the image stamp is in neither the node\'s nor the odometry\'s clock'
             if detection is None:
-                # The selected id is gone from this frame: a new id for the
-                # same object (tracking_core, "Track handover")?
                 if reason:
                     return
-                detection, measurement = self._handover(msg, pose, now, t)
+                if other_kind is not None:
+                    geo = self._geolocate(other_kind, pose, now)
+                    if geo is not None:
+                        measurement = tc.Measurement(geo.position, geo.covariance, t)
+                        if core.same_place(measurement):
+                            detection = other_kind
                 if detection is None:
-                    return
+                    # The selected id is gone from this frame: a new id for
+                    # the same object (tracking_core, "Track handover")?
+                    detection, measurement = self._handover(msg, pose, now, t)
+                    if detection is None:
+                        return
             else:
                 geo = None if reason else self._geolocate(detection, pose, now)
                 if not reason and geo is None:
@@ -815,6 +829,7 @@ class Tracker:
             situation.mode = core.command.mode
             situation.target_id = core.command.target_id
             situation.target_class = core.target_class
+            situation.target_person_seen = core.target_person_seen
         if core.last_seen is not None and core.active:
             situation.target_seen_s = now - core.last_seen
         if core.filter is not None and core.state == 'tracking':

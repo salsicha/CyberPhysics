@@ -284,6 +284,8 @@ GATE_CASES = [
     (dict(mode='slant'), 'tracking', 'not in centered mode (slant)'),
     (dict(target_class='person'), 'not_person', 'never at people: the target is a person'),
     (dict(target_class='Pedestrian'), 'not_person', 'never at people: the target is a Pedestrian'),
+    (dict(target_person_seen=True), 'not_person',
+     'never at people: the target was detected as a person'),
     (dict(target_class=' people '), 'not_person', 'never at people'),
     (dict(target_class=''), 'not_person', "the target's class is not known"),
     (dict(target_class=None), 'not_person', "the target's class is not known"),
@@ -1061,6 +1063,56 @@ def test_the_node_fires_one_dart_at_the_car_below():
     assert shot['at_command']['agl_m'] == pytest.approx(17.0, abs=0.01)
     assert shot['at_shot']['offset_m'] < 0.2
     assert node.out.status[-1]['last_fire']['result'] == 'fired'
+
+
+@pytest.mark.parametrize('cls', ['pedestrian', 'person', ''])
+def test_a_target_once_detected_as_a_person_is_never_fired_at(cls):
+    """The detector called a standing person a motorcycle from 30 m and a
+    pedestrian from 18 m (the Gazebo fire scenario): the target's own id
+    seen as a person marks it for good, and the tracker follows the id
+    there (where the target is) instead of losing it."""
+    node, t = tracking_node()
+    track_id, _, pixel = CAR_BELOW
+    for k in range(1, 6):
+        t = round(t + 0.1, 6)
+        node_step(node, t, [(track_id, cls, pixel)])
+    assert node.core.state == 'tracking' and node.core.target_class == 'car'
+    assert node.core.target_person_seen
+    situation = node._situation(t)
+    assert node.launcher.refusal(t, '7', situation) == \
+        'never at people: the target was detected as a person'
+    # Back to a car for longer than the person clear time: still never.
+    for k in range(1, 50):
+        t = round(t + 0.1, 6)
+        node_step(node, t, [CAR_BELOW])
+    assert node.core.target_person_seen
+    node._on_command(NS(data='{"action": "fire", "target_id": "7"}'))
+    assert node.launcher.last_fire['result'] == 'refused'
+    assert node.launcher.last_fire['reason'] == \
+        'never at people: the target was detected as a person'
+    for k in range(1, 30):
+        node_step(node, round(t + 0.05 * k, 6), [CAR_BELOW])
+    assert node.plant.shots == [] and node.out.shots == []
+    assert node._situation(t).target_person_seen
+    assert node.launcher.status(t, node._situation(t))['target_person_seen'] is True
+    # Another target selected: the mark does not carry over.
+    node._on_command(NS(data=json.dumps({'action': 'track', 'target_id': '8',
+                                         'mode': 'centered', 'altitude_agl_m': 17})))
+    assert not node.core.target_person_seen
+
+
+def test_the_id_on_a_person_elsewhere_is_not_followed_but_marks_the_target():
+    """The detector's tracker moved the car's id onto a person 10 m away:
+    not followed there (the target is lost), and never fired at."""
+    node, t = tracking_node()
+    last_seen = node.core.last_seen
+    for k in range(1, 50):
+        t = round(t + 0.1, 6)
+        node_step(node, t, [('7', 'pedestrian', (320.5 + 250.0, 240.5))])
+    assert node.core.target_person_seen
+    assert node.core.last_seen == last_seen  # never placed there
+    node.core.tick(t)
+    assert node.core.state == 'lost'
 
 
 def test_the_node_situation_from_odometry_terrain_and_the_target():

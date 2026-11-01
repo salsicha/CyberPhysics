@@ -976,6 +976,12 @@ class TrackerCore:
     target_class: str = None
     target_side_px: float = None
     handed_over_from: str = None
+    # The selected track has been detected as a person (or unclassified)
+    # since it was selected, under its own id, whatever its class: sticky
+    # until another target is selected, and the launcher never fires at it
+    # (launcher_core, "Never at people"). The detector can call a person
+    # something else from one height and a person from another.
+    target_person_seen: bool = False
     # The target is still (no lead; still_speed_mps): since when its speed
     # has been under the limit, for the filter it was measured on.
     still: bool = False
@@ -1041,6 +1047,7 @@ class TrackerCore:
         self.target_class = None
         self.target_side_px = None
         self.handed_over_from = None
+        self.target_person_seen = False
         self._enter('acquiring', now, f'acquiring {command.target_id}')
         return actions
 
@@ -1054,6 +1061,7 @@ class TrackerCore:
         self.target_class = None
         self.target_side_px = None
         self.handed_over_from = None
+        self.target_person_seen = False
 
     def _following_message(self):
         note = (f'; handed over from {self.handed_over_from}'
@@ -1095,6 +1103,16 @@ class TrackerCore:
                     self.filter is not None and self.last_seen is not None and
                     self.target_class and
                     now - self.last_seen <= self.config.handover_window_s)
+
+    def same_place(self, measurement):
+        """Whether a measurement is where the target is: within
+        handover_max_m of its predicted position and inside the filter's
+        gate (the target's own id, detected as another kind of object)."""
+        if self.filter is None:
+            return False
+        chi2, metres = self.filter.distance(measurement.position,
+                                            measurement.covariance, measurement.t)
+        return metres <= self.config.handover_max_m and chi2 <= self.config.gate_chi2
 
     def handover(self, candidates, now):
         """The id to hand the selected target over to, or None.

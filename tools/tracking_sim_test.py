@@ -1251,24 +1251,52 @@ def fly(args):
             record({'halt': name, 'at': [round(target_truth(name)[key], 2)
                                          for key in ('east', 'north', 'up')]})
 
+        def repicker(name, fields):
+            """A check to call while waiting: a target the tracker has lost
+            under a new id is tracked under that id --repick-s later, as in
+            follow() (the operator clicks its new box). Descending from the
+            approach height to the fire height, the detector renumbered the
+            standing person and the person step's refusal came from the
+            tracking gate instead of the person gate it tests."""
+            lost = {'since': None}
+
+            def repick():
+                if status_state() not in ('lost', 'error'):
+                    lost['since'] = None
+                    return
+                if lost['since'] is None:
+                    lost['since'] = sim_now()
+                lost_for = sim_now() - lost['since']
+                if lost_for < args.repick_s:
+                    return
+                target_id = current_id(name)
+                if target_id is not None and target_id != following():
+                    command(dict({'action': 'track', 'target_id': target_id}, **fields),
+                            {'reacquire': name, 'lost_s': round(lost_for, 1)})
+                    lost['since'] = None
+            return repick
+
         def fire_at(target_name, expect, step_name, altitude, settle_s, gates, reason=None):
             """Track target_name centered at altitude, arm, wait until
             gates(status) holds, send one fire command naming the tracked
-            target, and record the outcome."""
+            target, and record the outcome. A target lost under a new id
+            meanwhile is tracked again under it (repicker)."""
             step = {'name': step_name, 'kind': 'fire', 'target': target_name,
                     'expect': expect, 'altitude': altitude, 'reason': reason}
             begin(step)
             command({'action': 'stop'})
             above(target_name, args.fire_approach_altitude)
             require(wait(60.0, lambda: current_id(target_name)), f'{target_name} not detected')
-            track(target_name, {'mode': 'centered', 'altitude_agl_m': altitude})
+            fields = {'mode': 'centered', 'altitude_agl_m': altitude}
+            track(target_name, fields)
+            repick = repicker(target_name, fields)
             require(wait(30.0, lambda: status_state() == 'tracking'),
                     f'{target_name} not tracked')
-            wait(settle_s)
+            wait(settle_s, lambda: repick() and False)
             command({'action': 'launcher_arm'})
             require(wait(5.0, lambda: launcher_status().get('launcher_armed') is True),
                     'the launcher did not arm')
-            held = wait_gates(args.fire_gates_s, gates)
+            held = wait_gates(args.fire_gates_s, lambda status: (repick(), gates(status))[1])
             status = dict(launcher_status())
             target_id = status.get('target_id')
             state['launcher_max'] = [0.0, 0.0]

@@ -44,12 +44,19 @@ run all on the workstation the same day; details in "Results"):
   WildNav profile"). The same profile all on the workstation passes
   (5.3 / 8.3 / 9.6 m).
 - **Tracking:** centered following, losing and re-finding a person, stop and
-  both pre-emptions pass; **slant fails** (43 % tracking, 8 re-selections;
-  the control 99 %, 1). The page served by the Pi works in a browser on the
-  workstation (4.5 frames/s, 0.26 s from the camera to the screen).
+  both pre-emptions pass; slant failed (43 % tracking, 8 re-selections;
+  the control 99 %, 1) until SITL's clock fix: with it **every step
+  passes**, slant at 99.2 % and 1 (section 3). The page served by the Pi
+  works in a browser on the workstation (4.5 frames/s, 0.26 s from the
+  camera to the screen).
 - **Launcher:** no dart at a person in any run; HIL refused the scenario's
-  shot at the car (1.1 m from the bore against the 1 m gate); the
-  person-target step fails all-local too.
+  shot at the car (1.1 m from the bore against the 1 m gate; with SITL's
+  clock fix the hover swung 9.6 deg, likely MAVROS's arrival stamps over
+  Wi-Fi). The person step failed all-local too: the detector read a
+  standing person as a motorcycle, which also exposed the person gate
+  trusting the kind kept at selection. Fixed (a target once detected as a
+  person is never fired at), and the all-local fire scenario now passes
+  every step (section 3).
 - **Pi:** 62-73 % of the 4 cores (median), about 90 % at p95 and up to 95 %
   with WildNav at cruise, 2.6 GB of 8 used, throttled in 87-100 % of
   samples; BlueOS's ArduSub rises from 8 % to 18-22 % of a core. With
@@ -371,6 +378,32 @@ throughout. The README's earlier slant failures in Gazebo (the oscillation
 that rolls the aircraft and its body-fixed camera off the car) are this
 step's known weakness; the extra latency of HIL brought it back.
 
+**With SITL's clock fix (section 6), HIL tracking passes**
+(`generated/aerodrone_hil/tracking_fix2`, 2026-11-01; the Pi's clock
+0.018 s ahead at the start, 0.010 s behind at the end):
+
+| | HIL, SITL clock fix |
+|---|---|
+| Result | **pass** |
+| Centered: distance from the car [12.5 / 17.5] | 1.5 / 5.1 |
+| Centered: tracking [90 %], re-selections [3] | 100 %, 0 |
+| Centered: target estimate error | 0.6 / 1.3 |
+| Centered: car recall [0.8], IDs, followed [0.8] | 0.97, 5, 0.99 |
+| Slant: tracking [90 %], re-selections [3] | **99.2 %, 1** |
+| Slant: range error [5 / 12] | 1.0 / 3.1 |
+| Slant: depression error; shallower p95 [8] | 2.9 / 4.0; 2.1 |
+| Slant: recall, IDs, followed | 0.98, 7, 0.98 |
+| Lost (hidden 8 s): lost after [4 s], drift [1 m], tracking again [8 s] | 2.7 s, 0.08 m, 1.2 s |
+| Stop, map goal, GoTo | pass |
+| Detections (simulation / wall) [4.5 Hz] | 5.0 / 4.9 Hz |
+
+So the slant failure above was the simulated vehicle's attitude
+oscillation, not the HIL latency: with the same camera latency the slant
+step now matches the control (99.1 %, 1). The first attempt
+(`tracking_fix`) never started: a satellite tile failed to download (120
+of 121) and the terrain builder refused the hole; the seeder now retries
+failed tiles (`tools/gps_denied_sim_test.md`, "Seeding").
+
 Fire control (the foam dart launcher's gates, `TRACKING_TEST_SCENARIO=fire`):
 
 | | HIL | Control (same day) |
@@ -387,6 +420,49 @@ In HIL the hover over the car was looser (bore 0.64-1.1 m from the car
 against 0.18 m) and the aircraft was still moving when the third command
 came: every refusal was right, but the shot the scenario expects did not
 happen.
+
+**Why the person step failed, and a fire-control gap it showed
+(2026-11-01).** The tracker did not lose the person by chance:
+- In one all-local run (`control_fire_repick`) the detector labelled the
+  standing person a *motorcycle* from the 30 m approach, and the tracker
+  kept that as the target's kind.
+- From 18 m the detector saw a pedestrian, and the tracker dropped the
+  detections as another kind of object: lost.
+- In the earlier runs the detector renumbered the person on the descent.
+
+The person gate (`not_person`) read the kind kept at selection, so a
+person read as an object steadily for the 3 s `fire_person_clear_s`
+would have passed it and the "no person in view" gate. Fixed:
+- `tracking_core` / `aerodrone_tracker` / `launcher_core`: one detection
+  of the target's own id as a person (or without a class) marks it for
+  good (`target_person_seen`, refused as "never at people: the target was
+  detected as a person"), until another target is selected. The tracker
+  keeps following the id across the change of kind only where the target
+  is (within `handover_max_m` and the filter's gate);
+  `tests/test_aerodrone_launcher.py`, `systems/aerodrone/tracking.md`.
+- `tools/tracking_sim_test.py`: the fire steps re-pick a target lost under
+  a new id, as the follow steps do.
+
+With both, the all-local fire scenario passes every step for the first
+time (`control_fire_person_mark`):
+- the car shot 0.11 m from its centre;
+- the person refused "never at people";
+- the car with a person in view refused, "a person is in view".
+
+**HIL fire with SITL's clock fix** (`fire_fix`, before the two fixes
+above) refused both car shots, "not hovering: 1.3-1.5 m/s":
+- over the halted car the aircraft swung at 0.37 Hz, 9.6 deg (roll
+  standard deviation);
+- the tracker estimated the halted car 1.2 m off and moving at 1.3 m/s
+  (the earlier HIL run: 0.12 m and 0.14 m/s; all-local 0.07 m and
+  0.03 m/s).
+
+The likely cause is the stamps: in HIL the Pi's MAVROS never synchronises
+with SITL over Wi-Fi (its TIMESYNC round trips exceed the 10 ms it accepts)
+and stamps odometry on arrival, so the tracker places each frame with the
+aircraft's pose from up to 0.3 s earlier, and the Pi's clock was 66 ms ahead
+of the workstation's at the start of that run. The HIL layer now relaxes
+MAVROS's time sync for the Wi-Fi link (section 2).
 
 Page (`tools/aerodrone_hil_page_check.py`, loaded from the Pi in headless
 Chromium on the workstation for 60 s of the centered follow): passed. Page
@@ -882,9 +958,11 @@ Found and not changed (reported):
   DemNav, WildNav, Aerostack2 and OAK-1 services lack the open-file cap the
   test means to enforce. Harmless on this Pi (Docker gives 1024 / 524288
   already); the HIL layers set it on every ROS container.
-- **The fire scenario's person step fails all-local too:** the tracker loses
-  the standing person before the fire command, so the refusal comes from
-  the tracking gate, not the person gate the step tests.
+- **The fire scenario's person step failed all-local too** (fixed, section
+  3): the detector read the standing person as a motorcycle from 30 m and
+  a pedestrian from 18 m, and the tracker dropped it. That also showed the
+  person gate trusting the kind kept at selection: a target once detected
+  as a person is now never fired at.
 - **The stock all-local stack's multicast peers** can tangle with another
   Zenoh graph's peers on the same host (MAVROS lost its heartbeat here);
   `tools/aerodrone_hil_control.yaml` isolates a run.

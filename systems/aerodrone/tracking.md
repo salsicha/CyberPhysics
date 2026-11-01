@@ -209,7 +209,14 @@ hold, in this order):
 2. the tracker tracking, in centered mode, the target the command names
    (a stale tap for another target is refused);
 3. the target's class known and not a person's (`person`, and VisDrone's
-   `pedestrian` and `people` if a detector reports them);
+   `pedestrian` and `people` if a detector reports them), and the target
+   never detected as a person since it was selected: the detector can
+   call a standing person a motorcycle from 30 m and a pedestrian from
+   18 m (the Gazebo fire scenario, 2026-11-01), so one detection of the
+   target's own track as a person (or without a class) marks it for good,
+   until another target is selected (`"target_person_seen"`). The tracker
+   keeps following its id across such a change of kind only where the
+   target is (within `handover_max_m` and the filter's gate);
 4. no person anywhere in the camera's view: none in the latest
    `/tracking/detections` frame, which must be at most
    `fire_detection_timeout_s` (0.8 s) old, and none in any frame of the
@@ -259,6 +266,8 @@ Status fields added to `/tracking/status`: `"launcher": "none" | "ready" |
 "priming" | "chambering" | "firing" | "empty" | "fault"`, `"launcher_armed"`,
 `"launcher_ready"` (the bridge), `"darts"` (remaining), `"shots"`,
 `"target_class"` (the tracked target's kind, as first seen),
+`"target_person_seen"` (the target detected as a person since it was
+selected: never fired at),
 `"fire_block"` (the reason a fire command at the tracked target would be
 refused now, `""` when every gate holds), `"fire_checks"` (`{gate: bool}`
 for `launcher`, `armed`, `ready`, `tracking`, `target`, `not_person`,
