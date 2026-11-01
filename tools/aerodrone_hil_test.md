@@ -258,6 +258,21 @@ with the PyPI host entries; the Humble one is kept as
 `oak1-arm64-humble-before`). Its measurements on the Pi's own OAK-1 are in
 `applications/oak1/README.md`.
 
+The bench Pi's boot settings (`/boot/firmware/config.txt`, each with a
+comment and a backup beside it):
+- `os_prefix=k6631/` boots the 6.6.31 kernel. ArduPilot's AP_HAL_Linux
+  reads `/proc/device-tree/soc`, which 6.12 renamed `soc@107c000000`, so
+  no ArduPilot firmware starts on 6.12 (`config.txt.bak-cyberphysics`).
+- `usb_max_current_enable=1` (2026-11-01). The Pi is powered through the
+  Navigator's header, so its USB ports were limited to 600 mA in total; the
+  OAK-1 draws up to about 0.8 A (`hardware/aerodrone.md`, "Compatibility
+  notes"; `config.txt.bak-usbcurrent-20261101`).
+
+After the reboot BlueOS started ArduPilot again (`ardupilot_navigator64`)
+and the OAK-1 enumerated. The OAK-1 still links at USB 2 (480 Mb/s) after
+moving ports: it is on the second controller's USB 2 hub with its USB 3 hub
+empty, so either the black port of that pair or a USB 2 cable.
+
 ## Results (2026-10-31 and 11-01)
 
 Code: HEAD `907948d` with this change. Workstation: i9-13900H (20 threads),
