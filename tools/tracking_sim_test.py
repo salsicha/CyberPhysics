@@ -1387,7 +1387,10 @@ def fly(args):
                     args.fire_view_altitude, args.fire_settle_s,
                     lambda status: checks_but(status, 'no_person')
                     and 'is in view' in str(status.get('fire_block')),
-                    reason='a person is in view')
+                    # The person gate's refusal: "a person is in view (...)"
+                    # or, between the frames that show the walking person,
+                    # "a person was in view 0.5 s ago (...)".
+                    reason='in view')
             command({'action': 'stop'})
             halt_pub.publish(String(data=''))
             state['halted'] = ''

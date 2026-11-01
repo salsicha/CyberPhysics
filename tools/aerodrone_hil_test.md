@@ -33,16 +33,26 @@ run all on the workstation the same day; details in "Results"):
   HIL mission flew all 20 waypoints within 0.04 m horizontally and 0.07 m
   in 3D (the control: 0.04 / 0.08 m). It landed and disarmed after 18 min
   30 s with no autopilot warning, the estimate at 112 Hz.
-- **GPS-denied: fails in HIL** (fused 11.7 / 91.9 / 135.8 m median / p95 /
-  max while denied; the control 7.1 / 11.5 / 12.7 m, the documented
-  baseline 6.6 / 10.9 / 12.7 m). The Pi throttles at 85 °C to 1.5-1.9 GHz,
-  WildNav's matching takes 8 s instead of 1.2 s, the corrections thin out
-  and the EKF drifts. With WildNav's lighter profile it **still fails**
-  (11.8 / 94.1 / 147.9 m), though WildNav now turns a still into a fix in
-  0.2-0.5 s on the Pi and the Pi runs at 45 % instead of 73 % of its cores:
-  the drift is no longer WildNav's latency ("7. GPS-denied with the lighter
-  WildNav profile"). The same profile all on the workstation passes
-  (5.3 / 8.3 / 9.6 m).
+- **GPS-denied: passes in HIL**, though with less margin than all-local.
+  It passes with MAVROS's time synchroniser set for the Wi-Fi
+  (`gps_denied_timesync`). Fused fix 8.6 / 19.6 / 35.4 m (median / p95 /
+  max while denied); the control the same day 5.6 / 8.2 / 9.1 m. The two
+  HIL runs before it failed (fused 11.7 / 91.9 / 135.8 and 11.8 / 94.1 /
+  147.9 m):
+  - **The first:** WildNav matched for 8 s on the throttled Pi. Its lighter
+    profile fixed that.
+  - **The second, and the cause that remained:** the Pi's MAVROS never
+    synchronised its clock with SITL over the Wi-Fi. Its TIMESYNC filter
+    drops every round trip over 10 ms, so it stamped the odometry on
+    arrival: up to 0.3 s late, and seconds in a stall. The OAK-1 stand-in
+    stamps camera frames at capture. So DemNav and WildNav took the
+    attitude of the wrong instant while the vehicle manoeuvred (rolls of
+    10-20 deg), 220 m above the ground.
+  - **Reproduced all-local** by delaying MAVLink like the Wi-Fi: DemNav's
+    and WildNav's p95 / max errors doubled. Fixed for HIL by
+    `applications/aerostack2/config/mavros_time_wifi.yaml`, which brought
+    them back to the control's ("7. GPS-denied: the lighter WildNav profile
+    and MAVROS's clock over Wi-Fi").
 - **Tracking:** centered following, losing and re-finding a person, stop and
   both pre-emptions pass; slant failed (43 % tracking, 8 re-selections;
   the control 99 %, 1) until SITL's clock fix: with it **every step
@@ -316,6 +326,16 @@ denied 60 s of simulation time after reaching cruise for 150 s, DemNav,
 WildNav, the fusion and the navigation bridge on the Pi. Errors in metres,
 median / p95 / max while GPS 1 was denied.
 
+**Status (2026-11-01): passes.** The run below is the first HIL run, before
+WildNav's lighter profile, SITL's clock fix (section 6) and MAVROS's clock
+settings for the Wi-Fi. With all three (`generated/aerodrone_hil/
+gps_denied_timesync`) HIL passes:
+- fused fix 8.6 / 19.6 / 35.4 m;
+- the control the same day 5.6 / 8.2 / 9.1 m.
+
+The cause and the runs between are in "7. GPS-denied: the lighter WildNav
+profile and MAVROS's clock over Wi-Fi".
+
 | | HIL | Control (same day) | Zenoh baseline (2026-10-12) | DDS CAD baselines (2026-10-12) |
 |---|---|---|---|---|
 | Result | **fail**: fused and autopilot p95 and max, route | pass | pass | pass (3 runs) |
@@ -335,14 +355,22 @@ into the denial the corrections came 8.2 and 9.1 s apart (ArduPilot dropped
 and re-detected its GPS 2 each time), the EKF drifted, fewer fixes passed
 the fusion's gate (289 corrections from 360 fixes while denied, 80 %,
 against 475 from 485, 98 %, in the control), and the autopilot was 134 m off
-at the restore. The cause is on the Pi: WildNav's
-SIFT matching of each still against the tile cache took 8.0 s (median) on
-the throttled Pi against 1.2 s on the workstation, so WildNav, set to
-match every 5 s, matched every 8-11 s on stills 8-11 s old; DemNav's fixes
-came 70 ms later and less often (347 against 454 while denied; the
-aircraft-rate input, 4.6 Hz at 256x192 instead of Gazebo's 5 Hz at 320x240,
-accounts for about 8 % of that). The control, with the same images, site
-and middleware, passed with the documented errors.
+at the restore.
+
+What this run showed:
+- **WildNav's latency, on the Pi.** WildNav's SIFT matching of each still
+  against the tile cache took 8.0 s (median) on the throttled Pi, against
+  1.2 s on the workstation. So WildNav, set to match every 5 s, matched
+  every 8-11 s, on stills 8-11 s old.
+- **DemNav's fixes** came 70 ms later and less often (347 against 454 while
+  denied). The aircraft-rate input, 4.6 Hz at 256x192 instead of Gazebo's
+  5 Hz at 320x240, accounts for about 8 % of that.
+- **The control**, with the same images, site and middleware, passed with
+  the documented errors.
+
+Not seen then: the Pi's MAVROS was already stamping part of the odometry on
+arrival, 13 ms late in median and 80-90 ms at p95, against -5 / 0 ms in the
+control (section 7).
 
 ### 3. Tracking and the launcher
 
@@ -477,6 +505,36 @@ and stamps odometry on arrival, so the tracker places each frame with the
 aircraft's pose from up to 0.3 s earlier, and the Pi's clock was 66 ms ahead
 of the workstation's at the start of that run. The HIL layer now relaxes
 MAVROS's time sync for the Wi-Fi link (section 2).
+
+HIL fire with that time sync (`fire_timesync2`; the Pi's clock 1-16 ms
+ahead) came closer but did not pass:
+
+| Over the halted car (after settling) | `fire_fix` | `fire_timesync2` | All-local (`control_fire_person_mark`) |
+|---|---|---|---|
+| Tilt, median / p95 | 12.0 / 15.1 deg | 9.4 / 14.8 deg | 0.3 / 0.8 deg |
+| Target's estimated speed (halted car), median | 1.33 m/s | 0.33 m/s | 0.03 m/s |
+| Aircraft's offset from the car, standard deviation | | 0.3 m | 0.02 m |
+| Estimate's error, standard deviation | | 0.2 m | 0.02 m |
+| Car shot | refused: not hovering, 1.5 m/s | refused: not hovering, 0.5 m/s (at most 0.5) | fired, 0.11 m from its centre |
+| Person step | refused, but by the tracking gate | refused: "never at people" | refused: "never at people" |
+| Person-in-view step | refused, but not hovering | refused: "a person was in view 0.5 s ago" | refused: "a person is in view" |
+
+The person-in-view refusal is the person gate's, in its wording between
+the frames that show the walking person; the scenario now accepts either
+wording (`tools/tracking_sim_test.py`, `reason='in view'`).
+
+The aircraft holds the car within 0.3 m but rocks at about 0.4 Hz, 7 deg
+(roll and pitch standard deviation). The tracker's estimate of the halted
+car moves with that attitude: its east error correlates with pitch, its
+north error with roll (0.86-0.89 at about 0.1 s), so some of each frame's
+placement error follows the attitude, and the follow loop closes through
+it. All-local, the same tracker places the car within 0.02 m. What is left
+in HIL is not established. The likely candidate is the remaining timing
+between the stand-in's camera stamps (the workstation's wall time when
+`/clock` reached the frame) and MAVROS's synchronised autopilot time
+(5-30 ms, section 2). The aircraft has neither path: the OAK-1 stamps on
+the Pi's clock, and its autopilot clock is real time. The tracker was not
+retuned for HIL.
 
 Page (`tools/aerodrone_hil_page_check.py`, loaded from the Pi in headless
 Chromium on the workstation for 60 s of the centered follow): passed. Page
@@ -835,7 +893,15 @@ run 1). `tools/aerodrone_hil_mission_score.py` used to count gi2 as landed
 (disarmed on the ground); it now counts ArduPilot's warnings, and a
 `Crash:` text means no landing (`tests/test_aerodrone_hil.py`).
 
-### 7. GPS-denied with the lighter WildNav profile (2026-11-01)
+### 7. GPS-denied: the lighter WildNav profile and MAVROS's clock over Wi-Fi (2026-11-01)
+
+In short: with WildNav's lighter profile HIL still failed (`gps_denied_lite`,
+below). The cause that remained was the Pi's MAVROS, which never
+synchronised its clock with SITL over the Wi-Fi and stamped the vehicle's
+odometry on arrival. The camera fixes then took the attitude of the wrong
+instant. Reproduced all-local, fixed for HIL by MAVROS settings for the link;
+with them HIL passes (`gps_denied_timesync`, "MAVROS's clock over the
+Wi-Fi" below).
 
 WildNav on the companion computers now runs a lighter profile
 (`tools/wildnav_profile.md`; `compositions/blueos_nav_core.yaml`, mirrored by
@@ -893,20 +959,216 @@ The Pi while flying, median / p95 / max:
     was 3.5-3.8 deg off. 220 m above the ground that is 14-15 m at the nadir,
     which the fix's sigma (attitude 0.5 deg) does not cover.
   - The 29-33 m errors were the two stills 5-6 s old, while the EKF's
-    attitude was still within 0.35 deg.
+    attitude was still within 0.35 deg. They were taken in a Wi-Fi stall:
+    from 57 to 68 s into the denial everything crossing the link arrived up
+    to 4.5 s late (MAVLink round trip 4.3 s at most), and DemNav made its
+    744 m outlier then. The vehicle was rolling between -10 and +10 deg, and
+    the odometry WildNav took its attitude from was stamped on arrival
+    (below). The errors, mostly across the track, fit an attitude about
+    8 deg off. Most likely, then; not traced frame by frame.
 
   All-local, the profile's WildNav fixes were as good as before.
-- **The navigation still fails in HIL.** The fused fix drifted from about
-  20 s into the denial, while WildNav's fixes were still within 1-8 m. Two
-  things are worse in HIL, in both HIL runs:
-  - **DemNav's fixes** were worse than all-local both times. Its input in
-    HIL is the stand-in's 256 x 192 depth at 4.6 Hz, against Gazebo's
-    320 x 240 at 5 Hz. This run also had an outlier of 744 m, and DemNav's
-    camera-to-fix time reached 4.5 s at most (0.6 s before).
-  - **The corrections** came up to 9-10 s apart.
+- **The navigation still failed in HIL.** The fused fix ran 10-15 m off
+  from 20 s into the denial (7-10 m all-local). It ran away from 100 s:
+  - DemNav found few matches over that stretch, all-local too;
+  - WildNav missed two stills;
+  - the corrections stopped for 9.3 s;
+  - the EKF's velocity went 4 m/s off and its pitch and yaw 3.7 and 6 deg;
+  - from then on every camera fix inherited those errors.
 
-  What makes the HIL navigation drift is not established. It is no longer
-  WildNav's compute, and no longer the SITL oscillation.
+#### Cause: MAVROS's clock over the Wi-Fi
+
+The camera fixes and their attitude came from different clocks. The
+stand-in stamps each frame with its capture time, as wall time. DemNav and
+WildNav place the frame with the vehicle's attitude at that stamp, read from
+MAVROS's odometry (`camera_geometry.AttitudeHistory`). The fusion compares
+each fix with the odometry at the same stamp.
+
+**How MAVROS stamps.** MAVROS stamps a message with the autopilot's boot time
+plus a clock offset. It filters that offset from TIMESYNC round trips
+(MAVROS 2.16, `sys_time`):
+- it keeps only samples whose round trip is under `max_rtt_sample`, 10 ms
+  by default;
+- until 500 have converged, it stamps each message when it arrives.
+
+Over the Wi-Fi the round trip was 22-77 ms (median), so it kept none:
+- **The lite run.** The Pi's MAVROS logged "RTT too high" 0.88-0.93 times a
+  second all flight. That is 10 Hz / 11, the rate at which every sample is
+  rejected (it warns once per 11 in a row). It never converged and stamped
+  everything on arrival.
+- **The first HIL run** kept part of them (0.4-0.7 warnings a second), on a
+  faster link (22 ms median).
+- **Measured against the truth** in the GPS-on cruise (ArduPilot's own
+  position at its stamp), its stamps were late by:
+  - the lite run: 0-2 ms (median), 0.17 s (p95), 0.27 s at most, and
+    seconds in the stall;
+  - the first HIL run: 13 ms and 80-90 ms;
+  - the control: -10 to -5 ms and 0 ms.
+
+So the Pi read the attitude from up to 0.3 s before the frame.
+
+**Why 0.3 s matters.** While denied, the vehicle chases the corrections, in
+HIL and all-local alike. SITL's log shows roll 3-8 deg RMS, with peaks of
+10-23 deg. 220 m above the ground a 0.1-0.3 s stamp error then puts the
+point below the vehicle 4-20 m off, mostly across the track. That is beyond
+the fixes' stated sigma: in the lite run 19 % of DemNav's fixes were beyond
+2 sigma. Worse fixes made a worse EKF, more manoeuvring and worse fixes
+still. The stall added a few fixes tens of metres off, and the lite run's
+link was the worst of these runs: round trip 77 / 1647 / 4333 ms (median /
+p95 / max), against 22-45 / 85-141 ms in the others.
+
+**Not the cause:**
+- **The stand-in's camera model.** All-local with the stand-in's /oak1
+  topics (256x192 depth at 4.6 Hz, 0.5 Hz stills, wall-time stamps;
+  experiment L1 below) it passed, about 1.3 times the control's errors.
+- **WildNav's compute** (0.2-0.5 s a match).
+- **SITL's attitude.** It held, and the EKF's tilt stayed within 0.6 deg
+  until the run-away.
+- **The clock offset between the hosts** (-6 to +9 ms in the lite run).
+  The stamp error above is ten times larger.
+- **The corrections' lateness at ArduPilot** (0.18 / 0.40 s median / p95
+  from their stamp, against 0.11-0.13 / 0.27 s all-local).
+
+**Why the all-local control is immune.** Its own MAVROS also loses
+synchronisation: the default 10 ms deviation gate reset it 3-4 times a run
+("Time jump detected"). But all on one host, arrival time is the true time
+within a millisecond.
+
+#### Reproduced all-local
+
+`control gps_denied`'s stack with the HIL middleware and SITL's log kept,
+plus overlays (in a scratch directory, not committed):
+- **L1:** the stand-in with DemNav and WildNav on its /oak1 topics, as on
+  the Pi.
+- **L3:** MAVLink between SITL and MAVROS through a TCP relay that delays
+  each chunk in order, as the Wi-Fi does: 5 ms plus a lognormal of median
+  10 ms and sigma 1.4, each way. Its queue made it burstier than intended:
+  25-34 ms median and 0.29-0.52 s p95 each way. MAVROS kept no round trip
+  (397 warnings) and stamped on arrival.
+- **L3b:** L3 with MAVROS accepting 100 ms round trips and 100 ms
+  deviations.
+- **L3c:** L3 with the committed settings (below).
+
+WildNav ran the lighter profile in each. Errors in metres while denied;
+every run passed:
+
+| | Control (11-01) | L1: stand-in camera path | L3: MAVLink delayed | L3b: + 100 ms gates | L3c: + committed settings |
+|---|---|---|---|---|---|
+| MAVROS stamps | true time | true time | on arrival, 25-38 ms late (median), 0.28-0.55 s (p95) | synchronised 12 % of the flight, reset 3 times | synchronised 83-86 %, never reset; -3 / 7 ms |
+| Fused fix | 5.3 / 8.3 / 9.6 | 7.0 / 12.6 / 15.6 | 5.4 / 9.2 / 18.3 | 6.4 / 9.9 / 11.1 | 6.1 / 9.2 / 10.6 |
+| DemNav (n), error | 444: 6.3 / 9.5 / 12.7 | 392: 6.3 / 10.7 / 17.6 | 357: 7.1 / **16.4 / 39.9** | 375: 6.9 / 14.3 / 33.4 | 430: 6.4 / 10.0 / 53.3 |
+| DemNav beyond 2 / 3 sigma | 0.7 / 0.0 % | 0.5 / 0.0 % | **5.6 / 2.5 %** | 5.3 / 1.1 % | 0.9 / 0.0 % |
+| WildNav, error | 2.0 / 3.1 / 3.6 | 2.2 / 3.3 / 3.8 | 2.4 / **6.8 / 16.6** | 2.3 / 3.5 / 10.0 | 1.9 / 2.8 / 3.1 |
+| Corrections, error | 3.5 / 5.0 / 6.1 | 4.2 / 7.3 / 9.4 | 3.5 / 8.1 / 18.8 | 3.8 / 7.1 / 14.0 | 3.5 / 5.9 / 9.2 |
+
+- **Arrival stamps alone** (L3) roughly doubled the p95 and max errors of
+  both camera fixes and cost a fifth of DemNav's fixes. The stamp error was
+  of the size HIL had, though the link was steadier than the lite run's.
+- **The stand-in's camera path alone** (L1) cost little.
+- **Neither ran away all-local.** HIL had both at once, on a slower,
+  throttled companion and a link that stalled.
+- **The committed settings** (L3c) brought the fixes back to the control's
+  (DemNav's one 53 m fix was within its stated 3 sigma).
+
+#### MAVROS's clock over the Wi-Fi (fixed)
+
+**Why 100 ms gates are not enough.** SITL's clock is the simulation's, which
+runs at 0.9-1.0 of real time and pauses. Against wall time it wanders
+15-25 ms (median) and 70-180 ms (p95) off a 30 s straight line, and pauses
+reach 2 s. MAVROS's filter (gains 0.003, about 30 s) lags that, and a gate
+of 10 or 100 ms then resets it (L3b).
+
+**Choosing the settings.** A replay of these runs' recorded simulation clock
+and of round trips like the HIL ones, through MAVROS's filter, compared
+settings. Errors are median / p95 of the stamps:
+- **Stamped on arrival:** 11 / 44 ms on a good link (round trip about
+  25 ms) and 35 / 220 ms on one like the lite run's (about 75 ms).
+- **100 ms gates:** no better (27 / 100 and 42 / 204 ms), reset 3 times as
+  in L3b.
+- **Committed settings:** 4-9 / 15-45 ms.
+
+**The fix.** `applications/aerostack2/config/mavros_time_wifi.yaml` holds the
+settings:
+- round trips accepted up to 100 ms;
+- gains of 0.2 for the offset and 0.05 for its drift;
+- convergence after 50 samples (5 s);
+- a reset only on a jump of a second.
+
+How the Pi loads them:
+- `blueos_mavros.launch.xml` is now MAVROS's `node.launch` with a third
+  parameter file, `link_config_yaml`. Its default reloads the plugin list:
+  dumps of all 22 MAVROS nodes' parameters with the old and the new launch
+  file are identical.
+- The Pi's layer (`tools/aerodrone_hil_pi.yaml`) passes
+  `link_config_yaml:=/workspace/mavros_config/mavros_time_wifi.yaml`.
+- The aircraft's compositions do not; `tests/test_aerodrone_hil.py` checks
+  both.
+
+**HIL with the fix** (`generated/aerodrone_hil/gps_denied_timesync`;
+SITL's clock fix and the lighter profile as in the lite run), and the
+control the same day after it (`control_gps_denied_timesync`, with the
+lighter profile). Errors in metres, median / p95 / max while denied:
+
+| | HIL, MAVROS clock settings | HIL lite (before) | Control (same day) |
+|---|---|---|---|
+| Result | **pass** | fail | **pass** |
+| Fused fix | 8.6 / 19.6 / 35.4 | 11.8 / 94.1 / 147.9 | 5.6 / 8.2 / 9.1 |
+| Autopilot | 8.6 / 20.5 / 34.9 | 11.8 / 89.3 / 145.0 | 5.6 / 8.2 / 9.0 |
+| DemNav fixes (n), error | 405: 7.5 / 11.8 / 19.9 | 240: 9.4 / 23.8 / 743.7 | 423: 6.2 / 9.2 / 14.7 |
+| WildNav fixes (n), error | 28: 2.2 / 3.2 / 3.7 | 27: 5.0 / 31.9 / 48.4 | 30: 1.9 / 3.2 / 3.4 |
+| Corrections, error; longest gap | 5.2 / 9.3 / 13.9; 9.6 s | 6.6 / 13.9 / 40.2; 9.9 s | 3.5 / 5.5 / 7.7; 4.9 s |
+| Fused beyond 2 / 3 sigma | 15.4 / 3.9 % | 18.0 / 4.0 % | 0.0 / 0.0 % |
+| MAVROS stamps against the truth (GPS-on cruise, median / p95) | -10 to -2 / 0-14 ms | 0-2 / 170 ms | -10 to -5 / 0 ms (11-01 control) |
+| Pi's MAVROS: "RTT too high"; resets | 2 (start-up); 0 | 0.9 a second all flight; 0 | |
+| MAVLink round trip, median / p95 / max | 52 / 148 / 581 ms | 77 / 1647 / 4333 ms | |
+| Longest delay on the link | 0.6 s (a depth frame) | 4.5 s (stall) | |
+| Camera to fix: DemNav; WildNav (median / max) | 0.28 / 0.56 s; 1.7 / 3.0 s | to 4.5 s; 1.9 / 6.3 s | |
+| ArduPilot lost GPS 2 while denied (corrections over 4 s apart) | 5 times | 10 times | 3 times (`control_gps_denied_fix`) |
+| Pi clock minus the workstation's | +10 to +3 ms | -6 to +9 ms | |
+| Real-time factor | 1.0 | 0.99 | 0.99 |
+
+On the Pi, MAVROS's odometry now arrives 18 ms after its stamp (median),
+82-95 ms at p95, as the link's delay. Stamped on arrival it would be about
+0. `ros2 param get` on the Pi showed the settings in force. The 60 s probes
+for this ran beside the stack; the Pi then ran at 60 / 83 % CPU (median /
+p95), 84 °C, throttled throughout, at 2.1 GHz.
+
+**Still open:**
+- **Margin, and one run.** HIL passes with less margin than all-local, from
+  one run.
+  - In the denial's last 20 s the EKF drifted to 35 m. The corrections had
+    stopped for 9.6 s and ArduPilot dropped GPS 2 five times, while
+    DemNav's and WildNav's fixes stayed 7-8 and 3-4 m off.
+  - What is still slower in HIL than all-local through the stand-in (L1):
+    DemNav's camera-to-fix time (0.28 s against 0.18 s), WildNav's (1.7 s
+    against 1.1 s), and the corrections reaching SITL after their stamp
+    (0.18 s against 0.11 s).
+- **/clock crosses to the Pi**, at 198 Hz, with gaps up to 0.17 s. DemNav,
+  WildNav and the fusion subscribe to it by default (`sim_clock_topic`). On
+  the Pi they take their attitude-gap and propagation clocks from its
+  arrival times; the aircraft has no /clock. Not changed: their launch
+  files, which would pass an empty `sim_clock_topic`, are in the images.
+- **WildNav's 5 s period** is longer than ArduPilot's 4 s GPS timeout.
+  Wherever DemNav finds no match, ArduPilot drops GPS 2 between WildNav
+  fixes, all-local too.
+- **On the aircraft**, MAVROS reaches ArduPilot on the same Pi, through
+  BlueOS's router (`tcp://127.0.0.1:5777`), and the autopilot's clock is
+  steady. Two things remain unmeasured:
+  - whether TIMESYNC round trips stay under the 10 ms gate on a loaded,
+    throttled Pi. All-local here, SITL's went over it often enough for
+    63-70 warnings a run. Unsynchronised, MAVROS stamps on arrival, which
+    there is only the router's delay.
+  - To check, with the full stack running: `/mavros/timesync_status`
+    (round trip, offsets) and the rate of "RTT too high" and "Time jump"
+    in MAVROS's log. Only if it never converges, give the aircraft a
+    `link_config_yaml` sized from the measured round trips. The aircraft's
+    default is unchanged.
+- **The OAK-1 node stamps depth and stills on arrival at the host.** Depth
+  is 0.5 s old by then (`applications/oak1/README.md`). The stand-in stamps
+  at capture, which DemNav and WildNav assume. These runs show what a
+  0.1-0.3 s stamp error costs. On the aircraft, depth fixes would take the
+  attitude 0.5 s after the frame. The tracking path already stamps capture
+  time (`tracking_messages.capture_time_ns`). Not changed here.
 
 ## Findings, fixes and limits of these runs
 

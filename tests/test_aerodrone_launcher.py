@@ -1678,7 +1678,7 @@ def fire_rows(name, expect, last_fire, shots=(), sim_shots=(), checks=None, held
     the outcome at 15 s."""
     step = {'name': name, 'kind': 'fire', 'target': 'car_1', 'expect': expect,
             'reason': {'fire_person': 'never at people',
-                       'fire_person_in_view': 'a person is in view'}.get(name)}
+                       'fire_person_in_view': 'in view'}.get(name)}
     rows = [{'k': 'row', 'sim': 10.0, 'step': name,
              'event': {'command': {'action': 'fire', 'target_id': '7'}, 'gates_held': held,
                        'fire_block': block, 'fire_checks': checks or dict(ALL_CHECKS),
@@ -1734,6 +1734,14 @@ def test_the_fire_scenario_scores_the_refusals():
     rows, step = fire_rows('fire_person_in_view', 'refused', in_view,
                            checks=dict(ALL_CHECKS, no_person=False))
     assert sim_test.score_fire(rows, step)['passed']
+    # The same gate between the frames that show the walking person.
+    was = dict(in_view, reason='a person was in view 0.5 s ago (#82 person)')
+    rows, step = fire_rows('fire_person_in_view', 'refused', was,
+                           checks=dict(ALL_CHECKS, no_person=False))
+    assert sim_test.score_fire(rows, step)['passed']
+    # The step's expected reason is the scenario's own.
+    source = (REPO / 'tools/tracking_sim_test.py').read_text()
+    assert "reason='in view')" in source and "reason='never at people')" in source
     # Refused while another gate failed too: not the person's refusal alone.
     rows, step = fire_rows('fire_person_in_view', 'refused', in_view,
                            checks=dict(ALL_CHECKS, no_person=False, hover=False))
