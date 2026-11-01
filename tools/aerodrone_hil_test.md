@@ -250,6 +250,14 @@ BuildKit's cache key, so the aerostack2 build was split at its first network
 step and only the tail used them. These build steps were run by hand from a
 scratch script on the Pi; they are not part of the repository.
 
+The Pi's `oak1-arm64` was still the Humble image from before the Zenoh
+migration (HIL does not use it: the stand-in replaces the camera), so the
+aircraft's `oak1` service could not have joined the Jazzy stack. It was
+rebuilt from HEAD on the Pi on 2026-11-01 (`docker build --network host`
+with the PyPI host entries; the Humble one is kept as
+`oak1-arm64-humble-before`). Its measurements on the Pi's own OAK-1 are in
+`applications/oak1/README.md`.
+
 ## Results (2026-10-31 and 11-01)
 
 Code: HEAD `907948d` with this change. Workstation: i9-13900H (20 threads),

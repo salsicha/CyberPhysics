@@ -180,6 +180,23 @@ MegaDepth's. The node's topics, measured through ROS on the same camera:
 | tracking on, nothing subscribed (paused) | 4.5 Hz | 0.50 Hz | - | 0.5 s |
 | tracking on and subscribed (defaults: detector 5 Hz, MegaDepth capped at 3 Hz) | 2.9 Hz | 0.50 Hz | 5.0 Hz, 0.16 s after capture | 0.5 s |
 
+The same camera on the BlueOS Raspberry Pi 5 (2026-11-01), as the aircraft's
+`oak1` service runs it:
+- the image: the Jazzy `oak1-arm64` built from HEAD on the Pi;
+- the camera still on USB 2 (480 Mb/s);
+- the Pi's USB current at its 600 mA default;
+- 45 s with tracking subscribed.
+
+| Topic | Rate | Age of the stamp on arrival (median / p95) |
+|---|---|---|
+| `/oak1/relative_depth`, `/oak1/image_raw` | 2.90 Hz | 0.53 / 0.58 s |
+| `/oak1/image_highres` (1280x720) | 0.50 Hz | 0.09 / 0.10 s |
+| `/tracking/detections`, `/tracking/image/compressed` | 4.98 Hz | 0.16 / 0.31 s |
+
+Every topic now carries its frame's capture time, so these ages are the
+frames' real ages. Before, the depth was stamped on arrival and showed
+none. `vcgencmd get_throttled` reported no under-voltage during the run.
+
 Other splits (bench, same camera): MegaDepth uncapped with the detector at
 5 Hz gives MegaDepth 4.0 Hz but the detector only 1.4 Hz (MegaDepth's two
 threads keep both engines busy); MegaDepth capped at 3.5 Hz gives 3.3 Hz and
@@ -308,7 +325,8 @@ The measurements above are from a bench OAK-1 on USB 2 pointed at a room;
 on the aircraft check:
 
 - the rates of `/oak1/relative_depth`, `/tracking/detections` and
-  `/oak1/image_highres` with the Pi 5 as host over USB 3 (`ros2 topic hz`),
+  `/oak1/image_highres` with the Pi 5 as host over USB 3 (`ros2 topic hz`;
+  measured on the bench Pi over USB 2 above),
   with and without a subscriber to `/tracking/detections`, and that DemNav
   still matches at the lower MegaDepth rate while tracking. DemNav matches
   only where the depth footprint spans 5 DEM cells (`min_dem_footprint_pixels`):
