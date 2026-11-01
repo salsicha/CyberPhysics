@@ -246,6 +246,54 @@ def test_mavros_flies_the_workstations_sitl_over_wifi(pi_stack):
     assert '/workspace/mavros_config/blueos_mavros.launch.xml' in command  # the aircraft's
 
 
+def test_mavros_time_sync_accepts_the_wifi_round_trips(pi_stack):
+    """MAVROS stamps messages with the autopilot's clock only once its
+    time synchroniser has converged, on TIMESYNC samples whose round trip is
+    under max_rtt_sample (10 ms by default). Over the HIL Wi-Fi (20-80 ms
+    median) it took none and stamped every message on arrival, up to 0.3 s
+    late, so the Pi looked up attitude and position before the camera
+    frames' capture. SITL's clock is the simulation's and wanders against
+    wall time, so the filter must follow it and not reset on it. The Pi's
+    MAVROS loads the link's settings through the aircraft's launch file;
+    the aircraft keeps MAVROS's own."""
+    args = launch_args(command_text(pi_stack['base']['mavros']))
+    assert args['link_config_yaml'] == '/workspace/mavros_config/mavros_time_wifi.yaml'
+    config = yaml.safe_load(
+        (REPO / 'applications/aerostack2/config/mavros_time_wifi.yaml').read_text())
+    params = config['/**/time']['ros__parameters']
+    # Above the link's median round trip (22-77 ms in the HIL runs' probes).
+    assert params['max_rtt_sample'] >= 100
+    # Only a jump of about a second resets a converged estimate: the
+    # simulation's clock wanders 70-180 ms (p95) off a straight line.
+    assert params['max_deviation_sample'] >= 1000
+    # Follows that wander within about a second, and converges in seconds.
+    assert params['timesync_alpha_final'] >= 0.1
+    assert params['convergence_window'] <= 100
+    for name in ('blueos_nav_core.yaml', 'boat_hardware.yaml', 'submarine_hardware.yaml'):
+        assert 'link_config_yaml' not in (COMPOSITIONS / name).read_text(), name
+
+
+def test_blueos_mavros_launch_loads_the_link_settings_last():
+    """blueos_mavros.launch.xml is MAVROS's node.launch with a third
+    parameter file, loaded after ArduPilot's stock configuration; by default
+    it reloads the plugin list, which changes no parameter."""
+    import xml.etree.ElementTree as ET
+    root = ET.parse(REPO / 'applications/aerostack2/config/blueos_mavros.launch.xml').getroot()
+    args = {a.get('name'): a.get('default') for a in root.findall('arg')}
+    assert args['fcu_url'] == 'tcp://127.0.0.1:5777'
+    assert args['link_config_yaml'] == '/workspace/mavros_config/mavros_plugins.yaml'
+    node = root.find('node')
+    assert (node.get('pkg'), node.get('exec')) == ('mavros', 'mavros_node')
+    assert node.get('namespace') in (None, '')
+    files = [p.get('from') for p in node.findall('param') if p.get('from')]
+    assert files == ['/workspace/mavros_config/mavros_plugins.yaml',
+                     '$(find-pkg-share mavros)/launch/apm_config.yaml',
+                     '$(var link_config_yaml)']
+    values = {p.get('name'): p.get('value') for p in node.findall('param') if p.get('name')}
+    assert values == {'fcu_url': '$(var fcu_url)', 'gcs_url': '', 'tgt_system': '1',
+                      'tgt_component': '1', 'fcu_protocol': 'v2.0'}
+
+
 def test_pi_ros_nodes_are_loopback_peers_of_a_router_that_dials_out(pi_stack):
     env = env_values()
     port = env['HIL_ZENOH_PORT']

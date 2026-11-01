@@ -65,6 +65,14 @@ services:
   mavros:
     ulimits: *nofile
     depends_on: [hil_router]
+    # The aircraft's launch file, with the time synchroniser set for the
+    # Wi-Fi to SITL (mavros_time_wifi.yaml): with its 10 ms default it
+    # accepted none of the link's round trips and stamped every message on
+    # arrival, up to 0.3 s late, while the stand-in stamps frames at capture.
+    command: >
+      ros2 launch /workspace/mavros_config/blueos_mavros.launch.xml
+        fcu_url:=${BLUEOS_FCU_URL:-tcp://127.0.0.1:5777}
+        link_config_yaml:=/workspace/mavros_config/mavros_time_wifi.yaml
 
   navigation_bridge: {ulimits: *nofile}
   aerodrone_message_rates:

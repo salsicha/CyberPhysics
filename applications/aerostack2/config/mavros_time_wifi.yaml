@@ -1,0 +1,31 @@
+# MAVROS's time synchroniser for a flight controller across a network whose
+# clock is a simulation's: the hardware-in-the-loop test's Wi-Fi between the
+# Pi's MAVROS and the workstation's ArduPilot SITL (blueos_mavros.launch.xml,
+# link_config_yaml; tools/aerodrone_hil_test.md, "2. GPS-denied").
+#
+# MAVROS stamps each message with the autopilot's boot time plus a clock
+# offset it filters from TIMESYNC round trips once convergence_window
+# samples have been accepted; until then, and after each reset, it stamps
+# messages when they arrive. Its defaults suit a steady autopilot clock next
+# to the companion: round trips over 10 ms are discarded, the offset follows
+# with gains of 0.003 (about 30 s) and ten samples more than 10 ms off reset
+# it. Over the Wi-Fi (round trips 20-80 ms median) none were accepted, so
+# every message was stamped on arrival, 0.1-0.3 s late at p95 and seconds
+# in a stall. SITL's clock is the simulation's, which runs at 0.9-1.0 of
+# real time and pauses: against wall time it wanders 15-25 ms (median) and
+# 70-180 ms (p95) off a 30 s straight line, so a slow filter lags it and
+# the 10 ms (or 100 ms) gate resets it a few times a run.
+#
+# Here samples are accepted up to 100 ms (each then at most 50 ms off), the
+# filter follows within about half a second (alpha 0.2, the drift with beta
+# 0.05), converges after 50 samples (5 s at the 10 Hz TIMESYNC rate) and is
+# reset only by a jump of a second. In a replay of the HIL runs' clock and
+# round trips this stamps messages 4-9 ms off (median) and 15-45 ms (p95),
+# against 11-35 / 45-220 ms when stamped on arrival.
+/**/time:
+  ros__parameters:
+    max_rtt_sample: 100
+    max_deviation_sample: 1000
+    convergence_window: 50
+    timesync_alpha_final: 0.2
+    timesync_beta_final: 0.05
