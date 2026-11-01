@@ -184,6 +184,10 @@ services:
       - ../systems/aerodrone/config/fastdds.xml:/workspace/fastdds.xml:ro
       - /dev/shm:/dev/shm
       - ${WILDNAV_CACHE_HOST:-/data/wildnav_cache}:/data/wildnav_cache
+    # The lighter matching profile of a companion computer beside the
+    # autopilot (tools/wildnav_profile.md): the search ends at the first
+    # tile nearest the prior matched with confidence 0.5, on two OpenCV
+    # threads.
     command: >
       ros2 launch wildnav_pkg wildnav.launch.py
         image_topic:=${CAMERA_TOPIC_ROOT:-/oak1}/image_highres
@@ -204,6 +208,8 @@ services:
         max_tiles:=${WILDNAV_MAX_TILES:-49}
         max_tile_downloads_per_cycle:=${WILDNAV_MAX_DOWNLOADS:-8}
         match_rate_hz:=${WILDNAV_RATE_HZ:-0.2}
+        match_stop_confidence:=${WILDNAV_STOP_CONFIDENCE:-0.5}
+        opencv_threads:=${WILDNAV_THREADS:-2}
         feature_backend:=${WILDNAV_FEATURE_BACKEND:-SIFT}
         min_matches:=${WILDNAV_MIN_MATCHES:-16}
         min_inliers:=${WILDNAV_MIN_INLIERS:-10}

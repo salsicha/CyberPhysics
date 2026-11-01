@@ -130,6 +130,8 @@ services:
         max_tiles:=${WILDNAV_MAX_TILES:-49}
         max_tile_downloads_per_cycle:=${WILDNAV_MAX_DOWNLOADS:-8}
         match_rate_hz:=${WILDNAV_RATE_HZ:-0.2}
+        match_stop_confidence:=${WILDNAV_STOP_CONFIDENCE:-0.5}
+        opencv_threads:=${WILDNAV_THREADS:-2}
         feature_backend:=${WILDNAV_FEATURE_BACKEND:-SIFT}
         min_matches:=${WILDNAV_MIN_MATCHES:-16}
         min_inliers:=${WILDNAV_MIN_INLIERS:-10}

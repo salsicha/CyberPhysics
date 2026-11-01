@@ -2,6 +2,7 @@ import math
 import os
 import time
 import urllib.request
+from collections import OrderedDict
 
 import cv2
 import numpy as np
@@ -39,7 +40,7 @@ def ground_resolution_m(lat, zoom):
 class SatelliteTileCache:
     def __init__(self, cache_dir, url_template, zoom, feature_backend='SIFT',
                  max_features=1500, request_timeout=5.0,
-                 origin_lat=0.0, origin_lon=0.0):
+                 origin_lat=0.0, origin_lon=0.0, memory_tiles=256):
         self.cache_dir = cache_dir
         self.url_template = url_template
         self.zoom = zoom
@@ -50,6 +51,12 @@ class SatelliteTileCache:
         self.origin_lon = float(origin_lon)
         self.synthetic = str(url_template).startswith('synthetic://')
         self.failed_until = {}
+        # Tile features already loaded, most recently used last: every
+        # match goes through the same few dozen tiles, and reading them
+        # back (JPEG decode and compressed npz) cost as much as matching
+        # (tools/wildnav_profile.md). 0 keeps none.
+        self.memory_tiles = max(0, int(memory_tiles))
+        self._memory = OrderedDict()
         os.makedirs(cache_dir, exist_ok=True)
 
         if self.feature_backend == 'SIFT':
@@ -93,12 +100,18 @@ class SatelliteTileCache:
 
     def get_features(self, x, y, allow_download=True):
         stem = self._tile_stem(x, y)
+        remembered = self._memory.get(stem)
+        if remembered is not None:
+            self._memory.move_to_end(stem)
+            return remembered
         image_path = os.path.join(self.cache_dir, stem + '.jpg')
         feature_path = os.path.join(
             self.cache_dir,
             f'{stem}_{self.feature_backend.lower()}_nf{self.max_features}.npz')
 
-        image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+        image = None
+        if os.path.exists(image_path):
+            image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
         if image is None:
             if not allow_download:
                 return None
@@ -109,7 +122,8 @@ class SatelliteTileCache:
         if os.path.exists(feature_path):
             try:
                 cached = np.load(feature_path)
-                return cached['points'], cached['descriptors'], image.shape
+                return self._remember(stem, (
+                    cached['points'], cached['descriptors'], image.shape))
             except (OSError, KeyError, ValueError):
                 pass
 
@@ -119,7 +133,15 @@ class SatelliteTileCache:
         points = np.asarray([kp.pt for kp in keypoints], dtype=np.float32)
         np.savez_compressed(
             feature_path, points=points, descriptors=descriptors)
-        return points, descriptors, image.shape
+        return self._remember(stem, (points, descriptors, image.shape))
+
+    def _remember(self, stem, features):
+        if self.memory_tiles:
+            self._memory[stem] = features
+            self._memory.move_to_end(stem)
+            while len(self._memory) > self.memory_tiles:
+                self._memory.popitem(last=False)
+        return features
 
     def describe(self, image):
         keypoints, descriptors = self.detector.detectAndCompute(image, None)

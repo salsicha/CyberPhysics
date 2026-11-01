@@ -126,6 +126,31 @@ tile source.
 WildNav is deliberately low rate. On Raspberry Pi, start with 0.2 Hz, zoom
 level 18, a 250 m search radius, and no more than 49 candidate tiles.
 
+### Lighter matching on a companion computer
+
+The BlueOS stacks (`compositions/blueos_nav_core.yaml`, and the HIL Pi
+through `tools/aerodrone_hil_pi.yaml`) run the lighter profile; the
+workstation simulations match every candidate tile unless asked
+(`WILDNAV_STOP_CONFIDENCE`, `WILDNAV_THREADS`):
+
+- `match_stop_confidence` (0.5 there, 0 = every tile, the default): the
+  candidate tiles are tried nearest the prior first, and a tile matched
+  with at least this confidence, past every other gate, ends the search.
+  The jump gate still applies to the result.
+- `opencv_threads` (2 there, -1 = OpenCV's default, every core): the
+  matcher's bursts leave the other cores to the autopilot, MAVROS and the
+  rest of the stack.
+- `memory_cache_tiles` (256): tile features stay in memory between matches
+  instead of being decoded and decompressed from the cache on every one.
+  Each tile's 1500 SIFT descriptors take about 0.8 MB.
+
+On the bench Pi 5 this cut the time from still to fix from 1.35 s to
+0.14 s at the simulated site (121 tiles at zoom 17) and from 0.49 s to
+0.13 s with the aircraft's own 49 tiles at zoom 18, and the CPU per match
+from 3.7 and 1.1 core-seconds to 0.2, with the same fixes.
+`tools/wildnav_profile.md` has the measurements, and `tools/wildnav_benchmark.py`
+runs them on any host.
+
 ## Build-time cache seeding
 
 The Docker image seeds default Golden Gate Park satellite tiles and SIFT descriptors at build time (`37.7694, -122.4862`) into `/usr/share/cyberphysics/wildnav_seed` (`WILDNAV_SEED_DIR`), and the entrypoint copies the seed files `/data/wildnav_cache` does not have into it on every start, unless the cache is mounted read-only. Override these build args for another test area:

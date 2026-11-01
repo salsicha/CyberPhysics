@@ -536,3 +536,55 @@ def test_height_from_the_matched_scale(wn):
     assert wn.height_above_ground(homography, (CX, CY), rotation,
                                   (FOCAL, FOCAL, CX, CY), resolution) == \
         pytest.approx(300.0)
+
+
+class ThreeTiles(FakeCache):
+    """Three candidate tiles nearest first, each of which matches."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.read = []
+
+    def candidate_tiles(self, lat, lon, radius, max_tiles):
+        self.searches.append((lat, lon, radius))
+        x, y = self.tile
+        return [self.tile, (x + 1, y), (x, y + 1)]
+
+    def get_features(self, x, y, allow_download=True):
+        self.read.append((x, y))
+        return super().get_features(x, y, allow_download)
+
+
+@pytest.mark.parametrize('stop,read', [(0.0, 3), (0.5, 1), (1.01, 3)])
+def test_search_ends_at_the_first_confident_tile(make_node, stop, read):
+    """match_stop_confidence ends the nearest-first tile search at a tile
+    matched with that confidence (here 1.0); 0 matches every tile. The
+    fix is the nearest tile's either way."""
+    node = make_node(match_stop_confidence=stop)
+    node.cache = ThreeTiles(*sw.local_to_latlon(120.0, -80.0, *ORIGIN))
+    result = match(node, prior_at(150.0, -60.0))
+    assert len(node.cache.read) == read
+    east, north = sw.latlon_to_local(result.fix.latitude,
+                                     result.fix.longitude, *ORIGIN)
+    assert (east, north) == pytest.approx((120.0, -80.0), abs=0.5)
+    message = node.logger.info.call_args.args[0]
+    assert f'{read}/3 tiles in ' in message
+
+
+@pytest.mark.parametrize('threads,expected', [(-1, []), (2, [2]), (0, [0])])
+def test_opencv_threads(wn, make_node, monkeypatch, threads, expected):
+    calls = []
+    monkeypatch.setattr(wn.cv2, 'setNumThreads', calls.append)
+    make_node(opencv_threads=threads)
+    assert calls == expected
+
+
+def test_launch_file_passes_the_lighter_profile_parameters():
+    from conftest import REPO
+    text = (REPO / 'applications/wildnav/src/wildnav_pkg/launch/'
+            'wildnav.launch.py').read_text()
+    for name, default in (('match_stop_confidence', '0.0'),
+                          ('opencv_threads', '-1'),
+                          ('memory_cache_tiles', '256')):
+        assert f"('{name}', '{default}')" in text
+        assert f"'{name}': values['{name}']" in text

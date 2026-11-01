@@ -173,6 +173,17 @@ class WildNavNode(Node):
             'match_sigma_floor_m': 3.0,
             'max_attitude_offset_s': 0.25,
             'sim_clock_topic': '/clock',
+            # Lighter matching (tools/wildnav_profile.md). The candidate
+            # tiles are tried nearest the prior first; a tile whose match
+            # passes every gate with at least this confidence ends the
+            # search (0 tries them all and keeps the best).
+            'match_stop_confidence': 0.0,
+            # OpenCV worker threads (cv2.setNumThreads; -1 keeps OpenCV's
+            # default, every core): bounds the matcher's bursts on a
+            # companion computer it shares with the autopilot.
+            'opencv_threads': -1,
+            # Tiles whose features stay in memory between matches.
+            'memory_cache_tiles': 256,
         }
         for name, value in defaults.items():
             self.declare_parameter(name, value)
@@ -208,6 +219,9 @@ class WildNavNode(Node):
         self.latest_image_prior = None
         self.latest_image_received = 0.0
         self.busy = threading.Lock()
+        threads = int(self.get_parameter('opencv_threads').value)
+        if threads >= 0:
+            cv2.setNumThreads(threads)
 
         self.cache = SatelliteTileCache(
             self.get_parameter('cache_dir').value,
@@ -217,7 +231,8 @@ class WildNavNode(Node):
             int(self.get_parameter('max_features').value),
             float(self.get_parameter('request_timeout_s').value),
             initial_lat,
-            initial_lon)
+            initial_lon,
+            int(self.get_parameter('memory_cache_tiles').value))
 
         self.create_subscription(
             Image, self.get_parameter('image_topic').value,
@@ -260,7 +275,8 @@ class WildNavNode(Node):
         self.timer = self.create_timer(1.0 / rate, self._match_latest)
         self.get_logger().info(
             f'WildNav ready at {rate:.2f} Hz using '
-            f'{self.cache.feature_backend} and zoom {self.cache.zoom}')
+            f'{self.cache.feature_backend} and zoom {self.cache.zoom}, '
+            f'OpenCV threads {cv2.getNumThreads()}')
 
     def _on_image(self, msg):
         try:
@@ -354,6 +370,7 @@ class WildNavNode(Node):
             self.busy.release()
 
     def _run_match(self, image, header, image_odom, prior, camera_info):
+        started = time.monotonic()
         # The camera pose at the image's own timestamp.
         attitude = self.attitude.at(stamp_ns(header.stamp))
         if attitude is None:
@@ -422,7 +439,11 @@ class WildNavNode(Node):
         maximum_downloads = int(
             self.get_parameter('max_tile_downloads_per_cycle').value)
         ratio_threshold = float(self.get_parameter('ratio_threshold').value)
+        stop_confidence = float(
+            self.get_parameter('match_stop_confidence').value)
+        tried = 0
         for tile_x, tile_y in candidates:
+            tried += 1
             cached = self.cache.is_cached(tile_x, tile_y)
             allow_download = cached or downloads < maximum_downloads
             if not cached and allow_download:
@@ -486,6 +507,8 @@ class WildNavNode(Node):
                     'tile_y': tile_y,
                     'homography': homography,
                 }
+            if stop_confidence > 0.0 and confidence >= stop_confidence:
+                break
 
         if best is None:
             self._publish_invalid(0, 0.0)
@@ -563,7 +586,9 @@ class WildNavNode(Node):
         self.fix_pub.publish(fix)
         self.get_logger().info(
             f'WildNav fix {displacement:.1f} m from prediction, '
-            f'{best["inliers"]} inliers, confidence={confidence:.2f}')
+            f'{best["inliers"]} inliers, confidence={confidence:.2f}, '
+            f'{tried}/{len(candidates)} tiles in '
+            f'{time.monotonic() - started:.2f} s')
         if self.origin is None:
             # Local corrections need the EKF origin.
             self.valid_pub.publish(Bool(data=False))

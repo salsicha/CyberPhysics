@@ -39,6 +39,9 @@ def generate_launch_description():
         ('attitude_sigma_deg', '1.0'),
         ('stamp_sigma_s', '0.05'),
         ('match_sigma_floor_m', '3.0'),
+        ('match_stop_confidence', '0.0'),
+        ('opencv_threads', '-1'),
+        ('memory_cache_tiles', '256'),
         ('navigation_output_topic', '/navigation/odometry'),
         ('minimum_demnav_confidence', '0.35'),
         ('minimum_wildnav_confidence', '0.20'),
@@ -100,6 +103,9 @@ def generate_launch_description():
             'attitude_sigma_deg': values['attitude_sigma_deg'],
             'stamp_sigma_s': values['stamp_sigma_s'],
             'match_sigma_floor_m': values['match_sigma_floor_m'],
+            'match_stop_confidence': values['match_stop_confidence'],
+            'opencv_threads': values['opencv_threads'],
+            'memory_cache_tiles': values['memory_cache_tiles'],
         }],
     )
     fusion = Node(

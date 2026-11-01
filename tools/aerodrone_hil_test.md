@@ -31,7 +31,12 @@ run all on the workstation the same day; details in "Results"):
   max while denied; the control 7.1 / 11.5 / 12.7 m, the documented
   baseline 6.6 / 10.9 / 12.7 m). The Pi throttles at 85 °C to 1.5-1.9 GHz,
   WildNav's matching takes 8 s instead of 1.2 s, the corrections thin out
-  and the EKF drifts.
+  and the EKF drifts. With WildNav's lighter profile it **still fails**
+  (11.8 / 94.1 / 147.9 m), though WildNav now turns a still into a fix in
+  0.2-0.5 s on the Pi and the Pi runs at 45 % instead of 73 % of its cores:
+  the drift is no longer WildNav's latency ("7. GPS-denied with the lighter
+  WildNav profile"). The same profile all on the workstation passes
+  (5.3 / 8.3 / 9.6 m).
 - **Tracking:** centered following, losing and re-finding a person, stop and
   both pre-emptions pass; **slant fails** (43 % tracking, 8 re-selections;
   the control 99 %, 1). The page served by the Pi works in a browser on the
@@ -41,7 +46,9 @@ run all on the workstation the same day; details in "Results"):
   person-target step fails all-local too.
 - **Pi:** 62-73 % of the 4 cores (median), about 90 % at p95 and up to 95 %
   with WildNav at cruise, 2.6 GB of 8 used, throttled in 87-100 % of
-  samples; BlueOS's ArduSub rises from 8 % to 18-22 % of a core.
+  samples; BlueOS's ArduSub rises from 8 % to 18-22 % of a core. With
+  WildNav's lighter profile the GPS-denied flight ran at 45 / 59 % (median /
+  p95), throttled in 57 % of samples, at 2.3 GHz median.
 - **Link:** one Zenoh session carries 1.0-1.4 MB/s to the Pi (11-16 % of the
   measured 9 MB/s), MAVLink 3.5 kB/s; MAVLink round trip 19-45 ms median,
   85-141 ms p95; camera to autopilot about 0.25-0.3 s median; nothing
@@ -668,6 +675,79 @@ run 1). `tools/aerodrone_hil_mission_score.py` used to count gi2 as landed
 (disarmed on the ground); it now counts ArduPilot's warnings, and a
 `Crash:` text means no landing (`tests/test_aerodrone_hil.py`).
 
+### 7. GPS-denied with the lighter WildNav profile (2026-11-01)
+
+WildNav on the companion computers now runs a lighter profile
+(`tools/wildnav_profile.md`; `compositions/blueos_nav_core.yaml`, mirrored by
+`tools/aerodrone_hil_pi.yaml`):
+- the tile search ends at the first tile nearest the prior that matches
+  with confidence 0.5 (`match_stop_confidence`);
+- OpenCV runs on two threads (`opencv_threads`);
+- the tiles' features stay in memory between matches.
+
+The Pi's `wildnav-arm64` was rebuilt with it on the Pi.
+
+In the HIL run (`generated/aerodrone_hil/gps_denied_lite`) the
+workstation's ArduPilot SITL already ran without the attitude oscillation
+of section 6:
+- SITL's IMU rate estimate was 100-109 Hz (683-841 Hz in gi1-gi3);
+- roll and pitch varied by 3.2 / 5.8 deg over the flight (21-27 deg before);
+- the EKF tilt stayed within 0.6 deg of the truth for the first 108 s of
+  the denial.
+
+The control ran all on the workstation the same day, through `control
+gps_denied` from HEAD with only the WildNav change. Errors in metres,
+median / p95 / max while GPS 1 was denied.
+
+| | HIL, lighter profile | HIL before ("2. GPS-denied") | Control, lighter profile | Control before |
+|---|---|---|---|---|
+| Result | **fail**: fused and autopilot p95 and max | fail | **pass** | pass |
+| Fused fix | 11.8 / 94.1 / 147.9 | 11.7 / 91.9 / 135.8 | 5.3 / 8.3 / 9.6 | 7.1 / 11.5 / 12.7 |
+| Autopilot | 11.8 / 89.3 / 145.0 | 11.7 / 91.7 / 135.3 | 5.3 / 8.3 / 9.5 | 7.1 / 11.5 / 12.7 |
+| DemNav fixes while denied (n), error | 240: 9.4 / 23.8 / 743.7 | 347: 8.3 / 14.2 / 36.9 | 444: 6.3 / 9.5 / 12.7 | 454: 6.6 / 10.1 / 15.3 |
+| WildNav fixes while denied (n), error | 27: 5.0 / 31.9 / 48.4 | 13: 2.4 / 4.8 / 7.0 | 30: 2.0 / 3.1 / 3.6 | 31: 2.3 / 3.1 / 3.4 |
+| Corrections, error; longest gap | 6.6 / 13.9 / 40.2; 9.9 s | 8.3 / 13.9 / 69.2; 9.1 s | 3.5 / 5.0 / 6.1; 5.2 s | 4.2 / 6.9 / 8.4; 4.9 s |
+| Fused beyond 2 / 3 sigma | 18.0 / 4.0 % | 14.2 / 4.7 % | 0.0 / 0.0 % | 2.7 / 0.0 % |
+| WildNav, camera to fix, whole run (s; nearest-rank p95, from the recordings) | 1.9 / 3.8 / 6.3 | 8.0 / 9.8 / 11.5 | 0.30 / 0.41 / 0.56 | 1.19 / 1.51 / 1.59 |
+| WildNav's match on the Pi (its log) | 0.2-0.5 s, usually 1 of 121 tiles | about 8 s, every tile | | |
+
+The Pi while flying, median / p95 / max:
+
+| | Lighter profile | Before |
+|---|---|---|
+| Host CPU | 44.9 / 58.5 / 77.0 % | 72.6 / 90.4 / 95.4 % |
+| WildNav container (with the fusion) | 50.8 / 57.9 / 157.9 % | 130.3 / 190.2 / 198.3 % |
+| Temperature | 82.3 / 84.8 / 84.8 °C | 84.8 / 85.9 / 86.5 °C |
+| Throttled now (share of samples) | 57 % | 87 % |
+| ARM clock, median | 2.3 GHz | 1.9 GHz |
+
+- **WildNav's latency is fixed.** The camera-to-fix time in HIL is now
+  mostly the still's age: the Pi's stills come at 0.5 Hz over Wi-Fi and
+  WildNav matches the newest every 5 s. The two oldest stills were 5-6 s
+  old, waiting on the link. All-local, the camera-to-fix time is a quarter
+  of what it was.
+- **The early stop did not pick wrong tiles.** WildNav's worst fixes in
+  HIL were real matches: 100-340 inliers at confidence 0.8-0.9, mostly on
+  the first tile tried.
+  - The 14-19 m errors came in the denial's last 40 s, when the EKF's pitch
+    was 3.5-3.8 deg off. 220 m above the ground that is 14-15 m at the nadir,
+    which the fix's sigma (attitude 0.5 deg) does not cover.
+  - The 29-33 m errors were the two stills 5-6 s old, while the EKF's
+    attitude was still within 0.35 deg.
+
+  All-local, the profile's WildNav fixes were as good as before.
+- **The navigation still fails in HIL.** The fused fix drifted from about
+  20 s into the denial, while WildNav's fixes were still within 1-8 m. Two
+  things are worse in HIL, in both HIL runs:
+  - **DemNav's fixes** were worse than all-local both times. Its input in
+    HIL is the stand-in's 256 x 192 depth at 4.6 Hz, against Gazebo's
+    320 x 240 at 5 Hz. This run also had an outlier of 744 m, and DemNav's
+    camera-to-fix time reached 4.5 s at most (0.6 s before).
+  - **The corrections** came up to 9-10 s apart.
+
+  What makes the HIL navigation drift is not established. It is no longer
+  WildNav's compute, and no longer the SITL oscillation.
+
 ## Findings, fixes and limits of these runs
 
 Fixed in the repository:
@@ -706,7 +786,9 @@ Found and not changed (reported):
 
 - **The bench Pi throttles.** At the HIL load it sits at 85 °C and the
   firmware holds the cores at 1.5-1.9 GHz in 87-100 % of samples; WildNav's
-  matching then takes 8 s and the GPS-denied navigation fails. Cooling (an
+  matching then took 8 s and the GPS-denied navigation failed. WildNav's
+  lighter profile (section 7) brought the matching to 0.2-0.5 s and the
+  throttled share to 57 %; the GPS-denied navigation still fails in HIL. Cooling (an
   active cooler or the aircraft's airflow) has to be checked before trusting
   the aircraft's GPS-denied flight; on the aircraft WildNav's matching cost
   also competes with the tracker.

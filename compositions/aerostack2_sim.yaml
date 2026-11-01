@@ -284,7 +284,9 @@ services:
       - wildnav_gazebo_cache:/data/wildnav_cache:ro
     # Fix covariance fitted to WildNav's errors here (1-4 m, none beyond 2
     # sigma): tiles that are the rendered ground itself (the default 3 m floor
-    # is for real imagery).
+    # is for real imagery). Every candidate tile is matched; the aircraft's
+    # lighter profile (WILDNAV_STOP_CONFIDENCE=0.5 WILDNAV_THREADS=2,
+    # tools/wildnav_profile.md) is opt-in here.
     command: >
       ros2 launch wildnav_pkg wildnav.launch.py
         image_topic:=${WILDNAV_IMAGE_TOPIC:-/aerodrone/sensor_measurements/downward_rgb/image_raw}
@@ -298,6 +300,7 @@ services:
         search_radius_m:=${WILDNAV_SEARCH_RADIUS_M:-1100.0}
         max_tiles:=${WILDNAV_MAX_TILES:-169} max_tile_downloads_per_cycle:=0
         match_rate_hz:=${WILDNAV_RATE_HZ:-0.2}
+        match_stop_confidence:=${WILDNAV_STOP_CONFIDENCE:-0.0} opencv_threads:=${WILDNAV_THREADS:--1}
         feature_backend:=${WILDNAV_FEATURE_BACKEND:-SIFT}
         min_matches:=${WILDNAV_MIN_MATCHES:-16} min_inliers:=${WILDNAV_MIN_INLIERS:-10}
         min_inlier_ratio:=${WILDNAV_MIN_INLIER_RATIO:-0.25} cache_dir:=/data/wildnav_cache
