@@ -10,6 +10,7 @@ services:
 
   tracking_sim_test:
     profiles: [tracking, tracking_truth]
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
     network_mode: host
     ipc: host
@@ -46,6 +47,7 @@ services:
     # and score the detector. No DEM: the simulator's targets carry their
     # ground height.
     profiles: [tracking]
+    env_file: [../systems/ros2/middleware.env]
     image: salsicha/cyberphysics:demnav-${CYBERPHYSICS_TAG:-latest}
     network_mode: host
     ipc: host

@@ -172,6 +172,19 @@ def test_fixes_stamped_on_another_clock_are_scored_at_arrival():
     assert during['median_m'] == pytest.approx(5.0, abs=0.01)
 
 
+def test_wall_stamped_camera_fixes_beside_simulation_time_truth_use_that_wall_time():
+    """Hardware-in-the-loop runs (tools/aerodrone_hil_test.md): Gazebo's
+    truth carries simulation time while the OAK-1 stand-in stamps frames in
+    wall time. A fix is scored against the truth at its stamp's wall time
+    (by the truth's arrival), not at its own arrival."""
+    rows, events = make_run()
+    for row in rows:
+        if row['k'] == 'truth':
+            row['t'] = round((row['rx'] - RX0) * RTF, 4)
+    during = score(rows, events)['phases']['during']['fixes']['demnav']
+    assert during['median_m'] == pytest.approx(math.hypot(3.0 + SPEED * 0.5 * RTF, 4.0), abs=0.01)
+
+
 def test_invalid_camera_fixes_are_not_scored():
     rows, events = make_run()
     rows.append(fix('demnav', OFF + 10, (900.0, 0.0), status=-1))

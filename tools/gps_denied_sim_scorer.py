@@ -11,7 +11,10 @@ during and after the GPS 1 denial:
   fix (/navigation/fix) and of ArduPilot's own position (MAVROS global
   position), each against the truth at its arrival: median, p95, max, RMS;
 - the errors of the DemNav and WildNav fixes (truth at the fix's camera
-  stamp) and of the corrections sent to the autopilot, per source;
+  stamp: on the truth's clock, or, for a wall-clock stamp beside a
+  simulation-time truth, at that wall time by the truth's arrival, as in
+  hardware-in-the-loop runs whose OAK-1 stand-in stamps frames in wall time)
+  and of the corrections sent to the autopilot, per source;
 - covariance consistency: the share of fused fixes, DemNav/WildNav fixes and
   corrections farther than 2 and 3 sigma from the truth (Mahalanobis distance
   over the reported horizontal covariance; a consistent 2D Gaussian puts
@@ -294,8 +297,10 @@ class Run:
 
     def errors(self, kind, window, at_stamp=False):
         """Fix minus truth for each row of kind in the window; truth at the
-        header stamp (camera fixes) when it shares the truth's clock, else
-        at arrival. Returns (samples, unscored count)."""
+        header stamp (camera fixes) when it shares the truth's clock, or
+        when it is a wall time within the recording (a wall-stamped camera
+        beside a simulation-time truth: the truth at that wall time, by its
+        arrival), else at arrival. Returns (samples, unscored count)."""
         samples, unscored = [], 0
         for row in self.in_window(kind, window):
             if row.get('status', 0) < 0 and kind in FIX_SOURCES:
@@ -304,8 +309,11 @@ class Run:
                 unscored += 1
                 continue
             truth = None
-            if at_stamp and 't' in row and self.truth_stamp.covers(row['t']):
-                truth = self.truth_stamp.at(row['t'])
+            if at_stamp and 't' in row:
+                if self.truth_stamp.covers(row['t']):
+                    truth = self.truth_stamp.at(row['t'])
+                elif self.truth_rx.covers(row['t']):
+                    truth = self.truth_rx.at(row['t'])
             if truth is None:
                 truth = self.truth_rx.at(row['rx'])
             if truth is None:

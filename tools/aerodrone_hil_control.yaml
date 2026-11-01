@@ -1,0 +1,24 @@
+# All-on-the-workstation control runs for the hardware-in-the-loop comparison
+# (tools/aerodrone_hil_test.md, "Controls"): the Gazebo stack as it is, every
+# node on the workstation, with the HIL middleware of
+# applications/aerostack2/config/aerodrone_hil.env (Zenoh peers on loopback
+# connected to a local router, no multicast), so that a HIL run differs from
+# its control only by the Pi and the Wi-Fi. Layer it with the tests' own
+# override variables and the env of aerodrone_hil.env exported, e.g.
+#   GPS_DENIED_COMPOSE_OVERRIDE=tools/aerodrone_hil_control.yaml tools/gps_denied_sim_test.sh gazebo
+# (tools/aerodrone_hil_test.sh control <scenario> does it). On a host shared
+# with other Zenoh graphs this also keeps their multicast peers out.
+services:
+  hil_router:
+    image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
+    network_mode: host
+    stop_signal: SIGINT  # ros2 run as PID 1 ignores SIGTERM
+    ulimits:
+      nofile:
+        soft: 1024
+        hard: 524288
+    environment:
+      RMW_IMPLEMENTATION: rmw_zenoh_cpp
+      ZENOH_CONFIG_OVERRIDE: >-
+        listen/endpoints=["tcp/127.0.0.1:${HIL_ZENOH_PORT:?see aerodrone_hil.env}"];connect/endpoints=[];scouting/multicast/enabled=false;scouting/gossip/target={router:["peer"],peer:["router"]}
+    command: ros2 run rmw_zenoh_cpp rmw_zenohd

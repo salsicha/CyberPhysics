@@ -1,0 +1,211 @@
+# Aerodrone hardware-in-the-loop, the Pi's side (tools/aerodrone_hil_test.md):
+# a layer over the aircraft's composition, run on the BlueOS Raspberry Pi 5
+# with the aircraft's arm64 images, while the simulator, ArduPilot SITL and
+# the OAK-1 stand-in run on the workstation (aerodrone_hil_sim.yaml):
+#
+#   docker compose -p hil_pi \
+#     --env-file systems/aerodrone/config/topics.env \
+#     --env-file applications/aerostack2/config/mount_tamalpais.env \
+#     --env-file applications/aerostack2/config/aerodrone_hil.env \
+#     -f compositions/aerodrone_hardware.yaml -f tools/aerodrone_hil_pi.yaml \
+#     [--profile mission] [--profile tracking] up -d
+#
+# BlueOS and its ArduPilot (ArduSub on the bench Navigator) keep running
+# untouched: on the aircraft ArduPilot shares this CPU. Nothing here talks to
+# them; the vehicle flown is the workstation's SITL.
+#
+# Changes to the aircraft's stack, all through this layer and
+# aerodrone_hil.env:
+#   - MAVROS connects to ArduPilot SITL on the workstation (BLUEOS_FCU_URL)
+#     instead of BlueOS's router;
+#   - the OAK-1 and the rangefinder are the workstation's (its stand-in
+#     publishes their topics over Wi-Fi): scale 0 here;
+#   - the site is the simulated one (mount_tamalpais.env), and DemNav and
+#     WildNav get the parameters of the simulated sensors the Gazebo stack
+#     gives them: metric depth on the 10 m DEM the world is built from, and
+#     WildNav's covariance fitted to imagery that is the rendered ground
+#     itself (aerostack2_sim.yaml); otherwise their commands are the
+#     aircraft's (tests/test_aerodrone_hil.py holds them to it);
+#   - Aerostack2 accepts a GoTo within 3 m as the simulations do (the
+#     wilderness waypoints; applications/aerostack2/README.md, "Mission
+#     start"), and takes off to TAKEOFF_ALTITUDE;
+#   - --profile mission: flight_ready and the Gazebo wilderness mission tree
+#     (copied from the workstation's terrain assets to HIL_PI_ASSETS) in
+#     place of the map-goal tree; without it the behaviour tree does not run
+#     (the tracking test drives the behaviours from the workstation);
+#   - hil_router: this host's Zenoh router, connected to the workstation's.
+# Containers are named hil_*. Open-file cap on every ROS container. No
+# Compose YAML tags (!reset, !override): the repository's checks read every
+# composition with a plain YAML parser.
+
+x-nofile: &nofile
+  nofile:
+    soft: 1024
+    hard: 524288
+
+services:
+  hil_router:
+    image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-arm64}
+    container_name: hil_router
+    network_mode: host
+    stop_signal: SIGINT  # ros2 run as PID 1 ignores SIGTERM
+    ulimits: *nofile
+    environment:
+      RMW_IMPLEMENTATION: rmw_zenoh_cpp
+      # Listens on loopback only and connects out to the workstation's
+      # router over Wi-Fi; gossips to this host's peers only.
+      ZENOH_CONFIG_OVERRIDE: >-
+        listen/endpoints=["tcp/127.0.0.1:${HIL_ZENOH_PORT:-7468}"];connect/endpoints=["tcp/${HIL_SIM_HOST:-192.168.1.116}:${HIL_ZENOH_PORT:-7468}"];scouting/multicast/enabled=false;scouting/gossip/target={router:["peer"],peer:["router"]}
+    command: ros2 run rmw_zenoh_cpp rmw_zenohd
+
+  # The workstation plays the OAK-1 and the rangefinder.
+  oak1: {scale: 0}
+  rangefinder: {scale: 0}
+
+  mavros:
+    ulimits: *nofile
+    depends_on: [hil_router]
+
+  navigation_bridge: {ulimits: *nofile}
+  aerodrone_message_rates:
+    container_name: hil_aerodrone_message_rates
+    ulimits: *nofile
+  rosbridge: {ulimits: *nofile}
+  aerostack_gui:
+    container_name: hil_aerostack_gui
+    ulimits: *nofile
+  tracker: {ulimits: *nofile}
+
+  demnav:
+    ulimits: *nofile
+    depends_on: [hil_router]
+    # The aircraft's command (blueos_nav_core.yaml) and the simulated depth
+    # camera's metric depth on the world's DEM resolution.
+    command: >
+      ros2 launch demnav_pkg demnav.launch.py
+        gps_topic:=/${VEHICLE_NAMESPACE:-${DRONE_NAMESPACE:-drone0}}/sensor_measurements/gps
+        odom_topic:=/${VEHICLE_NAMESPACE:-${DRONE_NAMESPACE:-drone0}}/sensor_measurements/odom
+        depth_topic:=${CAMERA_TOPIC_ROOT:-/oak1}/relative_depth
+        camera_info_topic:=${CAMERA_TOPIC_ROOT:-/oak1}/camera_info
+        initial_lat:=${INITIAL_LAT:-0.0}
+        initial_lon:=${INITIAL_LON:-0.0}
+        area_km:=${AREA_KM:-10.0}
+        search_radius_m:=${SEARCH_RADIUS_M:-200.0}
+        fov_deg:=${FOV_DEG:-69.0}
+        min_correlation:=${MIN_CORRELATION:-0.35}
+        origin_topic:=/navigation/origin
+        prior_fix_topic:=${NAVIGATION_TOPIC_PREFIX:-/navigation}/fix
+        prior_timeout_s:=2.0
+        search_radius_sigma_scale:=3.0
+        max_search_radius_m:=${MAX_SEARCH_RADIUS_M:-600.0}
+        camera_mount_yaw_deg:=${CAMERA_MOUNT_YAW_DEG:-0.0}
+        gps_altitude_datum:=ellipsoid
+        geoid_file:=/usr/share/GeographicLib/geoids/egm96-5.pgm
+        "rangefinder_topic:=${RANGEFINDER_TOPIC:-''}"
+        rangefinder_timeout_s:=0.5
+        depth_is_metric:=true
+        dem_resolution_m:=${DEM_RESOLUTION_M:-10.0}
+
+  wildnav:
+    ulimits: *nofile
+    # The aircraft's command (blueos_nav_core.yaml) and the fix covariance
+    # fitted to the simulated imagery (aerostack2_sim.yaml).
+    command: >
+      ros2 launch wildnav_pkg wildnav.launch.py
+        image_topic:=${CAMERA_TOPIC_ROOT:-/oak1}/image_highres
+        camera_info_topic:=${CAMERA_TOPIC_ROOT:-/oak1}/image_highres/camera_info
+        prediction_odom_topic:=${NAVIGATION_ODOM_TOPIC:-/navigation/odometry}
+        raw_odom_topic:=/${VEHICLE_NAMESPACE:-${DRONE_NAMESPACE:-drone0}}/sensor_measurements/odom
+        gps_topic:=/${VEHICLE_NAMESPACE:-${DRONE_NAMESPACE:-drone0}}/sensor_measurements/gps
+        navigation_output_topic:=${NAVIGATION_ODOM_TOPIC:-/navigation/odometry}
+        initial_lat:=${INITIAL_LAT:-0.0}
+        initial_lon:=${INITIAL_LON:-0.0}
+        origin_topic:=/navigation/origin
+        prior_fix_topic:=${NAVIGATION_TOPIC_PREFIX:-/navigation}/fix
+        prior_timeout_s:=2.0
+        zoom:=${WILDNAV_ZOOM:-18}
+        search_radius_m:=${WILDNAV_SEARCH_RADIUS_M:-250.0}
+        search_radius_sigma_scale:=3.0
+        max_search_radius_m:=${WILDNAV_MAX_SEARCH_RADIUS_M:-750.0}
+        max_tiles:=${WILDNAV_MAX_TILES:-49}
+        max_tile_downloads_per_cycle:=${WILDNAV_MAX_DOWNLOADS:-8}
+        match_rate_hz:=${WILDNAV_RATE_HZ:-0.2}
+        feature_backend:=${WILDNAV_FEATURE_BACKEND:-SIFT}
+        min_matches:=${WILDNAV_MIN_MATCHES:-16}
+        min_inliers:=${WILDNAV_MIN_INLIERS:-10}
+        min_inlier_ratio:=${WILDNAV_MIN_INLIER_RATIO:-0.25}
+        max_position_jump_m:=${WILDNAV_MAX_JUMP_M:-250.0}
+        camera_mount_yaw_deg:=${CAMERA_MOUNT_YAW_DEG:-0.0}
+        minimum_demnav_confidence:=${DEMNAV_FUSION_CONFIDENCE:-0.35}
+        minimum_wildnav_confidence:=${WILDNAV_FUSION_CONFIDENCE:-0.20}
+        attitude_sigma_deg:=0.5 match_sigma_floor_m:=1.0
+
+  aerostack:
+    container_name: hil_aerostack
+    ulimits: *nofile
+    # The aircraft's command, with the simulations' GoTo acceptance.
+    command: >
+      ros2 launch as2_platform_blueos blueos_autonomy.launch.py
+        namespace:=${DRONE_NAMESPACE:-drone0}
+        mavros_namespace:=/mavros
+        navigation_odom_topic:=/navigation/odometry
+        takeoff_altitude:=${TAKEOFF_ALTITUDE:-2.0}
+        go_to_threshold:=3.0
+
+  # Ready to fly, as the simulations' flight_ready: MAVROS has a GPS fix and
+  # local odometry, and every server the wilderness tree calls can be
+  # discovered. Exits; the test runner waits for it.
+  flight_ready:
+    env_file: [../systems/ros2/middleware.env]
+    image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-arm64}
+    container_name: hil_flight_ready
+    network_mode: host
+    ipc: host
+    ulimits: *nofile
+    restart: "no"
+    depends_on: [mavros, aerostack]
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    volumes:
+      - ../applications/aerostack2/scripts:/workspace/applications/aerostack2/scripts:ro
+      - ${HIL_PI_ASSETS:-../generated/aerodrone_hil/pi/assets}:/hil/assets:ro
+    command: >
+      python3 /workspace/applications/aerostack2/scripts/wait_for_mavros_navigation.py
+        --namespace /mavros --timeout 900 --settle-seconds 3
+        --behavior-tree /hil/assets/wilderness_mission.xml
+        --behavior-namespace /${DRONE_NAMESPACE:-drone0}
+
+  # The Gazebo wilderness mission in place of the map-goal tree, once
+  # flight_ready has passed (as the simulations' wilderness_mission; the
+  # aircraft's own dependencies stay).
+  behavior_tree:
+    profiles: [mission]
+    container_name: hil_behavior_tree
+    ulimits: *nofile
+    restart: "no"
+    depends_on:
+      flight_ready: {condition: service_completed_successfully}
+    volumes:
+      - ${HIL_PI_ASSETS:-../generated/aerodrone_hil/pi/assets}:/hil/assets:ro
+    command: >
+      python3 /workspace/applications/aerostack2/scripts/run_behavior_tree.py
+        --attempts 5 --retry-delay 5 --
+        ros2 launch as2_behavior_tree behavior_trees.launch.py
+        drone_id:=${DRONE_NAMESPACE:-drone0} use_sim_time:=false
+        tree:=/hil/assets/wilderness_mission.xml server_timeout:=120000
+
+  # Topic probe (tools/aerodrone_hil_probe.py), run by the test runner with
+  # `docker compose run`.
+  hil_probe:
+    profiles: [hil_probe]
+    env_file: [../systems/ros2/middleware.env]
+    image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-arm64}
+    network_mode: host
+    ipc: host
+    ulimits: *nofile
+    environment:
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+    volumes:
+      - ../tools:/workspace/tools:ro
+      - ${HIL_RUN_DIR:-../generated/aerodrone_hil/run}:/out
+    command: python3 /workspace/tools/aerodrone_hil_probe.py --help

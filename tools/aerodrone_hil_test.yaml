@@ -1,0 +1,43 @@
+# Hardware-in-the-loop test harness on the workstation
+# (tools/aerodrone_hil_test.sh, tools/aerodrone_hil_test.md), layered last
+# over compositions/aerostack2_sim.yaml, tools/aerodrone_hil_sim.yaml
+# and tools/tracking_sim_test.yaml. The harness stays on the workstation
+# beside the simulator's ground truth, and reaches the Pi's MAVROS and
+# behaviours over the network:
+#   - the GPS-denied test's recorder and denier, and the tracking test's
+#     driver, wait for this host's router (the Pi's MAVROS and behaviours
+#     arrive through it);
+#   - the tracking test's driver is started by the runner once the Pi's
+#     flight_ready has exited (scale 0 here; the runner scales it to 1), and
+#     its truth boxes are stamped like the detector's, from the OAK-1
+#     stand-in's wall-stamped camera_info, so the driver pairs them frame by
+#     frame.
+x-nofile: &nofile
+  nofile:
+    soft: 1024
+    hard: 524288
+
+services:
+  gps_denial_recorder:
+    ulimits: *nofile
+    depends_on: [hil_router]
+
+  gps_denier:
+    ulimits: *nofile
+    depends_on: [hil_router]
+
+  tracking_sim_test:
+    scale: 0
+    ulimits: *nofile
+    depends_on: [hil_router]
+
+  tracking_truth_boxes:
+    ulimits: *nofile
+    command: >
+      python3 /workspace/applications/aerostack2/scripts/tracking_truth_detector.py --ros-args
+        -p topic_prefix:=/tracking/truth
+        -p targets_topic:=/simulation/targets
+        -p camera_info_topic:=${HIL_TRACKING_INPUT_PREFIX:?see aerodrone_hil.env}/camera_info
+        -p odometry_topic:=/navigation/odometry
+        -p camera_mount_yaw_deg:=${TRACKING_TEST_MOUNT_YAW_DEG:-0.0}
+        -p camera_stabilized:=${TRACKING_TEST_CAMERA_STABILIZED:-false}

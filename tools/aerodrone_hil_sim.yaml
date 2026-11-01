@@ -1,0 +1,171 @@
+# Aerodrone hardware-in-the-loop, the workstation's side
+# (tools/aerodrone_hil_test.md): a layer over the Gazebo stack that keeps the
+# simulator, ArduPilot SITL, the moving targets and the test harness here and
+# leaves the companion stack, MAVROS and everything after it, to the Pi
+# (tools/aerodrone_hil_pi.yaml over aerodrone_hardware.yaml):
+#
+#   docker compose -p hil_sim \
+#     --env-file systems/aerodrone/config/topics.env \
+#     --env-file applications/aerostack2/config/mount_tamalpais.env \
+#     --env-file applications/aerostack2/config/aerodrone_hil.env \
+#     -f compositions/aerostack2_sim.yaml -f tools/aerodrone_hil_sim.yaml up -d
+#
+# ArduPilot SITL stays here, beside Gazebo: its JSON lock-step exchanges a
+# packet every physics step and cannot run over a Wi-Fi round trip. The Pi's
+# MAVROS connects to its first serial port (TCP 5760, BLUEOS_FCU_URL).
+#
+# Added here:
+#   hil_router        the Zenoh router the Pi's router connects to: the only
+#                     ROS link over Wi-Fi (aerodrone_hil.env: every node is a
+#                     loopback peer of its own host's router; listeners on
+#                     loopback and the Wi-Fi address only, no multicast)
+#   hil_oak1_standin  the aircraft's OAK-1 and rangefinder: the simulated
+#                     cameras as the OAK-1's topics at its resolutions and
+#                     rates, stamped in wall time like the OAK-1's frames, so
+#                     the Pi runs on wall time as on the aircraft and /clock
+#                     stays on this host
+#                     (applications/aerostack2/scripts/hil_oak1_standin.py)
+# Rewired: with --profile tracking the YOLO detector (the OAK-1's on-camera
+# network) reads the stand-in's wall-stamped frames and the launcher stand-in
+# runs on wall time, as the aircraft's launcher bridge; the tracker, rosbridge
+# and the page run on the Pi (its aerostack_gui and rosbridge). The
+# navigation validator checks the OAK-1 topics DemNav and WildNav read.
+# Moved to the Pi (scale 0 here, so that what depends on them still starts):
+# MAVROS, the navigation bridge, DemNav, WildNav, Aerostack2, flight_ready,
+# the mission tree, the tracker and the simulators' rosbridge and page.
+#
+# No Compose YAML tags (!reset, !override): the repository's checks read
+# every composition with a plain YAML parser.
+#
+# Open-file cap on every ROS container started here (Jazzy images; see
+# tests/test_ros_open_file_limit.py).
+
+x-nofile: &nofile
+  nofile:
+    soft: 1024
+    hard: 524288
+
+services:
+  hil_router:
+    image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
+    network_mode: host
+    stop_signal: SIGINT  # ros2 run as PID 1 ignores SIGTERM
+    ulimits: *nofile
+    environment:
+      RMW_IMPLEMENTATION: rmw_zenoh_cpp
+      # Routers gossip to their own host's peers only, never to each other:
+      # a peer on the Pi must not learn this router's Wi-Fi address and
+      # open its own session across.
+      ZENOH_CONFIG_OVERRIDE: >-
+        listen/endpoints=["tcp/127.0.0.1:${HIL_ZENOH_PORT:-7468}","tcp/${HIL_SIM_HOST:-192.168.1.116}:${HIL_ZENOH_PORT:-7468}"];connect/endpoints=[];scouting/multicast/enabled=false;scouting/gossip/target={router:["peer"],peer:["router"]}
+    command: ros2 run rmw_zenoh_cpp rmw_zenohd
+
+  hil_oak1_standin:
+    env_file: [../systems/ros2/middleware.env]
+    image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
+    network_mode: host
+    ipc: host
+    ulimits: *nofile
+    depends_on: [hil_router, gazebo_bridges]
+    environment:
+      ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
+    volumes:
+      - ../applications/aerostack2/scripts:/workspace/applications/aerostack2/scripts:ro
+    command: >
+      python3 /workspace/applications/aerostack2/scripts/hil_oak1_standin.py --ros-args
+        -p depth_topic:=${DEPTH_TOPIC:-/aerodrone/sensor_measurements/downward_rgbd/depth}
+        -p depth_info_topic:=${CAMERA_INFO_TOPIC:-/aerodrone/sensor_measurements/downward_rgbd/depth/camera_info}
+        -p image_topic:=${WILDNAV_IMAGE_TOPIC:-/aerodrone/sensor_measurements/downward_rgb/image_raw}
+        -p image_info_topic:=${WILDNAV_CAMERA_INFO_TOPIC:-/aerodrone/sensor_measurements/downward_rgb/camera_info}
+        -p output_root:=${CAMERA_TOPIC_ROOT:-/oak1}
+        -p tracking_input_prefix:=${HIL_TRACKING_INPUT_PREFIX:-/hil/oak1/tracking_input}
+        -p tracking_demand_topic:=${TRACKING_TOPIC_PREFIX:-/tracking}/detections
+        -p rangefinder_topic:=${RANGEFINDER_TOPIC:-/aerodrone/rangefinder}
+
+  # Simulator services: unchanged, with the open-file cap.
+  gazebo: {ulimits: *nofile}
+  gazebo_bridges: {ulimits: *nofile}
+  gazebo_targets: {ulimits: *nofile}
+  gazebo_ardupilot_backend: {ulimits: *nofile}
+
+  # The companion stack runs on the Pi.
+  mavros: {scale: 0}
+  navigation_bridge: {scale: 0}
+  demnav: {scale: 0}
+  wildnav: {scale: 0}
+  aerostack2_autonomy: {scale: 0}
+  flight_ready: {scale: 0}
+  wilderness_mission: {scale: 0}
+  tracker: {scale: 0}
+  tracking_rosbridge: {scale: 0}
+  tracking_ui: {scale: 0}
+
+  navsim_validator:
+    ulimits: *nofile
+    depends_on: [hil_oak1_standin]
+    # What the Pi's DemNav and WildNav read: the OAK-1 topics and the
+    # rangefinder, from the stand-in.
+    command: >
+      python3 /workspace/applications/aerostack2/scripts/validate_aerodrone_navsim.py
+        --timeout-s ${NAVSIM_VALIDATION_TIMEOUT_S:-1800}
+        --freshness-s ${NAVSIM_VALIDATION_FRESHNESS_S:-10}
+        --image-topic ${OAK_IMAGE_TOPIC:-/oak1/image_highres}
+        --image-info-topic ${OAK_IMAGE_INFO_TOPIC:-/oak1/image_highres/camera_info}
+        --depth-topic ${OAK_RELATIVE_DEPTH_TOPIC:-/oak1/relative_depth}
+        --depth-info-topic ${OAK_DEPTH_INFO_TOPIC:-/oak1/camera_info}
+        --rangefinder-topic ${RANGEFINDER_TOPIC:-/aerodrone/rangefinder}
+        --required-tf earth:aerodrone/map aerodrone/map:aerodrone/odom
+        aerodrone/odom:aerodrone/base_link map:map_ned base_link:base_link_frd
+
+  tracking_detector:
+    ulimits: *nofile
+    depends_on: [hil_oak1_standin]
+    command: >
+      python3 /scripts/sim_tracking_detector.py --ros-args
+        -p image_topic:=${HIL_TRACKING_INPUT_PREFIX:-/hil/oak1/tracking_input}/image_raw
+        -p camera_info_topic:=${HIL_TRACKING_INPUT_PREFIX:-/hil/oak1/tracking_input}/camera_info
+        -p topic_prefix:=${TRACKING_TOPIC_PREFIX:-/tracking}
+        -p model:=/models/${TRACKING_DETECTOR_MODEL:-visdrone_yolov8n_640x352}.json
+
+  tracking_truth_detector:
+    ulimits: *nofile
+    depends_on: [hil_oak1_standin]
+    command: >
+      python3 /workspace/applications/aerostack2/scripts/tracking_truth_detector.py --ros-args
+        -p topic_prefix:=${TRACKING_TOPIC_PREFIX:-/tracking}
+        -p targets_topic:=/simulation/targets
+        -p camera_info_topic:=${HIL_TRACKING_INPUT_PREFIX:-/hil/oak1/tracking_input}/camera_info
+        -p odometry_topic:=${NAVIGATION_ODOM_TOPIC:-/navigation/odometry}
+        -p camera_mount_yaw_deg:=${TRACKING_CAMERA_MOUNT_YAW_DEG:-0.0}
+        -p camera_stabilized:=${TRACKING_CAMERA_STABILIZED:-false}
+        -p synthetic_targets:=${TRACKING_TRUTH_SYNTHETIC:-false}
+        -p pixel_noise_px:=${TRACKING_TRUTH_PIXEL_NOISE_PX:-0.0}
+        -p dropout:=${TRACKING_TRUTH_DROPOUT:-0.0}
+        -p dem_cache_dir:=/data/demnav_cache
+
+  tracking_launcher:
+    ulimits: *nofile
+    # Wall time, as the aircraft's launcher bridge and the Pi's tracker.
+    command: >
+      python3 /workspace/applications/aerostack2/scripts/launcher_standin.py --ros-args
+        -p use_sim_time:=false
+        -p topic_prefix:=/aerodrone/launcher
+        -p shots_topic:=/simulation/launcher/shots
+        -p auto_fire:=${SIM_AUTO_FIRE:-true}
+        -p tracking_topic_prefix:=${TRACKING_TOPIC_PREFIX:-/tracking}
+
+  # Topic probe (tools/aerodrone_hil_probe.py), run by the test runner with
+  # `docker compose run`.
+  hil_probe:
+    profiles: [hil_probe]
+    env_file: [../systems/ros2/middleware.env]
+    image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
+    network_mode: host
+    ipc: host
+    ulimits: *nofile
+    environment:
+      ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
+    volumes:
+      - ../tools:/workspace/tools:ro
+      - ${HIL_RUN_DIR:-../generated/aerodrone_hil/run}:/out
+    command: python3 /workspace/tools/aerodrone_hil_probe.py --help
