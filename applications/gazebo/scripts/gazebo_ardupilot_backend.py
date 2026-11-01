@@ -18,6 +18,7 @@ from sensor_msgs.msg import Imu
 sys.path.insert(0, "/workspace/applications/ardupilot_sitl/scripts")
 from ardupilot_json import (  # noqa: E402
     ArduPilotJSON,
+    SitlClock,
     body_velocity_to_enu,
     pwm_to_rotor_speed,
     state_from_enu,
@@ -47,6 +48,12 @@ class GazeboArduPilotBackend(Node):
             "GAZEBO_TWIST_IN_BODY_FRAME", "true").strip().lower() in ("1", "true", "yes")
         self.transport = ArduPilotJSON(
             port=int(os.environ.get("ARDUPILOT_JSON_PORT", "9002")))
+        # SITL's clock: Gazebo's pose time from SITL's first exchange on
+        # (ardupilot_json.SitlClock). Gazebo runs on its own; dated with
+        # Gazebo's elapsed time, a SITL that starts (or restarts) after
+        # Gazebo would begin past the 30 s in which ArduPilot learns its
+        # IMU's sample rate.
+        self.sitl_clock = SitlClock()
         self.actuator_pub = self.create_publisher(
             Actuators,
             os.environ.get("GAZEBO_ACTUATOR_TOPIC", "/gz/aerodrone/cmd_actuators"),
@@ -104,6 +111,13 @@ class GazeboArduPilotBackend(Node):
         velocity = [linear.x, linear.y, linear.z]
         if self.twist_in_body_frame:
             velocity = body_velocity_to_enu(velocity, [q.w, q.x, q.y, q.z])
+        pose_time = self.pose.header.stamp.sec + self.pose.header.stamp.nanosec * 1e-9
+        last_frame_count = self.sitl_clock.last_frame_count
+        timestamp = self.sitl_clock.timestamp(pose_time, frame.frame_count)
+        if last_frame_count is None or frame.frame_count < last_frame_count:
+            self.get_logger().info(
+                "ArduPilot SITL's first exchange at Gazebo t=%.3f s: SITL's clock starts at %.2f s"
+                % (pose_time, SitlClock.START_S))
         state = state_from_enu(
             [p.x, p.y, p.z],
             velocity,
@@ -113,7 +127,7 @@ class GazeboArduPilotBackend(Node):
             self.origin_lat,
             self.origin_lon,
             self.origin_alt,
-            timestamp=self.pose.header.stamp.sec + self.pose.header.stamp.nanosec * 1e-9,
+            timestamp=timestamp,
             reference_enu=self.home_enu,
         )
         self.transport.send(state)

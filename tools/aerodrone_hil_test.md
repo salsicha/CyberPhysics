@@ -25,8 +25,14 @@ run all on the workstation the same day; details in "Results"):
   vertical velocity by up to 2 m/s. Three re-runs with the hardened bridge
   (late, bursty corrections; GPS 2 only in source set 2) all oscillated:
   one landed normally, one tipped over at touchdown, one (without
-  corrections) timed out; why HIL runs fall into it and all-local runs do
-  not is not established.
+  corrections) timed out. **Cause, fixed:** ArduPilot SITL waited for the
+  Pi's MAVROS before starting its clock, too late to learn that Gazebo
+  delivers its IMU at 100 Hz (its estimate stayed at 680-840 Hz). Its gyro
+  filter then ran ten times too slow and the gyro lagged 0.1 s. SITL no
+  longer waits for its client ("6. The missions' height"). With the fix a
+  HIL mission flew all 20 waypoints within 0.04 m horizontally and 0.07 m
+  in 3D (the control: 0.04 / 0.08 m). It landed and disarmed after 18 min
+  30 s with no autopilot warning, the estimate at 112 Hz.
 - **GPS-denied: fails in HIL** (fused 11.7 / 91.9 / 135.8 m median / p95 /
   max while denied; the control 7.1 / 11.5 / 12.7 m, the documented
   baseline 6.6 / 10.9 / 12.7 m). The Pi throttles at 85 °C to 1.5-1.9 GHz,
@@ -275,7 +281,9 @@ truth between the second and the sixth minute, at cruise, to about 1 m low
 stayed there to the landing, so every GoTo, accepted within 3 m of
 ArduPilot's position, ended about 1-2 m off in height. No autopilot message
 accompanied it, it was not seen in the HIL GPS-denied run's first minutes,
-and its cause is not established. Over the same flight the navigation
+and its SITL log was not kept; most likely it was a mild case of the
+attitude oscillation found later (section 6: gi2 drifted the same metre).
+Over the same flight the navigation
 bridge on the Pi sent 80 corrections in 16 minutes, the last ones with a
 horizontal accuracy of 65-98 m, where the control's sent 100 in 75 s at
 10-23 m: the Pi's DemNav and WildNav (see "2. GPS-denied") barely corrected
@@ -557,33 +565,95 @@ reading, not established. All-local runs show none of it: roll and pitch
 the EKF's vertical velocity within 0.02-0.04 m/s of the truth (p95; every
 Gazebo run below with a SITL log, the all-local mission included).
 
-**Why the HIL runs, not established.** Every HIL mission run with the
-runner since its SITL logs are kept oscillated from the take-off (gi1, gi2,
-gi3 below: roll-rate standard deviation 110-210 deg/s); none of the nine
-all-local Gazebo flights of the same day with SITL logs did (0.4-6 deg/s:
-the runs in the table below with logs, the all-local mission included).
-SITL's parameters were identical (the dataflash parameter lists differ only
-in counters), the Pi sends the same velocity set-points (`GUIP` type 4) at
-the take-off as the all-local stack, and the simulator side's configuration
-differs only by the open-file cap and the OAK-1 stand-in. Measured during
-gi1 and an all-local mission with a passive gz-transport listener in the
-Gazebo container, the motor commands reached Gazebo 0.4 ms after the
-backend sent them (median; p99 20 ms, max 100 ms) and Gazebo's IMU came at
-197-198 Hz, identically in both. An all-local run with the HIL's open-file
-cap on the simulator services did not oscillate. One five-minute HIL flight
-did not either (H1, run by a scratch driver with an instrumented copy of
-`gazebo_ardupilot_backend.py` that does a little more work per frame): from
-the same commands it stayed level where gi1, gi2 and gi3 diverged about one
-second after lift-off. The loop SITL closes through Gazebo is the suspect:
-`gazebo_ardupilot_backend.py` answers each of SITL's 400 Hz servo frames
-with the latest of three ROS topics, Gazebo's pose (100 Hz, whose stamp
-sets SITL's clock, so SITL's physics advances in 10 ms steps; 3 of 4 frames
-repeat it), its IMU (200 Hz, typically 5 ms newer than the pose) and its
-twist, and the phase between those free-running clocks and the backend's
-timer, which the workstation's load shifts, may decide whether the rate
-loop is stable at lift-off. HIL's looser hover in the fire scenario
-(0.64 m against 0.18 m) and its slant tracking may share it; their logs
-were not kept.
+**Why the HIL runs: SITL waited for the Pi's MAVROS (fixed).** Every HIL
+mission run with the runner since its SITL logs are kept oscillated from
+the take-off (gi1, gi2, gi3 below: roll-rate standard deviation 110-210
+deg/s); none of the nine all-local Gazebo flights of the same day with
+SITL logs did (0.4-6 deg/s). ArduPilot's estimate of its IMU's sample rate
+(the dataflash `IMU` messages' `GHz`) separates them: at arming it was 841,
+758 and 683 Hz in gi1, gi2 and gi3 (the order of their oscillation), 405 Hz
+in the one five-minute HIL flight that stayed level (H1), and 109-176 Hz in
+every all-local run. Gazebo's JSON backend delivers one IMU sample per
+100 Hz pose step (the pose's timestamp is SITL's clock), but SITL registers
+its first IMU at 1000 Hz (`AP_InertialSensor_SITL.h`) and learns the real
+rate only in the first 30 s of its clock before arming
+(`HAL_INS_CONVERGANCE_MS`; afterwards the estimate moves by about 0.1 % a
+second). The 20 Hz gyro and accelerometer filters (`INS_GYRO_FILTER`,
+`INS_ACCEL_FILTER`) are built for the estimate; built for 760 Hz and fed
+100 Hz samples, they act as 2.6 Hz filters.
+
+A passive capture of the JSON exchange (UDP 9002 on loopback) and of
+Gazebo's IMU in a bounded HIL run (`generated/aerodrone_hil/osc_hil1`,
+759 Hz at arming) shows the rest:
+- ArduPilot's own gyro (the dataflash `IMU`) was the simulator's gyro
+  delayed by 100 ms and scaled by 0.89 (residual 5 %; 90 % with no delay);
+- from lift-off the roll rate grew at 2.2 Hz, doubling every cycle from
+  1 deg/s, the motor outputs following the roll angle instead of the rate;
+- the transport was not involved: the pose reached SITL 2.1 ms after Gazebo
+  published it (median; 4.5 ms p99), motor commands reached Gazebo in
+  0.3 ms (2.1 ms p99), SITL never paused, and Gazebo ran at 0.99 of real
+  time.
+
+What differs in HIL is when SITL's clock starts. SITL's first serial port
+defaults to `tcp:0:wait`: SITL does nothing until a MAVLink client connects.
+In HIL that client is the Pi's MAVROS, which starts after the workstation
+side is up and the caches are copied, 25-27 s after SITL in these runs; all
+on the workstation, MAVROS connects within seconds. SITL's clock comes up at
+the wall time SITL spent before its first exchange, whatever the backend's
+timestamp. Measured with SITL and a stationary JSON stand-in:
+- a client connecting after 2 s: 1000 Hz falling to 110 Hz by t = 36 s;
+- after 60 s: SITL's clock at 62 s two seconds later, and the estimate at
+  1000 Hz, falling 0.1 % a second;
+- after 60 s, with the stand-in's timestamps starting from zero: ArduPilot
+  did not boot until its clock reached the 60 s.
+
+Reproduced without the Pi: the all-local stack with MAVROS held back 60 s
+armed at 936 Hz and shook as HIL did. Roll and pitch varied by 27.7 /
+23.0 deg (standard deviation), the IMU read -11.93 m/s^2 and ArduPilot's
+vertical velocity was 1.0 / 2.5 m/s off (median / p95).
+
+**Fixed**, behind an external physics backend (the JSON model of the
+Gazebo and Isaac stacks; only Gazebo was run):
+- SITL's first serial port listens without waiting (`--serial0=tcp:0`,
+  `applications/ardupilot_sitl/scripts/run_arducopter_sitl.sh`), so SITL
+  starts exchanging with the simulator as soon as it starts;
+- the Gazebo backend dates its states from SITL's first exchange (`SitlClock`
+  in `applications/ardupilot_sitl/scripts/ardupilot_json.py`). A SITL
+  started or restarted against a Gazebo that has already run then does not
+  begin past the window either (stand-in, Gazebo's time 300 s at SITL's
+  first exchange: 864 Hz after 150 s; with `SitlClock`, 98 Hz).
+
+Tests: `tests/test_sitl_clock.py`. `tools/sitl_log_summary.py` reports the
+estimate (`imu_rate_estimate_hz`).
+
+Results with the fix:
+- the all-local stack with MAVROS held back 60 s armed at 112 Hz and flew
+  level (roll / pitch 0.24 / 2.41 deg, IMU -9.82 m/s^2, vertical velocity
+  0.001 / 0.017 m/s); ArduPilot's gyro was 15 ms behind the simulator's, at
+  a gain of 1.00;
+- in HIL, the GPS-denied run of section 7 (100-109 Hz);
+- in HIL, a mission with the stock runner
+  (`generated/aerodrone_hil/mission_fix1`):
+  - tree SUCCESS, 20 / 20 waypoints;
+  - closest approach 0.02 / 0.04 m horizontally and 0.02 / 0.07 m in 3D
+    (median / max; the control 0.01 / 0.04 and 0.03 / 0.08 m);
+  - landed and disarmed 18 min 30 s after arming, no ArduPilot warning;
+  - SITL: 112 Hz at arming; roll / pitch 0.97 / 2.78 deg standard
+    deviation; the IMU at -9.82 m/s^2; ArduPilot's vertical velocity
+    0.001 / 0.017 m/s and its height 0.01 / 0.07 m off the truth (median /
+    p95); its gyro 10 ms behind the simulator's, at a gain of 1.00;
+- the local GPS-denied acceptance (`control gps_denied`, with section 7's
+  WildNav image at the workstation's defaults, every tile matched on every
+  core, and SITL's log kept,
+  `generated/aerodrone_hil/control_gps_denied_fix`) passed: fused 5.9 / 8.6 /
+  9.4 m while denied; 112 Hz at arming, roll / pitch 2.49 / 3.08 deg.
+
+One window remains: SITL also waits, in wall time, for the simulator's
+first state. It waited about 3 s for Gazebo in these stacks; with the
+stand-in answering 20 s late the estimate reached only 477 Hz in the 30 s.
+
+HIL's looser hover in the fire scenario (0.64 m against 0.18 m) and its
+slant tracking may have shared the oscillation; they were not re-run.
 
 Corrections, late and bursty, in the Gazebo stack (`gps_denied_sim_test.sh
 gazebo` with the HIL control middleware; errors while GPS 1 was denied,
@@ -767,7 +837,17 @@ Fixed in the repository:
   `tools/gps_input_delay.yaml` and `tools/gps_input_delay_injector.py` make
   the corrections late and bursty for tests; `tools/gps_input_sitl_study.py`
   is the standalone SITL study; `tools/sitl_log_summary.py` summarises a
-  SITL log (EKF against the simulator, the attitude loop, warnings).
+  SITL log (EKF against the simulator, the attitude loop, warnings, the IMU
+  rate estimate).
+- The HIL attitude oscillation ("6. The missions' height"):
+  - `applications/ardupilot_sitl/scripts/run_arducopter_sitl.sh` starts SITL
+    behind an external physics backend with its first serial port listening
+    without waiting for a MAVLink client (`--serial0=tcp:0`);
+  - `gazebo_ardupilot_backend.py` dates its states from SITL's first exchange
+    (`SitlClock`, `ardupilot_json.py`).
+
+  SITL's clock thus starts with the simulator and ArduPilot learns its IMU's
+  100 Hz sample rate (`tests/test_sitl_clock.py`).
 
 - `tools/tracking_sim_test.yaml`: its two ROS services (the test driver and
   the truth boxes) did not load `systems/ros2/middleware.env`, so they
@@ -822,11 +902,12 @@ What failed and why:
   the hold looser than all-local (0.64 m against 0.18 m); and the person-in-
   view step refused for motion (2 m/s) instead of the person gate.
 - The HIL missions' height: run 1's EKF warnings, biased vertical velocity
-  and climb in Land are an attitude oscillation of the simulated vehicle
-  (seen in SITL's log of a later HIL run that sent no GPS_INPUT), not the
-  GPS_INPUT corrections; run 2's 1 m drift is likely a milder case. What
-  starts the oscillation in HIL runs and not all-local is not established
-  ("6. The missions' height and the GPS_INPUT corrections").
+  and climb in Land, and run 2's 1 m drift (likely a milder case), came from
+  an attitude oscillation of the simulated vehicle, not from the GPS_INPUT
+  corrections. It came from ArduPilot SITL waiting for the Pi's MAVROS
+  before starting its clock, which left its IMU rate estimate, and so its
+  gyro filter, ten times off. Fixed ("6. The missions' height and the
+  GPS_INPUT corrections").
 
 Not done:
 

@@ -71,7 +71,7 @@ def test_backend_default_sends_rotated_velocity_to_ardupilot(
     else:
         monkeypatch.setenv('GAZEBO_TWIST_IN_BODY_FRAME', setting)
     transport = MagicMock()
-    transport.receive.return_value = SimpleNamespace(pwm=[1500] * 4)
+    transport.receive.return_value = SimpleNamespace(pwm=[1500] * 4, frame_count=1)
     monkeypatch.setattr(backend, 'ArduPilotJSON', lambda **kwargs: transport)
     node = backend.GazeboArduPilotBackend()
     node.get_clock = MagicMock()

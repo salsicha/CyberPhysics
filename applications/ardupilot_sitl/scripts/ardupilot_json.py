@@ -71,6 +71,50 @@ class ArduPilotJSON:
         self.socket.close()
 
 
+class SitlClock:
+    """ArduPilot SITL's clock for a free-running simulator: the simulator's
+    time, counted from the state that answers SITL's first servo frame.
+
+    ArduPilot learns its IMU's sample rate only in the first 30 s of its
+    clock before arming (HAL_INS_CONVERGANCE_MS); afterwards the estimate
+    moves by about 0.1 % a second. SITL registers its first IMU at
+    1000 Hz, but a JSON backend delivers one sample per state time step
+    (Gazebo: 100 Hz). If SITL's clock starts past those 30 s, the estimate
+    stays near 1000 Hz, the 20 Hz gyro and accelerometer filters built for
+    it act as 2-3 Hz filters, the gyro lags by about 0.1 s and the
+    attitude loop oscillates from lift-off (tools/aerodrone_hil_test.md).
+
+    SITL's clock starts at the later of two times: the first state's
+    timestamp, and the wall time SITL spent before receiving it (measured
+    with a stationary JSON stand-in: SITL waiting 60 s for its MAVLink
+    client, or 20 s for the backend, came up at that time whatever the
+    timestamp). run_arducopter_sitl.sh keeps the wait short (SERIAL0 does
+    not wait for its client). This class keeps the timestamp small: a
+    simulator that has already run for a while before SITL's first
+    exchange (SITL started or restarted against a running Gazebo) would
+    otherwise date it with its own elapsed time.
+
+    START_S is not zero: SITL's HAL reads a stopped clock of 0 as no
+    stopped clock and runs on wall time (AP_HAL_SITL system.cpp,
+    micros64).
+
+    A servo frame count lower than the previous one is a new SITL session
+    (SITL restarted): its clock starts again too."""
+
+    START_S = 0.01
+
+    def __init__(self):
+        self.origin_s = None
+        self.last_frame_count = None
+
+    def timestamp(self, simulator_time_s: float, frame_count: int) -> float:
+        if (self.origin_s is None or self.last_frame_count is None
+                or frame_count < self.last_frame_count):
+            self.origin_s = float(simulator_time_s)
+        self.last_frame_count = frame_count
+        return self.START_S + float(simulator_time_s) - self.origin_s
+
+
 def decode_servo_packet(payload: bytes) -> ServoFrame | None:
     if len(payload) == PACKET_16.size:
         values = PACKET_16.unpack(payload)

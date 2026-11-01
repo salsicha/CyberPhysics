@@ -8,12 +8,19 @@ runner keeps them in <run>/sitl/logs, tools/aerodrone_hil_test.md):
   output (RCOU C1) and the IMU's mean vertical specific force (about
   -9.81 m/s^2 in steady flight; well beyond it when the vehicle shakes);
 - ArduPilot's warnings (vibration compensation, GPS glitch, yaw resets, EKF
-  failsafe, lane switches).
+  failsafe, lane switches);
+- ArduPilot's estimate of its first IMU's sample rate (IMU GHz) when the log
+  starts (at arming) and at its end. Gazebo's JSON backend delivers one IMU
+  sample per 100 Hz pose step; ArduPilot learns that only in the first 30 s
+  of SITL's clock, and an estimate near the nominal 1000 Hz at arming means
+  its gyro filter runs ten times too slow and the attitude loop shakes
+  (applications/ardupilot_sitl/scripts/ardupilot_json.py, SitlClock).
 
 A HIL mission whose attitude loop oscillated (2026-11-01, run gi1) shows
 roll and pitch standard deviations over 20 deg, motor outputs swinging by
-300 PWM, the IMU at -11.7 m/s^2 and the EKF's vertical velocity 2 m/s off;
-all-local runs show 2-5 deg, 30-40 PWM, -9.8 m/s^2 and 0.01-0.05 m/s.
+300 PWM, the IMU at -11.7 m/s^2, the EKF's vertical velocity 2 m/s off and
+an IMU rate estimate of 841 Hz at arming; all-local runs show 2-5 deg,
+30-40 PWM, -9.8 m/s^2, 0.01-0.05 m/s and 109-176 Hz.
 
   pip install pymavlink
   python3 tools/sitl_log_summary.py generated/aerodrone_hil/mission/sitl/logs/00000001.BIN.gz
@@ -46,6 +53,7 @@ def quantiles(values):
 def summarise(path):
     log = mavutil.mavlink_connection(path)
     ekf, truth, roll, pitch, rate, c1, accz, texts = [], [], [], [], [], [], [], []
+    imu_rate = []
     while True:
         msg = log.recv_match(type=['XKF1', 'SIM2', 'ATT', 'RATE', 'RCOU', 'IMU', 'MSG'])
         if msg is None:
@@ -64,6 +72,8 @@ def summarise(path):
             c1.append(msg.C1)
         elif kind == 'IMU' and msg.I == 0:
             accz.append(msg.AccZ)
+            if getattr(msg, 'GHz', None) is not None:
+                imu_rate.append(msg.GHz)
         elif kind == 'MSG':
             texts.append(msg.Message)
     out = {'log': path}
@@ -88,6 +98,8 @@ def summarise(path):
         'roll_sd_deg': spread(roll), 'pitch_sd_deg': spread(pitch),
         'roll_rate_sd_dps': spread(rate), 'motor1_pwm_sd': spread(c1),
         'imu_vertical_specific_force_mps2': round(statistics.mean(accz), 2) if accz else None}
+    out['imu_rate_estimate_hz'] = (
+        {'at_start': imu_rate[0], 'at_end': imu_rate[-1]} if imu_rate else None)
     out['warnings'] = {w: sum(1 for t in texts if w.lower() in t.lower()) for w in WARNINGS}
     return out
 

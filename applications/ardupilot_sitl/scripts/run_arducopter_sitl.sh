@@ -38,6 +38,18 @@ args=(
 )
 if [[ "$sitl_model" != "builtin" ]]; then
   args+=(--model "$sitl_model")
+  # SERIAL0 (TCP 5760 + 10 * N) listens without waiting for its first
+  # MAVLink client (SITL's default is tcp:0:wait). Behind an external
+  # physics backend SITL's clock comes up at the wall time SITL spent
+  # before its first exchange, and ArduPilot learns its IMU's sample rate
+  # only in the first 30 s of that clock. Gazebo delivers one IMU sample
+  # per 100 Hz pose step, not the nominal 1000 Hz. In HIL SITL waited about
+  # 25 s for its client, the Pi's MAVROS, and with its own boot started its
+  # IMU past those 30 s: it kept the nominal rate, its gyro filter ran ten
+  # times too slow and the attitude loop oscillated
+  # (tools/aerodrone_hil_test.md; the backend's side is
+  # ardupilot_json.SitlClock).
+  args+=(--sitl-instance-args=--serial0=tcp:0)
 fi
 for params in "$base_params" "$sitl_params" "$gps_input_params" "$backend_params"; do
   [[ -n "$params" ]] || continue
