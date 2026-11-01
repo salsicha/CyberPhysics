@@ -1,0 +1,56 @@
+# A slower camera, for tests: a layer over compositions/aerostack2_sim.yaml
+# (Gazebo) with the tracking profile that feeds the tracking detector the
+# downward camera's frames CAMERA_DELAY_S later (+ up to CAMERA_DELAY_JITTER_S),
+# capture stamps kept, or shifted by CAMERA_STAMP_OFFSET_S (a camera clock
+# off the odometry's; tools/camera_delay_relay.py), so the detections and
+# the tracker's input arrive as late as a slower camera pipeline's
+# (tools/aerodrone_hil_test.md, section 3). For example, the fire scenario
+# all-local with the HIL control's middleware:
+#
+#   CAMERA_DELAY_S=0.15 HIL_CONTROL_OVERRIDE=tools/camera_delay.yaml \
+#       tools/aerodrone_hil_test.sh control fire
+services:
+  tracking_detector:
+    command: >
+      python3 /scripts/sim_tracking_detector.py --ros-args
+        -p image_topic:=/camera_delay/image_raw
+        -p camera_info_topic:=/camera_delay/camera_info
+        -p topic_prefix:=${TRACKING_TOPIC_PREFIX:-/tracking}
+        -p model:=/models/${TRACKING_DETECTOR_MODEL:-visdrone_yolov8n_640x352}.json
+
+  # The test's truth boxes from the same frames, so that the driver pairs
+  # them with the detections by stamp (tools/tracking_sim_test.py); with a
+  # stamp offset they are projected at the shifted time too.
+  tracking_truth_boxes:
+    command: >
+      python3 /workspace/applications/aerostack2/scripts/tracking_truth_detector.py --ros-args
+        -p topic_prefix:=/tracking/truth
+        -p targets_topic:=/simulation/targets
+        -p camera_info_topic:=/camera_delay/camera_info
+        -p odometry_topic:=/navigation/odometry
+        -p camera_mount_yaw_deg:=${TRACKING_TEST_MOUNT_YAW_DEG:-0.0}
+        -p camera_stabilized:=${TRACKING_TEST_CAMERA_STABILIZED:-false}
+
+  camera_delay:
+    profiles: [tracking]
+    env_file: [../systems/ros2/middleware.env]
+    image: salsicha/cyberphysics:aerostack2-${CYBERPHYSICS_TAG:-latest}
+    network_mode: host
+    ipc: host
+    stop_signal: SIGINT
+    ulimits:
+      nofile:
+        soft: 1024
+        hard: 524288
+    environment:
+      ROS_DOMAIN_ID: ${ROS_DOMAIN_ID:-0}
+    volumes:
+      - /dev/shm:/dev/shm
+      - ../tools:/workspace/tools:ro
+    command: >
+      python3 /workspace/tools/camera_delay_relay.py --ros-args
+        -p in_image:=${WILDNAV_IMAGE_TOPIC:-/aerodrone/sensor_measurements/downward_rgb/image_raw}
+        -p in_info:=${WILDNAV_CAMERA_INFO_TOPIC:-/aerodrone/sensor_measurements/downward_rgb/camera_info}
+        -p delay_s:=${CAMERA_DELAY_S:-0.15}
+        -p jitter_s:=${CAMERA_DELAY_JITTER_S:-0.0}
+        -p stamp_offset_s:=${CAMERA_STAMP_OFFSET_S:-0.0}

@@ -27,7 +27,9 @@
 #   middleware (tools/aerodrone_hil_control.yaml: loopback Zenoh peers of a
 #   local router, ROS_DOMAIN_ID and Zenoh settings of aerodrone_hil.env),
 #   through tools/gps_denied_sim_test.sh or tools/tracking_sim_test.sh
-#   (their variables apply), or for the mission the Gazebo stack with the
+#   (their variables apply; HIL_CONTROL_OVERRIDE adds compose layers to
+#   the gps_denied, tracking and fire controls, e.g. tools/camera_delay.yaml),
+#   or for the mission the Gazebo stack with the
 #   recorder and the validator, scored as a HIL mission; output
 #   generated/aerodrone_hil/control_<scenario>.
 # Hold the host's simulator lock around it if the host is shared.
@@ -89,7 +91,7 @@ if [ "$scenario" = control ]; then
     output="${HIL_OUTPUT:-generated/aerodrone_hil/control_$control}"
     case "$control" in
         gps_denied)
-            GPS_DENIED_COMPOSE_OVERRIDE=tools/aerodrone_hil_control.yaml \
+            GPS_DENIED_COMPOSE_OVERRIDE="tools/aerodrone_hil_control.yaml ${HIL_CONTROL_OVERRIDE:-}" \
             GPS_DENIED_PROJECT=hil_control_gps_denied GPS_DENIED_OUTPUT="$output" \
                 exec tools/gps_denied_sim_test.sh gazebo ;;
         mission)
@@ -137,7 +139,7 @@ if [ "$scenario" = control ]; then
             cat "$GPS_DENIED_OUTPUT/mission_score.json"
             exit "$status" ;;
         tracking|fire)
-            TRACKING_TEST_COMPOSE_OVERRIDE=tools/aerodrone_hil_control.yaml \
+            TRACKING_TEST_COMPOSE_OVERRIDE="tools/aerodrone_hil_control.yaml ${HIL_CONTROL_OVERRIDE:-}" \
             TRACKING_TEST_PROJECT="hil_control_$control" TRACKING_TEST_OUTPUT="$output" \
             TRACKING_TEST_SCENARIO="$([ "$control" = fire ] && echo fire || echo tracking)" \
                 exec tools/tracking_sim_test.sh gazebo ;;

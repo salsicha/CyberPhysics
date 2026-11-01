@@ -571,12 +571,39 @@ ms) the hover was no better:
 - both car shots refused "not hovering"; the person step refused "never
   at people".
 
-So the network's latency was not the cause. The camera's age at the
-tracker remains: 0.18-0.27 s here against 0.14 s all-local, and the real
-OAK-1's detections arrive 0.16 s after capture (p95 0.31 s,
-`applications/oak1/README.md`). The aircraft's hover over a still target
-may therefore rock the same way. That is to check, all-local with the
-camera delayed, before tuning the tracker.
+So the network's latency was not the cause.
+
+**The cause: a camera-to-odometry stamp mismatch, not latency.** All-local
+fire runs through `tools/camera_delay.yaml` (`tools/camera_delay_relay.py`,
+`HIL_CONTROL_OVERRIDE` of `tools/aerodrone_hil_test.sh control`) delayed
+the detector's frames, and in two runs also shifted their stamps:
+
+| Camera | Detection age (median) | Tilt, median / p95 | Estimate's error (std) | Car shot |
+|---|---|---|---|---|
+| as it is (`control_fire_person_mark`) | 0.17 s | 0.3 / 0.8 deg | 0.02 m | fired, 0.11 m |
+| 0.15 s late (`control_fire_camdelay_015`) | 0.32 s | 0.3 / 0.9 deg | 0.02 m | fired, 0.24 m |
+| 0.30 s late (`control_fire_camdelay_030`) | 0.46 s | 0.7 / 1.7 deg | 0.03-0.05 m | fired, 0.20 m |
+| 0.15 s late, stamps +50 ms (`control_fire_stamp2_plus50`) | | 10.4 / 14.4 deg | 0.6 m | refused, tilted 14.3 deg |
+| 0.15 s late, stamps -50 ms (`control_fire_stamp2_minus50`) | | 12.6 / 15.2 deg | 0.9 m | refused, 1.2 m/s |
+
+- **Latency doesn't matter.** Frames that arrive late but carry their
+  capture time are placed right: the tracker looks the pose up at the
+  stamp.
+- **The stamps do.** When they are off the odometry's by 50 ms, the
+  tracker places the car where the pose 50 ms away puts it. The error
+  follows the aircraft's attitude, the follow loop closes through it, and
+  the aircraft rocks as in HIL.
+- **In HIL the two clocks differ:** the stand-in stamps on the
+  workstation's `/clock` arrival, MAVROS on its synchronisation with SITL
+  over the link, and the hosts' clocks differ by 1-66 ms.
+- **On the aircraft** both are the Pi's clock: the OAK-1's capture time
+  through DepthAI's host-synchronised clock, and MAVROS's synchronisation
+  over the local link. The tracker's sensitivity to a few tens of
+  milliseconds remains: check the OAK-1's stamps against the flight
+  controller's attitude (`applications/oak1/README.md`, "To verify") before
+  relying on the launcher. In the delayed runs the person step was refused
+  as "the target was detected as a person": the sticky mark at work in
+  flight.
 
 The person-in-view refusal is the person gate's, in its wording between
 the frames that show the walking person; the scenario now accepts either

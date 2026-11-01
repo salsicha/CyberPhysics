@@ -31,7 +31,8 @@
 #                               isaac 7200)
 #   TRACKING_TEST_KEEP_VOLUMES  true keeps the DEM/tile caches and terrain
 #                               assets for the next run (default false)
-#   TRACKING_TEST_COMPOSE_OVERRIDE  extra compose file layered last
+#   TRACKING_TEST_COMPOSE_OVERRIDE  extra compose files layered last, separated
+#                               by spaces
 #   TRACKING_TEST_SCENARIO      tracking (default) or fire
 #   TRACKING_TEST_TARGET, TRACKING_TEST_LOST_TARGET, TRACKING_TEST_ALTITUDE_M,
 #   TRACKING_TEST_LOST_ALTITUDE_M, TRACKING_TEST_SLANT_RANGE_M, TRACKING_TEST_DEPRESSION_DEG,
@@ -52,7 +53,7 @@ case "$stack" in
     isaac) composition=compositions/aerostack2_isaac.yaml; default_timeout=7200 ;;
     *) echo "usage: $0 <gazebo|isaac>" >&2; exit 2 ;;
 esac
-[ -z "${TRACKING_TEST_COMPOSE_OVERRIDE:-}" ] || layers+=(-f "$TRACKING_TEST_COMPOSE_OVERRIDE")
+for override in ${TRACKING_TEST_COMPOSE_OVERRIDE:-}; do layers+=(-f "$override"); done
 
 env_value() {  # the value of $1 in the stack's tracking env file
     sed -n "s/^$1=//p" "applications/aerostack2/config/tracking_$stack.env"
