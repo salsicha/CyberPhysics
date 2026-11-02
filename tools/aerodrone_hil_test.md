@@ -605,6 +605,30 @@ the detector's frames, and in two runs also shifted their stamps:
   as "the target was detected as a person": the sticky mark at work in
   flight.
 
+**The tracker made robust to it.** A target is now also still when its
+placements stop drifting, and the set-point over a still target is held on
+their average (`tracking_core`; `systems/aerodrone/tracking.md`, "Lead").
+All-local fire runs with the change:
+
+| Camera | Tilt, median / p95 | Aircraft's offset (std) | Car shot | Person steps |
+|---|---|---|---|---|
+| as it is (`control_fire_hold`) | 0.0 / 0.1 deg | 0.02 m | fired, 0.08 m | refused, refused |
+| stamps +50 ms (`control_fire_hold_plus50`) | 0.0 / 0.1 deg | 0.01-0.02 m | fired, 0.06 m | refused, refused |
+| stamps -50 ms (`control_fire_hold_minus50`) | 0.0 / 4.0 deg | 0.07-0.31 m | fired, 0.09 m | refused, refused |
+
+The tracking scenario with the change:
+- **First run** (`control_tracking_hold`): failed its slant step (49.9 %
+  tracking, 5 re-selections) with the car driving at 3.5 m/s, where the
+  hold does not engage.
+- **Second run** (`control_tracking_hold2`): passed, slant 98.3 % with 2
+  re-selections.
+- **Without the change, the same afternoon** (`control_tracking_nohold`):
+  passed, 100 % and 0.
+
+The slant step is the scenario's known weak one. One failure in two runs
+does not settle whether the change affects it; repeat the tracking
+scenario before relying on it.
+
 The person-in-view refusal is the person gate's, in its wording between
 the frames that show the walking person; the scenario now accepts either
 wording (`tools/tracking_sim_test.py`, `reason='in view'`).

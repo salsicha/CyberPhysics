@@ -222,7 +222,10 @@ geoid and camera geometry it uses.
   speed under `still_speed_mps`, 0.5 m/s, for `still_s`, 2 s, until it
   exceeds twice that: a parked car's filtered velocity is noise, and led in
   full it rocked the aircraft 10-16 deg either way above it in Gazebo;
-  without the lead, under 2 deg). The reference
+  without the lead, under 2 deg; it is also still when its placements
+  drift under `still_drift_m` over `still_drift_s`, and its set-point is
+  then held on their average, `still_hold_s`: `systems/aerodrone/tracking.md`,
+  "Lead"). The reference
   moves at most `max_speed_mps` (ArduPilot flies position targets at
   `WPNAV_SPEED`, 5 m/s, at most anyway) and stays within
   `max_reference_lead_m` of the aircraft; heights stay 15-120 m above the

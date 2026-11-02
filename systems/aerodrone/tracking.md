@@ -111,6 +111,18 @@ These were fixed while the parts were built and tested:
   the full 2.5 s lead swung the reference a metre either way; hovering 17 m
   above it in Gazebo the aircraft rolled and pitched 10-16 deg either way
   (median 12 deg), and under 2 deg (median 0.5-1.3) without the lead.
+  The filter's speed is a poor witness when each placement carries an
+  error that follows the aircraft's attitude. Camera stamps 50 ms off the
+  odometry's made a parked car 1-1.2 m/s, and the hover rocked 10-15 deg
+  (`tools/aerodrone_hil_test.md`, section 3). So a target is also still
+  when its placements' means in the two halves of the last
+  `still_drift_s` (4 s) are under `still_drift_m` (1 m) apart (0.5 m/s),
+  and a still target leaves only when its speed is over twice the limit
+  and the drift confirms it. While still, the set-point is held on the
+  placements' average (time constant `still_hold_s`, 3 s), not on the
+  instantaneous estimate. With the stamps 50 ms late or early, the Gazebo
+  fire scenario then hovered at 0.0 deg median tilt and fired 0.06-0.09 m
+  from the car's centre.
 - Speed: the effective horizontal limit is the lower of
   `TRACKING_MAX_SPEED_MPS` and ArduPilot's `WPNAV_SPEED`.
 - Time: the tracker runs on its node clock, simulation time under

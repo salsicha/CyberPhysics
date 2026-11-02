@@ -620,6 +620,63 @@ def test_a_still_target_is_not_led():
     assert lead_at(20.0, 0.3) == pytest.approx(CONFIG.lead_s)
 
 
+def place(core, t, east, north, speed=None):
+    """A placement at t; speed forces the filter's speed estimate (the
+    attitude-borne error makes it 1-1.2 m/s for a parked car)."""
+    core.measurement(tc.Measurement(np.array([east, north, 0.0]), COV, t), t)
+    if speed is not None:
+        core.filter.x[3:] = (speed, 0.0, 0.0)
+    return core.setpoint(t, flying(), flat(), 0.0, OAK1)
+
+
+def test_a_parked_target_placed_with_attitude_borne_error_is_held():
+    """Camera stamps 50 ms off the odometry's made a parked car's
+    placements swing 0.6-0.9 m with the aircraft's attitude and its
+    filtered speed 1-1.2 m/s; chasing them, the hover rocked 10-15 deg
+    (tools/aerodrone_hil_test.md, section 3). The placements' drift shows
+    the car parked, and the set-point is held on their average."""
+    core = tracking_core_at((10.0, 0.0, 0.0), now=0.0)
+    core.filter.created = -CONFIG.lead_ramp_s
+    points = []
+    for k in range(1, 60):  # 5 Hz, 0.8 m either way at 0.4 Hz
+        t = 0.2 * k
+        swing = 0.8 * math.sin(2 * math.pi * 0.4 * t)
+        points.append((t, place(core, t, 10.0 + swing, -swing, speed=1.2)))
+    assert core.still and core.hold is not None
+    late = [point.position for t, point in points if t >= 6.0]
+    east = [position[0] for position in late]
+    north = [position[1] for position in late]
+    # Held within 0.3 m of the car and nearly steady (the swing is 0.8 m).
+    assert max(abs(value - 10.0) for value in east) < 0.3
+    assert max(abs(value) for value in north) < 0.3
+    assert max(east) - min(east) < 0.35 and max(north) - min(north) < 0.35
+
+
+def test_a_target_driving_slowly_is_never_held():
+    """Driving at 1 m/s the placements drift 1 m between the window's
+    halves: never still, whatever the filter's speed says."""
+    core = tracking_core_at((0.0, 0.0, 0.0), now=0.0)
+    core.filter.created = -CONFIG.lead_ramp_s
+    for k in range(1, 50):
+        t = 0.2 * k
+        place(core, t, 1.0 * t, 0.0, speed=0.9)
+        assert not core.still, t
+
+
+def test_a_held_target_that_drives_off_is_followed_again():
+    core = tracking_core_at((0.0, 0.0, 0.0), now=0.0)
+    core.filter.created = -CONFIG.lead_ramp_s
+    for k in range(1, 20):
+        place(core, 0.2 * k, 0.0, 0.0, speed=0.1)
+    assert core.still
+    t, east = 3.8, 0.0
+    for k in range(1, 15):  # 2.5 m/s away
+        t, east = t + 0.2, east + 0.5
+        point = place(core, t, east, 0.0, speed=2.5)
+    assert not core.still and core.hold is None
+    assert point.position[0] > east  # led again
+
+
 @pytest.mark.parametrize('mount_deg', [0.0, 90.0])
 def test_centered_yaw_lays_the_targets_travel_along_the_long_axis(mount_deg):
     """A car driving north-east, followed centered: the set-point's yaw

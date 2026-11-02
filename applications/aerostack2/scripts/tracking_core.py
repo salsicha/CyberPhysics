@@ -129,6 +129,22 @@ class TrackerConfig:
     # (1.5 m/s) or a car driving is never still that long.
     still_speed_mps: float = 0.5
     still_s: float = 2.0
+    # The filter's speed is a poor witness when each placement carries an
+    # error that follows the aircraft's attitude: camera stamps 50 ms off the
+    # odometry's made a parked car 1-1.2 m/s in Gazebo and the hover rocked
+    # 10-15 deg (tools/aerodrone_hil_test.md, section 3). The measurements'
+    # drift says it too: the means of the placements in the two halves of
+    # the last still_drift_s under still_drift_m apart is still (halves 2 s
+    # apart: 0.5 m/s, as still_speed_mps; longer than the 2.5 s rocking, so
+    # its swing averages out), and a still
+    # target leaves only when its speed is over twice the limit and the
+    # drift confirms it. While still, the set-point is held on the
+    # placements' average (time constant still_hold_s), not on the
+    # instantaneous estimate, so the attitude-borne error cannot feed back
+    # through the hover.
+    still_drift_m: float = 1.0
+    still_drift_s: float = 4.0
+    still_hold_s: float = 3.0
     lost_timeout_s: float = 3.0
     slant_range_m: float = 60.0
     depression_deg: float = 70.0
@@ -987,6 +1003,11 @@ class TrackerCore:
     still: bool = False
     still_since: float = None
     still_filter: object = None
+    # The placements of the last still_drift_s [(t, east, north)], on this filter,
+    # and the held point while still (east, north, its time).
+    placements: list = field(default_factory=list)
+    placements_filter: object = None
+    hold: tuple = None
 
     @property
     def active(self):
@@ -1089,6 +1110,7 @@ class TrackerCore:
                 measurement.position, measurement.covariance, measurement.t,
                 self.config)
         self.last_seen = now
+        self._place(measurement)
         if self.state == 'error' and now < self.retry_at:
             return []  # the follow behaviour failed: retry later
         if self.state != 'tracking':
@@ -1293,9 +1315,14 @@ class TrackerCore:
         lead = self.config.lead_s + self.lead_extra_s
         if self.config.lead_ramp_s > 0.0:
             lead *= min(1.0, max(0.0, now - self.filter.created) / self.config.lead_ramp_s)
-        if self.update_still(now):
+        still = self.update_still(now)
+        if still:
             lead = 0.0
         state = self.filter.predicted_turning(now + lead)
+        if still and self.hold is not None:
+            state = np.array(state, dtype=float)
+            state[0], state[1] = self.hold[0], self.hold[1]
+            state[3:6] = 0.0
         setpoint = self._mode_setpoint(state, drone, ground_fn,
                                        mount_yaw_rad, intrinsics, notes)
         if self.command.mode == 'slant':
@@ -1305,19 +1332,58 @@ class TrackerCore:
         self.notes = tuple(notes)
         return setpoint
 
+    def _place(self, measurement):
+        """Keep the placement for the drift and move the held point."""
+        if self.placements_filter is not self.filter:
+            self.placements, self.placements_filter = [], self.filter
+        t, east, north = (float(measurement.t), float(measurement.position[0]),
+                          float(measurement.position[1]))
+        window = self.config.still_drift_s
+        self.placements = [item for item in self.placements
+                           if 0.0 <= t - item[0] <= window] + [(t, east, north)]
+        if self.still and self.hold is not None:
+            dt = max(0.0, t - self.hold[2])
+            rate = 1.0 - math.exp(-dt / max(self.config.still_hold_s, 1e-3))
+            self.hold = (self.hold[0] + rate * (east - self.hold[0]),
+                         self.hold[1] + rate * (north - self.hold[1]), t)
+
+    def drift_m(self):
+        """How far apart the means of the placements in the two halves of
+        the last still_drift_s are, or None with too few (three per half)
+        or a window not yet covered."""
+        items = self.placements
+        if len(items) < 6 or items[-1][0] - items[0][0] < 0.75 * self.config.still_drift_s:
+            return None
+        middle = (items[0][0] + items[-1][0]) / 2.0
+        first = [item for item in items if item[0] < middle]
+        second = [item for item in items if item[0] >= middle]
+        if len(first) < 3 or len(second) < 3:
+            return None
+        mean = lambda half, i: sum(item[i] for item in half) / len(half)
+        return math.hypot(mean(second, 1) - mean(first, 1), mean(second, 2) - mean(first, 2))
+
     def update_still(self, now):
         """Whether the target is still: its filtered speed under
-        still_speed_mps for still_s (on this filter), and since then never
-        over twice that."""
+        still_speed_mps, or its placements' drift (drift_m) under
+        still_drift_m, for still_s (on this filter); it stops being still when its speed is
+        over twice the limit and the drift (when known) is over
+        still_drift_m. Entering, the held point starts at the placements'
+        mean."""
         speed, limit = self.filter.speed_mps, self.config.still_speed_mps
         if self.still_filter is not self.filter:
             self.still, self.still_since, self.still_filter = False, None, self.filter
+            self.hold = None
+        drift = self.drift_m()
         if self.still:
-            if speed > 2.0 * limit:
-                self.still, self.still_since = False, None
-        elif speed < limit:
+            if speed > 2.0 * limit and (drift is None or drift > self.config.still_drift_m):
+                self.still, self.still_since, self.hold = False, None, None
+        elif speed < limit or (drift is not None and drift < self.config.still_drift_m):
             self.still_since = now if self.still_since is None else self.still_since
             self.still = now - self.still_since >= self.config.still_s
+            if self.still and self.placements:
+                items = self.placements
+                self.hold = (sum(item[1] for item in items) / len(items),
+                             sum(item[2] for item in items) / len(items), items[-1][0])
         else:
             self.still_since = None
         return self.still
