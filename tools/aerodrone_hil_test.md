@@ -616,18 +616,24 @@ All-local fire runs with the change:
 | stamps +50 ms (`control_fire_hold_plus50`) | 0.0 / 0.1 deg | 0.01-0.02 m | fired, 0.06 m | refused, refused |
 | stamps -50 ms (`control_fire_hold_minus50`) | 0.0 / 4.0 deg | 0.07-0.31 m | fired, 0.09 m | refused, refused |
 
-The tracking scenario with the change:
-- **First run** (`control_tracking_hold`): failed its slant step (49.9 %
-  tracking, 5 re-selections) with the car driving at 3.5 m/s, where the
-  hold does not engage.
-- **Second run** (`control_tracking_hold2`): passed, slant 98.3 % with 2
-  re-selections.
-- **Without the change, the same afternoon** (`control_tracking_nohold`):
-  passed, 100 % and 0.
+The tracking scenario with the first version of the change failed its
+slant step in 3 of 5 runs (49.9-71.2 % tracking), against 0 of 4 without
+it (98.3-100 %). The cause: a filter just started after a re-acquisition
+reads a 3.5 m/s car slow, the speed alone made it still (as before), and
+the set-point was then held on the placements' average, which trails the
+car by metres. The set-point is now held only while the placements
+themselves stand (their drift known and under `still_drift_m`), and the
+tracker's status message says `still` and `held` when they apply.
 
-The slant step is the scenario's known weak one. One failure in two runs
-does not settle whether the change affects it; repeat the tracking
-scenario before relying on it.
+With that (`control_tracking_hold_fix1-3`, `control_tracking_hold_diag`):
+- the status never said `still` or `held` in any of the four tracking
+  runs, so the set-point was the old code's throughout;
+- three of the four passed (slant 99.0-99.2 %, 1 re-selection each);
+- one failed its slant step (54.5 %, 8 re-selections), with the tracker
+  behaving as the old code, so the slant step's own spread;
+- the fire scenario with the stamps 50 ms late or early held the set-point
+  over the whole hover: tilt 0.0 / 0.6 and 0.0 / 0.2 deg (median / p95),
+  car shots 0.09 m from its centre, both person steps refused.
 
 The person-in-view refusal is the person gate's, in its wording between
 the frames that show the walking person; the scenario now accepts either

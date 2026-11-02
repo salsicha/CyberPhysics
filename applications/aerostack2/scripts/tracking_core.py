@@ -1319,10 +1319,13 @@ class TrackerCore:
         if still:
             lead = 0.0
         state = self.filter.predicted_turning(now + lead)
+        if still:
+            notes.append('still')
         if still and self.hold is not None:
             state = np.array(state, dtype=float)
             state[0], state[1] = self.hold[0], self.hold[1]
             state[3:6] = 0.0
+            notes.append('held')
         setpoint = self._mode_setpoint(state, drone, ground_fn,
                                        mount_yaw_rad, intrinsics, notes)
         if self.command.mode == 'slant':
@@ -1367,25 +1370,34 @@ class TrackerCore:
         still_speed_mps, or its placements' drift (drift_m) under
         still_drift_m, for still_s (on this filter); it stops being still when its speed is
         over twice the limit and the drift (when known) is over
-        still_drift_m. Entering, the held point starts at the placements'
-        mean."""
+        still_drift_m. The set-point is held (self.hold, starting at the
+        placements' mean) only while still and the drift is known and under
+        still_drift_m."""
         speed, limit = self.filter.speed_mps, self.config.still_speed_mps
         if self.still_filter is not self.filter:
             self.still, self.still_since, self.still_filter = False, None, self.filter
             self.hold = None
         drift = self.drift_m()
+        quiet = drift is not None and drift < self.config.still_drift_m
         if self.still:
             if speed > 2.0 * limit and (drift is None or drift > self.config.still_drift_m):
-                self.still, self.still_since, self.hold = False, None, None
-        elif speed < limit or (drift is not None and drift < self.config.still_drift_m):
+                self.still, self.still_since = False, None
+        elif speed < limit or quiet:
             self.still_since = now if self.still_since is None else self.still_since
             self.still = now - self.still_since >= self.config.still_s
-            if self.still and self.placements:
+        else:
+            self.still_since = None
+        # Held only while the placements themselves stand: a filter just
+        # started reads a driving car slow for a while (the speed alone made
+        # it still; held on the placements' average, which trails a 3.5 m/s
+        # car by metres, the car left the view in Gazebo's slant step).
+        if self.still and quiet:
+            if self.hold is None:
                 items = self.placements
                 self.hold = (sum(item[1] for item in items) / len(items),
                              sum(item[2] for item in items) / len(items), items[-1][0])
         else:
-            self.still_since = None
+            self.hold = None
         return self.still
 
     def estimate(self, now):

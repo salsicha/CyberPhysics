@@ -663,6 +663,21 @@ def test_a_target_driving_slowly_is_never_held():
         assert not core.still, t
 
 
+def test_a_driving_target_read_slow_by_a_new_filter_is_not_held():
+    """A filter just started reads a 3.5 m/s car slow for a while: the
+    speed alone may call it still (not led, as before), but it is not held
+    on the placements' average, which would trail the car by metres; the
+    set-point stays on the estimate."""
+    core = tracking_core_at((0.0, 0.0, 0.0), now=0.0)
+    core.filter.created = -CONFIG.lead_ramp_s
+    for k in range(1, 40):
+        t = 0.2 * k
+        point = place(core, t, 3.5 * t, 0.0, speed=0.2)
+        assert core.hold is None, t
+    assert core.still  # by the (misread) speed
+    assert point.position[0] == pytest.approx(core.filter.position[0], abs=1e-6)
+
+
 def test_a_held_target_that_drives_off_is_followed_again():
     core = tracking_core_at((0.0, 0.0, 0.0), now=0.0)
     core.filter.created = -CONFIG.lead_ramp_s

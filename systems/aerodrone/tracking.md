@@ -118,9 +118,11 @@ These were fixed while the parts were built and tested:
   when its placements' means in the two halves of the last
   `still_drift_s` (4 s) are under `still_drift_m` (1 m) apart (0.5 m/s),
   and a still target leaves only when its speed is over twice the limit
-  and the drift confirms it. While still, the set-point is held on the
-  placements' average (time constant `still_hold_s`, 3 s), not on the
-  instantaneous estimate. With the stamps 50 ms late or early, the Gazebo
+  and the drift confirms it. While still and the drift is known and under
+  `still_drift_m`, the set-point is held on the placements' average (time
+  constant `still_hold_s`, 3 s), not on the instantaneous estimate; still by
+  the speed alone (a filter just started reads a driving car slow), it is
+  only not led. The status message says `still` and `held`. With the stamps 50 ms late or early, the Gazebo
   fire scenario then hovered at 0.0 deg median tilt and fired 0.06-0.09 m
   from the car's centre.
 - Speed: the effective horizontal limit is the lower of
